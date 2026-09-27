@@ -88,7 +88,7 @@ mod:
   title: "Country Markers Map"
   version: "1.0.0"
   description: "An interactive world map that display tiles as markers organized by country."
-  entry_point: "./main.js"
+  entrypoint: "./main.js"
   tile_type:
     - country_location:
         title: string
