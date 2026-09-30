@@ -47,32 +47,57 @@ tile_collection:
 
 ## Tile Types
 
-A tile represents a piece of multidimensional information thanks to its metadata that allows to assign different types. Tile Types are yaml schemas that define interfaces via structural typing (i.e. define the minimum properties to be present in order to validate its belonging to a type), for example a definition for a type named book:
+A tile represents a piece of multidimensional information thanks to its metadata that allows to assign different types. Tile Types are yaml schemas that define interfaces via structural typing (i.e. define the minimum properties to be present in order to validate its belonging to a type). They are based on JSON Type Definition (JTD) like in the library `ajv`, for example a definition for a type named book:
 ```yaml
-tile_type:
-  - book:
-      title: string
-      date: string
-      authors: list[string]
-      country: string
-      language: optional:string
-      genres: list[string]
+definitions:
+  book:
+    properties:
+      title:
+        type: string
+      date:
+        type: string
+      authors:
+        elements:
+          type: string
+      country:
+        type: string
+      genres:
+        elements:
+          type: string
+    optionalProperties:
+      language:
+        type: string
+    additionalProperties: true
+
+ref: book
 ```
 
 More generic types can be defined. For example a simple event type can be define for any metadata containing a title and a date:
 ```yaml
-tile_type:
-  - simple_event:
-      title: string
-      date: string
+definitions:
+  simple_event:
+    properties:
+      title:
+        type: string
+      date:
+        type: string
+    additionalProperties: true
+
+ref: simple_event
 ```
 
 Or a country location type for any metadata containing a title and a country:
 ```yaml
-tile_type:
-  - country_location:
-      title: string
-      country: string
+definitions:
+  country_location:
+    properties:
+      title:
+        type: string
+      country:
+        type: string
+    additionalProperties: true
+
+ref: country_location
 ```
 
 ## Mosaic Designs (mod)
@@ -89,12 +114,7 @@ mod:
   version: "1.0.0"
   description: "An interactive world map that display tiles as markers organized by country."
   entrypoint: "./main.js"
-  tile_type:
-    - country_location:
-        title: string
-        country: string
-        image: optional:string  
-        date: optional:string
+  type_path: "./schema.yaml"
   config:
     map:
       center: [0, 0.0] # [latitude, longitude]

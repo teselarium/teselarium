@@ -12,3 +12,5 @@
 - Vite
 - Vitest
 - react-i18next
+- ajv
+- yaml
