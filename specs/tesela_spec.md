@@ -47,57 +47,63 @@ tile_collection:
 
 ## Tile Types
 
-A tile represents a piece of multidimensional information thanks to its metadata that allows to assign different types. Tile Types are yaml schemas that define interfaces via structural typing (i.e. define the minimum properties to be present in order to validate its belonging to a type). They are based on JSON Type Definition (JTD) like in the library `ajv`, for example a definition for a type named book:
-```yaml
-definitions:
-  book:
-    properties:
-      title:
-        type: string
-      date:
-        type: string
-      authors:
-        elements:
+A tile represents a piece of multidimensional information thanks to its metadata that allows to assign different types. Tile Types are yaml schemas defined in the frontmatter section of markdown files. They define interfaces via structural typing (i.e. define the minimum properties to be present in order to validate its belonging to a type). They are based on JSON Type Definition (JTD) like in the library `ajv`, for example a definition for a type named book:
+```
+---
+schema:
+  definitions:
+    book:
+      properties:
+        title:
           type: string
-      country:
-        type: string
-      genres:
-        elements:
+        date:
           type: string
-    optionalProperties:
-      language:
-        type: string
-    additionalProperties: true
+        authors:
+          elements:
+            type: string
+        country:
+          type: string
+        genres:
+          elements:
+            type: string
+      optionalProperties:
+        language:
+          type: string
+      additionalProperties: true
+  ref: book
+---
 
-ref: book
+# Book Type
+
+Type for defining a very simple book metadata.
 ```
 
 More generic types can be defined. For example a simple event type can be define for any metadata containing a title and a date:
 ```yaml
-definitions:
-  simple_event:
-    properties:
-      title:
-        type: string
-      date:
-        type: string
-    additionalProperties: true
-
-ref: simple_event
+schema:
+  definitions:
+    simple_event:
+      properties:
+        title:
+          type: string
+        date:
+          type: string
+      additionalProperties: true
+  ref: simple_event
 ```
 
 Or a country location type for any metadata containing a title and a country:
 ```yaml
-definitions:
-  country_location:
-    properties:
-      title:
-        type: string
-      country:
-        type: string
-    additionalProperties: true
-
-ref: country_location
+schema:
+  definitions:
+    country_location:
+      properties:
+        title:
+          type: string
+        country:
+          type: string
+      additionalProperties: true
+  ref: country_location
 ```
 
 ## Mosaic Designs (mod)

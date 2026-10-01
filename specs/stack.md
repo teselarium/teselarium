@@ -13,4 +13,4 @@
 - Vitest
 - react-i18next
 - ajv
-- yaml
+- @11ty/gray-matter

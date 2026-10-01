@@ -1,0 +1,4 @@
+collection:
+  - path: "./books/farenheit_451.md"
+  - path: "./books/kallocain.md"
+  - path: "./books/fictions.md"
