@@ -1,4 +1,7 @@
 collection:
-  - path: "./books/farenheit_451.md"
-  - path: "./books/kallocain.md"
-  - path: "./books/fictions.md"
+  name: "Science fiction books"
+  description: "A sample book list for demonstration purposes."
+  tiles:
+    - path: "./books/farenheit_451.md"
+    - path: "./books/kallocain.md"
+    - path: "./books/fictions.md"

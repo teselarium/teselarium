@@ -35,14 +35,17 @@ Source: https://en.wikipedia.org/wiki/Fahrenheit_451
 
 Tiles are organized in collections inside a yaml file. They are used as indexes of paths or urls, for example a collection of tiles named `science_fictions_books.yaml`:
 ```yaml
-tile_collection:
-  - url: "https://.../books/the_martian_chronicles.md"
-  - url: "https://.../books/farenheit_451.md"
-  - url: "https://.../books/foundation.md"
-  - path: "./books/brave_new_world.md"
-  - path: "./books/1984.md"
-  - path: "./books/kallocain.md"
-  - path: "./short_stories/the_library_of_babel.md"
+collection:
+  name: "Science fiction books"
+  description: "A sample book list for demonstration purposes."
+  tiles:
+    - url: "https://.../books/the_martian_chronicles.md"
+    - url: "https://.../books/farenheit_451.md"
+    - url: "https://.../books/foundation.md"
+    - path: "./books/brave_new_world.md"
+    - path: "./books/1984.md"
+    - path: "./books/kallocain.md"
+    - path: "./short_stories/the_library_of_babel.md"
 ```
 
 ## Tile Types
