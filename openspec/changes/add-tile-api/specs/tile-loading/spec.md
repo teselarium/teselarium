@@ -45,15 +45,15 @@ The system SHALL return the loaded tiles in the order their entries appear in th
 #### Scenario: Sample collection order
 - **WHEN** `samples/tiles/books_collection.yaml` is loaded and every tile is reachable
 - **THEN** the tile titles are, in order, `"Fahrenheit 451"`, `"Kallocain"` and `"The Library of Babel"`
-- **AND** the error list is empty
+- **AND** the issue list is empty
 
 ### Requirement: Skip and report failing collection entries
-The system SHALL skip any collection entry that is malformed or cannot be fetched or parsed. It SHALL still return every other tile, together with one error per skipped entry giving the entry's position, its location (if any) and the reason.
+The system SHALL skip any collection entry that is malformed or cannot be fetched or parsed. It SHALL still return every other tile, together with one issue per skipped entry giving the entry's position, its location (if any) and the reason.
 
 #### Scenario: One tile is missing
 - **WHEN** a collection with three entries is loaded and the second answers with HTTP 404
 - **THEN** the result has the first and third tiles in order
-- **AND** one error with entry position 1 (zero-based), the resolved location of the second entry and a reason mentioning the 404
+- **AND** one issue with entry position 1 (zero-based), the resolved location of the second entry and a reason mentioning the 404
 
 #### Scenario: Entry with unparseable frontmatter
 - **WHEN** a collection entry points to a document whose frontmatter is invalid YAML

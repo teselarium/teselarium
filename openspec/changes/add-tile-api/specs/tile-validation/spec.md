@@ -25,11 +25,11 @@ The system SHALL reject a tile type whose metadata has no `schema` object, or wh
 - **THEN** the request fails with a tile type error and no metadata is validated
 
 ### Requirement: Validate metadata against a tile type
-The system SHALL validate a metadata object against a tile type using JSON Type Definition semantics as written in the schema, and return a result showing whether the metadata matches.
+The system SHALL validate a metadata object against a tile type using JSON Type Definition semantics, except that `additionalProperties` defaults to `true` wherever it is omitted, and return a result showing whether the metadata matches.
 
 #### Scenario: Matching tile
 - **WHEN** the metadata of `samples/tiles/books/kallocain.md` is validated against the sample book type
-- **THEN** the result says the metadata is valid and has no errors
+- **THEN** the result says the metadata is valid and has no issues
 
 #### Scenario: Extra fields allowed by structural typing
 - **WHEN** metadata with all required book fields plus an extra `pages` field is validated against the book type, whose schema sets `additionalProperties: true`
@@ -39,17 +39,25 @@ The system SHALL validate a metadata object against a tile type using JSON Type 
 - **WHEN** metadata without `language` (an optional property of the book type) is validated against the book type
 - **THEN** the result says the metadata is valid
 
+#### Scenario: additionalProperties omitted
+- **WHEN** metadata with an extra field is validated against a type whose schema does not set `additionalProperties`
+- **THEN** the result says the metadata is valid
+
+#### Scenario: additionalProperties explicitly false
+- **WHEN** metadata with an extra field is validated against a type whose schema sets `additionalProperties: false`
+- **THEN** the result says the metadata is invalid
+
 ### Requirement: Report validation mismatches
-The system SHALL return, for metadata that does not match, a list of errors. Each error SHALL identify the offending metadata location and the schema rule it violated. Validation SHALL NOT throw for non-matching metadata.
+The system SHALL return, for metadata that does not match, a list of issues. Each issue SHALL identify the offending metadata location and the schema rule it violated. Validation SHALL NOT throw for non-matching metadata.
 
 #### Scenario: Missing required field
 - **WHEN** book metadata without `country` is validated against the book type
 - **THEN** the result says the metadata is invalid
-- **AND** the errors include one that refers to the missing `country` property
+- **AND** the issues include one that refers to the missing `country` property
 
 #### Scenario: Wrong field type
 - **WHEN** book metadata where `authors` is the string `"Ray Bradbury"` instead of a list is validated against the book type
-- **THEN** the result says the metadata is invalid and an error refers to `authors`
+- **THEN** the result says the metadata is invalid and an issue refers to `authors`
 
 ### Requirement: Validation does not modify input
 The system SHALL leave the metadata object and the tile type unchanged when validating. It SHALL NOT add defaults, remove fields or coerce types.

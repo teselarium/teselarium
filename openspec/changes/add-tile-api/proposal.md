@@ -30,6 +30,6 @@ None. No specs exist yet.
 
 - **New code**: `src/lib/tile_api/` (public entry point plus parser, validator, loader and shared types), with unit tests next to the code.
 - **New project files**: `package.json`, `vite.config.ts`, `tsconfig*.json`, ESLint/Prettier config, `index.html`, a minimal `src/` app shell. `package-lock.json` is regenerated.
-- **New dependencies**: `react`, `react-dom`, `vite`, `typescript`, `vitest`, `@testing-library/react`, `jsdom`, `eslint`, `prettier`, `ajv`, `@11ty/gray-matter` (or a YAML parser if gray-matter does not work in the browser; see design.md).
+- **New dependencies**: `react`, `react-dom`, `vite`, `typescript`, `vitest`, `@testing-library/react`, `jsdom`, `eslint`, `eslint-config-prettier`, `prettier`, `ajv`, `js-yaml` (+ `@types/js-yaml`), `@11ty/gray-matter` (dropped if it does not work in the browser; see design.md D3).
 - **Downstream**: `mod_api`, `mosaic_api` and the tiles UI modules will consume this library's tile object and results. Their shape becomes a contract.
 - **Out of scope**: mosaic metadata aliases, mod tile-type declarations, UI, caching or persistence, and the remaining stack items (Tailwind, shadcn/ui, TanStack Router, react-i18next). Those come with the first UI change.

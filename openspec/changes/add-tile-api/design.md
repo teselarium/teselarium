@@ -2,13 +2,13 @@
 
 ## Context
 
-The repo has only documentation (`docs/`), sample data (`samples/`) and a devcontainer. There is no `package.json`, no `src/`, and no tooling. See proposal.md for why `tile_api` comes first.
+The repo has only documentation (`docs/`), sample data (`samples/`), OpenSpec artifacts (`openspec/`) and a devcontainer. There is no `package.json`, no `src/`, and no tooling; the existing `package-lock.json` is an empty placeholder that D6 replaces. See proposal.md for why `tile_api` comes first.
 
 Constraints that shape the design:
 
 - **Static SPA**: there is no server. Everything runs in the browser, and tiles and collections are fetched over HTTP (same origin or cross-origin URLs). Node-only APIs (`fs`, `Buffer`, `path`) are not available at runtime.
-- **Stack** (`docs/stack.md`): TypeScript, React, Vite, Vitest, React Testing Library, ESLint, Prettier, `ajv`, `@11ty/gray-matter`.
-- **Code conventions** (`docs/code_conventions.md`): pure functions; explicit `for…of` loops instead of `map`/`forEach` callbacks; no anonymous functions; no functions defined inside functions; at most 3 levels of indentation; assign the output to a named variable and return that single variable; TDD.
+- **Stack** (`docs/stack.md`): TypeScript, React, Vite, Vitest, React Testing Library, ESLint, Prettier, `ajv`, `@11ty/gray-matter`. This change adds `js-yaml` (already gray-matter's YAML engine, see D3) as a direct dependency, and `docs/stack.md` is updated to list it.
+- **Code conventions**: [`docs/code_conventions.md`](../../../docs/code_conventions.md) is the reference for all code in this change and must be followed as written.
 - **Tile types are JTD**: `samples/types/book.md` holds a JTD root schema (`definitions` + `ref`) under `schema`, which is exactly the input that Ajv's JTD mode accepts.
 - **Untrusted content**: tiles, types and collections may come from any URL. Parsing must never execute code.
 
@@ -16,7 +16,7 @@ Constraints that shape the design:
 
 **Goals:**
 
-- A React-free, side-effect-free `tile_api` module that later modules (`mod_api`, `mosaic_api`, tiles UI) import through one entry point.
+- A React-free `tile_api` module with no side effects on import, that later modules (`mod_api`, `mosaic_api`, tiles UI) import through one entry point. Only `tile_loader` performs I/O (fetch); parsing and validation never touch the network.
 - Separate pure parsing and validation from I/O (fetching), so the pure parts can be tested without network mocks.
 - A working project scaffold where `npm run test`, `npm run lint` and `npm run build` pass.
 
@@ -35,8 +35,8 @@ Constraints that shape the design:
 ```
 src/lib/tile_api/
   index.ts              # public API, re-exports only
-  tile_types.ts         # Tile, ValidationResult, CollectionLoadResult, … (type-only)
-  tile_errors.ts        # TileParseError, TileTypeError, TileLoadError, CollectionError
+  tile_types.ts         # Tile, TileMetadata, TileValidationResult, TileCollection, … (type-only, see D2)
+  tile_errors.ts        # TileParseError, TileTypeError, TileLoadError, TileCollectionError
   yaml_parser.ts        # safe YAML → JSON-compatible value (shared by parser + loader)
   tile_parser.ts        # parseTile(text, source): Tile
   tile_validator.ts     # compileTileType, validateMetadata
@@ -65,10 +65,15 @@ interface TileValidationIssue {
 }
 interface TileValidationResult {
   valid: boolean;
-  issues: ValidationIssue[];
+  issues: TileValidationIssue[];
 }
 
-interface TileCollectionEntryError {
+interface CompiledTileType {
+  source: string; // source of the tile type it was compiled from
+  validate: ValidateFunction; // Ajv JTD validator
+}
+
+interface TileCollectionEntryIssue {
   index: number;
   location: string | null;
   reason: string;
@@ -78,11 +83,36 @@ interface TileCollection {
   description: string | null;
   source: string;
   tiles: Tile[];
-  errors: TileCollectionEntryError[];
+  issues: TileCollectionEntryIssue[];
+}
+
+interface TileLoadOptions {
+  fetch?: typeof globalThis.fetch;
+  baseUrl?: string;
 }
 ```
 
-All the data is plain and JSON-compatible, with no classes, so later on it can be sent to sandboxed mod iframes via `postMessage` without conversion. Error classes are used only for thrown failures.
+Error classes (`tile_errors.ts`) each extend `Error`. Their message includes the source or location, and they set `cause` when they wrap another error:
+
+```ts
+class TileParseError extends Error { source: string }
+class TileTypeError extends Error { source: string }
+class TileLoadError extends Error { location: string }
+class TileCollectionError extends Error { location: string }
+```
+
+Public API (`index.ts`), besides the types above:
+
+```ts
+parseTile(text: string, source: string): Tile
+compileTileType(tileType: Tile): CompiledTileType
+validateMetadata(metadata: TileMetadata, compiled: CompiledTileType): TileValidationResult
+loadTile(location: string, options?: TileLoadOptions): Promise<Tile>
+loadCollection(location: string, options?: TileLoadOptions): Promise<TileCollection>
+resolveLocation(location: string, base: string): string
+```
+
+All the data is plain and JSON-compatible, with no classes, so later on it can be sent to sandboxed mod iframes via `postMessage` without conversion. Validation is perfomed inside the main app, which filters tiles before passing them to a mod. Error classes are used only for thrown failures.
 
 ### D3. Frontmatter parsing: `@11ty/gray-matter`, restricted to YAML, with a fallback
 
@@ -94,24 +124,30 @@ All the data is plain and JSON-compatible, with no classes, so later on it can b
 ### D4. Validation: Ajv JTD mode, compile once and validate many times
 
 - A module-level `Ajv` instance from `ajv/dist/jtd` with `allErrors: true` and the default strict mode, so unknown keywords and types in a schema throw at compile time and become `TileTypeError`.
-- `compileTileType(tileType: Tile): CompiledTileType` reads `metadata.schema` and compiles it. A missing or non-object schema, or a compile failure, throws `TileTypeError`. `validateMetadata(metadata, compiled): ValidationResult` runs the compiled validator and maps Ajv errors to `ValidationIssue` (`instancePath` → `path`, `schemaPath` → `rule`, plus a readable message that names the missing property when there is one). Non-matching metadata never throws.
-- We follow JTD semantics with the principle of minimal properties. When `additionalProperties` is omitted, add it with true as default value `additionalProperties: true`.
+- `compileTileType(tileType: Tile): CompiledTileType` reads `metadata.schema` and compiles it. A missing or non-object schema, or a compile failure, throws `TileTypeError`. `validateMetadata(metadata, compiled): TileValidationResult` runs the compiled validator and maps Ajv errors to `TileValidationIssue` (`instancePath` → `path`, `schemaPath` → `rule`, plus a readable message). For a missing property, `path` points at the missing key (`instancePath` + `/` + `params.missingProperty`, e.g. `/country`) and the message names it. Non-matching metadata never throws.
+- We follow JTD semantics with one change, for structural typing (minimum properties): `additionalProperties` defaults to `true` instead of `false`. Before compiling, `compileTileType` builds a deep copy of the schema and, in every properties-form schema (one with `properties` or `optionalProperties`, at any depth: root, `definitions`, `elements`, `values`, discriminator `mapping`), adds `additionalProperties: true` when it is omitted. An explicit `additionalProperties: false` is kept. The tile type itself is never modified.
 - `CompiledTileType` is a plain record that holds the Ajv validate function. No closure is defined inside our functions, which respects the "no functions inside functions" convention.
 - Alternatives considered: JSON Schema mode (rejected because the docs specify JTD); a hand-written validator (rejected because it violates DRY and has no stack support).
 
 ### D5. Loading: injectable fetch, URL-based location resolution, settle all entries
 
-- `loadTile(location, options?)` and `loadCollection(location, options?)` accept `options.fetch` (default `globalThis.fetch`) and `options.baseUrl` (default `document.baseURI`, falling back to `globalThis.location.href`). Tests inject a fetch that serves `samples/` from disk.
+- `loadTile(location, options?)` and `loadCollection(location, options?)` accept a `TileLoadOptions` (D2): `fetch` (default `globalThis.fetch`) and `baseUrl` (default `document.baseURI`, falling back to `globalThis.location.href`). When no base is available (e.g. outside a browser), a relative location fails with `TileLoadError` (or `TileCollectionError` for a collection) saying that a `baseUrl` is needed; absolute URLs still work. Tests inject a fetch that serves `samples/` from disk, and a `baseUrl`.
 - Locations are resolved with `new URL(location, base)`. A collection entry's `path` resolves against the collection's own resolved URL. A `url` must be absolute: we parse it with `new URL(url)`, and a failure means the entry is malformed.
-- A non-2xx response or a fetch rejection becomes `TileLoadError` (single tile) or a `TileCollectionEntryError` (collection entry).
+- A non-2xx response or a fetch rejection becomes `TileLoadError` (single tile) or a `TileCollectionEntryIssue` (collection entry).
 - Collection entries are fetched concurrently with `Promise.allSettled`, which takes named per-entry functions rather than inline lambdas. Results are then assembled with a `for…of` loop over the indices, so the original order is kept and each failure is recorded at its index.
 - The collection structure (`collection.name`, `collection.tiles` array, each entry an object with exactly one of `path`/`url` as a string) is checked by a hand-written structural check in `tile_loader.ts`. It is small and gives precise messages. Alternative considered: an internal JTD schema for collections run through Ajv. That is possible later, but JTD cannot express "exactly one of path/url".
 
 ### D6. Project scaffold
 
-- Vite `react-ts` template generated in a temporary directory and copied to the repo root, because the root is not empty (`docs/`, `samples/`, `README.md` must be kept). The existing placeholder `package-lock.json` is replaced.
-- Vitest is configured in `vite.config.ts` with the `jsdom` environment by default, ready for React Testing Library. `tile_api` tests opt into the `node` environment (`// @vitest-environment node`), where `fs` is available to read the `samples/` fixtures.
-- ESLint uses the flat config from the template plus `eslint-config-prettier`. The conventions that have built-in rules are enforced on `src/lib/**`: `max-depth: ["error", 3]` and `func-style: ["error", "declaration"]`. The remaining conventions (no anonymous callbacks, single-variable return) are checked during review. Use explicit return types.
+- Vite `react-ts` template generated in a temporary directory and copied to the repo root, because the root is not empty (`docs/`, `samples/`, `openspec/`, `.devcontainer/`, `.claude/` and `README.md` must be kept; the template's own `README.md` is not copied). The existing placeholder `package-lock.json` is replaced.
+- Vitest is configured in `vite.config.ts` with the `jsdom` environment by default, ready for React Testing Library. `tile_api` tests opt into the `node` environment (`// @vitest-environment node`): with no `document` or `window`, they prove that `tile_api` does not depend on the DOM and cover the no-base-URL case of D5. The `samples/` fixtures are read with `fs`.
+- ESLint uses the flat config from the template plus `eslint-config-prettier`. The conventions that ESLint can check are enforced on `src/lib/**`:
+  - `max-depth: ["error", 3]` (indentation levels)
+  - `func-style: ["error", "declaration"]` and `func-names: ["error", "always"]`, plus `no-restricted-syntax` on `ArrowFunctionExpression` (no anonymous functions)
+  - `no-restricted-syntax` on calls to `.map`, `.forEach`, `.filter`, `.reduce` (explicit loops)
+  - `@typescript-eslint/explicit-function-return-type` (explicit return types)
+
+  The remaining conventions (single-variable return, naming, error context) are checked during review.
 - npm scripts: `dev`, `build`, `test`, `lint`, `format`.
 
 ## Risks / Trade-offs
@@ -122,6 +158,7 @@ All the data is plain and JSON-compatible, with no classes, so later on it can b
 - [Cross-origin `url` entries fail if the host lacks CORS headers] → this surfaces as a normal per-entry error (the "skip and report" policy). Documented as a hosting requirement for shared tiles.
 - [Concurrent fetches of very large collections could flood the network] → acceptable for now (non-goal). A concurrency limit can be added inside `loadCollection` without changing the API.
 - [Using `CORE_SCHEMA` differs from typical YAML tooling, because dates stay strings] → intentional. This keeps metadata JSON-compatible and lets it validate against `type: string`, as the samples expect.
+- [`additionalProperties` defaults to `true` (D4), unlike standard JTD] → intentional, for structural typing. The same schema is stricter in other JTD tools, so authors who want portable types set `additionalProperties` explicitly, as every example in `docs/tesela_spec.md` and `samples/types/book.md` already does. Documented in the tile_api README.
 
 ## Open Questions
 
