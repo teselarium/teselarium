@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "vitest"],
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": ["dist/**"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "max-depth": ["error", 3],
+    "func-style": ["error", "declaration"],
+    "func-names": ["error", "always"],
+    "typescript/explicit-function-return-type": "error",
+    "unicorn/no-array-for-each": "error",
+    "unicorn/no-array-reduce": "error"
+  }
+}
