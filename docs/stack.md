@@ -11,6 +11,8 @@
 - Prettier
 - Vite
 - Vitest
+- Playwright
 - react-i18next
 - ajv
 - @11ty/gray-matter
+- js-yaml

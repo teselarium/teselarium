@@ -27,6 +27,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   vim \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Playwright version for browser tests. Keep in sync with @playwright/test in package.json.
+ARG PLAYWRIGHT_VERSION=1.64.0
+
+# Install the system libraries Chromium needs for Playwright browser tests
+RUN npx -y playwright@${PLAYWRIGHT_VERSION} install-deps chromium && \
+  apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Ensure default node user has access to /usr/local/share
 RUN mkdir -p /usr/local/share/npm-global && \
   chown -R node:node /usr/local/share
@@ -80,6 +87,12 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 
 # Install Claude
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
+
+# Install OpenSpec
+RUN npm install -g @fission-ai/openspec@latest
+
+# Download Chromium for Playwright now, since the firewall blocks it at runtime
+RUN npx -y playwright@${PLAYWRIGHT_VERSION} install chromium
 
 
 # Copy and set up firewall script
