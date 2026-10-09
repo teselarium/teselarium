@@ -7,7 +7,7 @@
 - Tailwind CSS
 - shadcn/ui
 - lucide-react
-- ESlint
+- Oxlint
 - Prettier
 - Vite
 - Vitest
