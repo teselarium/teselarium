@@ -1,0 +1,300 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import {
+  fetchSample,
+  readSampleText,
+  SAMPLES_BASE_URL,
+} from "../../test/sample_files.ts";
+import { fetchFile, resolveLocation } from "./file_fetcher.ts";
+import { indexLocalFiles } from "./local_files.ts";
+import type { LocalFiles } from "./local_files.ts";
+import { FileFetchError } from "./tile_errors.ts";
+
+const KALLOCAIN_PATH = "tiles/books/kallocain.md";
+const KALLOCAIN_URL = `${SAMPLES_BASE_URL}${KALLOCAIN_PATH}`;
+
+function createSampleFetch(): Mock<typeof fetch> {
+  const sampleFetch = vi.fn<typeof fetch>(fetchSample);
+  return sampleFetch;
+}
+
+function createTextFetch(text: string): Mock<typeof fetch> {
+  const textFetch = vi.fn<typeof fetch>().mockResolvedValue(new Response(text));
+  return textFetch;
+}
+
+function pickLibraryFolder(): LocalFiles {
+  const kallocainContent = new Blob([readSampleText(KALLOCAIN_PATH)]);
+  const localFiles = indexLocalFiles([
+    { path: "library/books/kallocain.md", content: kallocainContent },
+    { path: "library/my books/kallocain.md", content: kallocainContent },
+  ]);
+  return localFiles;
+}
+
+describe("resolveLocation", function describeResolveLocation(): void {
+  it("Relative path with a base URL", function resolvesRelativePath(): void {
+    const url = resolveLocation("./tiles/books/kallocain.md", SAMPLES_BASE_URL);
+
+    expect(url.href).toBe(KALLOCAIN_URL);
+  });
+
+  it("Path with dot segments", function removesDotSegments(): void {
+    const url = resolveLocation(
+      "./tiles/../tiles/books/kallocain.md",
+      SAMPLES_BASE_URL,
+    );
+
+    expect(url.href).toBe(KALLOCAIN_URL);
+  });
+
+  it("Absolute URL ignores the base URL", function keepsAbsoluteUrl(): void {
+    const url = resolveLocation(
+      "https://other.example/books/kallocain.md",
+      SAMPLES_BASE_URL,
+    );
+
+    expect(url.href).toBe("https://other.example/books/kallocain.md");
+  });
+
+  it("Relative path without any base", function rejectsMissingBase(): void {
+    expect(function resolveWithoutBase(): URL {
+      return resolveLocation("books/kallocain.md", undefined);
+    }).toThrowError(FileFetchError);
+    expect(function resolveWithoutBase(): URL {
+      return resolveLocation("books/kallocain.md", undefined);
+    }).toThrowError(/books\/kallocain\.md.*base URL is required/);
+  });
+
+  it("Invalid URL", function rejectsInvalidUrl(): void {
+    expect(function resolveInvalidUrl(): URL {
+      return resolveLocation("https://[bad/kallocain.md", SAMPLES_BASE_URL);
+    }).toThrowError(FileFetchError);
+    expect(function resolveInvalidUrl(): URL {
+      return resolveLocation("https://[bad/kallocain.md", SAMPLES_BASE_URL);
+    }).toThrowError("https://[bad/kallocain.md");
+  });
+});
+
+describe("fetchFile", function describeFetchFile(): void {
+  afterEach(function restoreGlobals(): void {
+    vi.unstubAllGlobals();
+  });
+
+  it("Load a sample tile", async function fetchesSample(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetchedFile = await fetchFile(KALLOCAIN_URL, { fetch: sampleFetch });
+
+    expect(fetchedFile).toEqual({
+      source: KALLOCAIN_URL,
+      content: readSampleText(KALLOCAIN_PATH),
+    });
+  });
+
+  it("calls the fetch function as a plain function", async function callsFetchWithoutThis(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    await fetchFile(KALLOCAIN_URL, { fetch: sampleFetch });
+
+    expect(sampleFetch.mock.contexts).toEqual([undefined]);
+  });
+
+  it("Relative path with a base URL", async function fetchesResolvedUrl(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetchedFile = await fetchFile("./tiles/books/kallocain.md", {
+      baseUrl: SAMPLES_BASE_URL,
+      fetch: sampleFetch,
+    });
+
+    expect(sampleFetch).toHaveBeenCalledExactlyOnceWith(KALLOCAIN_URL);
+    expect(fetchedFile.source).toBe(KALLOCAIN_URL);
+  });
+
+  it("Path with dot segments", async function fetchesNormalizedUrl(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetchedFile = await fetchFile("./tiles/../tiles/books/kallocain.md", {
+      baseUrl: SAMPLES_BASE_URL,
+      fetch: sampleFetch,
+    });
+
+    expect(fetchedFile.source).toBe(KALLOCAIN_URL);
+  });
+
+  it("Absolute URL ignores the base URL", async function fetchesAbsoluteUrl(): Promise<void> {
+    const textFetch = createTextFetch("# Kallocain\n");
+
+    const fetchedFile = await fetchFile(
+      "https://other.example/books/kallocain.md",
+      { baseUrl: SAMPLES_BASE_URL, fetch: textFetch },
+    );
+
+    expect(textFetch).toHaveBeenCalledExactlyOnceWith(
+      "https://other.example/books/kallocain.md",
+    );
+    expect(fetchedFile.source).toBe("https://other.example/books/kallocain.md");
+  });
+
+  it("No base URL in a page", async function usesDocumentBaseUrl(): Promise<void> {
+    vi.stubGlobal("document", { baseURI: "https://example.org/app/" });
+    const textFetch = createTextFetch("# Kallocain\n");
+
+    const fetchedFile = await fetchFile("books/kallocain.md", {
+      fetch: textFetch,
+    });
+
+    expect(textFetch).toHaveBeenCalledExactlyOnceWith(
+      "https://example.org/app/books/kallocain.md",
+    );
+    expect(fetchedFile.source).toBe(
+      "https://example.org/app/books/kallocain.md",
+    );
+  });
+
+  it("Relative path without any base", async function rejectsMissingBase(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetching = fetchFile("books/kallocain.md", { fetch: sampleFetch });
+
+    await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
+    await expect(fetching).rejects.toThrowError(
+      /books\/kallocain\.md.*base URL is required/,
+    );
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("Invalid URL", async function rejectsInvalidUrl(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetching = fetchFile("https://[bad/kallocain.md", {
+      fetch: sampleFetch,
+    });
+
+    await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
+    await expect(fetching).rejects.toThrowError("https://[bad/kallocain.md");
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("HTTP 404", async function rejectsHttpError(): Promise<void> {
+    const missingUrl = `${SAMPLES_BASE_URL}tiles/missing.md`;
+
+    const fetching = fetchFile(missingUrl, { fetch: fetchSample });
+
+    await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
+    await expect(fetching).rejects.toMatchObject({
+      source: missingUrl,
+      message: expect.stringContaining(missingUrl),
+    });
+    await expect(fetching).rejects.toThrowError("404");
+  });
+
+  it("Network failure", async function rejectsNetworkFailure(): Promise<void> {
+    const networkError = new TypeError("Failed to fetch");
+    const failingFetch = vi.fn<typeof fetch>().mockRejectedValue(networkError);
+
+    const fetching = fetchFile(KALLOCAIN_URL, { fetch: failingFetch });
+
+    await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
+    await expect(fetching).rejects.toMatchObject({
+      source: KALLOCAIN_URL,
+      message: expect.stringContaining(KALLOCAIN_URL),
+      cause: networkError,
+    });
+  });
+
+  it("wraps a failure while reading the response body", async function rejectsUnreadableBody(): Promise<void> {
+    const readError = new TypeError("Body stream was aborted");
+    const unreadableResponse = {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: vi.fn<Response["text"]>().mockRejectedValue(readError),
+    };
+    const unreadableFetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(unreadableResponse as unknown as Response);
+
+    const fetching = fetchFile(KALLOCAIN_URL, { fetch: unreadableFetch });
+
+    await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
+    await expect(fetching).rejects.toMatchObject({
+      source: KALLOCAIN_URL,
+      message: expect.stringContaining(KALLOCAIN_URL),
+      cause: readError,
+    });
+  });
+
+  it("Load from a picked folder", async function readsPickedFile(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetchedFile = await fetchFile("file:///library/books/kallocain.md", {
+      fetch: sampleFetch,
+      localFiles: pickLibraryFolder(),
+    });
+
+    expect(fetchedFile).toEqual({
+      source: "file:///library/books/kallocain.md",
+      content: readSampleText(KALLOCAIN_PATH),
+    });
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("Relative path inside the picked folder", async function resolvesInsidePickedFolder(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetchedFile = await fetchFile("./books/kallocain.md", {
+      baseUrl: "file:///library/",
+      fetch: sampleFetch,
+      localFiles: pickLibraryFolder(),
+    });
+
+    expect(fetchedFile.source).toBe("file:///library/books/kallocain.md");
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("Picked path with spaces", async function resolvesPathWithSpaces(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetchedFile = await fetchFile("./my books/kallocain.md", {
+      baseUrl: "file:///library/",
+      fetch: sampleFetch,
+      localFiles: pickLibraryFolder(),
+    });
+
+    expect(fetchedFile.source).toBe("file:///library/my%20books/kallocain.md");
+    expect(fetchedFile.content).toBe(readSampleText(KALLOCAIN_PATH));
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("File was not picked", async function rejectsFileNotPicked(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetching = fetchFile("file:///library/books/missing.md", {
+      fetch: sampleFetch,
+      localFiles: pickLibraryFolder(),
+    });
+
+    await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
+    await expect(fetching).rejects.toMatchObject({
+      source: "file:///library/books/missing.md",
+      message: expect.stringContaining("not among the picked files"),
+    });
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("No picked files", async function rejectsWithoutPickedFiles(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetching = fetchFile("file:///library/books/kallocain.md", {
+      fetch: sampleFetch,
+    });
+
+    await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
+    await expect(fetching).rejects.toThrowError(
+      "file:///library/books/kallocain.md",
+    );
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+});
