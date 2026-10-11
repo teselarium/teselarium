@@ -171,6 +171,19 @@ The system SHALL list loaded tiles in the order of their entries in the collecti
 - **WHEN** a collection lists tiles A, B and C and the response for A arrives last
 - **THEN** tiles is A, B, C
 
+### Requirement: Limit parallel tile requests
+The system SHALL have at most 6 tile loads in progress at the same time for one collection. When one finishes, the next waiting tile SHALL start, in entry order, until every tile is loaded. The limit SHALL NOT change which tiles and issues the collection has, or their order.
+
+#### Scenario: Collection larger than the limit
+- **WHEN** a collection with 10 tile entries is loaded and no tile response has arrived yet
+- **THEN** exactly 6 tiles have been requested, those of the first 6 entries
+- **AND WHEN** the response for one of them arrives
+- **THEN** the tile of the 7th entry is requested
+
+#### Scenario: Every tile still loads
+- **WHEN** a collection with 10 tile entries that all load is loaded
+- **THEN** tiles has the 10 tiles in entry order and issues is empty
+
 ### Requirement: Load repeated tiles once
 The system SHALL load a tile only once when several entries resolve to the same source. The first entry SHALL keep the tile at its position. Each later entry SHALL add a warning issue whose source is the repeated tile's source and whose message gives that entry's position.
 

@@ -14,6 +14,7 @@ Mods and mosaics use tiles as collections, not one tile at a time. A mosaic poin
   - **Collection-level failures throw.** A collection file that cannot be fetched, is not valid YAML or does not have the collection structure rejects the load with an error that names the collection's source.
   - **Tile-level failures become issues.** A malformed entry, a tile that cannot be fetched or a tile with invalid frontmatter is left out of `tiles` and reported as an `error` issue. The loader still goes through the whole list.
   - **Repeated tiles are loaded once.** When two entries resolve to the same tile source, the first one is kept and each repeat gets a `warning` issue.
+- **Parallel requests are limited.** Tiles load in parallel, at most 6 at a time, so a large collection does not start hundreds of requests at once. The limit does not change the result or its order.
 - Add the **issue** object from the README: `level` (`warning` or `error`), `source` and `message`. The collection validator will add its own issues in the same shape.
 - **Local files stay local.** A collection loaded from a remote URL cannot list `file:` tiles. Such entries are reported as error issues and never read. Collections loaded from picked local files can list local and remote tiles. This closes the risk recorded in `add-tile-loader`'s design.
 - Export the new functions and types from `src/lib/tile/index.ts`.
@@ -23,7 +24,7 @@ Mods and mosaics use tiles as collections, not one tile at a time. A mosaic poin
 
 ### New Capabilities
 
-- `collection-loading`: loads a tile collection file from a relative path, an absolute URL or a picked local file into a tile collection (source, name, description, tiles, issues). Covers the collection file format, how tile entries are resolved, which failures throw and which become issues, repeated entries, and the local-files rule.
+- `collection-loading`: loads a tile collection file from a relative path, an absolute URL or a picked local file into a tile collection (source, name, description, tiles, issues). Covers the collection file format, how tile entries are resolved, which failures throw and which become issues, repeated entries, the limit on parallel tile requests, and the local-files rule.
 
 ### Modified Capabilities
 
@@ -35,4 +36,4 @@ None. `tile-loading` keeps its behavior. The frontmatter parser only starts shar
 - **Dependencies**: none added. Uses `js-yaml`, already installed.
 - **Docs**: `docs/modules/lib/tile/README.md` (see What Changes).
 - **Downstream contract**: the collection validator takes the tile collection and issue shapes defined here as input. Mosaics will call the collection loader with the collection path from the mosaic file.
-- **Out of scope**: tile type validation and filling in `types`, the collection validator, caching, retries, cancellation, a limit on parallel requests, nested collections (a collection listing other collections), and any UI (collection explorer or file picker).
+- **Out of scope**: tile type validation and filling in `types`, the collection validator, caching, retries, cancellation, a configurable request limit, nested collections (a collection listing other collections), and any UI (collection explorer or file picker).

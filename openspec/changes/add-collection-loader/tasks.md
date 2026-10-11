@@ -39,14 +39,15 @@ Each group writes its tests first (TDD) and names each test after the spec scena
   - Entries: relative and parent-folder `path`, absolute `url`, relative `url`, both keys at entry 2 (the other entries still load), neither key, plain string, `path: 42`. Check the issue source, message and position, and that malformed entries are never requested.
   - Tile failures: one 404 among three, one invalid frontmatter, every tile failing.
   - Order kept when the first response arrives last.
+  - Parallel limit: with 10 entries and pending responses, only the first 6 are requested; resolving one starts the 7th. A collection of 10 tiles that all load gives 10 tiles in entry order with no issues.
   - The same tile by `path` and by `url`: one request, one tile at the first position, one warning.
   - Local rule: a remote collection listing a `file:` URL (picked file not read, error issue), a collection in a picked folder (three tiles, `file:///library/books/farenheit_451.md`, fetch not called), and a local collection listing a remote tile.
   - The issue for a failed tile has exactly `level`, `source` and `message`.
   - `structuredClone` of the sample collection deep-equals it, and two loads of the same collection do not share tiles.
 
   Verify that the tests fail before 4.2.
-- [ ] 4.2 Implement `src/lib/tile/collection_loader.ts` (`TileCollection`, `loadTileCollection`) following D5 and D6: slots planned in entry order before any request, `localFiles` passed to tiles only for `file:` collections, `loadCollectionTile` turning only `FileFetchError` and `MarkdownParseError` into issues, `Promise.all` over promises built in a `for…of` loop, and assembly in slot order. Add the D8 exports to `src/lib/tile/index.ts`, with types through `export type` and the internal helpers not exported. Verify that `collection_loader.test.ts` passes and that `npm run lint` and `npm run build` succeed.
-- [ ] 4.3 Update `docs/modules/lib/tile/README.md` as described in D10: the YAML parser bullet, the collection loader bullet, the issue source rule, and a "Collection loader" entry under *Module Details* with the D8 additions and one usage example that loads `./tiles/books_collection.yaml`. Verify that every function and type named in the README is exported from `src/lib/tile/index.ts` and that the example's call matches the `loadTileCollection` signature.
+- [ ] 4.2 Implement `src/lib/tile/collection_loader.ts` (`TileCollection`, `loadTileCollection`) following D5 and D6: slots planned in entry order before any request, `localFiles` passed to tiles only for `file:` collections, `loadCollectionTile` turning only `FileFetchError` and `MarkdownParseError` into issues, at most `MAX_PARALLEL_TILE_LOADS` (6) loads in progress through the D6 load workers, results stored by slot index, and assembly in slot order. Add the D8 exports to `src/lib/tile/index.ts`, with types through `export type` and the internal helpers not exported. Verify that `collection_loader.test.ts` passes and that `npm run lint` and `npm run build` succeed.
+- [ ] 4.3 Update `docs/modules/lib/tile/README.md` as described in D10: the YAML parser bullet, the collection loader bullet (including the parallel limit), the issue source rule, and a "Collection loader" entry under *Module Details* with the D8 additions and one usage example that loads `./tiles/books_collection.yaml`. Verify that every function and type named in the README is exported from `src/lib/tile/index.ts` and that the example's call matches the `loadTileCollection` signature.
 
 ## 5. Integration check
 

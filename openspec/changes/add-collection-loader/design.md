@@ -20,7 +20,7 @@ js-yaml 5.4.3 with `CORE_SCHEMA`, as checked while preparing this design: empty 
 
 - The collection loader is built from the existing pieces (`resolveLocation`, `fetchFile`, `loadTile`) plus one new parser. No change to their behavior or signatures.
 - Every check that does not need the network (structure, entries, local rule, repeats) runs before any tile request, so malformed entries never cause requests.
-- Tiles load in parallel, but the result is deterministic: tiles and issues follow the order of the entries.
+- Tiles load in parallel, with at most 6 loads in progress at once (D6), but the result is deterministic: tiles and issues follow the order of the entries.
 
 **Non-Goals:**
 
@@ -117,13 +117,19 @@ As defense in depth, tiles are loaded with `localFiles` only when the collection
 ### D6. Loading and assembling
 
 - For each load slot, a named async function `loadCollectionTile(href, tileOptions)` calls `loadTile`. It returns the tile, or catches `FileFetchError` and `MarkdownParseError` and returns an error issue with `error.source` and `error.message`. It rethrows any other error.
-- The promises are built in a `for…of` loop and awaited with `Promise.all`. The requests run in parallel, and an unexpected error (a bug) rejects the whole load instead of being hidden as an issue. `Promise.allSettled` is not needed because tile failures never reject.
+- **Parallel limit.** A module constant `MAX_PARALLEL_TILE_LOADS = 6` caps the loads in progress. The loader starts `min(6, number of loads)` load workers, each a call to a named async function `runTileLoadWorker(loadQueue, tileOptions)`. `loadQueue` holds the load slots, a `next` cursor and a results array indexed like the slots. Each worker loops with `while`: it takes the slot at `next`, advances the cursor, awaits `loadCollectionTile` and stores the result at that slot's index. JavaScript runs one task at a time and the cursor only moves between awaits, so no slot is taken twice. Slots start in entry order, and a new one starts as soon as any load finishes.
+- The workers are awaited with `Promise.all`. An unexpected error (a bug) rejects the whole load instead of being hidden as an issue. `Promise.allSettled` is not needed because tile failures never reject. After such a rejection, the other workers finish their current loads and their results are dropped.
+- The mutable queue is the one exception to the functional style of the module. It never leaves `loadTileCollection`, and the returned collection is built fresh from it.
+- Why 6: over HTTP/1.1, browsers open at most 6 connections per host, so more parallel requests would only wait inside the browser. HTTP/2 hosts such as GitHub could take more, but a single fixed value keeps the API unchanged (see Risks).
 - Assembly walks the slots in entry order with `for…of` and pushes each tile or issue into its list. The result is a new `TileCollection` built in a named variable. This gives the order the spec requires, whatever order the responses arrive in.
 - `tileOptions` is `{ fetch: options.fetch, localFiles }` (see D5). No `baseUrl` is needed because every tile href is already absolute.
 
 Full flow of `loadTileCollection`: `fetchFile(location, options)` → `parseYaml` → `readCollectionFormat` → plan (D5) → load (D6) → assemble. Collection-level failures come from the first three steps and propagate as `FileFetchError`, `YamlParseError` or `CollectionFormatError`.
 
-- Alternative considered: loading tiles one after another. Simpler, but a collection of 100 remote tiles would take 100 round trips. The browser already limits connections per host, so parallel requests are safe.
+- Alternative considered: loading tiles one after another. Simpler, but a collection of 100 remote tiles would take 100 round trips.
+- Alternative considered: starting every load at once with a single `Promise.all`. Rejected (user decision): a large collection would create hundreds of pending requests at once.
+- Alternative considered: batches of 6 with one `Promise.all` per batch. Simpler than workers, but one slow tile holds up its whole batch.
+- Alternative considered: the `p-limit` package. Rejected: it adds a dependency for about 20 lines of code.
 
 ### D7. Errors
 
@@ -146,6 +152,7 @@ new CollectionFormatError(source, reason)          // message: Invalid tile coll
   - Inline collections and tiles for remote cases are served by a module-level named function in the test file, `fetchTestFile(input)`, which looks the URL up in a module-level `Map` of test texts and otherwise falls back to `fetchSample`. It is wrapped with `vi.fn(fetchTestFile)` so tests can check the requested URLs. Responses therefore do not depend on call order.
   - Local-collection cases use `indexLocalFiles` with `Blob`s built from `readSampleText` or inline text.
   - Out-of-order arrival uses a fetch mock whose response for the first tile is a pending promise that the test resolves after the others.
+  - The parallel limit uses a fetch mock that answers every tile request with a pending promise and keeps its resolver in a module-level list. The test checks that the mock has 6 calls, resolves one response, waits for pending promise callbacks to run (for example `await vi.waitFor(...)` on the call count), and checks that a 7th call was made for the 7th entry's URL.
 - Tests are written before the code for each file (TDD). Each spec scenario maps to at least one test named after it.
 
 ### D10. Docs
@@ -153,13 +160,14 @@ new CollectionFormatError(source, reason)          // message: Invalid tile coll
 `docs/modules/lib/tile/README.md`:
 
 - The YAML parser bullet says that it uses the frontmatter's plain-data rules and requires a mapping at the top level.
-- The collection loader bullet lists the output properties (`source`, `name`, `description`, `tiles`, `issues`) and covers which failures throw and which become issues, the `path`/`url` rule, repeated tiles and the local-files rule.
+- The collection loader bullet lists the output properties (`source`, `name`, `description`, `tiles`, `issues`) and covers which failures throw and which become issues, the `path`/`url` rule, repeated tiles, the limit of 6 parallel tile loads and the local-files rule.
 - The issue bullet says that the source is the tile's source, or the collection's source for an entry with no usable location.
 - A "Collection loader" entry under *Module Details* lists the D8 additions with one example.
 
 ## Risks / Trade-offs
 
-- [All tile requests start at once for a large collection] → the browser queues them per host. A concurrency limit can be added inside `loadTileCollection` later without changing the API.
+- [A fixed limit of 6 can be slower than needed on HTTP/2 hosts, and tiles spread over several hosts share the same 6 loads] → acceptable for collections of tens to hundreds of tiles. The limit can become a collection option later, with 6 as its default, without breaking callers.
+- [The limit applies per collection, so loading several collections at once multiplies the requests] → mosaics load one collection each. A shared limit can be added if a caller loads many collections.
 - [Repeats are detected by normalized href, so URLs that differ only by query string or letter case count as different tiles] → accepted. The same rule makes `source` stable, which the collection validator relies on.
 - [A `path` holding an absolute URL (for example `path: "https://…"`) resolves to itself and is accepted] → harmless, because the local rule still applies to the resolved URL. Rejecting it would add a rule the format does not need.
 - [A remote collection can list tiles from any host] → tiles are plain data and never run. Safe rendering of the markdown body is the viewer's job.
