@@ -27,3 +27,25 @@ export class MarkdownParseError extends Error {
     this.source = source;
   }
 }
+
+/** A fetched file is not valid plain YAML with a mapping at its top level. `source` is the file that failed. */
+export class YamlParseError extends Error {
+  readonly source: string;
+
+  constructor(source: string, reason: string, options?: ErrorOptions) {
+    super(`Cannot parse YAML "${source}": ${reason}`, options);
+    this.name = "YamlParseError";
+    this.source = source;
+  }
+}
+
+/** A collection file does not have the tile collection structure. `source` is the collection that failed. */
+export class CollectionFormatError extends Error {
+  readonly source: string;
+
+  constructor(source: string, reason: string, options?: ErrorOptions) {
+    super(`Invalid tile collection "${source}": ${reason}`, options);
+    this.name = "CollectionFormatError";
+    this.source = source;
+  }
+}

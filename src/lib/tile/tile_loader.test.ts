@@ -125,12 +125,16 @@ describe("loadTile", function describeLoadTile(): void {
 describe("tile module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(tileModule).sort()).toEqual([
+      "CollectionFormatError",
       "FileFetchError",
       "MarkdownParseError",
+      "YamlParseError",
       "fetchFile",
       "indexLocalFiles",
       "loadTile",
+      "loadTileCollection",
       "parseMarkdown",
+      "parseYaml",
       "resolveLocation",
     ]);
   });

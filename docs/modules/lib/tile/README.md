@@ -17,17 +17,25 @@ This library implements the following components based on [tesela_spec.md](../..
 - A yaml parser. It takes as input the output of the file fetcher. It will read a yaml and transform it in an object with properties. Output object properties:
   - Source path of the input as a string.
   - Content is the yaml parsed as an object.
+  - It uses the same plain-data rules as the frontmatter: a single document holding only strings, numbers, booleans, null, lists and mappings; unquoted dates stay strings and other YAML tags are rejected. The top level must be a mapping.
 - A tile loader that takes as input a path or URL and chains the file fetcher and the md parser. The output is called a tile. It has additional properties:
   - Types. A list of types for which the tile has been validated against. When first loaded this list is empty.
 - A tile validator builder that takes as input a path or URL and chains the file fetcher and the md parser, then uses the schema inside the metadata (yaml frontmatter) as reference schema for validation. It produces as output a tile validator. Raises an error if schema is missing or isn't valid JTD. In order to follow structural typing, it adds `additionalProperties: true` when it is omitted, an explicit `additionalProperties: false` is kept.
 - A tile validator. It will validate a tile object based on its metadata and a reference schema. It will return the tile type if valid (i.e. schema.ref property), if not it will raise an error.
 - A collection loader that takes as input a path or URL and chains the file fetcher and the yaml parser, for generating the tile path list, and then calls the tile loader for each path. Relative paths for tile are resolved against the collection file's location. Tile related errors are captured, so it traverses the whole tile list. Tiles that fail to load are excluded from tiles and reported as issues. Output properties:
-  - Tiles is a list of tile objects.
-  - Issues, containing warnings and errors.
+  - Source: the resolved absolute URL of the collection file.
+  - Name and description of the collection (description is empty when the file has none).
+  - Tiles is a list of tile objects, in the order of the entries.
+  - Issues, containing warnings and errors, in the order of the entries.
+  - Each tile entry has exactly one of `path` (resolved against the collection file's location) or `url` (must be an absolute URL).
+  - A collection file that cannot be fetched, is not valid YAML or does not have the collection structure makes the load fail. A malformed entry, a tile that cannot be fetched or a tile with invalid frontmatter becomes an error issue.
+  - When several entries resolve to the same tile, it is loaded once at the first entry's position, and each repeat adds a warning issue.
+  - Tiles load in parallel, at most 6 at a time. The limit does not change the result or its order.
+  - Local files stay local: only a collection loaded from a picked `file:` location can list `file:` tiles. In a remote collection, such entries become error issues and are never read.
 - A collection validator. It takes a tile collection and a tile validator as input, and produces a tile collection with the types assigned to each tile and the collection's issues property updated if validation issues were found. Tiles that are not validated are still kept in the collection but without the type updated. This validator should follow idempotency so validating the same collection twice does not create duplicates.
 - An issue is an object containing the properties:
   - Level: warning, error
-  - Source: tile path
+  - Source: the tile's source, or the collection's source for an entry with no usable tile location
   - Message
 
 ### Examples in pseudo-code (not real code):
@@ -91,3 +99,26 @@ const tile = await loadTile("./books/kallocain.md", {
 ```
 
 Hosting note: tiles loaded from another origin are fetched by the browser with CORS. If the host does not send CORS headers (`Access-Control-Allow-Origin`), loading fails with a `FileFetchError`. Shared tiles must be hosted with CORS enabled.
+
+### Collection loader
+
+Also exported from `src/lib/tile/index.ts`:
+
+- `loadTileCollection(location, options?)`: fetches and parses a collection file, then loads every tile it lists, at most 6 at a time. Takes the same `FileFetchOptions` as `loadTile`. Returns a `TileCollection` (`source`, `name`, `description`, `tiles`, `issues`).
+- `parseYaml(fetchedFile)`: yaml parser. Returns a `ParsedYaml` (`source`, `content`), where `content` is a mapping.
+- Errors: `YamlParseError` (not valid plain YAML, or no mapping at the top level) and `CollectionFormatError` (not the collection structure). Both expose the failing `source`. A collection file that cannot be fetched raises `FileFetchError`.
+- Types: `TileCollection`, `TileIssue` (`level`, `source`, `message`), `IssueLevel` (`"warning"` or `"error"`), `ParsedYaml`, `YamlMapping`, `YamlValue`.
+
+Example:
+
+```ts
+import { loadTileCollection } from "./lib/tile/index.ts";
+
+const collection = await loadTileCollection("./tiles/books_collection.yaml", {
+  baseUrl: "https://example.org/samples/",
+});
+// collection.source === "https://example.org/samples/tiles/books_collection.yaml"
+// collection.name === "Science fiction books"
+// collection.tiles[1].source === "https://example.org/samples/tiles/books/kallocain.md"
+// collection.issues is []
+```

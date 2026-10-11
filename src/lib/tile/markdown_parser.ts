@@ -1,19 +1,18 @@
 import matter from "@11ty/gray-matter";
-import { CORE_SCHEMA, load } from "js-yaml";
 import type { FetchedFile } from "./file_fetcher.ts";
 import { describeErrorCause, MarkdownParseError } from "./tile_errors.ts";
+import {
+  describeYamlValue,
+  isYamlMapping,
+  readPlainYaml,
+} from "./yaml_parser.ts";
+import type { YamlMapping, YamlValue } from "./yaml_parser.ts";
 
 /** A metadata value: plain data only, so tiles can be structured-cloned. */
-export type MetadataValue =
-  | string
-  | number
-  | boolean
-  | null
-  | MetadataValue[]
-  | { [key: string]: MetadataValue };
+export type MetadataValue = YamlValue;
 
 /** The parsed frontmatter of a markdown file. */
-export type Metadata = { [key: string]: MetadataValue };
+export type Metadata = YamlMapping;
 
 /** A markdown file split into its frontmatter metadata and its unchanged body. */
 export interface ParsedMarkdown {
@@ -31,28 +30,14 @@ const FRONTMATTER_CLOSING = `\n${FRONTMATTER_DELIMITER}`;
 /** Languages accepted after the opening delimiter. An empty name means YAML. */
 const YAML_LANGUAGE_NAMES = new Set(["", "yaml", "yml"]);
 
-function describeYamlValue(value: unknown): string {
-  if (value === null) {
-    return "an empty value";
-  }
-  if (Array.isArray(value)) {
-    return "a list";
-  }
-  const description = `a single ${typeof value} value`;
-  return description;
-}
-
-function isMapping(value: unknown): value is Metadata {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 /**
- * gray-matter engine for YAML frontmatter. CORE_SCHEMA keeps metadata as plain
- * data: dates stay strings and tags such as `!!binary` or `!!js/*` are rejected.
+ * gray-matter engine for YAML frontmatter, with the plain-data rules of
+ * `readPlainYaml`: dates stay strings and tags such as `!!binary` or `!!js/*`
+ * are rejected.
  */
 function parseFrontmatterYaml(text: string): Metadata {
-  const frontmatter = load(text, { schema: CORE_SCHEMA });
-  if (!isMapping(frontmatter)) {
+  const frontmatter = readPlainYaml(text);
+  if (!isYamlMapping(frontmatter)) {
     throw new Error(
       `frontmatter must be a mapping, found ${describeYamlValue(frontmatter)}`,
     );
