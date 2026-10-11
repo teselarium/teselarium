@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest *)",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(npm ci *)",
+      "Bash(npx prettier *)"
+    ]
+  }
+}
