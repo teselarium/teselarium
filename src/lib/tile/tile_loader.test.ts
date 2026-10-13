@@ -128,7 +128,10 @@ describe("tile module entry point", function describeEntryPoint(): void {
       "CollectionFormatError",
       "FileFetchError",
       "MarkdownParseError",
+      "TileTypeError",
+      "TileValidationError",
       "YamlParseError",
+      "buildTileValidator",
       "fetchFile",
       "indexLocalFiles",
       "loadTile",
@@ -136,6 +139,8 @@ describe("tile module entry point", function describeEntryPoint(): void {
       "parseMarkdown",
       "parseYaml",
       "resolveLocation",
+      "validateTile",
+      "validateTileCollection",
     ]);
   });
 });

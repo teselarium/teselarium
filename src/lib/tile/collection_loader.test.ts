@@ -6,6 +6,11 @@ import {
   SAMPLES_BASE_URL,
 } from "../../test/sample_files.ts";
 import {
+  fetchTestFile,
+  readRequestedUrl,
+  testTexts,
+} from "../../test/test_files.ts";
+import {
   CollectionFormatError,
   FileFetchError,
   indexLocalFiles,
@@ -22,9 +27,6 @@ const LOCAL_COLLECTION_URL = "file:///library/books_collection.yaml";
 const CODE_RAN_MARKER = "openTeselaCollectionCodeRan";
 const SAMPLE_BOOK_FILES = ["farenheit_451.md", "kallocain.md", "fictions.md"];
 
-/** Texts served by `fetchTestFile`, keyed by URL. Cleared after each test. */
-const testTexts = new Map<string, string>();
-
 interface PendingFetch {
   url: string;
   respond: (response: Response) => void;
@@ -32,25 +34,6 @@ interface PendingFetch {
 
 /** Requests made through `fetchPending` that have not been answered yet. */
 const pendingFetches: PendingFetch[] = [];
-
-function readRequestedUrl(input: RequestInfo | URL): string {
-  if (input instanceof Request) {
-    return input.url;
-  }
-  return String(input);
-}
-
-/** Serves the test texts, and falls back to the files under `samples/`. */
-async function fetchTestFile(input: RequestInfo | URL): Promise<Response> {
-  const requestedUrl = readRequestedUrl(input);
-  const testText = testTexts.get(requestedUrl);
-  if (testText === undefined) {
-    const sampleResponse = await fetchSample(requestedUrl);
-    return sampleResponse;
-  }
-  const testResponse = new Response(testText, { status: 200 });
-  return testResponse;
-}
 
 /** Fetch whose responses stay pending until the test answers them. */
 function fetchPending(input: RequestInfo | URL): Promise<Response> {
