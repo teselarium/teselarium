@@ -8,6 +8,58 @@
 - **Mosaic Design (Mod)**: Javascript plugin that allows to visualize and interact with a collection of tiles of a given tile type. 
 - **Mosaic**: Bundle configuration in yaml that ties together a tile collection, a mosaic design and its configuration.
 
+## Architecture Overview
+
+### Mosaic
+
+A mosaic is a bundle made of three parts: a tile collection, a mod and a mosaic configuration. The tile collection contains the tiles to be displayed, each one a markdown file with metadata in its frontmatter. The mod includes the javascript plugin, the tile type required by the plugin, a default mosaic configuration and a sample tile collection with example tiles. The mosaic configuration defines the values used by this specific mosaic, overriding the mod defaults when needed.
+
+```mermaid
+flowchart TD
+    subgraph Mosaic["Mosaic (bundle)"]
+      subgraph TileCollection["Tile collection"]
+        Tiles@{ shape: docs, label: "Tile\n(markdown +\n frontmatter)" }
+      end
+      subgraph Mod["Mosaic Design (Mod)"]
+        plugin["Plugin (js)"]
+        schema["Tile Type (schema)"]
+        default_mosaic_conf["Default Mosaic Configuration"]
+        subgraph SampleTileCollection["Sample Tile collection"]
+          SampleTiles@{ shape: docs, label: "Sample Tile" }
+        end
+      end
+      mosaic_conf["Mosaic Configuration"]
+    end
+```
+
+### Sandbox
+
+Mods run isolated inside a sandbox (iframe) and can only communicate with the core engine through an API. The core engine works as an on-browser backend: it reads and writes data in the storage and loads tiles, mods and mosaics from external sites or the filesystem. Mods have no direct access to the storage or to external sources.
+
+```mermaid
+flowchart LR
+
+  subgraph Sandbox["Sandbox (iframe)"]
+    mod["Mosaic Design (Mod)"]
+  end
+
+  subgraph Backend["On-browser Backend"]
+    engine["Core Engine"]
+    storage@{ shape: cyl, label: "Storage" }
+    engine <--> storage
+  end
+
+  subgraph External["External Sites or Filesystem"]
+    external_tiles@{ shape: docs, label: "Tiles" }
+    external_mod["Mosaic Design (Mod)"]
+    external_mosaic["Mosaic (bundle)"]
+  end
+
+  mod <-- "API" --> engine
+  External --> engine 
+
+```
+
 ## Tiles and Tile Collections
 
 A Tile is a markdown file with frontmatter containing metadata. 
