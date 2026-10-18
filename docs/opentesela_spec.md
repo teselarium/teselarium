@@ -60,6 +60,12 @@ flowchart LR
 
 ```
 
+### Portability principles
+
+OpenTesela is implemented as a Single Page Application design to be self hosted via static files like github pages. The project can be clones and put tiles, mods and mosaics inside the dedicated folder in order that the app load them by default.
+OpenTesela could be also loaded in a html file and initialized from there without the need of cloning the full project, the default tiles, mods and mosaics can be defined during initialization.
+A third way of using OpenTesela is by setting a mosaic path as parameter in the url via hash routing. In this way user can share a mosaic by only sharing a link.
+
 ## Tiles and Tile Collections
 
 A Tile is a markdown file with frontmatter containing metadata. 
