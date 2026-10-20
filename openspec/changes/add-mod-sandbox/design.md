@@ -103,6 +103,7 @@ src/main/
     StageBar.tsx         # title, version, source, Reload tiles, ×
     SandboxFrame.tsx     # the iframe, attached to the stage on load
     IssueList.tsx
+    stage.css
 public/samples/          # moved from samples/ (D18), plus mods/book_list/ (D19)
 public/default_mods/     # mod_explorer/, mod_viewer/ (D20)
 ```
@@ -115,6 +116,8 @@ Imports go one way:
 - `src/lib/core/permissions` → `src/lib/mod`;
 - `src/lib/mod` → `src/lib/tile` (for `IssueLevel`) and `src/lib/files`;
 - `src/lib/tile` → `src/lib/files`.
+
+Type-only imports may also point downward to modules not listed: the stage names `FileFetchOptions`, `ModIssue`, `ModStorage` and `TileIssue`, `lib/core/storage` names `YamlValue`, and `src/main` names `DefaultModSettings` and `ModIssue`. Re-exporting them from the engine would give one name two entry points.
 
 Each module is imported only through its `index.ts`. There are no cycles: the engine reaches the stage only through the `onOpenLink` callback the stage gives each session (D11). Imports use explicit extensions, so `src/main.tsx` and `src/main/` do not clash.
 
@@ -249,7 +252,7 @@ Grants live in `lib/core/permissions/mod_grants.ts` (D1): `lib/mod` says what a 
 
 `describeDeniedPermission(permission)` builds the warning text, for example: `Permission not granted: show content from https://upload.wikimedia.org ("Shows the book covers"). Mods from other sites run without extra permissions for now.` The verbs match the future prompt: show content from, exchange data with, embed pages from, load code from, open mods from. `"*"` reads as "any site".
 
-`checkOpenGrant(mod, grants, targetSource): string | null` returns `null` when a granted `open` permission has host `"*"` or the target's origin, and otherwise the denial message for `PERMISSION_DENIED` (D10):
+`checkOpenGrant(grants, targetSource): string | null` returns `null` when a granted `open` permission has host `"*"` or the target's origin, and otherwise the denial message for `PERMISSION_DENIED` (D10):
 
 - Not declared: `Opening mods from https://mods.example.net is not allowed. Add it to permissions.open in mod_conf.yaml.`
 - Declared but denied: `Opening mods from https://mods.example.net: the mod declares it in permissions.open, but the permission was not granted.`
@@ -296,7 +299,7 @@ The frame loader forwards each `securitypolicyviolation` as `{ blockedUrl, direc
 
 The blocked origin is `new URL(blockedUrl).origin`. Browsers sometimes report only the origin (checked for `<object>`), so the origin is all the message relies on. Messages, all `warning` with the mod's source:
 
-- Not declared: `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.` (the noun follows the category: image or media, connection, embedded page, script).
+- Not declared: `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.` (the noun follows the directive: image, media, font, stylesheet, connection, embedded page, script, worker).
 - Declared but denied: `Blocked image request to https://upload.wikimedia.org: the mod declares it in permissions.show, but the permission was not granted.`
 - No category, or a blocked URL that is not a URL such as `inline` or `eval`: `Blocked by the sandbox policy (object-src).`
 
@@ -309,11 +312,11 @@ The session (D11) reports each message once, keyed like the collection validator
 ```html
 <!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="POLICY">
-<script>FRAME_LOADER</script>
+<script type="module">FRAME_LOADER</script>
 </head><body></body></html>
 ```
 
-The policy comes first because a `<meta>` policy only applies to what follows it. The mod code is not in the document: it arrives over the channel (D9), so it never needs HTML escaping. The policy holds only keywords and checked origins, and a test checks that the frame loader text has no `</script`, so the document needs no escaping either. React sets `srcDoc` as an attribute, with its own escaping.
+The policy comes first because a `<meta>` policy only applies to what follows it. The frame loader is an inline module script, so its top-level names stay out of the mod's global scope (a mod script declaring the same `const` would otherwise fail), and inline modules still run before the frame's `load` event, when the engine posts `sandbox.connect`. The mod code is not in the document: it arrives over the channel (D9), so it never needs HTML escaping. The policy holds only keywords and checked origins, and a test checks that the frame loader text has no `</script`, so the document needs no escaping either. React sets `srcDoc` as an attribute, with its own escaping.
 
 The frame gets `sandbox="allow-scripts"`, never with `allow-same-origin`: with both flags, a frame whose document comes from the app could remove its own sandbox.
 
@@ -489,7 +492,7 @@ interface StageState { sandboxes: StageSandbox[]; entries: StageEntry[]; positio
 - `entries` maps history positions to sandboxes. The visible sandbox is the one of the entry at `position`.
 - `openStageEntry(state, hash, link, openerId, isHome)`: a new sandbox at `position + 1`. Entries after the current position are dropped, as a browser drops forward entries, and every sandbox that no remaining entry points to is in `closedIds`.
 - `restoreStageEntry(state, position, hash, link, isHome)`: when the entry at that position points to an open sandbox, it becomes visible. Otherwise a new sandbox takes that entry (after a reload, or when its sandbox was closed), and forward entries are kept.
-- `closeStageSandbox(state, id)`: removes the sandbox. When it was visible, the current entry points to the opener when it is still open; otherwise `opened` is a new home sandbox for the current entry. Entries that pointed to the closed sandbox stay, and are restored by `restoreStageEntry` when visited.
+- `closeStageSandbox(state, id, homeLink)`: removes the sandbox. When it was visible, the current entry points to the opener when it is still open; otherwise `opened` is a new home sandbox for the current entry. Entries that pointed to the closed sandbox stay, and are restored by `restoreStageEntry` when visited.
 
 ### D16. Stage controller, history and sandboxes
 
@@ -654,7 +657,7 @@ mod:
 `public/default_mods/mod_viewer/` (`mod_conf.yaml`, `main.js`), with `open` for `"*"` ("Runs the mod you are viewing") and no tile type: it reads `context.params.target`, says "No mod was given" when it is missing, and otherwise calls `mods.inspect` and shows the metadata in a definition list: title, version, description, name, source, tile type, sample collection, the config as indented `key: value` lines, and each permission with its category, host, reason and "granted" or "not granted". The run choices each call `mods.open`:
 
 - "Run with sample tiles", only when `sampleCollection` is not `null`: `{ mod: source, collection: sampleCollection }`;
-- a collection address field (`type="url"`) with "Run with this collection": `{ mod: source, collection: <typed address> }`;
+- a collection address field (`type="url"`) with "Run with this collection", also run by Enter in the field: `{ mod: source, collection: <typed address> }`. It is not a `<form>`: the sandbox has no `allow-forms`, so a form never fires `submit`;
 - "Run without tiles": `{ mod: source }`.
 
 Both use only the engine API and plain DOM code, like the sample mod, and never build an address. Their config values are relative to the app's address, as references in requests are (D14).

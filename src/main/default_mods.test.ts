@@ -1,0 +1,106 @@
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  prepareModLaunch,
+  resolveDefaultModSettings,
+} from "../lib/core/engine/index.ts";
+import { loadMod } from "../lib/mod/index.ts";
+import { APP_BASE_URL, fetchAppFile } from "../test/sample_files.ts";
+import { APP_ORIGIN } from "../test/sample_mods.ts";
+import { fetchTestFile, testTexts } from "../test/test_files.ts";
+import { DEFAULT_MODS } from "./default_mods.ts";
+
+const DEFAULTS = resolveDefaultModSettings(DEFAULT_MODS, APP_BASE_URL);
+const OPEN_ANY_SITE = { category: "open", host: "*" };
+
+afterEach(function clearTestTexts(): void {
+  testTexts.clear();
+});
+
+describe("default mods", function describeDefaultMods(): void {
+  it("Vanilla settings", function readsVanillaSettings(): void {
+    expect(DEFAULTS).toEqual({
+      folder: "https://example.org/default_mods/",
+      home: "mod_explorer",
+      switchedOff: [],
+    });
+  });
+
+  it("loads the mod explorer from public/", async function loadsExplorer(): Promise<void> {
+    const explorer = await loadMod("mod_explorer", {
+      baseUrl: APP_BASE_URL,
+      defaultModsFolder: DEFAULTS.folder,
+      fetch: fetchAppFile,
+    });
+
+    expect(explorer).toMatchObject({
+      source: "https://example.org/default_mods/mod_explorer/mod_conf.yaml",
+      name: "mod_explorer",
+      title: "Mods",
+      typeSource: null,
+      config: { viewer: "mod_viewer", mods: ["./samples/mods/book_list"] },
+    });
+    expect(explorer.permissions).toEqual([
+      expect.objectContaining(OPEN_ANY_SITE),
+    ]);
+    expect(explorer.code).toContain("export default async function mount");
+  });
+
+  it("loads the mod viewer from public/", async function loadsViewer(): Promise<void> {
+    const viewer = await loadMod("mod_viewer", {
+      baseUrl: APP_BASE_URL,
+      defaultModsFolder: DEFAULTS.folder,
+      fetch: fetchAppFile,
+    });
+
+    expect(viewer).toMatchObject({
+      source: "https://example.org/default_mods/mod_viewer/mod_conf.yaml",
+      name: "mod_viewer",
+      typeSource: null,
+      sampleCollection: null,
+    });
+    expect(viewer.permissions).toEqual([
+      expect.objectContaining(OPEN_ANY_SITE),
+    ]);
+    expect(viewer.code).toContain("export default async function mount");
+  });
+
+  it("Explorer from the default folder", async function launchesHomeMod(): Promise<void> {
+    const launch = await prepareModLaunch(
+      {
+        link: { mod: DEFAULTS.home, collection: null, params: {} },
+        appOrigin: APP_ORIGIN,
+        defaults: DEFAULTS,
+      },
+      { baseUrl: APP_BASE_URL, fetch: fetchAppFile },
+    );
+
+    expect(launch.mod.source).toBe(
+      "https://example.org/default_mods/mod_explorer/mod_conf.yaml",
+    );
+    expect(launch.context.permissions.granted).toEqual([
+      expect.objectContaining(OPEN_ANY_SITE),
+    ]);
+    expect(launch.issues).toEqual([]);
+  });
+
+  it("Replaced viewer", async function opensReplacedViewer(): Promise<void> {
+    testTexts.set(
+      "https://example.org/default_mods/mod_viewer/mod_conf.yaml",
+      'mod:\n  name: "fancy_viewer"\n  version: "2.0.0"\n  entrypoint: "./main.js"',
+    );
+
+    const launch = await prepareModLaunch(
+      {
+        link: { mod: "mod_viewer", collection: null, params: {} },
+        appOrigin: APP_ORIGIN,
+        defaults: DEFAULTS,
+      },
+      { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    );
+
+    expect(launch.mod.name).toBe("fancy_viewer");
+    expect(launch.mod.source).toBe(
+      "https://example.org/default_mods/mod_viewer/mod_conf.yaml",
+    );
+  });
+});

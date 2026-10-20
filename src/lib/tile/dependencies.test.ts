@@ -13,7 +13,7 @@ interface CollectionFile {
 
 function readSample(relativePath: string): string {
   const sampleUrl = new URL(
-    `../../../samples/${relativePath}`,
+    `../../../public/samples/${relativePath}`,
     import.meta.url,
   );
   const sampleText = readFileSync(sampleUrl, "utf8");

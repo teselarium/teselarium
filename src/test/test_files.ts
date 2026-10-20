@@ -1,5 +1,6 @@
-import type { Metadata, Tile } from "../lib/tile/index.ts";
-import { fetchSample } from "./sample_files.ts";
+import type { Metadata } from "../lib/files/index.ts";
+import type { Tile } from "../lib/tile/index.ts";
+import { fetchAppFile } from "./sample_files.ts";
 
 /** Texts served by `fetchTestFile`, keyed by URL. Each test file clears it after each test. */
 export const testTexts = new Map<string, string>();
@@ -11,15 +12,15 @@ export function readRequestedUrl(input: RequestInfo | URL): string {
   return String(input);
 }
 
-/** Serves the test texts, and falls back to the files under `samples/`. */
+/** Serves the test texts, and falls back to the files under `public/` (see `fetchAppFile`). */
 export async function fetchTestFile(
   input: RequestInfo | URL,
 ): Promise<Response> {
   const requestedUrl = readRequestedUrl(input);
   const testText = testTexts.get(requestedUrl);
   if (testText === undefined) {
-    const sampleResponse = await fetchSample(requestedUrl);
-    return sampleResponse;
+    const publicResponse = await fetchAppFile(requestedUrl);
+    return publicResponse;
   }
   const testResponse = new Response(testText, { status: 200 });
   return testResponse;

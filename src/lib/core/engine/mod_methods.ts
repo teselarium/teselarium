@@ -1,0 +1,51 @@
+import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
+import type { LoadedMod } from "../../mod/index.ts";
+import type { ModGrants } from "../permissions/index.ts";
+import type { ModStorage } from "../storage/index.ts";
+import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
+import { ModMethodError } from "./engine_errors.ts";
+import type { RunLink } from "./mod_launch.ts";
+import { INVALID_PARAMS } from "./mod_messages.ts";
+
+/** What a request handler knows about the mod that sent the request and the app. */
+export interface ModMethodContext {
+  mod: LoadedMod;
+  grants: ModGrants;
+  storage: ModStorage;
+  appOrigin: string;
+  defaults: ResolvedDefaultModSettings;
+  /** `baseUrl` is the app's address. */
+  fetchOptions: FileFetchOptions;
+  /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */
+  onOpenLink: (link: RunLink) => boolean;
+}
+
+/**
+ * A request handler. It resolves with the response's `result`, plain data, or
+ * throws `ModMethodError` with the error code and message.
+ */
+export type ModMethod = (
+  context: ModMethodContext,
+  params: YamlMapping,
+) => Promise<unknown>;
+
+/** The handlers of one request namespace, keyed by method name. */
+export type ModMethodTable = Record<string, ModMethod>;
+
+/** Raises `INVALID_PARAMS` with a message naming the method and the problem. */
+export function throwInvalidParams(method: string, reason: string): never {
+  throw new ModMethodError(INVALID_PARAMS, `${method}: ${reason}`);
+}
+
+/** Reads a param that must be a non-empty string, or raises `INVALID_PARAMS`. */
+export function readRequiredText(
+  params: YamlMapping,
+  fieldName: string,
+  method: string,
+): string {
+  const value = params[fieldName];
+  if (typeof value !== "string" || value === "") {
+    throwInvalidParams(method, `"${fieldName}" must be a non-empty string`);
+  }
+  return value;
+}

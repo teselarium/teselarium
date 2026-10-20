@@ -1,7 +1,6 @@
-import type { ParsedMarkdown } from "./markdown_parser.ts";
+import { describeYamlValue, isYamlMapping } from "../files/index.ts";
+import type { ParsedMarkdown, YamlMapping, YamlValue } from "../files/index.ts";
 import { TileTypeError } from "./tile_errors.ts";
-import { describeYamlValue, isYamlMapping } from "./yaml_parser.ts";
-import type { YamlMapping, YamlValue } from "./yaml_parser.ts";
 
 /** The schema of a tile type file, ready to compile. */
 export interface TileTypeSchema {

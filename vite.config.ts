@@ -4,6 +4,8 @@ import { defineConfig } from "vitest/config";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // The app routes with the hash, so dev and preview answer missing files with 404 like static hosts.
+  appType: "mpa",
   server: { host: "127.0.0.1" },
   preview: { host: "127.0.0.1" },
   test: {

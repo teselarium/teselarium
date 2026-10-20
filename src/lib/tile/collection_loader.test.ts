@@ -11,13 +11,13 @@ import {
   testTexts,
 } from "../../test/test_files.ts";
 import {
-  CollectionFormatError,
   FileFetchError,
   indexLocalFiles,
-  loadTileCollection,
   YamlParseError,
-} from "./index.ts";
-import type { FileFetchOptions, TileCollection } from "./index.ts";
+} from "../files/index.ts";
+import type { FileFetchOptions } from "../files/index.ts";
+import { CollectionFormatError, loadTileCollection } from "./index.ts";
+import type { TileCollection } from "./index.ts";
 
 const SAMPLE_COLLECTION_PATH = "tiles/books_collection.yaml";
 const SAMPLE_COLLECTION_URL = `${SAMPLES_BASE_URL}${SAMPLE_COLLECTION_PATH}`;

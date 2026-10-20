@@ -1,12 +1,10 @@
 import Ajv from "ajv/dist/jtd";
 import type { ErrorObject, ValidateFunction } from "ajv/dist/jtd";
-import { fetchFile } from "./file_fetcher.ts";
-import type { FileFetchOptions } from "./file_fetcher.ts";
-import { parseMarkdown } from "./markdown_parser.ts";
+import { fetchFile, parseMarkdown } from "../files/index.ts";
+import type { FileFetchOptions, YamlMapping } from "../files/index.ts";
 import { TileTypeError, TileValidationError } from "./tile_errors.ts";
 import type { Tile } from "./tile_loader.ts";
 import { readTileTypeSchema } from "./tile_type_schema.ts";
-import type { YamlMapping } from "./yaml_parser.ts";
 
 /** Checks tiles against one tile type. Built by `buildTileValidator`, used with `validateTile`. */
 export interface TileValidator {

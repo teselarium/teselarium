@@ -1,6 +1,6 @@
+import { isYamlMapping } from "../files/index.ts";
+import type { ParsedYaml, YamlMapping, YamlValue } from "../files/index.ts";
 import { CollectionFormatError } from "./tile_errors.ts";
-import { isYamlMapping } from "./yaml_parser.ts";
-import type { ParsedYaml, YamlMapping, YamlValue } from "./yaml_parser.ts";
 
 /** The checked content of a collection file. `entries` are the unchecked tile entries. */
 export interface CollectionFormat {

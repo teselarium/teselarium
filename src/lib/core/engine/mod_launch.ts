@@ -1,0 +1,217 @@
+import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
+import { loadMod, resolveModReference } from "../../mod/index.ts";
+import type { LoadedMod, ModIssue } from "../../mod/index.ts";
+import {
+  buildTileValidator,
+  loadTileCollection,
+  validateTileCollection,
+} from "../../tile/index.ts";
+import type { Tile, TileCollection, TileIssue } from "../../tile/index.ts";
+import {
+  describeDeniedPermission,
+  grantModPermissions,
+} from "../permissions/index.ts";
+import type { ModGrants } from "../permissions/index.ts";
+import {
+  buildSandboxDocument,
+  buildSandboxPolicy,
+  collectContentHosts,
+} from "../sandbox/index.ts";
+import { findSwitchedOffMod } from "./default_mod_settings.ts";
+import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
+import { ModSwitchedOffError } from "./engine_errors.ts";
+
+/** What to run: a mod reference, a collection location and the link parameters. Not an address. */
+export interface RunLink {
+  mod: string;
+  collection: string | null;
+  params: Record<string, string>;
+}
+
+/** What a mod receives as the second argument of `mount`. Plain data. */
+export interface ModContext {
+  mod: {
+    source: string;
+    name: string;
+    title: string;
+    version: string;
+    description: string;
+  };
+  config: YamlMapping;
+  params: Record<string, string>;
+  tiles: Tile[];
+  issues: TileIssue[];
+  permissions: ModGrants;
+}
+
+/** Everything needed to start a mod's frame. Plain data. */
+export interface ModLaunch {
+  mod: LoadedMod;
+  collectionSource: string | null;
+  context: ModContext;
+  contentHosts: string[];
+  /** The frame's `srcdoc` HTML. */
+  sandboxDocument: string;
+  /** Permission issues found before the mod starts. */
+  issues: ModIssue[];
+}
+
+export interface ModLaunchRequest {
+  link: RunLink;
+  appOrigin: string;
+  defaults: ResolvedDefaultModSettings;
+}
+
+/** The tiles a mod receives from a collection, and the collection's issues. */
+export interface ModTiles {
+  collectionSource: string;
+  tiles: Tile[];
+  issues: TileIssue[];
+}
+
+function keepTilesOfType(tiles: Tile[], typeName: string): Tile[] {
+  const typedTiles: Tile[] = [];
+  for (const tile of tiles) {
+    if (tile.types.includes(typeName)) {
+      typedTiles.push(tile);
+    }
+  }
+  return typedTiles;
+}
+
+function buildModTiles(collection: TileCollection, tiles: Tile[]): ModTiles {
+  const modTiles: ModTiles = {
+    collectionSource: collection.source,
+    tiles,
+    issues: collection.issues,
+  };
+  return modTiles;
+}
+
+/**
+ * Loads a collection for a mod. When the mod has a tile type, the collection
+ * is validated with it and only the tiles of that type are kept; the others
+ * appear as warnings in the issues. Load errors propagate.
+ */
+export async function loadModTiles(
+  mod: LoadedMod,
+  collectionLocation: string,
+  options: FileFetchOptions = {},
+): Promise<ModTiles> {
+  const collection = await loadTileCollection(collectionLocation, options);
+  if (mod.typeSource === null) {
+    return buildModTiles(collection, collection.tiles);
+  }
+  const tileValidator = await buildTileValidator(mod.typeSource, options);
+  const validatedCollection = validateTileCollection(collection, tileValidator);
+  const typedTiles = keepTilesOfType(
+    validatedCollection.tiles,
+    tileValidator.typeName,
+  );
+  return buildModTiles(validatedCollection, typedTiles);
+}
+
+function resolveLaunchSource(
+  request: ModLaunchRequest,
+  options: FileFetchOptions,
+): string {
+  const source = resolveModReference(request.link.mod, {
+    baseUrl: options.baseUrl,
+    defaultModsFolder: request.defaults.folder,
+  });
+  const switchedOffName = findSwitchedOffMod(source, request.defaults);
+  if (switchedOffName !== null) {
+    throw new ModSwitchedOffError(switchedOffName, source);
+  }
+  return source;
+}
+
+function loadLinkTiles(
+  mod: LoadedMod,
+  link: RunLink,
+  options: FileFetchOptions,
+): Promise<ModTiles> | null {
+  if (link.collection === null) {
+    return null;
+  }
+  return loadModTiles(mod, link.collection, options);
+}
+
+function listContentSources(
+  mod: LoadedMod,
+  modTiles: ModTiles | null,
+): string[] {
+  const sources = [mod.source, mod.entrypoint];
+  if (mod.typeSource !== null) {
+    sources.push(mod.typeSource);
+  }
+  if (modTiles !== null) {
+    sources.push(modTiles.collectionSource);
+    for (const tile of modTiles.tiles) {
+      sources.push(tile.source);
+    }
+  }
+  return sources;
+}
+
+function buildPermissionIssues(mod: LoadedMod, grants: ModGrants): ModIssue[] {
+  const issues: ModIssue[] = [];
+  for (const permission of grants.denied) {
+    issues.push({
+      level: "warning",
+      source: mod.source,
+      message: describeDeniedPermission(permission),
+    });
+  }
+  return issues;
+}
+
+function buildModContext(
+  mod: LoadedMod,
+  link: RunLink,
+  modTiles: ModTiles | null,
+  grants: ModGrants,
+): ModContext {
+  const context: ModContext = {
+    mod: {
+      source: mod.source,
+      name: mod.name,
+      title: mod.title,
+      version: mod.version,
+      description: mod.description,
+    },
+    config: structuredClone(mod.config),
+    params: { ...link.params },
+    tiles: modTiles === null ? [] : modTiles.tiles,
+    issues: modTiles === null ? [] : modTiles.issues,
+    permissions: grants,
+  };
+  return context;
+}
+
+/**
+ * Prepares everything a mod's frame needs: refuses a switched-off default mod
+ * before any request, loads the mod and, when the link names one, its
+ * collection; then grants its permissions and builds its policy, its frame
+ * document and its mount context. Every error propagates.
+ */
+export async function prepareModLaunch(
+  request: ModLaunchRequest,
+  options: FileFetchOptions,
+): Promise<ModLaunch> {
+  const source = resolveLaunchSource(request, options);
+  const mod = await loadMod(source, options);
+  const modTiles = await loadLinkTiles(mod, request.link, options);
+  const grants = grantModPermissions(mod, request.appOrigin);
+  const contentHosts = collectContentHosts(listContentSources(mod, modTiles));
+  const policy = buildSandboxPolicy(contentHosts, grants.granted);
+  const launch: ModLaunch = {
+    mod,
+    collectionSource: modTiles === null ? null : modTiles.collectionSource,
+    context: buildModContext(mod, request.link, modTiles, grants),
+    contentHosts,
+    sandboxDocument: buildSandboxDocument(policy),
+    issues: buildPermissionIssues(mod, grants),
+  };
+  return launch;
+}

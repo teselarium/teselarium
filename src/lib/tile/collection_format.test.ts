@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readSampleText } from "../../test/sample_files.ts";
+import { parseYaml } from "../files/index.ts";
+import type { ParsedYaml } from "../files/index.ts";
 import { readCollectionFormat, readTileEntry } from "./collection_format.ts";
 import { CollectionFormatError } from "./tile_errors.ts";
-import { parseYaml } from "./yaml_parser.ts";
-import type { ParsedYaml } from "./yaml_parser.ts";
 
 const TEST_SOURCE = "https://example.org/samples/test_collection.yaml";
 const COLLECTION_PATH = "tiles/books_collection.yaml";

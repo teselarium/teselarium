@@ -3,5 +3,6 @@ coverage/
 package-lock.json
 docs/
 openspec/
-samples/
+public/samples/tiles/
+public/samples/types/
 .claude/

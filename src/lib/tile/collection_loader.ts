@@ -1,4 +1,12 @@
 import {
+  fetchFile,
+  FileFetchError,
+  MarkdownParseError,
+  parseYaml,
+  resolveLocation,
+} from "../files/index.ts";
+import type { FileFetchOptions, YamlValue } from "../files/index.ts";
+import {
   buildMalformedTileEntry,
   readCollectionFormat,
   readTileEntry,
@@ -8,14 +16,9 @@ import type {
   MalformedTileEntry,
   TileEntry,
 } from "./collection_format.ts";
-import { fetchFile, resolveLocation } from "./file_fetcher.ts";
-import type { FileFetchOptions } from "./file_fetcher.ts";
-import { FileFetchError, MarkdownParseError } from "./tile_errors.ts";
 import type { IssueLevel, TileIssue } from "./tile_issues.ts";
 import { loadTile } from "./tile_loader.ts";
 import type { Tile } from "./tile_loader.ts";
-import { parseYaml } from "./yaml_parser.ts";
-import type { YamlValue } from "./yaml_parser.ts";
 
 /** A loaded tile collection. Tiles and issues follow the order of the entries. */
 export interface TileCollection {

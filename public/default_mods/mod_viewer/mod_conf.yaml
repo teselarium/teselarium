@@ -1,0 +1,10 @@
+mod:
+  name: "mod_viewer"
+  title: "Mod Viewer"
+  version: "0.1.0"
+  description: "Shows a mod's metadata and runs it with or without tiles."
+  entrypoint: "./main.js"
+  permissions:
+    open:
+      - host: "*"
+        reason: "Runs the mod you are viewing"

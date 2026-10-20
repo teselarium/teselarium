@@ -5,13 +5,13 @@ import {
   readSampleText,
   SAMPLES_BASE_URL,
 } from "../../test/sample_files.ts";
-import * as tileModule from "./index.ts";
 import {
   FileFetchError,
   indexLocalFiles,
-  loadTile,
   MarkdownParseError,
-} from "./index.ts";
+} from "../files/index.ts";
+import * as tileModule from "./index.ts";
+import { loadTile } from "./index.ts";
 import type { Tile } from "./index.ts";
 
 const KALLOCAIN_PATH = "tiles/books/kallocain.md";
@@ -126,19 +126,11 @@ describe("tile module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(tileModule).sort()).toEqual([
       "CollectionFormatError",
-      "FileFetchError",
-      "MarkdownParseError",
       "TileTypeError",
       "TileValidationError",
-      "YamlParseError",
       "buildTileValidator",
-      "fetchFile",
-      "indexLocalFiles",
       "loadTile",
       "loadTileCollection",
-      "parseMarkdown",
-      "parseYaml",
-      "resolveLocation",
       "validateTile",
       "validateTileCollection",
     ]);

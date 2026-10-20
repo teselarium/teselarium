@@ -1,0 +1,350 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import {
+  collectMessages,
+  createFakeFrame,
+  readModPort,
+  waitForMessages,
+} from "../../../test/fake_frames.ts";
+import { createMemoryStorage } from "../../../test/memory_storage.ts";
+import { APP_BASE_URL } from "../../../test/sample_files.ts";
+import {
+  APP_ORIGIN,
+  SAMPLE_MOD_SOURCE,
+  TEST_DEFAULTS,
+} from "../../../test/sample_mods.ts";
+import { fetchTestFile } from "../../../test/test_files.ts";
+import type { ModIssue } from "../../mod/index.ts";
+import type { Tile } from "../../tile/index.ts";
+import { prepareModLaunch } from "./mod_launch.ts";
+import type { ModLaunch, RunLink } from "./mod_launch.ts";
+import {
+  connectModSession,
+  pushTilesChanged,
+  stopModSession,
+} from "./mod_session.ts";
+import type { ModSession } from "./mod_session.ts";
+
+interface PlayedSession {
+  session: ModSession;
+  modPort: MessagePort;
+  received: unknown[];
+  onIssue: Mock<(issue: ModIssue) => void>;
+  onOpenLink: Mock<(link: RunLink) => boolean>;
+  launch: ModLaunch;
+}
+
+const openPorts: MessagePort[] = [];
+
+afterEach(function closePorts(): void {
+  for (const port of openPorts) {
+    port.close();
+  }
+  openPorts.length = 0;
+});
+
+function launchSampleMod(): Promise<ModLaunch> {
+  return prepareModLaunch(
+    {
+      link: {
+        mod: "./samples/mods/book_list",
+        collection: "./samples/tiles/books_collection.yaml",
+        params: {},
+      },
+      appOrigin: APP_ORIGIN,
+      defaults: TEST_DEFAULTS,
+    },
+    { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+  );
+}
+
+/** Connects a session for the sample mod (granted `open` for `"*"`), and plays the mod side. */
+async function playSession(): Promise<PlayedSession> {
+  const sampleLaunch = await launchSampleMod();
+  const openPermission = {
+    category: "open" as const,
+    host: "*",
+    reason: "Opens mods",
+  };
+  const launch: ModLaunch = {
+    ...sampleLaunch,
+    mod: {
+      ...sampleLaunch.mod,
+      permissions: [...sampleLaunch.mod.permissions, openPermission],
+    },
+    context: {
+      ...sampleLaunch.context,
+      permissions: {
+        granted: [...sampleLaunch.context.permissions.granted, openPermission],
+        denied: [],
+      },
+    },
+  };
+  const fakeFrame = createFakeFrame();
+  const onIssue = vi.fn<(issue: ModIssue) => void>();
+  const onOpenLink = vi.fn<(link: RunLink) => boolean>();
+  onOpenLink.mockReturnValue(true);
+  const session = connectModSession(fakeFrame.target, launch, {
+    storage: createMemoryStorage(),
+    appOrigin: APP_ORIGIN,
+    defaults: TEST_DEFAULTS,
+    fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    onIssue,
+    onOpenLink,
+  });
+  const modPort = readModPort(fakeFrame);
+  openPorts.push(modPort, session.port);
+  const playedSession: PlayedSession = {
+    session,
+    modPort,
+    received: collectMessages(modPort),
+    onIssue,
+    onOpenLink,
+    launch,
+  };
+  return playedSession;
+}
+
+function sendRequest(
+  played: PlayedSession,
+  id: number,
+  method: string,
+  params: object,
+): void {
+  played.modPort.postMessage({ jsonrpc: "2.0", id, method, params });
+}
+
+function sendNotification(
+  played: PlayedSession,
+  method: string,
+  params: unknown,
+): void {
+  played.modPort.postMessage({ jsonrpc: "2.0", method, params });
+}
+
+/** Waits until the mod side received `count` messages, for requests that fetch files. */
+async function waitForReceived(
+  played: PlayedSession,
+  count: number,
+): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (played.received.length >= count) {
+      return;
+    }
+    await waitForMessages();
+  }
+}
+
+describe("connectModSession", function describeConnectModSession(): void {
+  it("posts sandbox.connect with the code and the context", async function postsConnect(): Promise<void> {
+    const fakeFrame = createFakeFrame();
+    const launch = await launchSampleMod();
+
+    const session = connectModSession(fakeFrame.target, launch, {
+      storage: createMemoryStorage(),
+      appOrigin: APP_ORIGIN,
+      defaults: TEST_DEFAULTS,
+      fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+      onIssue: vi.fn<(issue: ModIssue) => void>(),
+      onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+    });
+    openPorts.push(session.port, readModPort(fakeFrame));
+
+    expect(fakeFrame.posted).toHaveLength(1);
+    expect(fakeFrame.posted[0].message).toEqual({
+      jsonrpc: "2.0",
+      method: "sandbox.connect",
+      params: { code: launch.mod.code, context: launch.context },
+    });
+  });
+
+  it("Store and read a value", async function storesValue(): Promise<void> {
+    const played = await playSession();
+    const value = {
+      source: "https://example.org/samples/tiles/books/kallocain.md",
+    };
+
+    sendRequest(played, 1, "storage.set", { key: "selected", value });
+    sendRequest(played, 2, "storage.get", { key: "selected" });
+    await waitForReceived(played, 2);
+
+    expect(played.received).toEqual([
+      { jsonrpc: "2.0", id: 1, result: null },
+      { jsonrpc: "2.0", id: 2, result: value },
+    ]);
+  });
+
+  it("Response matches the request id", async function answersOnce(): Promise<void> {
+    const played = await playSession();
+
+    sendRequest(played, 7, "storage.get", { key: "selected" });
+    await waitForReceived(played, 1);
+    await waitForMessages();
+
+    expect(played.received).toEqual([{ jsonrpc: "2.0", id: 7, result: null }]);
+  });
+
+  it("dispatches mods.open to the session's onOpenLink", async function opensLink(): Promise<void> {
+    const played = await playSession();
+
+    sendRequest(played, 3, "mods.open", {
+      mod: "mod_viewer",
+      params: { target: SAMPLE_MOD_SOURCE },
+    });
+    await waitForReceived(played, 1);
+
+    expect(played.onOpenLink).toHaveBeenCalledExactlyOnceWith({
+      mod: "mod_viewer",
+      collection: null,
+      params: { target: SAMPLE_MOD_SOURCE },
+    });
+    expect(played.received).toEqual([{ jsonrpc: "2.0", id: 3, result: null }]);
+  });
+
+  it("Unknown method", async function answersUnknownMethod(): Promise<void> {
+    const played = await playSession();
+
+    sendRequest(played, 8, "tiles.delete", {});
+    await waitForReceived(played, 1);
+
+    expect(played.received).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: 8,
+        error: { code: -32601, message: 'Unknown method "tiles.delete"' },
+      },
+    ]);
+  });
+
+  it("treats inherited names as unknown methods", async function ignoresInherited(): Promise<void> {
+    const played = await playSession();
+
+    sendRequest(played, 9, "toString", {});
+    await waitForReceived(played, 1);
+
+    expect(played.received).toMatchObject([{ id: 9, error: { code: -32601 } }]);
+  });
+
+  it("Not a JSON-RPC request", async function answersInvalidRequest(): Promise<void> {
+    const played = await playSession();
+
+    played.modPort.postMessage({ id: 4, method: 12 });
+    await waitForReceived(played, 1);
+
+    expect(played.received).toMatchObject([
+      { jsonrpc: "2.0", id: 4, error: { code: -32600 } },
+    ]);
+  });
+
+  it("sends a handler's ModMethodError as the error response", async function answersMethodError(): Promise<void> {
+    const played = await playSession();
+
+    sendRequest(played, 5, "storage.get", { key: 3 });
+    await waitForReceived(played, 1);
+
+    expect(played.received).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: 5,
+        error: {
+          code: -32602,
+          message: 'storage.get: "key" must be a non-empty string',
+        },
+      },
+    ]);
+  });
+
+  it("Reloaded tiles are pushed", async function pushesTilesChanged(): Promise<void> {
+    const played = await playSession();
+    const tiles: Tile[] = played.launch.context.tiles.slice(0, 2);
+
+    pushTilesChanged(played.session, tiles, []);
+    await waitForReceived(played, 1);
+
+    expect(played.received).toEqual([
+      {
+        jsonrpc: "2.0",
+        method: "tiles.changed",
+        params: { tiles, issues: [] },
+      },
+    ]);
+    expect(played.received[0]).not.toHaveProperty("id");
+  });
+
+  it("Repeated block is reported once", async function reportsBlockOnce(): Promise<void> {
+    const played = await playSession();
+    const blocked = { directive: "img-src" };
+
+    sendNotification(played, "sandbox.blocked", {
+      ...blocked,
+      blockedUrl: "https://images.example.net/a.jpg",
+    });
+    sendNotification(played, "sandbox.blocked", {
+      ...blocked,
+      blockedUrl: "https://images.example.net/b.jpg",
+    });
+    sendNotification(played, "sandbox.blocked", {
+      ...blocked,
+      blockedUrl: "https://images.example.net/c.jpg",
+    });
+    await waitForMessages();
+
+    expect(played.onIssue).toHaveBeenCalledExactlyOnceWith({
+      level: "warning",
+      source: SAMPLE_MOD_SOURCE,
+      message:
+        "Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.",
+    });
+    expect(played.received).toEqual([]);
+  });
+
+  it("ignores sandbox.blocked with wrong params", async function ignoresWrongBlock(): Promise<void> {
+    const played = await playSession();
+
+    sendNotification(played, "sandbox.blocked", { blockedUrl: 3 });
+    sendNotification(played, "sandbox.blocked", "img-src");
+    await waitForMessages();
+
+    expect(played.onIssue).not.toHaveBeenCalled();
+  });
+
+  it("turns sandbox.mountFailed into an error issue", async function reportsMountFailure(): Promise<void> {
+    const played = await playSession();
+
+    sendNotification(played, "sandbox.mountFailed", { message: "map failed" });
+    await waitForMessages();
+
+    expect(played.onIssue).toHaveBeenCalledExactlyOnceWith({
+      level: "error",
+      source: SAMPLE_MOD_SOURCE,
+      message: "The mod could not be mounted: map failed",
+    });
+  });
+});
+
+describe("stopModSession", function describeStopModSession(): void {
+  it("answers nothing and pushes nothing after a stop", async function stopsSession(): Promise<void> {
+    const played = await playSession();
+
+    sendRequest(played, 1, "mods.inspect", { mod: "./samples/mods/book_list" });
+    stopModSession(played.session);
+    sendRequest(played, 2, "storage.get", { key: "selected" });
+    pushTilesChanged(played.session, [], []);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await waitForMessages();
+    }
+
+    expect(played.session.stopped).toBe(true);
+    expect(played.received).toEqual([]);
+  });
+
+  it("reports no issue after a stop", async function stopsIssues(): Promise<void> {
+    const played = await playSession();
+
+    stopModSession(played.session);
+    sendNotification(played, "sandbox.mountFailed", { message: "late" });
+    await waitForMessages();
+
+    expect(played.onIssue).not.toHaveBeenCalled();
+  });
+});

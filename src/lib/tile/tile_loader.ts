@@ -1,7 +1,5 @@
-import { fetchFile } from "./file_fetcher.ts";
-import type { FileFetchOptions } from "./file_fetcher.ts";
-import { parseMarkdown } from "./markdown_parser.ts";
-import type { ParsedMarkdown } from "./markdown_parser.ts";
+import { fetchFile, parseMarkdown } from "../files/index.ts";
+import type { FileFetchOptions, ParsedMarkdown } from "../files/index.ts";
 
 /** A loaded tile: parsed markdown plus the names of the tile types it was validated against. */
 export interface Tile extends ParsedMarkdown {

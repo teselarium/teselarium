@@ -15,11 +15,13 @@ import {
   testTexts,
 } from "../../test/test_files.ts";
 import {
-  buildTileValidator,
   FileFetchError,
   indexLocalFiles,
-  loadTile,
   MarkdownParseError,
+} from "../files/index.ts";
+import {
+  buildTileValidator,
+  loadTile,
   TileTypeError,
   TileValidationError,
   validateTile,
