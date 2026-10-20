@@ -152,23 +152,28 @@ Relative mod references and locations in `mods.inspect` and `mods.open` SHALL be
 - **WHEN** the mod explorer and the mod viewer each inspect `./samples/mods/book_list`
 - **THEN** both results have the source `https://example.org/samples/mods/book_list/mod_conf.yaml`
 
-### Requirement: Open a link in a new sandbox
-`mods.open` with `{ link }`, where `link` is a run link (`#/run?mod=...`), SHALL open the link as if the user had followed it: in a new sandbox that becomes the visible one, with a new history entry, and with the requesting sandbox recorded as its opener. It SHALL return `null` once the new sandbox is created.
+### Requirement: Open a mod in a new sandbox
+`mods.open` with `{ mod, collection, params }`, where `mod` is a mod reference, `collection` an optional collection location and `params` an optional mapping of strings, SHALL open the mod as if the user had followed its run link: in a new sandbox that becomes the visible one, with a new history entry whose address is that run link, and with the requesting sandbox recorded as its opener. It SHALL return `null` once the new sandbox is created. Mods SHALL NOT need to know the app's address format.
 
 #### Scenario: Explorer opens the viewer
-- **WHEN** the visible mod explorer sends `mods.open` with `{ "link": "#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml" }`
+- **WHEN** the visible mod explorer sends `mods.open` with `{ "mod": "mod_viewer", "params": { "target": "https://example.org/samples/mods/book_list/mod_conf.yaml" } }`
 - **THEN** the response's result is `null`, the mod viewer is the visible mod and the explorer is hidden
+- **AND** the app's address is `#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml`
 
 ### Requirement: Opened mods report their own failures
-Loading and running the opened mod SHALL NOT change the `mods.open` response: its load failures and issues SHALL belong to the new sandbox. A link that is not a run link with a non-empty `mod` SHALL be answered with error code `-32602`.
+Loading and running the opened mod SHALL NOT change the `mods.open` response: its load failures and issues SHALL belong to the new sandbox. A request whose `mod` is not a non-empty string, whose `collection` is neither absent, `null` nor a non-empty string, or whose `params` is present but not a mapping of strings SHALL be answered with error code `-32602`.
 
 #### Scenario: Opened mod is missing
-- **WHEN** the visible mod explorer opens a run link to `./samples/mods/missing`
+- **WHEN** the visible mod explorer sends `mods.open` with `{ "mod": "./samples/mods/missing" }`
 - **THEN** the response's result is `null`, and the new sandbox shows an error that names `404`
 
-#### Scenario: Not a run link
-- **WHEN** a mod sends `mods.open` with `{ "link": "https://example.org/" }`
-- **THEN** the response has an error with code `-32602` whose message names `mods.open` and says that `link` must be a run link
+#### Scenario: Missing mod reference
+- **WHEN** a mod sends `mods.open` with `{ "collection": "./samples/tiles/books_collection.yaml" }`
+- **THEN** the response has an error with code `-32602` whose message names `mods.open` and says that `mod` must be a non-empty string
+
+#### Scenario: Parameter that is not a string
+- **WHEN** a mod sends `mods.open` with `{ "mod": "mod_viewer", "params": { "target": 3 } }`
+- **THEN** the response has an error with code `-32602` whose message names `mods.open` and says that `params.target` must be a string
 
 ### Requirement: Inspecting and opening need the open permission
 The engine SHALL answer `mods.inspect` and `mods.open` with error code `-32002`, without requesting any file, unless the requesting mod has a granted `open` permission whose host is `"*"` or the origin of the target mod file. The message SHALL name the origin and say to add it to `permissions.open` in `mod_conf.yaml`, or that the declared permission was not granted.
@@ -198,7 +203,7 @@ The engine SHALL answer `mods.open` from a mod whose sandbox is not the visible 
 The engine SHALL refuse a default mod that is switched off, whatever reference names it: `mods.inspect` and `mods.open` SHALL be answered with error code `-32003` and a message naming the mod, without requesting its file.
 
 #### Scenario: Viewer switched off
-- **WHEN** `mod_viewer` is switched off and a mod with `open` granted for `"*"` sends `mods.open` with a link to `./default_mods/mod_viewer/mod_conf.yaml`
+- **WHEN** `mod_viewer` is switched off and a mod with `open` granted for `"*"` sends `mods.open` with `{ "mod": "./default_mods/mod_viewer/mod_conf.yaml" }`
 - **THEN** the response has an error with code `-32003` whose message names `mod_viewer`
 
 ### Requirement: Tiles changed event

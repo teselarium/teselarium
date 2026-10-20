@@ -33,7 +33,7 @@ The app SHALL open the home mod for an empty hash, for `#/`, and for any hash th
 - **THEN** the home mod is the visible mod
 
 ### Requirement: Several sandboxes, one visible
-Each sandbox SHALL have an id that the engine gives it, unique in the page. Opening a link, whether the user followed it or a mod asked for it, SHALL create a new sandbox and hide the visible one without stopping it. Exactly one sandbox SHALL be visible at a time. Hiding or showing a sandbox SHALL NOT reload its frame.
+Each sandbox SHALL have an id that the app gives it, unique in the page. Opening a link, whether the user followed it or a mod asked for it, SHALL create a new sandbox and hide the visible one without stopping it. Exactly one sandbox SHALL be visible at a time. Hiding or showing a sandbox SHALL NOT reload its frame.
 
 #### Scenario: Second link hides the first mod
 - **WHEN** the sample book list mod is running and the user follows a run link to another mod

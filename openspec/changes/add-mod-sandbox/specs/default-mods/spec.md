@@ -32,7 +32,7 @@ Default mods SHALL run in a sandbox with the same policy, grants and engine API 
 - **THEN** its frame has the sandbox value `allow-scripts` and reading `parent.document` inside it fails with a security error
 
 ### Requirement: Mod explorer
-The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list each mod reference in its config's `mods` list with the title and description it gets from `mods.inspect`. A reference that cannot be inspected SHALL be listed with the reference and the error message. Selecting a mod SHALL open a run link to the mod in its config's `viewer`, with the selected mod's source as the `target` parameter. The vanilla config SHALL list the sample book list mod and use `mod_viewer` as viewer.
+The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list each mod reference in its config's `mods` with the title and description it gets from `mods.inspect`. A reference that cannot be inspected SHALL be listed with the reference and the error message. Selecting a mod SHALL send `mods.open` for the mod in its config's `viewer`, with the selected mod's source as the `target` parameter. The vanilla config SHALL list the sample book list mod and use `mod_viewer` as viewer.
 
 #### Scenario: Vanilla explorer lists the sample
 - **WHEN** the mod explorer runs with its vanilla config
@@ -63,7 +63,7 @@ The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the m
 - **THEN** the viewer's frame shows an error that names `404`
 
 ### Requirement: Mod viewer runs the mod
-The mod viewer SHALL offer to run the viewed mod with its sample collection (only when the mod declares one), with a collection whose address the user types, or without tiles. Each choice SHALL open a run link with the mod's source as `mod` and, when there is one, the chosen collection as `collection`.
+The mod viewer SHALL offer to run the viewed mod with its sample collection (only when the mod declares one), with a collection whose address the user types, or without tiles. Each choice SHALL send `mods.open` with the mod's source as `mod` and, when there is one, the chosen collection as `collection`.
 
 #### Scenario: Run with the sample tiles
 - **WHEN** the viewer shows the sample book list mod and the user chooses to run it with its sample tiles
