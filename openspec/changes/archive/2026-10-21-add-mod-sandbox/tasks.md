@@ -162,7 +162,7 @@ Each group writes its tests first (TDD) and names each test after the spec scena
 ## 9. Integration check
 
 - [x] 9.1 On a clean install (`npm ci`), run `npm run build`, `npm test`, `npm run lint`, `npm run format:check` and `npm run test:e2e`. Verify that all five succeed and that each scenario in the five spec files has a test named after it. Verify that the tile and file test cases are unchanged apart from the sample path in 1.1 and the imports and export lists in 1.4. Verify that the imports follow the D1 direction, with each module imported only through its `index.ts`. Verify that `git status` shows only the files listed in the proposal's Impact section and this change's folder.
-- [ ] 9.2 Manually open `npm run preview` in Firefox and, if available, in Safari or Playwright WebKit (design, Risks). Check that the explorer, the viewer and the sample mod work with their covers, that back, forward and reload behave as in `specs/mod-stage`, and that reading `localStorage` in a frame's console throws. If the `blob:` module import fails there, record the result in design.md and apply the `data:` fallback described in Risks before archiving.
+- [x] 9.2 Manually open `npm run preview` in Firefox and, if available, in Safari or Playwright WebKit (design, Risks). Check that the explorer, the viewer and the sample mod work with their covers, that back, forward and reload behave as in `specs/mod-stage`, and that reading `localStorage` in a frame's console throws. If the `blob:` module import fails there, record the result in design.md and apply the `data:` fallback described in Risks before archiving.
 
 ## Workflow follow-up
 
