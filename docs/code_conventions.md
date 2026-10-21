@@ -13,6 +13,7 @@ This project follows the next principles:
 
 ## Conventions
 
+AI is used in this project for accelerating development via OpenSpec (spec-driven development, not vibe coding), but AI is not authorized to create commits or push changes by it self.
 Keep code readable for humans.
 Don't use anonymous functions.
 Don't write returns of anonymous object like anonymous list or dict (e.g. "return [a, b, ...]" or "return {a, b}"). Store the function output in a variable first and then return this variable (e.g. "variable_name = [a, b, ...]; return variable_name;").
