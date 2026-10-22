@@ -20,6 +20,8 @@ import {
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
 import { resolveDefaultModSettings } from "../engine/index.ts";
 import type { RunLink } from "../engine/index.ts";
+import { buildTheme } from "../theme/index.ts";
+import type { Theme } from "../theme/index.ts";
 import type { StageSandbox } from "./stage_state.ts";
 import {
   attachSandboxFrame,
@@ -48,6 +50,10 @@ interface SpiedServices {
   onOpenLink: Mock<(openerId: string, link: RunLink) => boolean>;
 }
 
+function readLightTheme(): Theme {
+  return buildTheme("light");
+}
+
 function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
   const onChange = vi.fn<() => void>();
   const onOpenLink = vi.fn<(openerId: string, link: RunLink) => boolean>();
@@ -59,6 +65,7 @@ function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
     storage: createMemoryStorage(),
     onChange,
     onOpenLink,
+    readTheme: readLightTheme,
   };
   const spiedServices: SpiedServices = { services, onChange, onOpenLink };
   return spiedServices;

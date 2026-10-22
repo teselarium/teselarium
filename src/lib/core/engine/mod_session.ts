@@ -10,9 +10,15 @@ import {
   SANDBOX_MOUNT_FAILED_METHOD,
 } from "../sandbox/index.ts";
 import type { ModStorage } from "../storage/index.ts";
+import type { Theme } from "../theme/index.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { describeEngineError, ModMethodError } from "./engine_errors.ts";
-import type { ModLaunch, RunLink } from "./mod_launch.ts";
+import type {
+  LaunchContext,
+  ModContext,
+  ModLaunch,
+  RunLink,
+} from "./mod_launch.ts";
 import {
   buildErrorResponse,
   buildNotification,
@@ -42,6 +48,8 @@ export interface ModSessionOptions {
   onIssue: (issue: ModIssue) => void;
   /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */
   onOpenLink: (link: RunLink) => boolean;
+  /** The theme the mod mounts with: the one current when the frame connects. */
+  theme: Theme;
 }
 
 /** The engine's side of one running mod. Mutable, because a channel is state. */
@@ -53,6 +61,9 @@ export interface ModSession {
   reportedIssueKeys: Set<string>;
   stopped: boolean;
 }
+
+/** Engine to mod: the resolved color scheme changed. The frame loader sets its attribute first. */
+export const THEME_CHANGED_METHOD = "theme.changed";
 
 /** JSON-RPC's code for an error inside the engine. It only answers a bug. */
 const INTERNAL_ERROR = -32603;
@@ -193,9 +204,17 @@ function handleModPortMessage(session: ModSession, event: MessageEvent): void {
   void answerRequest(session, message);
 }
 
+function buildMountContext(
+  launchContext: LaunchContext,
+  theme: Theme,
+): ModContext {
+  const context: ModContext = { ...launchContext, theme };
+  return context;
+}
+
 /**
  * Opens the private channel to a mod's frame, sends it the mod's code and
- * context, and answers the mod's requests until the session is stopped.
+ * its mount context with the session's theme, and answers the mod's requests until the session is stopped.
  */
 export function connectModSession(
   frameTarget: Pick<Window, "postMessage">,
@@ -204,7 +223,7 @@ export function connectModSession(
 ): ModSession {
   const port = openSandboxChannel(frameTarget, {
     code: launch.mod.code,
-    context: launch.context,
+    context: buildMountContext(launch.context, options.theme),
   });
   const session: ModSession = {
     port,
@@ -232,6 +251,11 @@ export function pushTilesChanged(
   issues: TileIssue[],
 ): void {
   sendToMod(session, buildNotification("tiles.changed", { tiles, issues }));
+}
+
+/** Pushes `theme.changed` with the new theme. */
+export function pushThemeChanged(session: ModSession, theme: Theme): void {
+  sendToMod(session, buildNotification(THEME_CHANGED_METHOD, theme));
 }
 
 /** Closes the channel. Later messages, pushes and answers to pending requests do nothing. */

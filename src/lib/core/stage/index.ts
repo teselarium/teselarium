@@ -1,5 +1,6 @@
 export {
   attachFrame,
+  changeStageColorScheme,
   closeSandbox,
   createStage,
   followHistory,

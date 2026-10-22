@@ -12,6 +12,7 @@ export { inspectMod } from "./mod_inspection.ts";
 export type { ModInspection } from "./mod_inspection.ts";
 export { loadModTiles, prepareModLaunch } from "./mod_launch.ts";
 export type {
+  LaunchContext,
   ModContext,
   ModLaunch,
   ModLaunchRequest,
@@ -25,7 +26,9 @@ export type {
 } from "./mod_methods.ts";
 export {
   connectModSession,
+  pushThemeChanged,
   pushTilesChanged,
   stopModSession,
+  THEME_CHANGED_METHOD,
 } from "./mod_session.ts";
 export type { ModSession, ModSessionOptions } from "./mod_session.ts";

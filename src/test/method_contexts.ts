@@ -30,6 +30,7 @@ export function buildRequestingMod(permissions: ModPermission[]): LoadedMod {
     sampleCollection: null,
     config: {},
     permissions,
+    theme: "default",
     code: "",
   };
   return mod;

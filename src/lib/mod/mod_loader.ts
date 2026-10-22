@@ -1,7 +1,7 @@
 import { fetchFile, parseYaml, resolveLocation } from "../files/index.ts";
 import type { FileFetchOptions, YamlMapping } from "../files/index.ts";
 import { readModFormat } from "./mod_format.ts";
-import type { ModFormat } from "./mod_format.ts";
+import type { ModFormat, ModThemeSetting } from "./mod_format.ts";
 import type { ModPermission } from "./mod_permissions.ts";
 import { resolveModReference } from "./mod_reference.ts";
 
@@ -21,6 +21,7 @@ export interface ModFile {
   sampleCollection: string | null;
   config: YamlMapping;
   permissions: ModPermission[];
+  theme: ModThemeSetting;
 }
 
 /** A mod file with the text of its entrypoint. */
@@ -60,6 +61,7 @@ function buildModFile(source: string, modFormat: ModFormat): ModFile {
     sampleCollection: resolveModPath(modFormat.sampleCollection, source),
     config: modFormat.config,
     permissions: modFormat.permissions,
+    theme: modFormat.theme,
   };
   return modFile;
 }

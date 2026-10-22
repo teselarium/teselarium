@@ -1,0 +1,70 @@
+/* The page: full height, colors and fonts from the theme tokens. */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--ot-color-background);
+  color: var(--ot-color-text);
+  font-family: var(--ot-font-body);
+  font-size: var(--ot-font-size);
+  line-height: var(--ot-line-height);
+}
+
+/* The header, then the stage, which takes the rest of the viewport. */
+#root {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100dvh;
+}
+
+code {
+  font-family: var(--ot-font-mono);
+  font-size: 0.875em;
+}
+
+button,
+select {
+  padding: var(--ot-space-1) var(--ot-space-3);
+  border: 1px solid var(--ot-color-border);
+  border-radius: var(--ot-radius);
+  background-color: var(--ot-color-surface);
+  color: var(--ot-color-text);
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--ot-color-text-muted);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ot-color-focus);
+  outline-offset: 2px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ot-space-4);
+  padding: var(--ot-space-2) var(--ot-space-4);
+  border-bottom: 1px solid var(--ot-color-border);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.theme-control {
+  display: flex;
+  align-items: center;
+  gap: var(--ot-space-2);
+  color: var(--ot-color-text-muted);
+}

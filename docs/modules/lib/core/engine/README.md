@@ -64,6 +64,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | Event | Params |
 |---|---|
 | `tiles.changed` | `{ tiles, issues }`: the reloaded tiles, with the same rules as the mount context. Pushed when the user presses "Reload tiles" for a mod opened with a collection. |
+| `theme.changed` | `{ colorScheme, tokens }`: the new theme, the same shape as `context.theme`. Pushed to every running mod, visible or hidden, once each time the app's resolved color scheme changes. A new theme choice that resolves to the same color scheme pushes nothing. The frame loader updates the frame's `data-ot-color-scheme` attribute before the mod's handlers run. |
 
 Inside the frame, a mod uses them through its engine API object:
 
@@ -89,6 +90,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | `tiles` | The tiles of the link's collection that match the mod's tile type. |
 | `issues` | The issues from loading and validating the collection. |
 | `permissions` | `granted` and `denied` lists of `{ category, host, reason }`. |
+| `theme` | `colorScheme` (`"light"` or `"dark"`) and `tokens`, a mapping from each theme token name to its value for that color scheme (see the [theme module](../theme/README.md)). It is the theme current when the frame connects, not when the mod started loading, so a mod opened while the user switches still mounts with the right one. |
 
 ### Tiles
 
@@ -272,7 +274,7 @@ const inspection = await inspectMod(
 
 ### Launch
 
-- `prepareModLaunch(request, options)`: prepares everything a mod's frame needs. `request` is a `ModLaunchRequest` (`link`, `appOrigin`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `params`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` before any request, loads the mod and its entrypoint, loads the collection when `link.collection` is not `null`, grants the permissions, collects the content hosts and builds the policy and the frame document. Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `sandboxDocument`, `issues`), where `issues` holds one warning per denied permission. Every error propagates, and each names its source.
+- `prepareModLaunch(request, options)`: prepares everything a mod's frame needs. `request` is a `ModLaunchRequest` (`link`, `appOrigin`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `params`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` before any request, loads the mod and its entrypoint, loads the collection when `link.collection` is not `null`, grants the permissions, collects the content hosts and builds the policy and the frame document. Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `sandboxDocument`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects, and `issues` holds one warning per denied permission. Every error propagates, and each names its source.
 - `loadModTiles(mod, collectionLocation, options?)`: loads and filters a collection for a mod. Returns `ModTiles` (`collectionSource`, `tiles`, `issues`). The stage's "Reload tiles" calls it again.
 
 ```ts
@@ -308,8 +310,10 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
 
 ### Session
 
-- `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and context), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `onIssue`, `onOpenLink`). Returns a `ModSession`.
+- `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `onIssue`, `onOpenLink`, `theme`). Returns a `ModSession`.
 - `pushTilesChanged(session, tiles, issues)`: pushes `tiles.changed`.
+- `pushThemeChanged(session, theme)`: pushes `theme.changed` with the `Theme`.
+- `THEME_CHANGED_METHOD`: `"theme.changed"`, shared with the frame loader.
 - `stopModSession(session)`: closes the channel. Later messages, pushes and answers to pending requests do nothing.
 
 Lifecycle:
@@ -317,7 +321,7 @@ Lifecycle:
 1. The stage launches the mod with `prepareModLaunch` and renders its frame with `launch.sandboxDocument`.
 2. On the frame's first `load`, the stage calls `connectModSession` with the frame's window.
 3. The session answers each request once with the same `id`. `sandbox.blocked` and `sandbox.mountFailed` from the frame loader become issues through `onIssue`, each reported once.
-4. "Reload tiles" calls `loadModTiles` and `pushTilesChanged`.
+4. "Reload tiles" calls `loadModTiles` and `pushTilesChanged`. A color scheme change calls `pushThemeChanged` for every running session.
 5. Closing the sandbox, or the frame loading another document, calls `stopModSession`.
 
 ```ts
@@ -330,6 +334,7 @@ const session = connectModSession(frame.contentWindow, launch, {
   fetchOptions: { baseUrl: document.baseURI },
   onIssue: addIssue,
   onOpenLink: openLinkFromThisSandbox,
+  theme: buildTheme("dark"),
 });
 pushTilesChanged(session, reloadedTiles.tiles, reloadedTiles.issues);
 ```

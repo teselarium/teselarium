@@ -67,6 +67,7 @@ describe("readModFormat", function describeReadModFormat(): void {
           reason: "Shows the book covers",
         },
       ],
+      theme: "default",
     });
   });
 
@@ -83,6 +84,7 @@ describe("readModFormat", function describeReadModFormat(): void {
       sampleCollection: null,
       config: {},
       permissions: [],
+      theme: "default",
     });
   });
 
@@ -183,6 +185,39 @@ describe("readModFormat", function describeReadModFormat(): void {
     expect(error.message).toContain(
       'inline "schema" is not supported yet, use "type_path" with the path of a tile type file',
     );
+  });
+
+  it("reads a missing theme as the default one", function readsDefaultTheme(): void {
+    const modFormat = readModFormat(buildMinimalMod({}));
+
+    expect(modFormat.theme).toBe("default");
+  });
+
+  it("keeps an explicit default theme", function readsExplicitDefault(): void {
+    const modFormat = readModFormat(buildMinimalMod({ theme: "default" }));
+
+    expect(modFormat.theme).toBe("default");
+  });
+
+  it("keeps the none theme", function readsNoTheme(): void {
+    const modFormat = readModFormat(buildMinimalMod({ theme: "none" }));
+
+    expect(modFormat.theme).toBe("none");
+  });
+
+  it("Unknown theme value", function rejectsUnknownTheme(): void {
+    const error = catchFormatError(buildMinimalMod({ theme: "dark" }));
+
+    expect(error.source).toBe(MOD_SOURCE);
+    expect(error.message).toBe(
+      `Invalid mod "${MOD_SOURCE}": "theme" must be "default" or "none"`,
+    );
+  });
+
+  it("rejects a theme that is not a string", function rejectsThemeNumber(): void {
+    const error = catchFormatError(buildMinimalMod({ theme: 0 }));
+
+    expect(error.message).toContain('"theme" must be "default" or "none"');
   });
 
   it("reads the permissions with the mod file's source", function readsPermissions(): void {

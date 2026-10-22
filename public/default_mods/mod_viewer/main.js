@@ -1,13 +1,13 @@
 /** Default mod: shows the metadata of the mod named by the `target` parameter, and runs it. */
 
+// Only the layout: the theme's base stylesheet gives the colors and fonts.
 const VIEWER_STYLE = `
-  body { font-family: system-ui, sans-serif; margin: 1rem; }
-  dt { font-weight: bold; margin-top: 0.5rem; }
-  dd { margin-left: 1rem; overflow-wrap: anywhere; }
+  dt { margin-top: var(--ot-space-2); }
+  dd { margin-left: var(--ot-space-4); overflow-wrap: anywhere; }
   pre { margin: 0; }
-  .collection-field, .run-choices { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+  .collection-field, .run-choices { display: flex; flex-wrap: wrap; gap: var(--ot-space-2); margin-top: var(--ot-space-4); }
   input[type="url"] { flex: 1; min-width: 16rem; }
-  .viewer-error { color: #b91c1c; }
+  .viewer-error { color: var(--ot-color-danger); }
 `;
 
 function describeError(error) {

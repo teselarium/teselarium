@@ -17,6 +17,7 @@ import {
   buildSandboxPolicy,
   collectContentHosts,
 } from "../sandbox/index.ts";
+import type { Theme } from "../theme/index.ts";
 import { findSwitchedOffMod } from "./default_mod_settings.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModSwitchedOffError } from "./engine_errors.ts";
@@ -42,13 +43,21 @@ export interface ModContext {
   tiles: Tile[];
   issues: TileIssue[];
   permissions: ModGrants;
+  /** The theme current when the frame connected. */
+  theme: Theme;
 }
+
+/**
+ * The mount context as built when the mod starts loading: everything but the
+ * theme, which is only known when the frame connects.
+ */
+export type LaunchContext = Omit<ModContext, "theme">;
 
 /** Everything needed to start a mod's frame. Plain data. */
 export interface ModLaunch {
   mod: LoadedMod;
   collectionSource: string | null;
-  context: ModContext;
+  context: LaunchContext;
   contentHosts: string[];
   /** The frame's `srcdoc` HTML. */
   sandboxDocument: string;
@@ -171,8 +180,8 @@ function buildModContext(
   link: RunLink,
   modTiles: ModTiles | null,
   grants: ModGrants,
-): ModContext {
-  const context: ModContext = {
+): LaunchContext {
+  const context: LaunchContext = {
     mod: {
       source: mod.source,
       name: mod.name,
@@ -210,7 +219,7 @@ export async function prepareModLaunch(
     collectionSource: modTiles === null ? null : modTiles.collectionSource,
     context: buildModContext(mod, request.link, modTiles, grants),
     contentHosts,
-    sandboxDocument: buildSandboxDocument(policy),
+    sandboxDocument: buildSandboxDocument(policy, mod.theme),
     issues: buildPermissionIssues(mod, grants),
   };
   return launch;

@@ -6,11 +6,13 @@ describe("engine module entry point", function describeEntryPoint(): void {
     expect(Object.keys(engineModule).sort()).toEqual([
       "ModMethodError",
       "ModSwitchedOffError",
+      "THEME_CHANGED_METHOD",
       "connectModSession",
       "findSwitchedOffMod",
       "inspectMod",
       "loadModTiles",
       "prepareModLaunch",
+      "pushThemeChanged",
       "pushTilesChanged",
       "resolveDefaultModSettings",
       "stopModSession",

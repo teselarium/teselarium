@@ -6,6 +6,7 @@ import {
   SANDBOX_CONNECT_METHOD,
   SANDBOX_MOUNT_FAILED_METHOD,
 } from "./index.ts";
+import { THEME_CHANGED_METHOD } from "../engine/index.ts";
 import SANDBOX_LOADER from "./sandbox_loader.js?raw";
 
 describe("readBlockedRequest", function describeReadBlockedRequest(): void {
@@ -72,5 +73,12 @@ describe("frame loader message names", function describeMethodNames(): void {
       "sandbox.blocked",
       "sandbox.mountFailed",
     ]);
+  });
+
+  it("include the engine's theme.changed event", function matchesThemeChanged(): void {
+    expect(THEME_CHANGED_METHOD).toBe("theme.changed");
+    expect(SANDBOX_LOADER).toContain(
+      `const THEME_CHANGED_METHOD = "${THEME_CHANGED_METHOD}";`,
+    );
   });
 });

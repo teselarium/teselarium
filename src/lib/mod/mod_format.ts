@@ -4,6 +4,9 @@ import { ModFormatError } from "./mod_errors.ts";
 import { readModPermissions } from "./mod_permissions.ts";
 import type { ModPermission } from "./mod_permissions.ts";
 
+/** Whether the mod's frame gets the theme styles (`"default"`) or none (`"none"`). */
+export type ModThemeSetting = "default" | "none";
+
 /** The checked content of a mod file. Paths are not resolved yet. */
 export interface ModFormat {
   name: string;
@@ -15,6 +18,7 @@ export interface ModFormat {
   sampleCollection: string | null;
   config: YamlMapping;
   permissions: ModPermission[];
+  theme: ModThemeSetting;
 }
 
 function readModMapping(parsedYaml: ParsedYaml): YamlMapping {
@@ -83,6 +87,18 @@ function readModConfig(mod: YamlMapping, source: string): YamlMapping {
   return config;
 }
 
+/** Reads `theme`: missing gives `"default"`, and only `"default"` and `"none"` are accepted. */
+function readModTheme(mod: YamlMapping, source: string): ModThemeSetting {
+  const theme = mod.theme;
+  if (theme === undefined) {
+    return "default";
+  }
+  if (theme !== "default" && theme !== "none") {
+    throw new ModFormatError(source, '"theme" must be "default" or "none"');
+  }
+  return theme;
+}
+
 function checkNoInlineSchema(mod: YamlMapping, source: string): void {
   if (Object.hasOwn(mod, "schema")) {
     throw new ModFormatError(
@@ -96,8 +112,8 @@ function checkNoInlineSchema(mod: YamlMapping, source: string): void {
  * Checks the structure of a parsed mod file: a `mod` mapping with non-empty
  * string `name`, `version` and `entrypoint`, optional string `title` (defaults
  * to `name`) and `description` (defaults to `""`), optional non-empty
- * `type_path` and `sample_collection`, an optional `config` mapping and
- * optional `permissions`. Other keys are ignored, and an inline `schema` is
+ * `type_path` and `sample_collection`, an optional `config` mapping,
+ * optional `permissions` and an optional `theme` (`"default"` or `"none"`). Other keys are ignored, and an inline `schema` is
  * rejected. Raises `ModFormatError` at the first failure.
  */
 export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
@@ -122,6 +138,7 @@ export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
     sampleCollection,
     config,
     permissions: readModPermissions(mod.permissions, source),
+    theme: readModTheme(mod, source),
   };
   return modFormat;
 }

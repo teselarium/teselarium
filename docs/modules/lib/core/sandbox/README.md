@@ -77,17 +77,20 @@ Each mod runs in its own `<iframe sandbox="allow-scripts">` whose document is bu
 - The app creates every frame itself, also for a mod opened by another mod, so frames are never nested.
 - When a mod navigates its frame, the frame fires a second `load` event: the stage stops the mod, removes its frame and reports `The mod left its page and was stopped.`
 
-The frame document holds only the policy and the frame loader:
+The frame document holds only the policy, the theme styles and the frame loader:
 
 ```html
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="POLICY">
+<style>THEME_FRAME_STYLES</style>
 <script type="module">FRAME_LOADER</script>
 </head><body></body></html>
 ```
 
-The policy comes first, because a `<meta>` policy only applies to what follows it. The mod's code is not in the document: it arrives over the channel, so nothing needs HTML escaping. The frame loader is an inline module script, so its names stay out of the mod's global scope.
+The policy comes first, because a `<meta>` policy only applies to what follows it. The `<style>` holds the theme tokens and the base stylesheet in the layer `opentesela` (see the [theme module](../theme/README.md)); a mod whose file sets `theme: "none"` gets no `<style>`. The policy's `style-src 'unsafe-inline'` already allows it. The mod's code is not in the document: it arrives over the channel, and the styles are static text without a closing style tag, so nothing needs HTML escaping. The frame loader is an inline module script, so its names stay out of the mod's global scope.
+
+The document is fixed for the life of the mod, because changing `srcdoc` reloads the frame, which stops the mod. What changes while a mod runs, such as the color scheme, reaches the frame only over the channel.
 
 ### The frame loader
 
@@ -97,7 +100,9 @@ The frame loader (`sandbox_loader.js`) is the only script the app puts in a mod'
 2. It accepts only the first message whose `source` is the app's window (`window.parent`), whose data is a `sandbox.connect` notification and which carries exactly one port. Later messages are ignored.
 3. It builds the frozen engine API object: `request(method, params)` sends a JSON-RPC request with ids counting from 1, and `on(event, handler)` adds a handler for an event.
 4. On the port, a response settles its pending request: resolved with `result`, or rejected with an `Error` that has the response's `message` and `code`. A notification calls the handlers of its method in registration order; a handler that throws is logged with `console.error` and the others still run.
-5. It turns the mod's code into a `blob:` URL, `import()`s it, revokes the URL, checks that the default export is a function and calls `mount(engine, context)`, awaiting the result. A missing default export, an import error, a throw or a rejection becomes `sandbox.mountFailed`.
+5. On connect, it sets `data-ot-color-scheme` on `<html>` to `context.theme.colorScheme`, before importing the mod, so the attribute is there before `mount`.
+6. On a `theme.changed` notification, it sets the attribute to the params' `colorScheme` before calling the mod's handlers. If `mount` has not been called yet, it also replaces `context.theme` with the params, so a mod whose code is still being imported mounts with the newest theme. A `colorScheme` other than `"light"` or `"dark"` is ignored. The attribute is set for mods that opted out of the theme styles too.
+7. It turns the mod's code into a `blob:` URL, `import()`s it, revokes the URL, checks that the default export is a function and calls `mount(engine, context)`, awaiting the result. A missing default export, an import error, a throw or a rejection becomes `sandbox.mountFailed`.
 
 ### Frame loader messages
 
@@ -108,6 +113,8 @@ The frame loader and the engine use three notifications, whose names start with 
 | `sandbox.connect` | engine to frame, on `window`, with the port | `{ code, context }`: the entrypoint text and the mount context |
 | `sandbox.blocked` | frame to engine, on the port | `{ blockedUrl, directive }` of a `securitypolicyviolation` |
 | `sandbox.mountFailed` | frame to engine, on the port | `{ message }` of the mount error |
+
+The frame loader also knows the engine's `theme.changed` event (see the [engine module](../engine/README.md)), to keep the color scheme attribute up to date. The name test in `sandbox_messages.test.ts` checks it against the engine's `THEME_CHANGED_METHOD`.
 
 The engine turns `sandbox.blocked` into a blocked request report and `sandbox.mountFailed` into the error issue `The mod could not be mounted: <message>`, each reported once. Params of the wrong shape are ignored. A mod could send these notifications itself, but they only add issues to its own list.
 
@@ -146,7 +153,7 @@ const policy = buildSandboxPolicy(contentHosts, grants.granted);
 
 ### Frame document, messages and channel
 
-- `buildSandboxDocument(policy)`: the `srcdoc` HTML of a mod's frame, with the policy before the frame loader.
+- `buildSandboxDocument(policy, theme)`: the `srcdoc` HTML of a mod's frame, with the policy, then the theme styles when `theme` (the mod's `ModThemeSetting`) is `"default"`, then the frame loader.
 - `openSandboxChannel(frameTarget, params)`: posts `sandbox.connect` with `params` (`SandboxConnectParams`: `code`, `context`) and one port to the frame, and returns the engine's port.
 - `readBlockedRequest(params)` and `readMountFailure(params)`: read the params of `sandbox.blocked` and `sandbox.mountFailed`, or `null` for params of the wrong shape.
 - `SANDBOX_CONNECT_METHOD`, `SANDBOX_BLOCKED_METHOD`, `SANDBOX_MOUNT_FAILED_METHOD`: the message names, shared with the frame loader.
@@ -157,7 +164,7 @@ Example:
 ```ts
 import { buildSandboxDocument, openSandboxChannel } from "./lib/core/sandbox/index.ts";
 
-frame.srcdoc = buildSandboxDocument(policy);
+frame.srcdoc = buildSandboxDocument(policy, mod.theme);
 frame.addEventListener("load", function connectFrame(): void {
   const port = openSandboxChannel(frame.contentWindow, { code, context });
   port.onmessage = handleModMessage;

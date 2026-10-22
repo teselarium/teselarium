@@ -16,10 +16,13 @@ import {
 import { fetchTestFile } from "../../../test/test_files.ts";
 import type { ModIssue } from "../../mod/index.ts";
 import type { Tile } from "../../tile/index.ts";
+import { buildTheme } from "../theme/index.ts";
+import type { Theme } from "../theme/index.ts";
 import { prepareModLaunch } from "./mod_launch.ts";
-import type { ModLaunch, RunLink } from "./mod_launch.ts";
+import type { ModContext, ModLaunch, RunLink } from "./mod_launch.ts";
 import {
   connectModSession,
+  pushThemeChanged,
   pushTilesChanged,
   stopModSession,
 } from "./mod_session.ts";
@@ -59,7 +62,9 @@ function launchSampleMod(): Promise<ModLaunch> {
 }
 
 /** Connects a session for the sample mod (granted `open` for `"*"`), and plays the mod side. */
-async function playSession(): Promise<PlayedSession> {
+async function playSession(
+  theme: Theme = buildTheme("light"),
+): Promise<PlayedSession> {
   const sampleLaunch = await launchSampleMod();
   const openPermission = {
     category: "open" as const,
@@ -91,6 +96,7 @@ async function playSession(): Promise<PlayedSession> {
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     onIssue,
     onOpenLink,
+    theme,
   });
   const modPort = readModPort(fakeFrame);
   openPorts.push(modPort, session.port);
@@ -103,6 +109,12 @@ async function playSession(): Promise<PlayedSession> {
     launch,
   };
   return playedSession;
+}
+
+/** The mount context of a posted `sandbox.connect`. */
+function readSentContext(message: unknown): ModContext {
+  const connect = message as { params: { context: ModContext } };
+  return connect.params.context;
 }
 
 function sendRequest(
@@ -147,6 +159,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      theme: buildTheme("light"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
 
@@ -154,8 +167,50 @@ describe("connectModSession", function describeConnectModSession(): void {
     expect(fakeFrame.posted[0].message).toEqual({
       jsonrpc: "2.0",
       method: "sandbox.connect",
-      params: { code: launch.mod.code, context: launch.context },
+      params: {
+        code: launch.mod.code,
+        context: { ...launch.context, theme: buildTheme("light") },
+      },
     });
+  });
+
+  it("Dark mount context", async function sendsDarkTheme(): Promise<void> {
+    const fakeFrame = createFakeFrame();
+    const launch = await launchSampleMod();
+
+    const session = connectModSession(fakeFrame.target, launch, {
+      storage: createMemoryStorage(),
+      appOrigin: APP_ORIGIN,
+      defaults: TEST_DEFAULTS,
+      fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+      onIssue: vi.fn<(issue: ModIssue) => void>(),
+      onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      theme: buildTheme("dark"),
+    });
+    openPorts.push(session.port, readModPort(fakeFrame));
+
+    const context = readSentContext(fakeFrame.posted[0].message);
+    expect(context.theme.colorScheme).toBe("dark");
+    expect(context.theme.tokens["--ot-color-background"]).toBe("#18181b");
+  });
+
+  it("Structured clone of the theme", async function clonesTheme(): Promise<void> {
+    const fakeFrame = createFakeFrame();
+    const launch = await launchSampleMod();
+
+    const session = connectModSession(fakeFrame.target, launch, {
+      storage: createMemoryStorage(),
+      appOrigin: APP_ORIGIN,
+      defaults: TEST_DEFAULTS,
+      fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+      onIssue: vi.fn<(issue: ModIssue) => void>(),
+      onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      theme: buildTheme("dark"),
+    });
+    openPorts.push(session.port, readModPort(fakeFrame));
+
+    const context = readSentContext(fakeFrame.posted[0].message);
+    expect(structuredClone(context.theme)).toEqual(context.theme);
   });
 
   it("Store and read a value", async function storesValue(): Promise<void> {
@@ -271,6 +326,19 @@ describe("connectModSession", function describeConnectModSession(): void {
     expect(played.received[0]).not.toHaveProperty("id");
   });
 
+  it("pushes theme.changed with the theme", async function pushesThemeChanged(): Promise<void> {
+    const played = await playSession();
+    const theme = buildTheme("dark");
+
+    pushThemeChanged(played.session, theme);
+    await waitForReceived(played, 1);
+    await waitForMessages();
+
+    expect(played.received).toEqual([
+      { jsonrpc: "2.0", method: "theme.changed", params: theme },
+    ]);
+  });
+
   it("Repeated block is reported once", async function reportsBlockOnce(): Promise<void> {
     const played = await playSession();
     const blocked = { directive: "img-src" };
@@ -330,6 +398,7 @@ describe("stopModSession", function describeStopModSession(): void {
     stopModSession(played.session);
     sendRequest(played, 2, "storage.get", { key: "selected" });
     pushTilesChanged(played.session, [], []);
+    pushThemeChanged(played.session, buildTheme("dark"));
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await waitForMessages();
     }

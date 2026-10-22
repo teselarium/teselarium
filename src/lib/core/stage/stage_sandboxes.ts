@@ -5,6 +5,7 @@ import {
   connectModSession,
   loadModTiles,
   prepareModLaunch,
+  pushThemeChanged,
   pushTilesChanged,
   stopModSession,
 } from "../engine/index.ts";
@@ -15,6 +16,7 @@ import type {
   RunLink,
 } from "../engine/index.ts";
 import type { ModStorage } from "../storage/index.ts";
+import type { Theme } from "../theme/index.ts";
 import type { StageSandbox } from "./stage_state.ts";
 
 /** What the runtimes need from the stage. */
@@ -27,6 +29,8 @@ export interface SandboxServices {
   /** Called when a runtime changed on its own, so the stage publishes a snapshot. */
   onChange: () => void;
   onOpenLink: (openerId: string, link: RunLink) => boolean;
+  /** The stage's current theme, read when a session connects. */
+  readTheme: () => Theme;
 }
 
 export type SandboxStatus = "loading" | "failed" | "running" | "stopped";
@@ -146,7 +150,19 @@ export function attachSandboxFrame(
     fetchOptions: services.fetchOptions,
     onIssue: addRuntimeIssue.bind(undefined, runtime, services),
     onOpenLink: services.onOpenLink.bind(undefined, runtime.id),
+    theme: services.readTheme(),
   });
+}
+
+/**
+ * Pushes `theme.changed` to a running sandbox with a session. A sandbox still
+ * loading gets the theme when its frame connects.
+ */
+export function pushSandboxTheme(runtime: SandboxRuntime, theme: Theme): void {
+  if (runtime.status !== "running" || runtime.session === null) {
+    return;
+  }
+  pushThemeChanged(runtime.session, theme);
 }
 
 /** Stops the sandbox's session, adding `issue` when the mod was stopped for a reason. */

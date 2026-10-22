@@ -145,6 +145,24 @@ describe("loadMod", function describeLoadMod(): void {
     expect(mod.permissions).toEqual([]);
   });
 
+  it("No theme key", async function loadsDefaultTheme(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, MINIMAL_MOD_TEXT);
+    testTexts.set(BROKEN_ENTRYPOINT, "export default function mount() {}");
+
+    const mod = await loadMod(BROKEN_MOD_SOURCE, { fetch: fetchTestFile });
+
+    expect(mod.theme).toBe("default");
+  });
+
+  it("Opt out", async function loadsNoTheme(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, `${MINIMAL_MOD_TEXT}\n  theme: "none"`);
+    testTexts.set(BROKEN_ENTRYPOINT, "export default function mount() {}");
+
+    const mod = await loadMod(BROKEN_MOD_SOURCE, { fetch: fetchTestFile });
+
+    expect(mod.theme).toBe("none");
+  });
+
   it("Unknown keys are ignored", async function ignoresUnknownKeys(): Promise<void> {
     testTexts.set(BROKEN_MOD_SOURCE, MINIMAL_MOD_TEXT);
 

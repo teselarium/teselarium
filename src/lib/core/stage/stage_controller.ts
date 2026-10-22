@@ -7,6 +7,8 @@ import type {
   RunLink,
 } from "../engine/index.ts";
 import type { ModStorage } from "../storage/index.ts";
+import { buildTheme } from "../theme/index.ts";
+import type { ColorScheme, Theme } from "../theme/index.ts";
 import {
   readHistoryPosition,
   readStageRoute,
@@ -17,6 +19,7 @@ import type { StageHistory } from "./stage_history.ts";
 import {
   attachSandboxFrame,
   launchSandbox,
+  pushSandboxTheme,
   readSandboxIssues,
   reloadSandboxTiles,
   stopSandbox,
@@ -43,6 +46,8 @@ export interface StageOptions {
   baseUrl: string;
   storage: ModStorage;
   fetch?: typeof globalThis.fetch;
+  /** The color scheme the app starts with. */
+  colorScheme: ColorScheme;
 }
 
 /** What the page renders of one sandbox. Frozen. */
@@ -76,6 +81,8 @@ export interface Stage {
   appOrigin: string;
   fetchOptions: FileFetchOptions;
   storage: ModStorage;
+  /** The current theme: new sessions connect with it, and running ones are told when it changes. */
+  theme: Theme;
   listeners: Set<() => void>;
   snapshot: StageSnapshot;
 }
@@ -103,6 +110,10 @@ function openLinkFromSandbox(
   return openStageLink(stage, link, openerId);
 }
 
+function readStageTheme(stage: Stage): Theme {
+  return stage.theme;
+}
+
 function buildSandboxServices(stage: Stage): SandboxServices {
   const services: SandboxServices = {
     defaults: stage.defaults,
@@ -111,6 +122,7 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     storage: stage.storage,
     onChange: publishStage.bind(undefined, stage),
     onOpenLink: openLinkFromSandbox.bind(undefined, stage),
+    readTheme: readStageTheme.bind(undefined, stage),
   };
   return services;
 }
@@ -210,6 +222,7 @@ export function createStage(options: StageOptions): Stage {
     appOrigin: options.appOrigin,
     fetchOptions: { baseUrl: options.baseUrl, fetch: options.fetch },
     storage: options.storage,
+    theme: buildTheme(options.colorScheme),
     listeners: new Set(),
     snapshot: EMPTY_SNAPSHOT,
   };
@@ -336,6 +349,24 @@ export function frameLoadedAgain(stage: Stage, id: string): void {
   const source = runtime.launch?.mod.source ?? id;
   stopSandbox(runtime, { level: "error", source, message: LEFT_PAGE_MESSAGE });
   publishStage(stage);
+}
+
+/**
+ * Switches the stage to a color scheme and pushes `theme.changed` to every
+ * running mod, visible or hidden. Does nothing when the color scheme is the
+ * current one.
+ */
+export function changeStageColorScheme(
+  stage: Stage,
+  colorScheme: ColorScheme,
+): void {
+  if (stage.theme.colorScheme === colorScheme) {
+    return;
+  }
+  stage.theme = buildTheme(colorScheme);
+  for (const runtime of stage.runtimes.values()) {
+    pushSandboxTheme(runtime, stage.theme);
+  }
 }
 
 export function readStageSnapshot(stage: Stage): StageSnapshot {

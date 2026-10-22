@@ -81,7 +81,7 @@ Imports go one way, extending the order of `add-mod-sandbox` (its design D1):
 | `--ot-color-accent-text` | `#ffffff` | `#18181b` |
 | `--ot-color-focus` | `#1d4ed8` | `#93c5fd` |
 | `--ot-color-danger` | `#b91c1c` | `#f87171` |
-| `--ot-color-warning` | `#a16207` | `#facc15` |
+| `--ot-color-warning` | `#854d0e` | `#facc15` |
 | `--ot-color-success` | `#15803d` | `#4ade80` |
 | `--ot-font-body` | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` | same |
 | `--ot-font-mono` | `ui-monospace, "SF Mono", Menlo, Consolas, monospace` | same |
@@ -91,7 +91,7 @@ Imports go one way, extending the order of `add-mod-sandbox` (its design D1):
 | `--ot-radius` | `0.375rem` | same |
 | `--ot-shadow` | `0 1px 3px rgb(0 0 0 / 0.25)` | same |
 
-The light grays, the issue red and amber and the selection blue are the ones the app and the sample mod use today, so the light theme looks like the current app. Every text color (`text`, `text-muted`, `accent`, `danger`, `warning`, `success`) has a contrast of at least 4.5:1 on `background` and on `surface` in its color scheme, and `accent-text` on `accent` too. A unit test computes the ratios, so a later palette edit cannot break them silently.
+The light grays, the issue red and the selection blue are the ones the app and the sample mod use today, so the light theme looks like the current app. The light warning is one step darker than today's issue amber (`#a16207`), which has only 4.48:1 on `surface` (found by the contrast test in task 1.1). Every text color (`text`, `text-muted`, `accent`, `danger`, `warning`, `success`) has a contrast of at least 4.5:1 on `background` and on `surface` in its color scheme, and `accent-text` on `accent` too. A unit test computes the ratios, so a later palette edit cannot break them silently.
 
 The names stay close to common conventions (Open Props, shadcn/ui: background, surface, text, muted, border, accent), so authors can guess them and a later Tailwind or shadcn adoption (`docs/stack.md`) can map them one to one.
 
@@ -238,7 +238,9 @@ Each scenario of the four spec files has a test named after it, as in `add-mod-s
 ## Risks / Trade-offs
 
 - [A dark app may show a light frame for a moment before the frame connects, because the frame document starts without the attribute and the browser may paint it first] → The attribute is set in the connect handler, before the mod's code is imported, so the gap is one message after `load`. Task 7.3 checks it in Playwright with a dark color scheme. If a light flash shows, the fallback is to give the `<iframe>` element `visibility: hidden` until the stage attaches the frame. That is a change in `SandboxFrame` only.
+  - Result of task 7.3 (Playwright Chromium 1.64, dark color scheme, sample mod): the flash is real. An init script recorded each rendering of the page and of the frame; in 16 of 30 loads the page showed the frame in a rendering where the frame's `<html>` had no `data-ot-color-scheme` yet, so one white frame (about 16 ms) appeared in the dark app. With the fallback as written (hidden until the stage attaches the frame), 4 of 30 loads still flashed: attaching only posts `sandbox.connect`, and React can show the `<iframe>` before the frame handles it. `SandboxFrame` therefore shows the frame one animation frame after attaching it (`requestAnimationFrame`); with that, 120 of 120 loads showed no unthemed frame. The test "a dark app never shows the frame without its color scheme" in `e2e/mod_theme.spec.ts` checks it. This relies on the browser handling the already-posted message before its next rendering, which the platform does not guarantee; if it ever flashes again, the robust fix is a frame-to-engine notification after the attribute is set, which needs a new frame loader message.
 - [Only Chromium was checked] → Custom properties, cascade layers and `color-scheme` are supported in current Firefox and Safari. Task 9.2 checks the theme switch in Firefox and, if available, WebKit, as `add-mod-sandbox` did for the frame.
+  - Result of task 9.2 (2026-10-22): checked by hand in Firefox; no differences from Chromium. Safari and Playwright WebKit were not available, so WebKit is unchecked.
 - [A mod can remove the theme styles or change the attribute] → It only changes its own frame. The app's colors and the other mods are not affected.
 - [Mods that use `@media (prefers-color-scheme)` follow the operating system, not the app] → Documented in the theme README with the attribute selector to use instead. The sample and default mods use neither.
 - [The base stylesheet changes the look of existing third-party mods] → No mod exists outside this repository yet. A mod that wants the old blank frame sets `theme: "none"`.

@@ -19,6 +19,7 @@ export function buildTestStage(history: FakeHistory): Stage {
     baseUrl: APP_BASE_URL,
     storage: createMemoryStorage(),
     fetch: fetchTestFile,
+    colorScheme: "light",
   });
   return stage;
 }

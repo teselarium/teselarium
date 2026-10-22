@@ -219,6 +219,26 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     );
   });
 
+  it("builds the frame document with the mod's theme setting", async function passesTheme(): Promise<void> {
+    const plainSource = `${APP_BASE_URL}mods/plain/mod_conf.yaml`;
+    serveTestMod(plainSource, [
+      '  name: "plain"',
+      '  version: "0.1.0"',
+      '  entrypoint: "./main.js"',
+      '  theme: "none"',
+    ]);
+
+    const sampleLaunch = await launchMod(SAMPLE_LINK);
+    const plainLaunch = await launchMod({
+      mod: plainSource,
+      collection: null,
+      params: {},
+    });
+
+    expect(sampleLaunch.sandboxDocument).toContain("<style>");
+    expect(plainLaunch.sandboxDocument).not.toContain("<style");
+  });
+
   it("Structured clone of the mount context", async function clonesContext(): Promise<void> {
     const launch = await launchMod(SAMPLE_LINK);
 

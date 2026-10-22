@@ -61,6 +61,17 @@ The stage bar lists every issue of the visible sandbox, in the order they were f
 
 "Reload tiles", for a sandbox opened with a collection, loads and validates the collection again, pushes `tiles.changed` to the running mod and replaces the collection issues.
 
+### The theme
+
+The stage keeps the app's current theme, built from the resolved color scheme (see the [theme module](../theme/README.md)). It does not know where the color scheme comes from: the app tells it with `changeStageColorScheme`.
+
+- A mod's session connects, on the frame's first `load`, with the theme current at that moment, so a mod opened while the color scheme changes mounts with the new one.
+- When the color scheme changes, every running mod, visible or hidden, gets `theme.changed` once. A mod still loading gets nothing: it connects with the new theme. A change to the current color scheme pushes nothing.
+
+### The frame size
+
+The visible sandbox's frame fills the stage area: the page's width, and the viewport height left under the app header and the stage bar. It follows the window's size and never depends on the mod's content: content taller than the frame scrolls inside the frame, not the page. The frame is at least 16rem tall; when less room is left, the page scrolls. The layout lives in `src/main/app.css` and `src/main/stage/stage.css`.
+
 ## Module Details
 
 Implemented in `src/lib/core/stage/`. Other modules import only from the public entry point `src/lib/core/stage/index.ts`.
@@ -79,13 +90,14 @@ The work behind the public API is split so each file has one reason to change:
 
 ### Public API
 
-- `createStage(options)`: builds a stage. `StageOptions` are `history` (the `state`, `pushState` and `replaceState` of `History`), `defaults` (`DefaultModSettings`), `appOrigin`, `baseUrl` (the app's address), `storage` (`localStorage`) and an optional `fetch`.
+- `createStage(options)`: builds a stage. `StageOptions` are `history` (the `state`, `pushState` and `replaceState` of `History`), `defaults` (`DefaultModSettings`), `appOrigin`, `baseUrl` (the app's address), `storage` (`localStorage`), an optional `fetch` and `colorScheme`, the color scheme the app starts with.
 - `followHistory(stage, hash, historyState)`: follows the current entry, on start and on each `popstate`.
 - `openStageLink(stage, link, openerId)`: opens a `RunLink` a mod asked for. Returns `false` when the opener is not the visible sandbox. The sessions call it through their `onOpenLink`.
 - `closeSandbox(stage, id)`: the × button.
 - `reloadTiles(stage, id)`: the "Reload tiles" button.
 - `attachFrame(stage, id, frameTarget)`: on a frame's first `load`, connects its mod's session.
 - `frameLoadedAgain(stage, id)`: on any later `load` of a frame: its mod navigated, so it is stopped with the issue `The mod left its page and was stopped.` and its frame removed.
+- `changeStageColorScheme(stage, colorScheme)`: switches the stage's theme and pushes `theme.changed` to every running mod, visible or hidden. Does nothing when the color scheme is the current one. The stage's current `Theme` is `stage.theme`.
 - `readStageSnapshot(stage)` and `subscribeStage(stage, listener)`: a frozen `StageSnapshot` that is new after every change, for React's `useSyncExternalStore`. `subscribeStage` returns the function that unsubscribes.
 - Types: `Stage`, `StageOptions`, `StageSnapshot`, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, `sandboxDocument`, `canReloadTiles`, `issues`, `errorMessage`), `SandboxStatus` (`loading`, `failed`, `running` or `stopped`), `StageHistory`.
 
@@ -103,6 +115,7 @@ const stage = createStage({
   appOrigin: location.origin,
   baseUrl: document.baseURI,
   storage: localStorage,
+  colorScheme: "light",
 });
 followHistory(stage, location.hash, history.state);
 window.addEventListener("popstate", function followPopState(): void {
@@ -110,7 +123,7 @@ window.addEventListener("popstate", function followPopState(): void {
 });
 ```
 
-Fragment navigations fire `popstate` too, so `hashchange` is not needed. `App` then renders `StageView`, which reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`.
+Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. `App` then renders `StageView`, which reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`.
 
 ### Why no router library
 

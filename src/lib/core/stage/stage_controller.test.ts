@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  collectMessages,
   createFakeFrame,
   readModPort,
   waitForMessages,
@@ -10,8 +11,11 @@ import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import { APP_ORIGIN, SAMPLE_MOD_SOURCE } from "../../../test/sample_mods.ts";
 import { fetchTestFile } from "../../../test/test_files.ts";
+import { buildTheme } from "../theme/index.ts";
+import type { ColorScheme } from "../theme/index.ts";
 import {
   attachFrame,
+  changeStageColorScheme,
   closeSandbox,
   createStage,
   followHistory,
@@ -38,7 +42,10 @@ afterEach(function closePorts(): void {
   openPorts.length = 0;
 });
 
-function buildStage(history: FakeHistory): Stage {
+function buildStage(
+  history: FakeHistory,
+  colorScheme: ColorScheme = "light",
+): Stage {
   const stage = createStage({
     history,
     defaults: {
@@ -50,8 +57,34 @@ function buildStage(history: FakeHistory): Stage {
     baseUrl: APP_BASE_URL,
     storage: createMemoryStorage(),
     fetch: fetchTestFile,
+    colorScheme,
   });
   return stage;
+}
+
+/** Attaches a fake frame to a sandbox, and keeps what its mod receives. */
+function attachCollectingFrame(
+  stage: Stage,
+  id: string,
+): { posted: unknown[]; received: unknown[] } {
+  const fakeFrame = createFakeFrame();
+  attachFrame(stage, id, fakeFrame.target);
+  const modPort = readModPort(fakeFrame);
+  openPorts.push(modPort);
+  const posted: unknown[] = [];
+  for (const post of fakeFrame.posted) {
+    posted.push(post.message);
+  }
+  const attached = { posted, received: collectMessages(modPort) };
+  return attached;
+}
+
+/** The `colorScheme` of the mount context in a posted `sandbox.connect`. */
+function readConnectColorScheme(message: unknown): string {
+  const connect = message as {
+    params: { context: { theme: { colorScheme: string } } };
+  };
+  return connect.params.context.theme.colorScheme;
 }
 
 async function settleStage(stage: Stage): Promise<void> {
@@ -336,5 +369,86 @@ describe("subscribeStage", function describeSubscribeStage(): void {
     expect(readVisible(stage).issues[0].message).toContain(
       "https://images.example.net",
     );
+  });
+});
+
+describe("changeStageColorScheme", function describeChangeColorScheme(): void {
+  it("keeps the theme of the color scheme it was created with", function buildsTheme(): void {
+    const stage = buildStage(new FakeHistory(""), "dark");
+
+    expect(stage.theme).toEqual(buildTheme("dark"));
+  });
+
+  it("Color scheme changed while the mod loads", async function connectsWithNewTheme(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history, "light");
+    followHistory(stage, history.hash, history.state);
+
+    changeStageColorScheme(stage, "dark");
+    await settleStage(stage);
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    expect(readConnectColorScheme(attached.posted[0])).toBe("dark");
+  });
+
+  it("pushes nothing to a loading mod, which connects with the new theme", async function skipsLoading(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history, "light");
+    followHistory(stage, history.hash, history.state);
+    const runtime = stage.runtimes.get("sandbox-1");
+
+    changeStageColorScheme(stage, "dark");
+    expect(runtime?.status).toBe("loading");
+    await settleStage(stage);
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+    await waitForMessages();
+
+    expect(attached.received).toEqual([]);
+    expect(readConnectColorScheme(attached.posted[0])).toBe("dark");
+  });
+
+  it("Visible and hidden mods are told", async function pushesToEveryMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    const hidden = attachCollectingFrame(stage, "sandbox-1");
+    const visible = attachCollectingFrame(stage, "sandbox-2");
+
+    changeStageColorScheme(stage, "dark");
+    await waitForMessages();
+
+    const pushed = {
+      jsonrpc: "2.0",
+      method: "theme.changed",
+      params: buildTheme("dark"),
+    };
+    expect(readVisible(stage).id).toBe("sandbox-2");
+    expect(hidden.received).toEqual([pushed]);
+    expect(visible.received).toEqual([pushed]);
+    expect(stage.theme).toEqual(buildTheme("dark"));
+  });
+
+  it("Same color scheme, no event", async function skipsSameScheme(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history, "dark");
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    changeStageColorScheme(stage, "dark");
+    await waitForMessages();
+
+    expect(attached.received).toEqual([]);
+  });
+
+  it("pushes nothing to a stopped mod", async function skipsStopped(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history, "light");
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+    frameLoadedAgain(stage, "sandbox-1");
+
+    changeStageColorScheme(stage, "dark");
+    await waitForMessages();
+
+    expect(attached.received).toEqual([]);
   });
 });

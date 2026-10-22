@@ -1,10 +1,10 @@
 /** Default mod: lists the mods of its config and opens the viewer for the one the user picks. */
 
+// Only the layout: the theme's base stylesheet gives the colors and fonts.
 const EXPLORER_STYLE = `
-  body { font-family: system-ui, sans-serif; margin: 1rem; }
-  ul { list-style: none; padding: 0; display: grid; gap: 0.5rem; }
-  button { display: block; width: 100%; text-align: left; padding: 0.5rem; }
-  .mod-error { color: #b91c1c; }
+  ul { list-style: none; padding: 0; display: grid; gap: var(--ot-space-2); }
+  button { display: block; width: 100%; text-align: left; padding: var(--ot-space-2); }
+  .mod-error { color: var(--ot-color-danger); }
 `;
 
 function describeError(error) {

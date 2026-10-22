@@ -9,6 +9,8 @@ export default defineConfig({
   server: { host: "127.0.0.1" },
   preview: { host: "127.0.0.1" },
   test: {
+    // The theme imports its base stylesheet as text, which Vitest empties unless CSS is processed.
+    css: { include: [/base_stylesheet\.css/] },
     projects: [
       {
         extends: true,

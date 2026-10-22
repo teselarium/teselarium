@@ -38,6 +38,7 @@ Every key lives under a `mod` mapping:
 | `sample_collection` | no | Path of the sample tiles the mod comes with. It is not fetched when the mod is loaded. |
 | `config` | no | Mapping given to the mod as `context.config`, defaults to `{}`. |
 | `permissions` | no | The web hosts and mods the mod needs, see below. |
+| `theme` | no | `"default"` (the default) or `"none"`. With `"none"`, the mod's frame gets neither the theme tokens nor the base stylesheet; the mod still receives the theme in its mount context and the `theme.changed` event. Any other value is rejected. See the [theme module](../core/theme/README.md). |
 
 - `entrypoint`, `type_path` and `sample_collection` are resolved against the mod file's location, so they can leave the mod folder (`../../types/book.md`).
 - Other keys are ignored. An inline `schema` is rejected for now: use `type_path` with the path of a tile type file.
@@ -85,11 +86,11 @@ Implemented in `src/lib/mod/`. Other modules import only from the public entry p
 ### Mod loader
 
 - `resolveModReference(reference, options)`: resolves a mod reference to the URL of its mod file. `options` are `{ baseUrl?, defaultModsFolder? }`. Raises `FileFetchError` when it cannot, for example for a default mod name without a default mods folder.
-- `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `name`, `title`, `version`, `description`, `entrypoint`, `typeSource`, `sampleCollection`, `config`, `permissions`). The entrypoint, the tile type and the sample collection are not fetched.
+- `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `name`, `title`, `version`, `description`, `entrypoint`, `typeSource`, `sampleCollection`, `config`, `permissions`, `theme`). The entrypoint, the tile type and the sample collection are not fetched.
 - `loadMod(reference, options?)`: `loadModFile`, then fetches the entrypoint. Returns a `LoadedMod`: a `ModFile` with `code`, the entrypoint text.
 - `ModLoadOptions`: the `FileFetchOptions` of the [files module](../files/README.md) plus `defaultModsFolder`. Relative references are resolved against `baseUrl`, by default the page's document base URL.
 - Errors: `ModFormatError` (the file does not follow the mod file format). It exposes the failing `source`. A mod file or entrypoint that cannot be fetched raises `FileFetchError`, and a mod file that is not plain YAML raises `YamlParseError`.
-- Types: `ModFile`, `LoadedMod`, `ModLoadOptions`, `ModPermission` (`category`, `host`, `reason`), `PermissionCategory`, `ModIssue` (`level`, `source`, `message`, the shape of a `TileIssue`).
+- Types: `ModFile`, `LoadedMod`, `ModLoadOptions`, `ModPermission` (`category`, `host`, `reason`), `PermissionCategory`, `ModThemeSetting` (`"default" | "none"`), `ModIssue` (`level`, `source`, `message`, the shape of a `TileIssue`).
 
 Loaded mods are plain data, and two loads of the same mod never share objects.
 

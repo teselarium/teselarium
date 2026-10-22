@@ -6,6 +6,7 @@
 const CONNECT_METHOD = "sandbox.connect";
 const BLOCKED_METHOD = "sandbox.blocked";
 const MOUNT_FAILED_METHOD = "sandbox.mountFailed";
+const THEME_CHANGED_METHOD = "theme.changed";
 
 const loader = {
   port: null,
@@ -13,6 +14,9 @@ const loader = {
   nextRequestId: 1,
   pendingRequests: new Map(),
   eventHandlers: new Map(),
+  // The mount context, kept until `mount` is called so a theme change can still reach it.
+  context: null,
+  mounted: false,
 };
 
 function sendNotification(method, params) {
@@ -91,6 +95,31 @@ function dispatchNotification(notification) {
   }
 }
 
+function isTheme(theme) {
+  return (
+    typeof theme === "object" &&
+    theme !== null &&
+    (theme.colorScheme === "light" || theme.colorScheme === "dark")
+  );
+}
+
+// The attribute selects the theme tokens. Anything but a light or dark theme is ignored.
+function applyColorScheme(theme) {
+  if (!isTheme(theme)) {
+    return;
+  }
+  document.documentElement.dataset.otColorScheme = theme.colorScheme;
+}
+
+// Before the mod's handlers run: they read the new attribute, and a mod
+// still being imported mounts with the newest theme.
+function applyThemeChanged(theme) {
+  applyColorScheme(theme);
+  if (isTheme(theme) && !loader.mounted && loader.context !== null) {
+    loader.context.theme = theme;
+  }
+}
+
 function handlePortMessage(event) {
   const message = event.data;
   if (typeof message !== "object" || message === null) {
@@ -99,6 +128,9 @@ function handlePortMessage(event) {
   if (message.id !== undefined && message.id !== null) {
     settleRequest(message);
     return;
+  }
+  if (message.method === THEME_CHANGED_METHOD) {
+    applyThemeChanged(message.params);
   }
   if (typeof message.method === "string") {
     dispatchNotification(message);
@@ -136,12 +168,13 @@ async function importModCode(code) {
   }
 }
 
-async function mountMod(params) {
-  const modModule = await importModCode(params.code);
+async function mountMod(code) {
+  const modModule = await importModCode(code);
   if (typeof modModule.default !== "function") {
     throw new Error("the entrypoint has no default export function");
   }
-  await modModule.default(engine, params.context);
+  loader.mounted = true;
+  await modModule.default(engine, loader.context);
 }
 
 function reportMountFailure(error) {
@@ -163,7 +196,10 @@ function connectToEngine(event) {
   loader.port = event.ports[0];
   loader.port.onmessage = handlePortMessage;
   flushPendingReports();
-  mountMod(event.data.params).catch(reportMountFailure);
+  const params = event.data.params;
+  loader.context = params.context;
+  applyColorScheme(params.context?.theme);
+  mountMod(params.code).catch(reportMountFailure);
 }
 
 document.addEventListener("securitypolicyviolation", reportViolation);

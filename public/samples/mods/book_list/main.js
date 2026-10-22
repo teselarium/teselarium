@@ -2,11 +2,10 @@
 
 const SELECTED_KEY = "selected";
 
+// Only the layout: the theme's base stylesheet gives the colors, fonts and the selected book's outline.
 const BOOK_LIST_STYLE = `
-  body { font-family: system-ui, sans-serif; margin: 1rem; }
-  ul { list-style: none; padding: 0; display: grid; gap: 0.5rem; }
-  button { display: flex; gap: 0.75rem; align-items: center; width: 100%; text-align: left; padding: 0.5rem; }
-  button[aria-pressed="true"] { outline: 3px solid #2563eb; }
+  ul { list-style: none; padding: 0; display: grid; gap: var(--ot-space-2); }
+  button { display: flex; gap: var(--ot-space-3); align-items: center; width: 100%; text-align: left; padding: var(--ot-space-2); }
   img { width: 48px; height: 72px; object-fit: cover; }
 `;
 

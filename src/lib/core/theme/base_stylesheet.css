@@ -1,0 +1,245 @@
+/*
+ * The base stylesheet of mod frames: plain HTML styled from the theme tokens,
+ * with element and attribute selectors only. It sits in the layer
+ * `opentesela`, so any style a mod adds outside a layer wins. Inlined as text
+ * in the frame document, so it must never contain a closing style tag.
+ */
+@layer opentesela {
+  html {
+    height: 100%;
+    background-color: var(--ot-color-background);
+    color: var(--ot-color-text);
+    accent-color: var(--ot-color-accent);
+    font-family: var(--ot-font-body);
+    font-size: var(--ot-font-size);
+    line-height: var(--ot-line-height);
+  }
+
+  body {
+    box-sizing: border-box;
+    min-height: 100%;
+    margin: 0;
+    padding: var(--ot-space-4);
+    background-color: var(--ot-color-background);
+    color: var(--ot-color-text);
+  }
+
+  /* A color scheme section: the element gets its own color scheme's colors. */
+  [data-ot-color-scheme] {
+    background-color: var(--ot-color-background);
+    color: var(--ot-color-text);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: var(--ot-space-6) 0 var(--ot-space-2);
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+  }
+
+  h4 {
+    font-size: 1.125rem;
+  }
+
+  h5,
+  h6 {
+    font-size: 1rem;
+  }
+
+  h1:first-child,
+  h2:first-child,
+  h3:first-child,
+  h4:first-child,
+  h5:first-child,
+  h6:first-child {
+    margin-top: 0;
+  }
+
+  p,
+  ul,
+  ol,
+  dl,
+  pre,
+  table,
+  figure,
+  blockquote {
+    margin: 0 0 var(--ot-space-4);
+  }
+
+  a {
+    color: var(--ot-color-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  a:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  hr {
+    margin: var(--ot-space-6) 0;
+    border: 0;
+    border-top: 1px solid var(--ot-color-border);
+  }
+
+  small {
+    color: var(--ot-color-text-muted);
+    font-size: 0.875em;
+  }
+
+  blockquote {
+    padding-left: var(--ot-space-4);
+    border-left: 3px solid var(--ot-color-border);
+    color: var(--ot-color-text-muted);
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--ot-font-mono);
+    font-size: 0.875em;
+  }
+
+  code,
+  kbd,
+  samp {
+    padding: 0.1em 0.3em;
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-color-surface);
+  }
+
+  kbd {
+    border: 1px solid var(--ot-color-border);
+  }
+
+  pre {
+    overflow: auto;
+    padding: var(--ot-space-3) var(--ot-space-4);
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-color-surface);
+  }
+
+  pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    box-sizing: border-box;
+    padding: var(--ot-space-1) var(--ot-space-3);
+    border: 1px solid var(--ot-color-border);
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-color-surface);
+    color: var(--ot-color-text);
+    font: inherit;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ot-color-text-muted);
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:hover:not(:disabled) {
+    border-color: var(--ot-color-text-muted);
+  }
+
+  :disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  button[aria-pressed="true"],
+  [aria-current]:not([aria-current="false"]) {
+    outline: 3px solid var(--ot-color-accent);
+    outline-offset: 1px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ot-color-focus);
+    outline-offset: 2px;
+  }
+
+  ul,
+  ol {
+    padding-left: var(--ot-space-6);
+  }
+
+  dt {
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0 0 var(--ot-space-2) var(--ot-space-4);
+  }
+
+  table {
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: var(--ot-space-1) var(--ot-space-3);
+    border: 1px solid var(--ot-color-border);
+    text-align: start;
+  }
+
+  th {
+    background-color: var(--ot-color-surface);
+    font-weight: 600;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+
+  img,
+  video {
+    height: auto;
+  }
+
+  dialog {
+    padding: var(--ot-space-6);
+    border: 1px solid var(--ot-color-border);
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-color-surface);
+    color: var(--ot-color-text);
+    box-shadow: var(--ot-shadow);
+  }
+
+  dialog::backdrop {
+    background-color: var(--ot-color-background);
+    opacity: 0.75;
+  }
+
+  [hidden] {
+    display: none;
+  }
+}

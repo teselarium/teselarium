@@ -42,6 +42,8 @@ The sandbox is now in place (`add-mod-sandbox` is archived), so this is the mome
   - `src/lib/core/stage/`: the stage keeps the current theme, hands it to new sessions and pushes changes to running ones.
   - `src/main/`, `src/App.tsx`, `src/main.tsx`: the header with the Theme control, the full-height layout and the themed stage stylesheet.
   - `public/samples/mods/book_list/main.js` and `public/default_mods/*/main.js`: smaller stylesheets.
+  - `vite.config.ts`: Vitest loads the base stylesheet as text (`test.css.include`), since it empties CSS imports by default.
+  - Tests: `src/test/` helpers (a fake `prefers-color-scheme` query, the theme in test stages), and `e2e/app_theme.spec.ts`, `e2e/mod_theme.spec.ts` and `e2e/theme_probes.ts`.
 - **Unchanged**: the content policy (`style-src` already allows inline styles), the sandbox flags, the frame document's position in the trust model, and every existing requirement.
 - **Dependencies**: none added. Tailwind CSS and shadcn/ui from `docs/stack.md` are not adopted here. The token names stay close to common conventions, so a later adoption can map them.
 - **Browsers**: the tokens use CSS custom properties and cascade layers, available in current Chromium, Firefox and Safari.
