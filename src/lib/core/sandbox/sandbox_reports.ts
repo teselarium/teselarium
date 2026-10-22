@@ -12,6 +12,20 @@ export interface BlockedRequest {
   directive: string;
 }
 
+/** A browser dialog function the frame loader replaces, because the sandbox blocks it. */
+export type BlockedDialogName = "alert" | "confirm" | "prompt" | "print";
+
+/** What each blocked dialog function does in a mod, and what to use instead. */
+const BLOCKED_DIALOG_MESSAGES: Record<BlockedDialogName, string> = {
+  alert:
+    "alert() is not available in mods. Show the message in the page or in a <dialog> element.",
+  confirm:
+    'confirm() is not available in mods and always returns false. Use a <dialog> element, or request "ui.confirm" for a confirmation shown by the app.',
+  prompt:
+    "prompt() is not available in mods and always returns null. Use an <input> in a <dialog> element.",
+  print: "print() is not available in mods.",
+};
+
 interface DirectiveRule {
   category: PermissionCategory;
   /** What the blocked request was, e.g. `image` in "Blocked image request". */
@@ -100,6 +114,19 @@ export function describeBlockedRequest(
     level: "warning",
     source: mod.source,
     message: describeBlock(blocked, grants),
+  };
+  return issue;
+}
+
+/** Turns a blocked dialog function into a warning for the mod's issue list, naming what to use instead. */
+export function describeBlockedDialog(
+  name: BlockedDialogName,
+  mod: Pick<ModFile, "source">,
+): ModIssue {
+  const issue: ModIssue = {
+    level: "warning",
+    source: mod.source,
+    message: BLOCKED_DIALOG_MESSAGES[name],
   };
   return issue;
 }

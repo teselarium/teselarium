@@ -11,9 +11,11 @@ import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import { APP_ORIGIN, SAMPLE_MOD_SOURCE } from "../../../test/sample_mods.ts";
 import { fetchTestFile } from "../../../test/test_files.ts";
+import type { AppAction } from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme } from "../theme/index.ts";
 import {
+  answerStageAction,
   attachFrame,
   changeStageColorScheme,
   closeSandbox,
@@ -22,6 +24,7 @@ import {
   frameLoadedAgain,
   openStageLink,
   readStageSnapshot,
+  requestStageAction,
   subscribeStage,
 } from "./stage_controller.ts";
 import type { SandboxSnapshot, Stage } from "./stage_controller.ts";
@@ -66,7 +69,7 @@ function buildStage(
 function attachCollectingFrame(
   stage: Stage,
   id: string,
-): { posted: unknown[]; received: unknown[] } {
+): { posted: unknown[]; received: unknown[]; modPort: MessagePort } {
   const fakeFrame = createFakeFrame();
   attachFrame(stage, id, fakeFrame.target);
   const modPort = readModPort(fakeFrame);
@@ -75,7 +78,7 @@ function attachCollectingFrame(
   for (const post of fakeFrame.posted) {
     posted.push(post.message);
   }
-  const attached = { posted, received: collectMessages(modPort) };
+  const attached = { posted, received: collectMessages(modPort), modPort };
   return attached;
 }
 
@@ -323,6 +326,190 @@ describe("frameLoadedAgain", function describeFrameLoadedAgain(): void {
   });
 });
 
+function buildConfirm(message: string): AppAction {
+  const action: AppAction = {
+    kind: "confirm",
+    message,
+    confirmLabel: "OK",
+    cancelLabel: "Cancel",
+  };
+  return action;
+}
+
+/** The message of the action the snapshot shows, or `null`. */
+function readShownMessage(stage: Stage): string | null {
+  const shown = readStageSnapshot(stage).action;
+  if (shown === null || shown.action.kind !== "confirm") {
+    return null;
+  }
+  return shown.action.message;
+}
+
+describe("requestStageAction", function describeRequestStageAction(): void {
+  it("Two confirmations", async function showsOneAtATime(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    const first = requestStageAction(stage, "sandbox-1", buildConfirm("First"));
+    const second = requestStageAction(
+      stage,
+      "sandbox-1",
+      buildConfirm("Second"),
+    );
+    const firstShown = readStageSnapshot(stage).action;
+
+    expect(firstShown).toMatchObject({
+      action: { kind: "confirm", message: "First" },
+      mod: { title: "Book List", source: SAMPLE_MOD_SOURCE },
+    });
+    expect(Object.isFrozen(firstShown)).toBe(true);
+    answerStageAction(stage, firstShown?.id ?? -1, true);
+    await expect(first).resolves.toBe(true);
+    expect(readShownMessage(stage)).toBe("Second");
+    answerStageAction(stage, readStageSnapshot(stage).action?.id ?? -1, false);
+    await expect(second).resolves.toBe(false);
+    expect(readStageSnapshot(stage).action).toBeNull();
+  });
+
+  it("ignores an answer to an unknown id", async function ignoresUnknownId(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    void requestStageAction(stage, "sandbox-1", buildConfirm("First"));
+    const listener = vi.fn<() => void>();
+    subscribeStage(stage, listener);
+    const shownId = readStageSnapshot(stage).action?.id ?? -1;
+
+    answerStageAction(stage, shownId + 1, true);
+
+    expect(readShownMessage(stage)).toBe("First");
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("gives null to a hidden sandbox and shows nothing", async function refusesHidden(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+
+    const answer = requestStageAction(
+      stage,
+      "sandbox-1",
+      buildConfirm("Hidden"),
+    );
+
+    expect(answer).toBeNull();
+    expect(readStageSnapshot(stage).action).toBeNull();
+  });
+
+  it("gives null to a sandbox that is not running", async function refusesStopped(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    frameLoadedAgain(stage, "sandbox-1");
+
+    expect(
+      requestStageAction(stage, "sandbox-1", buildConfirm("Stopped")),
+    ).toBeNull();
+  });
+
+  it("answers the mod's ui.confirm with the user's answer", async function answersMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    postRequest(attached.modPort, 1, "ui.confirm", { message: "Delete?" });
+    await waitForMessages();
+    expect(readShownMessage(stage)).toBe("Delete?");
+    expect(attached.received).toEqual([]);
+    answerStageAction(stage, readStageSnapshot(stage).action?.id ?? -1, true);
+    await waitForMessages();
+
+    expect(attached.received).toEqual([
+      { jsonrpc: "2.0", id: 1, result: true },
+    ]);
+  });
+});
+
+describe("a mod that leaves gets no", function describeLeftActions(): void {
+  it("Back while a dialog is open", async function dropsOnBack(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    const answer = requestStageAction(
+      stage,
+      "sandbox-2",
+      buildConfirm("Viewer asks"),
+    );
+
+    await follow(stage, history.goBack());
+
+    await expect(answer).resolves.toBe(false);
+    expect(readStageSnapshot(stage).action).toBeNull();
+    expect(readVisible(stage).id).toBe("sandbox-1");
+  });
+
+  it("drops the actions of a closed sandbox", async function dropsOnClose(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    const answer = requestStageAction(
+      stage,
+      "sandbox-2",
+      buildConfirm("Viewer asks"),
+    );
+
+    closeSandbox(stage, "sandbox-2");
+
+    await expect(answer).resolves.toBe(false);
+    expect(readStageSnapshot(stage).action).toBeNull();
+  });
+
+  it("keeps the actions of the sandbox that stays visible", async function keepsVisible(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    void requestStageAction(stage, "sandbox-1", buildConfirm("Home asks"));
+
+    await follow(stage, history.readNavigation());
+
+    expect(readShownMessage(stage)).toBe("Home asks");
+  });
+
+  it("drops the actions of a sandbox hidden by a followed link", async function dropsOnLink(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const answer = requestStageAction(
+      stage,
+      "sandbox-1",
+      buildConfirm("Home asks"),
+    );
+
+    await follow(stage, history.followLink(SAMPLE_HASH));
+
+    await expect(answer).resolves.toBe(false);
+    expect(readStageSnapshot(stage).action).toBeNull();
+  });
+
+  it("Stopped while a dialog is open", async function dropsOnStop(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+    postRequest(attached.modPort, 1, "files.save", {
+      name: "books.csv",
+      content: "title\n",
+    });
+    await waitForMessages();
+    expect(readStageSnapshot(stage).action?.action.kind).toBe("save");
+
+    frameLoadedAgain(stage, "sandbox-1");
+    await waitForMessages();
+
+    expect(readStageSnapshot(stage).action).toBeNull();
+    expect(attached.received).toEqual([]);
+  });
+});
+
 describe("subscribeStage", function describeSubscribeStage(): void {
   it("notifies every change with a new frozen snapshot", async function notifiesChanges(): Promise<void> {
     const history = new FakeHistory("");
@@ -452,3 +639,12 @@ describe("changeStageColorScheme", function describeChangeColorScheme(): void {
     expect(attached.received).toEqual([]);
   });
 });
+
+function postRequest(
+  port: MessagePort,
+  id: number,
+  method: string,
+  params: object,
+): void {
+  port.postMessage({ jsonrpc: "2.0", id, method, params });
+}

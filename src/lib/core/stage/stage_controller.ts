@@ -2,6 +2,7 @@ import type { FileFetchOptions } from "../../files/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
 import { resolveDefaultModSettings } from "../engine/index.ts";
 import type {
+  AppAction,
   DefaultModSettings,
   ResolvedDefaultModSettings,
   RunLink,
@@ -9,6 +10,14 @@ import type {
 import type { ModStorage } from "../storage/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme, Theme } from "../theme/index.ts";
+import {
+  addStageAction,
+  answerAction,
+  createStageActions,
+  dropActions,
+  readShownAction,
+} from "./stage_actions.ts";
+import type { ActionMod, StageActions } from "./stage_actions.ts";
 import {
   readHistoryPosition,
   readStageRoute,
@@ -67,9 +76,20 @@ export interface SandboxSnapshot {
   errorMessage: string | null;
 }
 
+/** The action the page shows in its dialog. Frozen, except the bytes of a save. */
+export interface ActionSnapshot {
+  /** Passed back to `answerStageAction`. */
+  id: number;
+  /** The asking mod's title and source. */
+  mod: ActionMod;
+  action: AppAction;
+}
+
 /** What the page renders of the stage. Frozen, and new after every change. */
 export interface StageSnapshot {
   sandboxes: readonly SandboxSnapshot[];
+  /** The oldest action waiting for the user, or `null`. Later ones wait their turn. */
+  action: ActionSnapshot | null;
 }
 
 /** The stage: open sandboxes, their history entries and the snapshot the page renders. Mutable. */
@@ -83,6 +103,8 @@ export interface Stage {
   storage: ModStorage;
   /** The current theme: new sessions connect with it, and running ones are told when it changes. */
   theme: Theme;
+  /** The actions the visible mod asked for, oldest first. */
+  actions: StageActions;
   listeners: Set<() => void>;
   snapshot: StageSnapshot;
 }
@@ -91,6 +113,7 @@ const LEFT_PAGE_MESSAGE = "The mod left its page and was stopped.";
 
 const EMPTY_SNAPSHOT: StageSnapshot = Object.freeze({
   sandboxes: Object.freeze([]),
+  action: null,
 });
 
 function buildHomeLink(stage: Stage): RunLink {
@@ -122,6 +145,7 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     storage: stage.storage,
     onChange: publishStage.bind(undefined, stage),
     onOpenLink: openLinkFromSandbox.bind(undefined, stage),
+    onRequestAction: requestStageAction.bind(undefined, stage),
     readTheme: readStageTheme.bind(undefined, stage),
   };
   return services;
@@ -175,6 +199,20 @@ function buildSandboxSnapshot(
   return Object.freeze(snapshot);
 }
 
+/** The shown action, frozen. The bytes of a save stay as they are: a typed array cannot be frozen. */
+function buildActionSnapshot(stage: Stage): ActionSnapshot | null {
+  const entry = readShownAction(stage.actions);
+  if (entry === null) {
+    return null;
+  }
+  const snapshot: ActionSnapshot = {
+    id: entry.id,
+    mod: Object.freeze({ ...entry.mod }),
+    action: Object.freeze({ ...entry.action }),
+  };
+  return Object.freeze(snapshot);
+}
+
 function buildStageSnapshot(stage: Stage): StageSnapshot {
   const visibleId = readVisibleSandbox(stage.state)?.id ?? null;
   const sandboxes: SandboxSnapshot[] = [];
@@ -183,7 +221,10 @@ function buildStageSnapshot(stage: Stage): StageSnapshot {
       buildSandboxSnapshot(sandbox, stage.runtimes.get(sandbox.id), visibleId),
     );
   }
-  const snapshot: StageSnapshot = { sandboxes: Object.freeze(sandboxes) };
+  const snapshot: StageSnapshot = {
+    sandboxes: Object.freeze(sandboxes),
+    action: buildActionSnapshot(stage),
+  };
   return Object.freeze(snapshot);
 }
 
@@ -195,7 +236,27 @@ function publishStage(stage: Stage): void {
   }
 }
 
-/** Applies a state change: stops the closed sandboxes and launches the opened one. */
+/** A sandbox can ask the user while it is the visible one and its mod runs. */
+function canSandboxAsk(stage: Stage, sandboxId: string): boolean {
+  return (
+    readVisibleSandbox(stage.state)?.id === sandboxId &&
+    stage.runtimes.get(sandboxId)?.status === "running"
+  );
+}
+
+/**
+ * Answers `false` to the actions of every sandbox that is no longer visible,
+ * was closed or was stopped, and removes them without acting. A stopped
+ * session drops the answer, so a stopped mod gets none.
+ */
+function dropLeftActions(stage: Stage): void {
+  dropActions(stage.actions, canSandboxAsk.bind(undefined, stage));
+}
+
+/**
+ * Applies a state change: stops the closed sandboxes, launches the opened
+ * one and drops the actions of the sandboxes that left.
+ */
 function applyStageChange(stage: Stage, change: StageChange): void {
   stage.state = change.state;
   for (const closedId of change.closedIds) {
@@ -211,6 +272,7 @@ function applyStageChange(stage: Stage, change: StageChange): void {
       launchSandbox(change.opened, buildSandboxServices(stage)),
     );
   }
+  dropLeftActions(stage);
 }
 
 export function createStage(options: StageOptions): Stage {
@@ -223,6 +285,7 @@ export function createStage(options: StageOptions): Stage {
     fetchOptions: { baseUrl: options.baseUrl, fetch: options.fetch },
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
+    actions: createStageActions(),
     listeners: new Set(),
     snapshot: EMPTY_SNAPSHOT,
   };
@@ -326,6 +389,53 @@ export async function reloadTiles(stage: Stage, id: string): Promise<void> {
   await reloadSandboxTiles(runtime, buildSandboxServices(stage));
 }
 
+/** The title and source of a running sandbox's mod, or `null` when it is not running. */
+function readRunningMod(stage: Stage, sandboxId: string): ActionMod | null {
+  const runtime = stage.runtimes.get(sandboxId);
+  if (runtime?.status !== "running" || runtime.launch === null) {
+    return null;
+  }
+  const mod: ActionMod = {
+    title: runtime.launch.mod.title,
+    source: runtime.launch.mod.source,
+  };
+  return mod;
+}
+
+/**
+ * Queues an action a mod asked for, to show to the user after the ones
+ * already waiting. Resolves with the user's answer. Returns `null`, and
+ * queues nothing, when the sandbox is not the visible one or not running.
+ */
+export function requestStageAction(
+  stage: Stage,
+  sandboxId: string,
+  action: AppAction,
+): Promise<boolean> | null {
+  const mod = readRunningMod(stage, sandboxId);
+  if (readVisibleSandbox(stage.state)?.id !== sandboxId || mod === null) {
+    return null;
+  }
+  const answer = addStageAction(stage.actions, sandboxId, mod, action);
+  publishStage(stage);
+  return answer;
+}
+
+/**
+ * Answers the action `id` the page shows, so the mod's request resolves and
+ * the next action is shown. Does nothing for an unknown id.
+ */
+export function answerStageAction(
+  stage: Stage,
+  id: number,
+  accepted: boolean,
+): void {
+  if (!answerAction(stage.actions, id, accepted)) {
+    return;
+  }
+  publishStage(stage);
+}
+
 /** Connects a sandbox's frame, on the frame's first `load`. */
 export function attachFrame(
   stage: Stage,
@@ -348,6 +458,7 @@ export function frameLoadedAgain(stage: Stage, id: string): void {
   }
   const source = runtime.launch?.mod.source ?? id;
   stopSandbox(runtime, { level: "error", source, message: LEFT_PAGE_MESSAGE });
+  dropLeftActions(stage);
   publishStage(stage);
 }
 

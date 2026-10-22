@@ -1,6 +1,7 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import {
+  answerStageAction,
   readStageSnapshot,
   subscribeStage,
 } from "../../lib/core/stage/index.ts";
@@ -9,6 +10,7 @@ import type {
   Stage,
   StageSnapshot,
 } from "../../lib/core/stage/index.ts";
+import { ActionDialog } from "./ActionDialog.tsx";
 import { SandboxFrame } from "./SandboxFrame.tsx";
 import { StageBar } from "./StageBar.tsx";
 import "./stage.css";
@@ -56,6 +58,18 @@ function renderSandbox(stage: Stage, sandbox: SandboxSnapshot): ReactElement {
   );
 }
 
+function ignoreExitError(): void {
+  // The document left fullscreen meanwhile.
+}
+
+/** A hidden frame never keeps the screen. */
+function leaveFullscreen(): void {
+  if ((document.fullscreenElement ?? null) === null) {
+    return;
+  }
+  document.exitFullscreen().catch(ignoreExitError);
+}
+
 function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
   for (const sandbox of snapshot.sandboxes) {
     if (sandbox.isVisible) {
@@ -68,7 +82,9 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
 /**
  * Every sandbox of the stage, in creation order and keyed by id, so a frame
  * never moves in the DOM (moving an iframe reloads it). Only the visible one
- * is shown, under the stage bar.
+ * is shown, under the stage bar. The action dialog shows the action the
+ * visible mod asked for, if any. When the visible sandbox changes, the page
+ * leaves fullscreen.
  */
 export function StageView({ stage }: StageViewProps): ReactElement {
   const subscribe = useMemo(
@@ -84,7 +100,19 @@ export function StageView({ stage }: StageViewProps): ReactElement {
     [stage],
   );
   const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+
+  function handleActionAnswer(id: number, accepted: boolean): void {
+    answerStageAction(stage, id, accepted);
+  }
+
   const visibleSandbox = findVisibleSandbox(snapshot);
+  const visibleId = visibleSandbox?.id ?? null;
+  useEffect(
+    function leaveFullscreenOnSwitch(): void {
+      leaveFullscreen();
+    },
+    [visibleId],
+  );
   const sandboxes: ReactElement[] = [];
   for (const sandbox of snapshot.sandboxes) {
     sandboxes.push(renderSandbox(stage, sandbox));
@@ -95,6 +123,7 @@ export function StageView({ stage }: StageViewProps): ReactElement {
         <StageBar stage={stage} sandbox={visibleSandbox} />
       )}
       <div className="stage-sandboxes">{sandboxes}</div>
+      <ActionDialog shown={snapshot.action} onAnswer={handleActionAnswer} />
     </main>
   );
 }

@@ -1,3 +1,9 @@
+export type {
+  AppAction,
+  ConfirmAction,
+  LinkAction,
+  SaveFileAction,
+} from "./app_actions.ts";
 export {
   findSwitchedOffMod,
   resolveDefaultModSettings,

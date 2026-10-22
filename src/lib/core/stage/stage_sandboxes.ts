@@ -10,6 +10,7 @@ import {
   stopModSession,
 } from "../engine/index.ts";
 import type {
+  AppAction,
   ModLaunch,
   ModSession,
   ResolvedDefaultModSettings,
@@ -29,6 +30,11 @@ export interface SandboxServices {
   /** Called when a runtime changed on its own, so the stage publishes a snapshot. */
   onChange: () => void;
   onOpenLink: (openerId: string, link: RunLink) => boolean;
+  /** Queues an action for the user. `null` when the sandbox is not the visible one. */
+  onRequestAction: (
+    sandboxId: string,
+    action: AppAction,
+  ) => Promise<boolean> | null;
   /** The stage's current theme, read when a session connects. */
   readTheme: () => Theme;
 }
@@ -150,6 +156,7 @@ export function attachSandboxFrame(
     fetchOptions: services.fetchOptions,
     onIssue: addRuntimeIssue.bind(undefined, runtime, services),
     onOpenLink: services.onOpenLink.bind(undefined, runtime.id),
+    onRequestAction: services.onRequestAction.bind(undefined, runtime.id),
     theme: services.readTheme(),
   });
 }

@@ -2,17 +2,23 @@ import type { FileFetchOptions } from "../../files/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
 import type { Tile, TileIssue } from "../../tile/index.ts";
 import {
+  describeBlockedDialog,
   describeBlockedRequest,
   openSandboxChannel,
+  readBlockedDialog,
   readBlockedRequest,
   readMountFailure,
   SANDBOX_BLOCKED_METHOD,
+  SANDBOX_DIALOG_BLOCKED_METHOD,
   SANDBOX_MOUNT_FAILED_METHOD,
 } from "../sandbox/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
+import type { AppAction } from "./app_actions.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { describeEngineError, ModMethodError } from "./engine_errors.ts";
+import { FILES_METHODS } from "./files_methods.ts";
+import { LINKS_METHODS } from "./links_methods.ts";
 import type {
   LaunchContext,
   ModContext,
@@ -37,6 +43,7 @@ import type {
 import type { ModMethodContext, ModMethodTable } from "./mod_methods.ts";
 import { MODS_METHODS } from "./mods_methods.ts";
 import { STORAGE_METHODS } from "./storage_methods.ts";
+import { UI_METHODS } from "./ui_methods.ts";
 
 /** The services a session needs from the app. */
 export interface ModSessionOptions {
@@ -48,6 +55,11 @@ export interface ModSessionOptions {
   onIssue: (issue: ModIssue) => void;
   /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */
   onOpenLink: (link: RunLink) => boolean;
+  /**
+   * Asks the stage to show an action to the user. Resolves with the user's
+   * answer, or is `null` when the sandbox is not the visible one.
+   */
+  onRequestAction: (action: AppAction) => Promise<boolean> | null;
   /** The theme the mod mounts with: the one current when the frame connects. */
   theme: Theme;
 }
@@ -72,6 +84,9 @@ const INTERNAL_ERROR = -32603;
 const ENGINE_METHODS: ModMethodTable = {
   ...STORAGE_METHODS,
   ...MODS_METHODS,
+  ...LINKS_METHODS,
+  ...FILES_METHODS,
+  ...UI_METHODS,
 };
 
 /** Two issues are equal when their level, source and message are equal. */
@@ -152,6 +167,14 @@ function reportBlockedRequest(session: ModSession, params: unknown): void {
   );
 }
 
+function reportBlockedDialog(session: ModSession, params: unknown): void {
+  const name = readBlockedDialog(params);
+  if (name === null) {
+    return;
+  }
+  reportIssue(session, describeBlockedDialog(name, session.methodContext.mod));
+}
+
 function reportMountFailure(session: ModSession, params: unknown): void {
   const message = readMountFailure(params);
   if (message === null) {
@@ -174,6 +197,9 @@ function handleModNotification(
   }
   if (notification.method === SANDBOX_MOUNT_FAILED_METHOD) {
     reportMountFailure(session, notification.params);
+  }
+  if (notification.method === SANDBOX_DIALOG_BLOCKED_METHOD) {
+    reportBlockedDialog(session, notification.params);
   }
 }
 
@@ -235,6 +261,7 @@ export function connectModSession(
       defaults: options.defaults,
       fetchOptions: options.fetchOptions,
       onOpenLink: options.onOpenLink,
+      onRequestAction: options.onRequestAction,
     },
     onIssue: options.onIssue,
     reportedIssueKeys: new Set(),

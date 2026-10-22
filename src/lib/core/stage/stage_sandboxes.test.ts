@@ -19,7 +19,7 @@ import {
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
 import { resolveDefaultModSettings } from "../engine/index.ts";
-import type { RunLink } from "../engine/index.ts";
+import type { AppAction, RunLink } from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { StageSandbox } from "./stage_state.ts";
@@ -48,6 +48,9 @@ interface SpiedServices {
   services: SandboxServices;
   onChange: Mock<() => void>;
   onOpenLink: Mock<(openerId: string, link: RunLink) => boolean>;
+  onRequestAction: Mock<
+    (sandboxId: string, action: AppAction) => Promise<boolean> | null
+  >;
 }
 
 function readLightTheme(): Theme {
@@ -58,6 +61,9 @@ function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
   const onChange = vi.fn<() => void>();
   const onOpenLink = vi.fn<(openerId: string, link: RunLink) => boolean>();
   onOpenLink.mockReturnValue(true);
+  const onRequestAction =
+    vi.fn<(sandboxId: string, action: AppAction) => Promise<boolean> | null>();
+  onRequestAction.mockResolvedValue(true);
   const services: SandboxServices = {
     defaults: TEST_DEFAULTS,
     appOrigin,
@@ -65,9 +71,15 @@ function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
     storage: createMemoryStorage(),
     onChange,
     onOpenLink,
+    onRequestAction,
     readTheme: readLightTheme,
   };
-  const spiedServices: SpiedServices = { services, onChange, onOpenLink };
+  const spiedServices: SpiedServices = {
+    services,
+    onChange,
+    onOpenLink,
+    onRequestAction,
+  };
   return spiedServices;
 }
 
@@ -227,6 +239,30 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
       },
     ]);
     expect(spied.onChange).toHaveBeenCalledOnce();
+  });
+
+  it("passes ui.confirm to onRequestAction with the runtime's id", async function asksWithId(): Promise<void> {
+    const spied = buildServices();
+    const { modPort, received } = await startSandbox(
+      buildSandbox("./samples/mods/book_list", null),
+      spied,
+    );
+
+    modPort.postMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ui.confirm",
+      params: { message: "Delete?" },
+    });
+    await waitForMessages();
+
+    expect(spied.onRequestAction).toHaveBeenCalledExactlyOnceWith("sandbox-1", {
+      kind: "confirm",
+      message: "Delete?",
+      confirmLabel: "OK",
+      cancelLabel: "Cancel",
+    });
+    expect(received).toEqual([{ jsonrpc: "2.0", id: 1, result: true }]);
   });
 
   it("passes mods.open to onOpenLink with the runtime's id", async function opensWithId(): Promise<void> {

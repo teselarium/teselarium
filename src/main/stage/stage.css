@@ -82,3 +82,72 @@
   color: var(--ot-color-danger);
   overflow-wrap: anywhere;
 }
+
+/* The action dialog: drawn by the app in the top layer, over the stage and every frame. */
+.action-dialog {
+  box-sizing: border-box;
+  width: min(32rem, calc(100vw - 2 * var(--ot-space-4)));
+  padding: var(--ot-space-4);
+  border: 1px solid var(--ot-color-border);
+  border-radius: var(--ot-radius);
+  background-color: var(--ot-color-background);
+  color: var(--ot-color-text);
+  box-shadow: var(--ot-shadow);
+}
+
+.action-dialog::backdrop {
+  background-color: rgb(0 0 0 / 0.5);
+}
+
+.action-dialog-title {
+  margin: 0;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+/* Under the title, so a mod that borrows another title still shows where it comes from. */
+.action-dialog-source {
+  display: block;
+  color: var(--ot-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.action-dialog-lead {
+  margin: var(--ot-space-4) 0 var(--ot-space-1);
+}
+
+.action-dialog-url,
+.action-dialog-file,
+.action-dialog-message {
+  margin: 0;
+  padding: var(--ot-space-2);
+  border-radius: var(--ot-radius);
+  background-color: var(--ot-color-surface);
+  overflow-wrap: anywhere;
+}
+
+/* The full address, broken anywhere, so no part of it can be pushed out of sight. */
+.action-dialog-url {
+  font-family: var(--ot-font-mono);
+  word-break: break-all;
+}
+
+/* Keeps the mod's line breaks, and scrolls a long message. */
+.action-dialog-message {
+  max-height: 50vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.action-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ot-space-2);
+  margin-top: var(--ot-space-4);
+}
+
+.action-dialog-accept {
+  border-color: var(--ot-color-accent);
+  background-color: var(--ot-color-accent);
+  color: var(--ot-color-accent-text);
+}

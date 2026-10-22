@@ -61,6 +61,15 @@ The stage bar lists every issue of the visible sandbox, in the order they were f
 
 "Reload tiles", for a sandbox opened with a collection, loads and validates the collection again, pushes `tiles.changed` to the running mod and replaces the collection issues.
 
+### Actions the user answers
+
+A mod asks the app to open a link, save a file or confirm something with `links.open`, `files.save` and `ui.confirm` (see the [engine module](../engine/README.md)). The engine checks the params into an action, and the stage queues it until the user answers in the page's action dialog.
+
+- Only the visible sandbox, while its mod is running, can ask. Any other gets no queued action, and the engine answers `-32002`.
+- The stage has one queue, oldest first. The snapshot's `action` is the oldest one, with the asking mod's title and source, and later ones wait their turn, so the page shows one dialog at a time.
+- Each queued action has an id from the stage, `1`, `2`, …, and the page answers the id it shows, so a double click or a late answer cannot answer the next action. An unknown id does nothing.
+- After every stage change (back, forward, a followed or opened link, a close) and when a mod navigates its frame, every action whose sandbox is no longer visible or no longer running is removed and answers `false`. A stopped mod's session drops that answer, so the mod gets none.
+
 ### The theme
 
 The stage keeps the app's current theme, built from the resolved color scheme (see the [theme module](../theme/README.md)). It does not know where the color scheme comes from: the app tells it with `changeStageColorScheme`.
@@ -76,7 +85,7 @@ The visible sandbox's frame fills the stage area: the page's width, and the view
 
 Implemented in `src/lib/core/stage/`. Other modules import only from the public entry point `src/lib/core/stage/index.ts`.
 
-### The three stage files
+### The stage files
 
 The work behind the public API is split so each file has one reason to change:
 
@@ -84,6 +93,7 @@ The work behind the public API is split so each file has one reason to change:
 |---|---|
 | `stage_history.ts` | Addresses and history entries. The only file that calls `History` (`pushState`, `replaceState`) and the run link functions of `run_links.ts`. |
 | `stage_sandboxes.ts` | The runtime of one sandbox: launch, frame, session, issues, reload and stop. |
+| `stage_actions.ts` | The queue of actions waiting for the user: add, show the oldest, answer by id, drop. |
 | `stage_controller.ts` | Connects them: applies each state change by writing history, starting and stopping runtimes, and publishing a snapshot. |
 
 `stage_state.ts` holds the pure stage state (sandboxes, entries, position): each function returns the new state with the sandboxes to open and close, and the controller applies them. All of these are browser-free apart from the `postMessage` targets and the `History` subset they receive, so they are tested in Node.
@@ -97,9 +107,11 @@ The work behind the public API is split so each file has one reason to change:
 - `reloadTiles(stage, id)`: the "Reload tiles" button.
 - `attachFrame(stage, id, frameTarget)`: on a frame's first `load`, connects its mod's session.
 - `frameLoadedAgain(stage, id)`: on any later `load` of a frame: its mod navigated, so it is stopped with the issue `The mod left its page and was stopped.` and its frame removed.
+- `answerStageAction(stage, id, accepted)`: answers the action the page shows, so the mod's request resolves with `accepted` and the next action is shown. Does nothing for an unknown id.
+- `requestStageAction(stage, sandboxId, action)`, not exported: queues an action and resolves with the user's answer, or returns `null` when the sandbox is not the visible one or not running. The sessions call it through their `onRequestAction`.
 - `changeStageColorScheme(stage, colorScheme)`: switches the stage's theme and pushes `theme.changed` to every running mod, visible or hidden. Does nothing when the color scheme is the current one. The stage's current `Theme` is `stage.theme`.
 - `readStageSnapshot(stage)` and `subscribeStage(stage, listener)`: a frozen `StageSnapshot` that is new after every change, for React's `useSyncExternalStore`. `subscribeStage` returns the function that unsubscribes.
-- Types: `Stage`, `StageOptions`, `StageSnapshot`, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, `sandboxDocument`, `canReloadTiles`, `issues`, `errorMessage`), `SandboxStatus` (`loading`, `failed`, `running` or `stopped`), `StageHistory`.
+- Types: `Stage`, `StageOptions`, `StageSnapshot` (`sandboxes` and `action`), `ActionSnapshot` (`id`, `mod` with `title` and `source`, and `action`), `ActionMod`, the engine's `AppAction`, `LinkAction`, `SaveFileAction` and `ConfirmAction` re-exported as types, so the page imports them from the stage, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, `sandboxDocument`, `canReloadTiles`, `issues`, `errorMessage`), `SandboxStatus` (`loading`, `failed`, `running` or `stopped`), `StageHistory`.
 
 ### How the page wires the stage
 
@@ -123,7 +135,7 @@ window.addEventListener("popstate", function followPopState(): void {
 });
 ```
 
-Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. `App` then renders `StageView`, which reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`.
+Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. `App` then renders `StageView`, which reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`. Its `ActionDialog` shows the snapshot's `action`, performs it from the accept button's click and calls `answerStageAction`.
 
 ### Why no router library
 

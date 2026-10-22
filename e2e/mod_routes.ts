@@ -34,6 +34,9 @@ function readContentType(path: string): string {
   if (path.endsWith(".md")) {
     return "text/markdown";
   }
+  if (path.endsWith(".svg")) {
+    return "image/svg+xml";
+  }
   return "text/yaml";
 }
 
@@ -382,9 +385,16 @@ export function navigateTop(url: string): string {
   }
 }
 
-/** Runs in a mod frame: true when `window.open` gave `null`. */
+/**
+ * Runs in a mod frame: true when `window.open` was blocked. Chromium and
+ * WebKit return `null`; Firefox throws in a sandboxed frame.
+ */
 export function isPopupBlocked(url: string): boolean {
-  return window.open(url) === null;
+  try {
+    return window.open(url) === null;
+  } catch {
+    return true;
+  }
 }
 
 export function readFrameOrigin(): string {
@@ -405,4 +415,147 @@ export function readLoadedCovers(): string[] {
 /** Runs in a mod frame: navigates the frame to another page. */
 export function navigateFrame(url: string): void {
   location.href = url;
+}
+
+/** The line that starts the sample mod's `mount`. */
+const SAMPLE_MOUNT_LINE =
+  "export default async function mount(engine, context) {";
+
+async function answerExposedSample(route: Route): Promise<void> {
+  const response = await route.fetch();
+  const code = await response.text();
+  if (!code.includes(SAMPLE_MOUNT_LINE)) {
+    throw new Error("The sample mod's mount line changed");
+  }
+  await route.fulfill({
+    response,
+    body: code.replace(
+      SAMPLE_MOUNT_LINE,
+      `${SAMPLE_MOUNT_LINE}\n  globalThis.probe = { engine, context };`,
+    ),
+  });
+}
+
+/**
+ * Serves the sample book list mod with one more line at the start of its
+ * `mount`, which stores its engine API object on `globalThis.probe`, so a
+ * test can send requests as the sample mod.
+ */
+export async function exposeSampleEngine(page: Page): Promise<void> {
+  await page.route("**/samples/mods/book_list/main.js", answerExposedSample);
+}
+
+/** The app's action dialog, while it is open. */
+export function actionDialog(page: Page): Locator {
+  return page.getByRole("dialog");
+}
+
+/**
+ * Runs in a probe frame: sends requests in order without waiting for their
+ * answers, which `readProbeAnswers` waits for. For requests that wait for the
+ * user.
+ */
+export function startProbeRequests(requests: (string | object)[][]): void {
+  const probeGlobal = globalThis as unknown as ProbeGlobal & {
+    answers?: Promise<ProbeAnswer>[];
+  };
+  function toResult(result: unknown): ProbeAnswer {
+    return { result };
+  }
+  function toFailure(error: ProbeError): ProbeAnswer {
+    return { code: error.code, message: error.message };
+  }
+  probeGlobal.answers = [];
+  for (const request of requests) {
+    const [method, params] = request as [string, object];
+    probeGlobal.answers.push(
+      probeGlobal.probe.engine
+        .request(method, params)
+        .then(toResult, toFailure),
+    );
+  }
+}
+
+/** Runs in a probe frame: the answers of the requests `startProbeRequests` sent, once all arrived. */
+export function readProbeAnswers(): Promise<ProbeAnswer[]> {
+  const probeGlobal = globalThis as unknown as {
+    answers?: Promise<ProbeAnswer>[];
+  };
+  return Promise.all(probeGlobal.answers ?? []);
+}
+
+/** Runs in a probe frame: whether any request `startProbeRequests` sent got an answer. */
+export async function hasProbeAnswer(): Promise<boolean> {
+  const probeGlobal = globalThis as unknown as {
+    answers?: Promise<ProbeAnswer>[];
+  };
+  const pending = Symbol("pending");
+  for (const answer of probeGlobal.answers ?? []) {
+    const settled = await Promise.race([answer, Promise.resolve(pending)]);
+    if (settled !== pending) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Runs in a mod frame: adds a "Fullscreen" button whose click shows the
+ * frame's `<body>` fullscreen, and keeps the outcome on `globalThis`.
+ */
+export function addFullscreenButton(): void {
+  const probeGlobal = globalThis as { fullscreen?: Promise<string> };
+  function describeFailure(error: unknown): string {
+    return String(error);
+  }
+  function requestBodyFullscreen(): void {
+    probeGlobal.fullscreen = document.body
+      .requestFullscreen()
+      .then(readFullscreenElement, describeFailure);
+  }
+  function readFullscreenElement(): string {
+    return document.fullscreenElement?.tagName ?? "none";
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Fullscreen";
+  button.addEventListener("click", requestBodyFullscreen);
+  document.body.append(button);
+}
+
+/** Runs in a mod frame: the fullscreen element's tag once the request settled, or the error. */
+export function readFullscreenOutcome(): Promise<string> {
+  const probeGlobal = globalThis as { fullscreen?: Promise<string> };
+  return probeGlobal.fullscreen ?? Promise.resolve("not requested");
+}
+
+/** Runs in the app page: whether an element of the page is fullscreen. */
+export function isPageFullscreen(): boolean {
+  return document.fullscreenElement !== null;
+}
+
+/** A 1×1 SVG, served as an asset next to a test mod. */
+export const ICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
+
+/** What `showAssetNextToMod` found: the image's address, and whether it loaded. */
+export interface ShownAsset {
+  url: string;
+  loaded: boolean;
+}
+
+/** Runs in a probe frame: shows the image at `path` resolved against `context.mod.source`. */
+export async function showAssetNextToMod(path: string): Promise<ShownAsset> {
+  const probe = (globalThis as unknown as ProbeGlobal).probe;
+  const mod = probe.context.mod as { source: string };
+  const url = new URL(path, mod.source).href;
+  const image = document.createElement("img");
+  image.src = url;
+  document.body.append(image);
+  try {
+    await image.decode();
+    return { url, loaded: true };
+  } catch {
+    return { url, loaded: false };
+  }
 }

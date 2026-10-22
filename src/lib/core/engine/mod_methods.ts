@@ -2,10 +2,11 @@ import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
 import type { LoadedMod } from "../../mod/index.ts";
 import type { ModGrants } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
+import type { AppAction } from "./app_actions.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
 import type { RunLink } from "./mod_launch.ts";
-import { INVALID_PARAMS } from "./mod_messages.ts";
+import { INVALID_PARAMS, PERMISSION_DENIED } from "./mod_messages.ts";
 
 /** What a request handler knows about the mod that sent the request and the app. */
 export interface ModMethodContext {
@@ -18,6 +19,11 @@ export interface ModMethodContext {
   fetchOptions: FileFetchOptions;
   /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */
   onOpenLink: (link: RunLink) => boolean;
+  /**
+   * Asks the stage to show an action to the user. Resolves with the user's
+   * answer, or is `null` when the sandbox is not the visible one.
+   */
+  onRequestAction: (action: AppAction) => Promise<boolean> | null;
 }
 
 /**
@@ -48,4 +54,23 @@ export function readRequiredText(
     throwInvalidParams(method, `"${fieldName}" must be a non-empty string`);
   }
   return value;
+}
+
+/**
+ * Asks the user to accept an action, and resolves with the answer. Raises
+ * `PERMISSION_DENIED` when the mod's sandbox is not the visible one.
+ */
+export function askUser(
+  context: ModMethodContext,
+  method: string,
+  action: AppAction,
+): Promise<boolean> {
+  const answer = context.onRequestAction(action);
+  if (answer === null) {
+    throw new ModMethodError(
+      PERMISSION_DENIED,
+      `${method}: only the visible mod can ask the user`,
+    );
+  }
+  return answer;
 }

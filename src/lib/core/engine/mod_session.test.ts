@@ -18,6 +18,7 @@ import type { ModIssue } from "../../mod/index.ts";
 import type { Tile } from "../../tile/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
+import type { AppAction } from "./app_actions.ts";
 import { prepareModLaunch } from "./mod_launch.ts";
 import type { ModContext, ModLaunch, RunLink } from "./mod_launch.ts";
 import {
@@ -34,6 +35,7 @@ interface PlayedSession {
   received: unknown[];
   onIssue: Mock<(issue: ModIssue) => void>;
   onOpenLink: Mock<(link: RunLink) => boolean>;
+  onRequestAction: Mock<(action: AppAction) => Promise<boolean> | null>;
   launch: ModLaunch;
 }
 
@@ -89,6 +91,9 @@ async function playSession(
   const onIssue = vi.fn<(issue: ModIssue) => void>();
   const onOpenLink = vi.fn<(link: RunLink) => boolean>();
   onOpenLink.mockReturnValue(true);
+  const onRequestAction =
+    vi.fn<(action: AppAction) => Promise<boolean> | null>();
+  onRequestAction.mockResolvedValue(true);
   const session = connectModSession(fakeFrame.target, launch, {
     storage: createMemoryStorage(),
     appOrigin: APP_ORIGIN,
@@ -96,6 +101,7 @@ async function playSession(
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     onIssue,
     onOpenLink,
+    onRequestAction,
     theme,
   });
   const modPort = readModPort(fakeFrame);
@@ -106,6 +112,7 @@ async function playSession(
     received: collectMessages(modPort),
     onIssue,
     onOpenLink,
+    onRequestAction,
     launch,
   };
   return playedSession;
@@ -159,6 +166,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       theme: buildTheme("light"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
@@ -185,6 +193,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       theme: buildTheme("dark"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
@@ -205,6 +214,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       theme: buildTheme("dark"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
@@ -254,6 +264,54 @@ describe("connectModSession", function describeConnectModSession(): void {
       params: { target: SAMPLE_MOD_SOURCE },
     });
     expect(played.received).toEqual([{ jsonrpc: "2.0", id: 3, result: null }]);
+  });
+
+  it("dispatches ui.confirm to the session's onRequestAction", async function asksUser(): Promise<void> {
+    const played = await playSession();
+    played.onRequestAction.mockResolvedValue(false);
+
+    sendRequest(played, 4, "ui.confirm", { message: "Delete this list?" });
+    await waitForReceived(played, 1);
+
+    expect(played.onRequestAction).toHaveBeenCalledExactlyOnceWith({
+      kind: "confirm",
+      message: "Delete this list?",
+      confirmLabel: "OK",
+      cancelLabel: "Cancel",
+    });
+    expect(played.received).toEqual([{ jsonrpc: "2.0", id: 4, result: false }]);
+  });
+
+  it("answers links.open and files.save with the user's answer", async function answersActions(): Promise<void> {
+    const played = await playSession();
+
+    sendRequest(played, 5, "links.open", { url: "https://example.org/" });
+    sendRequest(played, 6, "files.save", { name: "a.txt", content: "x" });
+    await waitForReceived(played, 2);
+
+    expect(played.received).toEqual([
+      { jsonrpc: "2.0", id: 5, result: true },
+      { jsonrpc: "2.0", id: 6, result: true },
+    ]);
+  });
+
+  it("answers -32002 when the sandbox is not the visible one", async function refusesHidden(): Promise<void> {
+    const played = await playSession();
+    played.onRequestAction.mockReturnValue(null);
+
+    sendRequest(played, 7, "ui.confirm", { message: "Delete this list?" });
+    await waitForReceived(played, 1);
+
+    expect(played.received).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: 7,
+        error: {
+          code: -32002,
+          message: "ui.confirm: only the visible mod can ask the user",
+        },
+      },
+    ]);
   });
 
   it("Unknown method", async function answersUnknownMethod(): Promise<void> {
@@ -371,6 +429,36 @@ describe("connectModSession", function describeConnectModSession(): void {
 
     sendNotification(played, "sandbox.blocked", { blockedUrl: 3 });
     sendNotification(played, "sandbox.blocked", "img-src");
+    await waitForMessages();
+
+    expect(played.onIssue).not.toHaveBeenCalled();
+  });
+
+  it("reports each blocked dialog function once", async function reportsDialogsOnce(): Promise<void> {
+    const played = await playSession();
+
+    for (const name of ["alert", "alert", "confirm", "alert", "confirm"]) {
+      sendNotification(played, "sandbox.dialogBlocked", { name });
+    }
+    await waitForMessages();
+
+    expect(played.onIssue).toHaveBeenCalledTimes(2);
+    expect(played.onIssue).toHaveBeenNthCalledWith(1, {
+      level: "warning",
+      source: SAMPLE_MOD_SOURCE,
+      message:
+        "alert() is not available in mods. Show the message in the page or in a <dialog> element.",
+    });
+    expect(played.onIssue.mock.calls[1][0].message).toMatch(/^confirm\(\) /);
+    expect(played.received).toEqual([]);
+  });
+
+  it("ignores sandbox.dialogBlocked with an unknown name", async function ignoresUnknownDialog(): Promise<void> {
+    const played = await playSession();
+
+    sendNotification(played, "sandbox.dialogBlocked", { name: "open" });
+    sendNotification(played, "sandbox.dialogBlocked", { name: 3 });
+    sendNotification(played, "sandbox.dialogBlocked", "alert");
     await waitForMessages();
 
     expect(played.onIssue).not.toHaveBeenCalled();

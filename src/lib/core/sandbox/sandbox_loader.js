@@ -6,6 +6,7 @@
 const CONNECT_METHOD = "sandbox.connect";
 const BLOCKED_METHOD = "sandbox.blocked";
 const MOUNT_FAILED_METHOD = "sandbox.mountFailed";
+const DIALOG_BLOCKED_METHOD = "sandbox.dialogBlocked";
 const THEME_CHANGED_METHOD = "theme.changed";
 
 const loader = {
@@ -34,6 +35,40 @@ function reportViolation(event) {
     return;
   }
   sendNotification(BLOCKED_METHOD, params);
+}
+
+function reportBlockedDialog(name) {
+  sendNotification(DIALOG_BLOCKED_METHOD, { name });
+}
+
+// The sandbox has no allow-modals, so the browser shows none of these. The
+// replacements return what the blocked originals return, and report the call
+// so the mod's issue list says what to use instead. Methods, so each keeps
+// the original's name.
+const blockedDialogs = {
+  alert() {
+    reportBlockedDialog("alert");
+    return undefined;
+  },
+  confirm() {
+    reportBlockedDialog("confirm");
+    return false;
+  },
+  prompt() {
+    reportBlockedDialog("prompt");
+    return null;
+  },
+  print() {
+    reportBlockedDialog("print");
+    return undefined;
+  },
+};
+
+function replaceBlockedDialogs() {
+  window.alert = blockedDialogs.alert;
+  window.confirm = blockedDialogs.confirm;
+  window.prompt = blockedDialogs.prompt;
+  window.print = blockedDialogs.print;
 }
 
 function requestEngine(method, params) {
@@ -199,6 +234,7 @@ function connectToEngine(event) {
   const params = event.data.params;
   loader.context = params.context;
   applyColorScheme(params.context?.theme);
+  replaceBlockedDialogs();
   mountMod(params.code).catch(reportMountFailure);
 }
 

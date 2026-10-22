@@ -1,25 +1,31 @@
 import { expect, test } from "@playwright/test";
-import type { Frame, Page, Request, Route } from "@playwright/test";
+import type { Dialog, Frame, Page, Request, Route } from "@playwright/test";
 import {
+  addFullscreenButton,
   buildProbeFiles,
   COVER_HOST,
   embedObject,
   fetchFromFrame,
   findModFrame,
   FOREIGN_HOST,
+  ICON_SVG,
   importFromFrame,
+  isPageFullscreen,
   isPopupBlocked,
   issueList,
   navigateFrame,
   navigateTop,
   readFrameOrigin,
+  readFullscreenOutcome,
   readLoadedCovers,
   readParentDocumentError,
   readProbeContext,
   readStorageError,
+  requestFromProbe,
   routeCovers,
   serveAppOriginMod,
   serveForeignMod,
+  showAssetNextToMod,
   showImage,
   stageBar,
   visibleSandbox,
@@ -531,3 +537,166 @@ async function answerBlankPage(route: Route): Promise<void> {
 function ignoreError(): void {
   // The frame's document is replaced while the evaluation runs.
 }
+
+/** Records every browser dialog the page or its frames show. */
+function recordDialogs(page: Page): Dialog[] {
+  const dialogs: Dialog[] = [];
+  page.on("dialog", Array.prototype.push.bind(dialogs));
+  return dialogs;
+}
+
+function callConfirm(): boolean {
+  return confirm("Delete?");
+}
+
+function callAlertThreeTimes(): void {
+  alert("a");
+  alert("a");
+  alert("a");
+}
+
+function callPromptAndPrint(): string | null {
+  const answer = prompt("Name?");
+  print();
+  return answer;
+}
+
+test.describe("Blocked browser dialogs are reported", function describeBlockedDialogs(): void {
+  test("Confirm", async function reportsConfirm({ page }): Promise<void> {
+    const dialogs = recordDialogs(page);
+    const frame = await openAppProbe(page);
+
+    const answer = await frame.evaluate(callConfirm);
+
+    expect(answer).toBe(false);
+    await expect(issueList(page)).toContainText(
+      'confirm() is not available in mods and always returns false. Use a <dialog> element, or request "ui.confirm" for a confirmation shown by the app.',
+    );
+    await expect(issueList(page)).toContainText("warning");
+    await expect(issueList(page)).toContainText(
+      "/test-mods/probe/mod_conf.yaml",
+    );
+    expect(dialogs).toEqual([]);
+  });
+
+  test("Reported once", async function reportsAlertOnce({
+    page,
+  }): Promise<void> {
+    const frame = await openAppProbe(page);
+
+    await frame.evaluate(callAlertThreeTimes);
+
+    await expect(issueList(page)).toContainText("alert()");
+    await expect(issueList(page).getByRole("listitem")).toHaveCount(1);
+  });
+
+  test("Each function is named", async function namesEachFunction({
+    page,
+  }): Promise<void> {
+    const dialogs = recordDialogs(page);
+    const frame = await openAppProbe(page);
+
+    const answer = await frame.evaluate(callPromptAndPrint);
+
+    expect(answer).toBeNull();
+    const items = issueList(page).getByRole("listitem");
+    await expect(items).toHaveCount(2);
+    await expect(items.filter({ hasText: "prompt()" })).toHaveCount(1);
+    await expect(items.filter({ hasText: "print()" })).toHaveCount(1);
+    expect(dialogs).toEqual([]);
+  });
+});
+
+const OPEN_ANY_SITE_LINES = [
+  "  permissions:",
+  "    open:",
+  '      - host: "*"',
+  '        reason: "Opens mods"',
+];
+
+async function goFullscreen(page: Page, frame: Frame): Promise<void> {
+  await frame.evaluate(addFullscreenButton);
+  await page
+    .frameLocator('iframe[title="probe"]')
+    .getByRole("button", { name: "Fullscreen" })
+    .click();
+}
+
+test.describe("Mods can go fullscreen", function describeFullscreen(): void {
+  test("Fullscreen after a click", async function goesFullscreen({
+    page,
+  }): Promise<void> {
+    const frame = await openAppProbe(page);
+
+    await goFullscreen(page, frame);
+
+    expect(await frame.evaluate(readFullscreenOutcome)).toBe("BODY");
+    expect(await page.evaluate(isPageFullscreen)).toBe(true);
+  });
+
+  test("Opening another mod leaves fullscreen", async function leavesFullscreen({
+    page,
+  }): Promise<void> {
+    const frame = await openAppProbe(page, OPEN_ANY_SITE_LINES);
+    await goFullscreen(page, frame);
+    expect(await frame.evaluate(readFullscreenOutcome)).toBe("BODY");
+
+    const answer = await frame.evaluate(requestFromProbe, [
+      "mods.open",
+      { mod: "mod_viewer" },
+    ]);
+
+    expect(answer).toEqual({ result: null });
+    await expect(stageBar(page)).toContainText("Mod Viewer");
+    await expect.poll(readPageFullscreen.bind(undefined, page)).toBe(false);
+  });
+});
+
+function readPageFullscreen(page: Page): Promise<boolean> {
+  return page.evaluate(isPageFullscreen);
+}
+
+test.describe("Assets next to the mod", function describeAssets(): void {
+  test("Asset of a mod from the app's origin", async function loadsAppAsset({
+    page,
+  }): Promise<void> {
+    const seenUrls = await serveAppOriginMod(page, {
+      ...buildProbeFiles("probe"),
+      "probe/icon.svg": ICON_SVG,
+    });
+    await page.goto(APP_PROBE_LINK);
+    const frame = await findModFrame(page, "probe");
+    await waitForProbe(frame);
+    const appOrigin = new URL(page.url()).origin;
+
+    const asset = await frame.evaluate(showAssetNextToMod, "./icon.svg");
+
+    expect(asset).toEqual({
+      url: `${appOrigin}/test-mods/probe/icon.svg`,
+      loaded: true,
+    });
+    expect(seenUrls).toContain(`${appOrigin}/test-mods/probe/icon.svg`);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("Asset of a mod from another origin", async function loadsForeignAsset({
+    page,
+  }): Promise<void> {
+    const seenUrls = await serveForeignMod(page, {
+      ...buildProbeFiles("probe"),
+      "probe/icon.svg": ICON_SVG,
+    });
+    await page.goto(FOREIGN_PROBE_LINK);
+    const frame = await findModFrame(page, "probe");
+    await waitForProbe(frame);
+
+    const asset = await frame.evaluate(showAssetNextToMod, "./icon.svg");
+
+    expect(asset).toEqual({
+      url: `${FOREIGN_HOST}/probe/icon.svg`,
+      loaded: true,
+    });
+    expect(seenUrls).toContain(`${FOREIGN_HOST}/probe/icon.svg`);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+});

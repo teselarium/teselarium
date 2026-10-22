@@ -14,7 +14,7 @@ Current state:
 
 Browser behavior, checked while preparing this design in the installed Playwright Chromium (1.64) with a sandboxed `srcdoc` frame:
 
-- Without `allow="fullscreen"` on the `<iframe>`, `document.fullscreenEnabled` is `false` in the frame and `requestFullscreen()` rejects with "Disallowed by permissions policy". With it, `requestFullscreen()` after a click inside the frame resolves.
+- Without `allow="fullscreen"` on the `<iframe>`, `document.fullscreenEnabled` is `false` in the frame and `requestFullscreen()` rejects with "Disallowed by permissions policy". With it, `requestFullscreen()` after a click inside the frame resolves. Firefox and WebKit refuse it with a bare `allow="fullscreen"`, so the frame uses `allow="fullscreen *"` (D8, Browser differences).
 - `alert`, `confirm` and `prompt` show nothing (no dialog reaches the page) and return `undefined`, `false` and `null`. A script in the frame can replace `window.confirm`, and later calls use the replacement.
 - After a click inside the frame, the app page has no user activation (`navigator.userActivation.isActive` is `false`). The frame's origin is opaque, so its activation does not reach the app. Headless Playwright does not block popups, so a test cannot show the blocker. But a real browser blocks `window.open` from a page without activation, so the app can only open a tab from a click on its own page.
 
@@ -53,7 +53,7 @@ src/lib/core/stage/
 src/main/stage/
   ActionDialog.tsx       # the modal dialog (D6)
   action_effects.ts      # openLinkInNewTab, downloadFile, formatFileSize (D6)
-  SandboxFrame.tsx       # + allow="fullscreen" (D8)
+  SandboxFrame.tsx       # + allow="fullscreen *" (D8)
   StageView.tsx          # + ActionDialog, leaving fullscreen (D8)
 ```
 
@@ -134,7 +134,11 @@ A mod can put the originals back. They stay blocked by the sandbox, and only the
 
 ### D8. Fullscreen
 
-`SandboxFrame` adds `allow="fullscreen"`. This is a permissions policy for the frame, not a sandbox flag, so the frame's `sandbox` value stays `allow-scripts`. `StageView` runs an effect keyed on the visible sandbox's id: when it changes and `document.fullscreenElement` is not `null`, it calls `document.exitFullscreen()`, so a hidden frame never keeps the screen.
+`SandboxFrame` adds `allow="fullscreen *"`. This is a permissions policy for the frame, not a sandbox flag, so the frame's `sandbox` value stays `allow-scripts`.
+
+The allowlist must be `*`. A bare `allow="fullscreen"` uses the default allowlist `'src'`: the origin the frame was declared with, which for a `srcdoc` frame is the app's origin. The sandboxed document has an opaque origin, which never matches it. Chromium allows the request anyway, but Firefox and WebKit refuse it (see Browser differences). `*` gives nothing more away: the only document that can run in the frame is the mod's own, since a mod that navigates its frame is stopped and its frame removed.
+
+- Alternative considered: the older `allowfullscreen` attribute. It means the same policy and passed the same tests in the three browsers, but it is the legacy form, and with both attributes Chromium warns that `allow` takes precedence. `StageView` runs an effect keyed on the visible sandbox's id: when it changes and `document.fullscreenElement` is not `null`, it calls `document.exitFullscreen()`, so a hidden frame never keeps the screen.
 
 ### D9. Assets next to the mod
 
@@ -158,8 +162,18 @@ Each scenario of the two spec files has a test named after it:
 
 - [A mod can give itself a misleading title, such as "OpenTesela", to borrow the app's authority in the dialog] → The dialog always shows the mod's source under the title, and mods from other origins have that origin in their source. Mods from the app's origin are trusted by the site owner already. The permission prompt change can add a stronger mark for mods from other sites.
 - [A mod can keep asking, one dialog after another] → Each dialog needs a user action, the browser's back button always leaves the mod (which drops its requests), and only the visible mod can ask. A per-mod limit can come later if a real mod abuses it.
-- [Popup behavior was not seen being blocked in tests] → Headless Chromium does not block popups. The user activation check in Context is the evidence, and task 8.2 checks the link and the download by hand in Firefox and, if available, WebKit.
+- [Popup behavior was not seen being blocked in tests] → Headless Chromium does not block popups. The user activation check in Context is the evidence. The link and the download are tested in Chromium, Firefox and WebKit (task 8.2), but all headless, so no test shows that a real browser opens the tab or starts the download without a popup or download warning.
 - [Large saves hold the bytes in memory twice, in the action and in the `Blob`] → Bounded by 20 MB. The action is dropped as soon as it is answered.
+
+## Browser differences
+
+Found by running the Playwright suite in Playwright 1.64's Chromium, Firefox (157) and WebKit, all headless (task 8.2). The three are now projects in `playwright.config.ts`, so every test runs in each:
+
+- **Fullscreen**: with a bare `allow="fullscreen"`, `requestFullscreen()` in the mod frame rejects in Firefox with `TypeError: Fullscreen request denied` and in WebKit with `TypeError: Fullscreen API is disabled by permissions policy.`, while Chromium allows it. With `allow="fullscreen *"` (D8), "Fullscreen after a click", "Opening another mod leaves fullscreen" and "Frame sandbox" pass in all three.
+- **`window.open` in a mod frame**: Chromium and WebKit return `null`, Firefox throws (`A parameter or an operation is not supported by the underlying object`). The popup is blocked either way. The test helper of "Popups are blocked" (from `add-mod-sandbox`) now accepts both.
+- Every other test, including the action dialog, the link, the downloads, Escape and back, passes in all three.
+
+Headless browsers do not show popup blockers or download warnings, so these tests cannot show them (see Risks).
 
 ## Migration Plan
 

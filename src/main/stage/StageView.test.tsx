@@ -1,8 +1,9 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { attachFrame, openStageLink } from "../../lib/core/stage/index.ts";
 import type { Stage } from "../../lib/core/stage/index.ts";
 import {
+  collectMessages,
   createFakeFrame,
   readModPort,
   waitForMessages,
@@ -69,6 +70,7 @@ describe("StageView", function describeStageView(): void {
 
     expect(frame.tagName).toBe("IFRAME");
     expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(frame.getAttribute("allow")).toBe("fullscreen *");
     expect(frame.hasAttribute("src")).toBe(false);
     expect(frame.getAttribute("srcdoc")).toContain("Content-Security-Policy");
   });
@@ -133,6 +135,36 @@ describe("StageView", function describeStageView(): void {
     render(<StageView stage={stage} />);
 
     expect(screen.getByText("No issues.")).toBeInTheDocument();
+  });
+
+  it("shows the visible mod's ui.confirm and sends the answer", async function answersConfirm(): Promise<void> {
+    const stage = await startTestStage("");
+    const fakeFrame = createFakeFrame();
+    attachFrame(stage, "sandbox-1", fakeFrame.target);
+    const modPort = readModPort(fakeFrame);
+    openPorts.push(modPort);
+    const received = collectMessages(modPort);
+    render(<StageView stage={stage} />);
+
+    await act(async function askUser(): Promise<void> {
+      modPort.postMessage({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ui.confirm",
+        params: { message: "Delete this list?", confirmLabel: "Delete" },
+      });
+      await waitForMessages();
+    });
+    const dialog = screen.getByRole("dialog", { name: "Book List" });
+    expect(dialog).toHaveTextContent("Delete this list?");
+    expect(dialog).toHaveTextContent(SAMPLE_MOD_SOURCE);
+    await act(async function confirm(): Promise<void> {
+      fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+      await waitForMessages();
+    });
+
+    expect(received).toEqual([{ jsonrpc: "2.0", id: 1, result: true }]);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("lists the issues in order with level, source and message", async function listsIssues(): Promise<void> {

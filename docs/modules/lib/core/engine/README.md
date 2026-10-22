@@ -48,7 +48,7 @@ Data that is not a valid request but has a string or number `id` is answered wit
 
 ### Reserved names
 
-Methods starting with `sandbox.` belong to the frame loader, which uses them to connect the channel and to report blocked requests and mount failures (see the [sandbox module](../sandbox/README.md)). Mods must not use them.
+Methods starting with `sandbox.` belong to the frame loader, which uses them to connect the channel and to report blocked requests, blocked browser dialogs and mount failures (see the [sandbox module](../sandbox/README.md)). Mods must not use them.
 
 Method names are looked up as own properties of the engine's handler tables, so names such as `toString` or `__proto__` are unknown methods.
 
@@ -60,6 +60,9 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `storage.set` | `{ key, value }`, with `value` plain data (strings, finite numbers, booleans, null, lists and mappings) | `null`. Storing `null` removes the key. |
 | `mods.inspect` | `{ mod }`, a mod reference | The mod's metadata, without running it (see below). |
 | `mods.open` | `{ mod, collection?, params? }` | `null`, once the stage opened the mod in a new sandbox. |
+| `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
+| `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
+| `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
 
 | Event | Params |
 |---|---|
@@ -116,6 +119,46 @@ Then:
 - `mods.open` asks the stage to open the link in a new sandbox, with the requesting sandbox as its opener, and answers `null`. Only the visible mod can open mods: a hidden one gets `-32002` with `mods.open: only the visible mod can open mods`. The new mod's load failures belong to its own sandbox, not to the response.
 
 Mods never build app addresses: they send what to run, and only the stage turns it into a run link and a history entry (see the [stage module](../stage/README.md)).
+
+### Asking the user: links, files and confirmations
+
+The sandbox keeps a mod from opening tabs, starting downloads and showing browser dialogs. Instead, a mod asks the app, which shows the request in its own dialog, outside every frame, with the mod's title and source. The app acts only when the user accepts, and the request answers `true` or `false`. No permission is needed.
+
+| Request | The dialog shows | Accept does |
+|---|---|---|
+| `links.open { url }` | The full address, normalized, with an internationalized host in punycode. Buttons Open and Cancel. | Opens the address in a new tab with `noopener` and `noreferrer`, so the tab has no access to the app. |
+| `files.save { name, content, encoding?, type? }` | The file name and size. Buttons Save and Cancel. | Downloads a file with that name, type and content. |
+| `ui.confirm { message, confirmLabel?, cancelLabel? }` | The message as plain text, keeping its line breaks. Buttons `confirmLabel` (default `OK`) and `cancelLabel` (default `Cancel`). | Nothing more: the answer is the action. |
+
+The params are checked before any dialog, and a problem is `-32602` with a message naming the method and the problem:
+
+- `links.open`: `url` must be an absolute `http:` or `https:` address (`links.open: "url" must be an http: or https: address`), without a user name or password.
+- `files.save`: `name` must be a file name: 1 to 255 characters, not `.` or `..`, and without `/`, `\` or control characters (`files.save: "name" must be a file name without a path`). `content` must be a string. `encoding` is `"text"` (the default) or `"base64"`. Text is saved as UTF-8, and base64 must decode (`files.save: "content" is not valid base64`). `type` is a media type such as `"text/csv"`, by default `text/plain` for text and `application/octet-stream` for base64. The saved file must be at most 20 MB (`files.save: the file is larger than 20 MB`).
+- `ui.confirm`: `message` must be a non-empty string of at most 1000 characters, and each label, when given, a non-empty string of at most 40 characters.
+
+Only the visible mod can ask: a hidden one gets `-32002` with, for example, `ui.confirm: only the visible mod can ask the user`, and no dialog is shown.
+
+The app shows one dialog at a time. A request that arrives while a dialog is open waits, and dialogs are shown in the order the requests arrived. When the asking mod stops being visible or is closed, its dialogs are removed and its requests answer `false`. A mod that is stopped gets no answer.
+
+```js
+const deleted = await engine.request("ui.confirm", {
+  message: `Delete "${list.name}"?`,
+  confirmLabel: "Delete",
+});
+if (deleted) {
+  removeList(list);
+}
+
+await engine.request("files.save", {
+  name: "books.csv",
+  content: "title\nKallocain\n",
+  type: "text/csv",
+});
+
+await engine.request("links.open", { url: tile.data.url });
+```
+
+The request stays pending while the dialog is open, for as long as the user needs, so a mod must not rely on a quick answer.
 
 ### Default mod settings
 
@@ -298,7 +341,15 @@ const launch = await prepareModLaunch(
 
 ### Request handlers
 
-Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`) and `mods_methods.ts` (`MODS_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `onOpenLink`).
+Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`) and `ui_methods.ts` (`UI_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `onOpenLink`, `onRequestAction`).
+
+The `links.*`, `files.*` and `ui.*` handlers check their params into an `AppAction` (`app_actions.ts`), data the app can perform with no more checks:
+
+- `LinkAction`: `{ kind: "link", url }`, with `url` the normalized `href`.
+- `SaveFileAction`: `{ kind: "save", name, type, bytes }`, with `bytes` a `Uint8Array` holding the file, so the size the dialog shows is the size downloaded. `MAX_SAVE_BYTES` is 20 MB.
+- `ConfirmAction`: `{ kind: "confirm", message, confirmLabel, cancelLabel }`, with the labels defaulted.
+
+Then they call `askUser(context, method, action)`, which calls `context.onRequestAction(action)`: a promise of the user's answer, or `null` when the sandbox is not the visible one, which `askUser` turns into `-32002`. Actions never cross `postMessage`: they go from the session to the stage and the page in the same window. The types are exported from `index.ts` as types only.
 
 To add a namespace, for example `tiles.*`:
 
@@ -310,7 +361,7 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
 
 ### Session
 
-- `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `onIssue`, `onOpenLink`, `theme`). Returns a `ModSession`.
+- `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `onIssue`, `onOpenLink`, `onRequestAction`, `theme`). Returns a `ModSession`.
 - `pushTilesChanged(session, tiles, issues)`: pushes `tiles.changed`.
 - `pushThemeChanged(session, theme)`: pushes `theme.changed` with the `Theme`.
 - `THEME_CHANGED_METHOD`: `"theme.changed"`, shared with the frame loader.
@@ -320,7 +371,7 @@ Lifecycle:
 
 1. The stage launches the mod with `prepareModLaunch` and renders its frame with `launch.sandboxDocument`.
 2. On the frame's first `load`, the stage calls `connectModSession` with the frame's window.
-3. The session answers each request once with the same `id`. `sandbox.blocked` and `sandbox.mountFailed` from the frame loader become issues through `onIssue`, each reported once.
+3. The session answers each request once with the same `id`. `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked` from the frame loader become issues through `onIssue`, each reported once.
 4. "Reload tiles" calls `loadModTiles` and `pushTilesChanged`. A color scheme change calls `pushThemeChanged` for every running session.
 5. Closing the sandbox, or the frame loading another document, calls `stopModSession`.
 
@@ -334,6 +385,7 @@ const session = connectModSession(frame.contentWindow, launch, {
   fetchOptions: { baseUrl: document.baseURI },
   onIssue: addIssue,
   onOpenLink: openLinkFromThisSandbox,
+  onRequestAction: showActionFromThisSandbox,
   theme: buildTheme("dark"),
 });
 pushTilesChanged(session, reloadedTiles.tiles, reloadedTiles.issues);

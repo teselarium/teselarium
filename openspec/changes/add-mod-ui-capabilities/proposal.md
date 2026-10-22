@@ -26,7 +26,7 @@ Each capability has to come back without giving up what the sandbox protects. A 
 
 ### Modified Capabilities
 
-- `mod-sandbox`: adds requirements for fullscreen, the reports of blocked browser dialogs, and assets next to the mod. Existing requirements are unchanged: the frame's sandbox still allows scripts only, since fullscreen is a frame permission (`allow="fullscreen"`), not a sandbox flag.
+- `mod-sandbox`: adds requirements for fullscreen, the reports of blocked browser dialogs, and assets next to the mod. Existing requirements are unchanged: the frame's sandbox still allows scripts only, since fullscreen is a frame permission (`allow="fullscreen *"`), not a sandbox flag.
 
 ## Impact
 

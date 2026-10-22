@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ModFile, ModPermission } from "../../mod/index.ts";
 import type { ModGrants } from "../permissions/index.ts";
-import { describeBlockedRequest } from "./index.ts";
+import { describeBlockedDialog, describeBlockedRequest } from "./index.ts";
 import type { BlockedRequest } from "./index.ts";
 
 const MOD_SOURCE = "https://mods.example.net/probe/mod_conf.yaml";
@@ -137,5 +137,28 @@ describe("describeBlockedRequest", function describeDescribeBlocked(): void {
     );
 
     expect(message).toContain("to https://images.example.net:8443.");
+  });
+});
+
+describe("describeBlockedDialog", function describeDescribeBlockedDialog(): void {
+  it("Confirm", function describesConfirm(): void {
+    expect(describeBlockedDialog("confirm", MOD)).toEqual({
+      level: "warning",
+      source: MOD_SOURCE,
+      message:
+        'confirm() is not available in mods and always returns false. Use a <dialog> element, or request "ui.confirm" for a confirmation shown by the app.',
+    });
+  });
+
+  it("names each function and what to use instead", function describesEach(): void {
+    expect(describeBlockedDialog("alert", MOD).message).toBe(
+      "alert() is not available in mods. Show the message in the page or in a <dialog> element.",
+    );
+    expect(describeBlockedDialog("prompt", MOD).message).toBe(
+      "prompt() is not available in mods and always returns null. Use an <input> in a <dialog> element.",
+    );
+    expect(describeBlockedDialog("print", MOD).message).toBe(
+      "print() is not available in mods.",
+    );
   });
 });

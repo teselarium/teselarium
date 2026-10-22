@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  readBlockedDialog,
   readBlockedRequest,
   readMountFailure,
   SANDBOX_BLOCKED_METHOD,
   SANDBOX_CONNECT_METHOD,
+  SANDBOX_DIALOG_BLOCKED_METHOD,
   SANDBOX_MOUNT_FAILED_METHOD,
 } from "./index.ts";
 import { THEME_CHANGED_METHOD } from "../engine/index.ts";
@@ -57,12 +59,32 @@ describe("readMountFailure", function describeReadMountFailure(): void {
   });
 });
 
+describe("readBlockedDialog", function describeReadBlockedDialog(): void {
+  it("reads each blocked function's name", function readsNames(): void {
+    for (const name of ["alert", "confirm", "prompt", "print"]) {
+      expect(readBlockedDialog({ name })).toBe(name);
+    }
+  });
+
+  it("gives null for an unknown name", function rejectsUnknown(): void {
+    expect(readBlockedDialog({ name: "open" })).toBeNull();
+    expect(readBlockedDialog({ name: "toString" })).toBeNull();
+  });
+
+  it("gives null for params of the wrong shape", function rejectsShape(): void {
+    expect(readBlockedDialog({})).toBeNull();
+    expect(readBlockedDialog({ name: 3 })).toBeNull();
+    expect(readBlockedDialog("alert")).toBeNull();
+  });
+});
+
 describe("frame loader message names", function describeMethodNames(): void {
   it("match the ones the frame loader uses", function matchesLoader(): void {
     const methodNames = [
       SANDBOX_CONNECT_METHOD,
       SANDBOX_BLOCKED_METHOD,
       SANDBOX_MOUNT_FAILED_METHOD,
+      SANDBOX_DIALOG_BLOCKED_METHOD,
     ];
 
     for (const methodName of methodNames) {
@@ -72,6 +94,7 @@ describe("frame loader message names", function describeMethodNames(): void {
       "sandbox.connect",
       "sandbox.blocked",
       "sandbox.mountFailed",
+      "sandbox.dialogBlocked",
     ]);
   });
 
