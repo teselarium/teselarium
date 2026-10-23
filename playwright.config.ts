@@ -1,6 +1,24 @@
 import { defineConfig, devices } from "@playwright/test";
+import {
+  EXPLORER_OFF_PREVIEW_URL,
+  HOME_MOD_PREVIEW_URL,
+  PREVIEW_URL,
+} from "./e2e/app_servers.ts";
 
-const PREVIEW_URL = "http://127.0.0.1:4173";
+/** Builds the app in an e2e mode (vite.config.ts) and previews it on its own port. */
+function buildInstantiationServer(
+  mode: string,
+  port: number,
+  url: string,
+): { command: string; url: string; reuseExistingServer: boolean } {
+  const outDir = `dist-${mode}`;
+  const server = {
+    command: `npx vite build --mode ${mode} --outDir ${outDir} && npx vite preview --outDir ${outDir} --port ${port} --strictPort`,
+    url,
+    reuseExistingServer: false,
+  };
+  return server;
+}
 
 export default defineConfig({
   testDir: "e2e",
@@ -12,9 +30,18 @@ export default defineConfig({
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
-  webServer: {
-    command: "npm run build && npm run preview -- --strictPort",
-    url: PREVIEW_URL,
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      command: "npm run build && npm run preview -- --strictPort",
+      url: PREVIEW_URL,
+      reuseExistingServer: false,
+    },
+    // Instantiations the vanilla app cannot show (src/test/registries/).
+    buildInstantiationServer("e2e-home-mod", 4174, HOME_MOD_PREVIEW_URL),
+    buildInstantiationServer(
+      "e2e-explorer-off",
+      4175,
+      EXPLORER_OFF_PREVIEW_URL,
+    ),
+  ],
 });

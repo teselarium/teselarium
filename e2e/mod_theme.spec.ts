@@ -37,6 +37,7 @@ import {
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const SAMPLE_RUN_LINK =
   "/#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
+const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
 /** Opens the theme probe while the operating system prefers `colorScheme`, with the choice System. */
 async function openThemeProbe(
@@ -261,7 +262,7 @@ test.describe("Theme changed event", function describeThemeChanged(): void {
   }): Promise<void> {
     await recordDefaultModThemes(page);
     await page.emulateMedia({ colorScheme: "light" });
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     const explorer = await findModFrame(page, "Mods");
     await explorer.getByRole("button", { name: /Book List/ }).click();
     const viewer = await findModFrame(page, "Mod Viewer");
@@ -360,7 +361,7 @@ test.describe("Sample and default mods follow the theme", function describeShipp
     page,
   }): Promise<void> {
     await page.emulateMedia({ colorScheme: "dark" });
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     const explorer = await findModFrame(page, "Mods");
     const explorerColors = await explorer.evaluate(readBodyColors);
     await explorer.getByRole("button", { name: /Book List/ }).click();

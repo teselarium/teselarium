@@ -17,13 +17,12 @@ const VIEWER_SOURCE =
 describe("resolveDefaultModSettings", function describeResolveSettings(): void {
   it("resolves the folder against the app's address with a trailing slash", function resolvesFolder(): void {
     const defaults = resolveDefaultModSettings(
-      { folder: "./default_mods", home: "mod_explorer", switchedOff: [] },
+      { folder: "./default_mods", switchedOff: [] },
       APP_URL,
     );
 
     expect(defaults).toEqual({
       folder: "https://example.org/app/default_mods/",
-      home: "mod_explorer",
       switchedOff: [],
     });
   });
@@ -32,7 +31,6 @@ describe("resolveDefaultModSettings", function describeResolveSettings(): void {
     const defaults = resolveDefaultModSettings(
       {
         folder: "./default_mods/",
-        home: "mod_explorer",
         switchedOff: ["mod_viewer"],
       },
       APP_URL,
@@ -48,7 +46,6 @@ describe("findSwitchedOffMod", function describeFindSwitchedOffMod(): void {
   const defaults = resolveDefaultModSettings(
     {
       folder: "./default_mods/",
-      home: "mod_explorer",
       switchedOff: ["mod_viewer"],
     },
     APP_URL,

@@ -41,6 +41,13 @@
   --input: var(--ot-input);
   --ring: var(--ot-ring);
   --radius: var(--ot-radius);
+  /* The sidebar's roles, for the app only: mods do not get them. */
+  --sidebar: var(--ot-card);
+  --sidebar-foreground: var(--ot-card-foreground);
+  --sidebar-accent: var(--ot-accent);
+  --sidebar-accent-foreground: var(--ot-accent-foreground);
+  --sidebar-border: var(--ot-border);
+  --sidebar-ring: var(--ot-ring);
 }
 
 @theme inline {
@@ -67,6 +74,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -99,9 +112,44 @@
   }
 }
 
-/* The header, then the stage, which takes the rest of the viewport. */
 #root {
-  display: grid;
-  grid-template-rows: auto 1fr;
   height: 100dvh;
+}
+
+/*
+ * The header across the top, then the sidebar's column and the main area,
+ * which takes the rest of the viewport. App.tsx sets `--sidebar-column` from
+ * the sidebar's state, so resizing it resizes the frame without a reload.
+ */
+.app-layout {
+  --sidebar-rail-width: calc(var(--ot-space-1) * 12);
+  display: grid;
+  grid-template-columns: var(--sidebar-column, 240px) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+
+.app-layout > header {
+  grid-column: 1 / -1;
+}
+
+/* Placed explicitly: a hidden sidebar leaves the grid, and the main area must keep its column. */
+.app-layout > aside {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.app-layout > main {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* While the sidebar is resized, a frame under the pointer must not take the drag. */
+body[data-sidebar-resizing] {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body[data-sidebar-resizing] iframe {
+  pointer-events: none;
 }

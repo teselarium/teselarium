@@ -1,58 +1,28 @@
-import type { RunLink } from "../engine/index.ts";
-import { buildRunLink, readAppRoute } from "./run_links.ts";
-
 /** The part of `History` the stage uses. The page passes `window.history`. */
 export type StageHistory = Pick<
   History,
   "state" | "pushState" | "replaceState"
 >;
 
-/** What an address means to the stage: the hash of its entry, the link to run, and whether it is home. */
-export interface StageRoute {
+/** What the stage writes for a history entry: its position, its section and its address. */
+export interface HistoryEntryWrite {
+  position: number;
+  section: string | null;
   hash: string;
-  link: RunLink;
-  isHome: boolean;
 }
 
-const HOME_HASH = "#/";
-
-/**
- * Reads an address hash. Home (`""`, `#/` or any hash that is not a run
- * link) becomes the home mod's link with hash `#/`. A run link keeps its hash.
- */
-export function readStageRoute(hash: string, homeMod: string): StageRoute {
-  const appRoute = readAppRoute(hash);
-  if (appRoute.page === "home") {
-    const homeRoute: StageRoute = {
-      hash: HOME_HASH,
-      link: { mod: homeMod, collection: null, params: {} },
-      isHome: true,
-    };
-    return homeRoute;
-  }
-  const runRoute: StageRoute = { hash, link: appRoute.link, isHome: false };
-  return runRoute;
-}
-
-/** The route of a link a mod asked to open. */
-export function routeForLink(link: RunLink): StageRoute {
-  const route: StageRoute = {
-    hash: buildRunLink(link),
-    link: structuredClone(link),
-    isHome: false,
-  };
-  return route;
-}
-
-function isStageState(
+function readStageHistoryState(
   historyState: unknown,
-): historyState is { opentesela: { position: unknown } } {
+): { position?: unknown; section?: unknown } | null {
   if (typeof historyState !== "object" || historyState === null) {
-    return false;
+    return null;
   }
   const stageState: unknown = (historyState as { opentesela?: unknown })
     .opentesela;
-  return typeof stageState === "object" && stageState !== null;
+  if (typeof stageState !== "object" || stageState === null) {
+    return null;
+  }
+  return stageState;
 }
 
 /**
@@ -61,10 +31,7 @@ function isStageState(
  * another app's state).
  */
 export function readHistoryPosition(historyState: unknown): number | null {
-  if (!isStageState(historyState)) {
-    return null;
-  }
-  const position = historyState.opentesela.position;
+  const position = readStageHistoryState(historyState)?.position;
   if (
     typeof position !== "number" ||
     !Number.isInteger(position) ||
@@ -76,20 +43,33 @@ export function readHistoryPosition(historyState: unknown): number | null {
 }
 
 /**
- * Writes a history entry with the stage's position in its state, so positions
- * stay consistent after a reload. `push` adds an entry, `replace` changes the
+ * The section the stage stored in an entry's state, or `null` when the entry
+ * belongs to no section. Anything but a non-empty string counts as `null`.
+ */
+export function readHistorySection(historyState: unknown): string | null {
+  const section = readStageHistoryState(historyState)?.section;
+  if (typeof section !== "string" || section === "") {
+    return null;
+  }
+  return section;
+}
+
+/**
+ * Writes a history entry with the stage's position and section in its state,
+ * so both stay after a reload. `push` adds an entry, `replace` changes the
  * current one.
  */
 export function writeStageEntry(
   history: StageHistory,
   mode: "push" | "replace",
-  position: number,
-  hash: string,
+  entry: HistoryEntryWrite,
 ): void {
-  const historyState = { opentesela: { position } };
+  const historyState = {
+    opentesela: { position: entry.position, section: entry.section },
+  };
   if (mode === "push") {
-    history.pushState(historyState, "", hash);
+    history.pushState(historyState, "", entry.hash);
     return;
   }
-  history.replaceState(historyState, "", hash);
+  history.replaceState(historyState, "", entry.hash);
 }

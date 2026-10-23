@@ -89,7 +89,8 @@ function buildSandbox(mod: string, collection: string | null): StageSandbox {
     hash: "#/run",
     link: { mod, collection, params: {} },
     openerId: null,
-    isHome: false,
+    section: null,
+    isHomeMod: false,
   };
   return sandbox;
 }
@@ -178,7 +179,6 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     spied.services.defaults = resolveDefaultModSettings(
       {
         folder: "./default_mods/",
-        home: "mod_explorer",
         switchedOff: ["mod_viewer"],
       },
       APP_BASE_URL,

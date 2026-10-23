@@ -1,4 +1,6 @@
+import { expect } from "@playwright/test";
 import type { Frame, Locator, Page, Route } from "@playwright/test";
+import { openSection } from "./app_layout.ts";
 import { buildModConf } from "./mod_routes.ts";
 import type { ModFiles } from "./mod_routes.ts";
 
@@ -19,6 +21,9 @@ export const LIGHT_COLORS = {
   primary: { value: "#1f4e9c", computed: "rgb(31, 78, 156)" },
   popover: { value: "#ffffff", computed: "rgb(255, 255, 255)" },
   popoverForeground: { value: "#1d2433", computed: "rgb(29, 36, 51)" },
+  card: { value: "#ffffff", computed: "rgb(255, 255, 255)" },
+  accentForeground: { value: "#1d2433", computed: "rgb(29, 36, 51)" },
+  border: { value: "#e3d9c6", computed: "rgb(227, 217, 198)" },
 } as const satisfies Record<string, TokenColor>;
 
 export const DARK_COLORS = {
@@ -27,6 +32,9 @@ export const DARK_COLORS = {
   primary: { value: "#78a6f2", computed: "rgb(120, 166, 242)" },
   popover: { value: "#18202c", computed: "rgb(24, 32, 44)" },
   popoverForeground: { value: "#f2ede3", computed: "rgb(242, 237, 227)" },
+  card: { value: "#18202c", computed: "rgb(24, 32, 44)" },
+  accentForeground: { value: "#0f141d", computed: "rgb(15, 20, 29)" },
+  border: { value: "#283245", computed: "rgb(40, 50, 69)" },
 } as const satisfies Record<string, TokenColor>;
 
 /**
@@ -80,9 +88,21 @@ export function themeControl(page: Page): Locator {
   return page.getByLabel("Theme");
 }
 
-/** Picks System, Light or Dark in the Theme control, as a user would. */
+/**
+ * Picks System, Light or Dark in the Theme control, as a user would: opens
+ * Settings from the sidebar, chooses, and goes back to what was shown, unless
+ * Settings was already shown.
+ */
 export async function chooseTheme(page: Page, label: string): Promise<void> {
+  const wasOnSettings = await themeControl(page).isVisible();
+  if (!wasOnSettings) {
+    await openSection(page, "Settings");
+  }
   await themeControl(page).selectOption({ label });
+  if (!wasOnSettings) {
+    await page.goBack();
+    await expect(themeControl(page)).toHaveCount(0);
+  }
 }
 
 /** Runs in a page or a frame: the `data-ot-color-scheme` of `<html>`. */

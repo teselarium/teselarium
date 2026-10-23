@@ -20,11 +20,21 @@ import {
 import type { ActionMod, StageActions } from "./stage_actions.ts";
 import {
   readHistoryPosition,
-  readStageRoute,
-  routeForLink,
+  readHistorySection,
   writeStageEntry,
 } from "./stage_history.ts";
 import type { StageHistory } from "./stage_history.ts";
+import {
+  buildHomeRoute,
+  buildPageHash,
+  buildSectionHash,
+  findLinkSection,
+  findSectionLink,
+  isHomeModSection,
+  readStageRoute,
+  routeForLink,
+} from "./stage_routes.ts";
+import type { StageRoute, StageRouting } from "./stage_routes.ts";
 import {
   attachSandboxFrame,
   launchSandbox,
@@ -39,17 +49,35 @@ import type {
   SandboxStatus,
 } from "./stage_sandboxes.ts";
 import {
+  createSectionMemory,
+  forgetSandboxes,
+  readSectionPlace,
+  rememberShownEntry,
+} from "./stage_sections.ts";
+import type { SectionMemory, SectionPlace } from "./stage_sections.ts";
+import {
   closeStageSandbox,
   createStageState,
+  findSandbox,
   openStageEntry,
+  readVisibleEntry,
   readVisibleSandbox,
   restoreStageEntry,
 } from "./stage_state.ts";
-import type { StageChange, StageSandbox, StageState } from "./stage_state.ts";
+import type {
+  EntryTarget,
+  EntryView,
+  HomeFallback,
+  StageChange,
+  StageSandbox,
+  StageState,
+} from "./stage_state.ts";
 
 export interface StageOptions {
   history: StageHistory;
   defaults: DefaultModSettings;
+  /** The page sections, what Home is and the mod sections' links. */
+  routing: StageRouting;
   appOrigin: string;
   /** The app's address: relative references and locations resolve against it. */
   baseUrl: string;
@@ -64,7 +92,7 @@ export interface SandboxSnapshot {
   id: string;
   hash: string;
   isVisible: boolean;
-  /** Every sandbox but the home mod at `#/` has a close button. */
+  /** Every sandbox but the Home mod at `#/` has a close button. */
   canClose: boolean;
   status: SandboxStatus;
   /** Known once the mod is loaded. */
@@ -85,11 +113,20 @@ export interface ActionSnapshot {
   action: AppAction;
 }
 
+/** What the current entry shows: a sandbox, a page, or nothing before the first entry. */
+export type VisibleView =
+  | { kind: "sandbox"; id: string }
+  | { kind: "page"; section: string; page: string | null }
+  | null;
+
 /** What the page renders of the stage. Frozen, and new after every change. */
 export interface StageSnapshot {
   sandboxes: readonly SandboxSnapshot[];
   /** The oldest action waiting for the user, or `null`. Later ones wait their turn. */
   action: ActionSnapshot | null;
+  visible: VisibleView;
+  /** The section the current entry belongs to, or `null`. */
+  activeSection: string | null;
 }
 
 /** The stage: open sandboxes, their history entries and the snapshot the page renders. Mutable. */
@@ -98,6 +135,9 @@ export interface Stage {
   runtimes: Map<string, SandboxRuntime>;
   history: StageHistory;
   defaults: ResolvedDefaultModSettings;
+  routing: StageRouting;
+  /** Where each section was left, for section navigation. */
+  sections: SectionMemory;
   appOrigin: string;
   fetchOptions: FileFetchOptions;
   storage: ModStorage;
@@ -114,16 +154,9 @@ const LEFT_PAGE_MESSAGE = "The mod left its page and was stopped.";
 const EMPTY_SNAPSHOT: StageSnapshot = Object.freeze({
   sandboxes: Object.freeze([]),
   action: null,
+  visible: null,
+  activeSection: null,
 });
-
-function buildHomeLink(stage: Stage): RunLink {
-  const homeLink: RunLink = {
-    mod: stage.defaults.home,
-    collection: null,
-    params: {},
-  };
-  return homeLink;
-}
 
 function openLinkFromSandbox(
   stage: Stage,
@@ -186,7 +219,7 @@ function buildSandboxSnapshot(
     id: sandbox.id,
     hash: sandbox.hash,
     isVisible: sandbox.id === visibleId,
-    canClose: !sandbox.isHome,
+    canClose: !sandbox.isHomeMod,
     status,
     mod: buildModSummary(runtime),
     sandboxDocument: isRunning ? launch.sandboxDocument : null,
@@ -213,6 +246,26 @@ function buildActionSnapshot(stage: Stage): ActionSnapshot | null {
   return Object.freeze(snapshot);
 }
 
+function buildVisibleView(state: StageState): VisibleView {
+  const entry = readVisibleEntry(state);
+  if (entry === null) {
+    return null;
+  }
+  if (entry.view.kind === "page") {
+    const pageView: VisibleView = {
+      kind: "page",
+      section: entry.view.section,
+      page: entry.view.page,
+    };
+    return Object.freeze(pageView);
+  }
+  const sandboxView: VisibleView = {
+    kind: "sandbox",
+    id: entry.view.sandboxId,
+  };
+  return Object.freeze(sandboxView);
+}
+
 function buildStageSnapshot(stage: Stage): StageSnapshot {
   const visibleId = readVisibleSandbox(stage.state)?.id ?? null;
   const sandboxes: SandboxSnapshot[] = [];
@@ -224,6 +277,8 @@ function buildStageSnapshot(stage: Stage): StageSnapshot {
   const snapshot: StageSnapshot = {
     sandboxes: Object.freeze(sandboxes),
     action: buildActionSnapshot(stage),
+    visible: buildVisibleView(stage.state),
+    activeSection: readVisibleEntry(stage.state)?.section ?? null,
   };
   return Object.freeze(snapshot);
 }
@@ -255,10 +310,16 @@ function dropLeftActions(stage: Stage): void {
 
 /**
  * Applies a state change: stops the closed sandboxes, launches the opened
- * one and drops the actions of the sandboxes that left.
+ * one, updates the section memory and drops the actions of the sandboxes
+ * that left.
  */
 function applyStageChange(stage: Stage, change: StageChange): void {
   stage.state = change.state;
+  stage.sections = rememberShownEntry(
+    forgetSandboxes(stage.sections, change.closedIds),
+    stage.state,
+    stage.routing,
+  );
   for (const closedId of change.closedIds) {
     const runtime = stage.runtimes.get(closedId);
     if (runtime !== undefined) {
@@ -281,6 +342,8 @@ export function createStage(options: StageOptions): Stage {
     runtimes: new Map(),
     history: options.history,
     defaults: resolveDefaultModSettings(options.defaults, options.baseUrl),
+    routing: options.routing,
+    sections: createSectionMemory(),
     appOrigin: options.appOrigin,
     fetchOptions: { baseUrl: options.baseUrl, fetch: options.fetch },
     storage: options.storage,
@@ -292,44 +355,100 @@ export function createStage(options: StageOptions): Stage {
   return stage;
 }
 
+/** The address of a view: its sandbox's hash, or its page's address. */
+function readViewHash(stage: Stage, view: EntryView): string {
+  if (view.kind === "page") {
+    return buildPageHash(stage.routing, view.section, view.page);
+  }
+  return findSandbox(stage.state, view.sandboxId)?.hash ?? "#/";
+}
+
+/** Writes the current entry to the history, with its position, its section and its address. */
+function writeCurrentEntry(stage: Stage, mode: "push" | "replace"): void {
+  const entry = readVisibleEntry(stage.state);
+  if (entry === null) {
+    return;
+  }
+  writeStageEntry(stage.history, mode, {
+    position: entry.position,
+    section: entry.section,
+    hash: readViewHash(stage, entry.view),
+  });
+}
+
+/**
+ * The section of an address the stage did not write: a page belongs to its
+ * section, the Home mod to the Home section, and a run link to the section
+ * whose mod link it exactly is, or to none.
+ */
+function readRouteSection(
+  routing: StageRouting,
+  route: StageRoute,
+): string | null {
+  if (route.kind === "page") {
+    return route.section;
+  }
+  if (route.isHomeMod) {
+    return routing.home.section;
+  }
+  return findLinkSection(routing, route.link);
+}
+
+function buildRouteTarget(
+  route: StageRoute,
+  openerId: string | null,
+): EntryTarget {
+  if (route.kind === "page") {
+    const pageTarget: EntryTarget = {
+      kind: "page",
+      section: route.section,
+      page: route.page,
+    };
+    return pageTarget;
+  }
+  const sandboxTarget: EntryTarget = {
+    kind: "new-sandbox",
+    opening: {
+      hash: route.hash,
+      link: route.link,
+      openerId,
+      isHomeMod: route.isHomeMod,
+    },
+  };
+  return sandboxTarget;
+}
+
 /**
  * Follows the current history entry, on start and on every `popstate`. An
- * entry the stage wrote shows its sandbox again, or opens its link in a new
- * one when that sandbox is closed. Any other entry (first load, a typed
- * address, a link followed in the page) opens its link in a new sandbox at
- * the next position.
+ * entry the stage wrote shows its page or its sandbox again, or opens its
+ * link in a new sandbox when that sandbox is closed, and keeps its stored
+ * section. Any other entry (first load, a typed address, a link followed in
+ * the page) shows its page or opens its link in a new sandbox at the next
+ * position.
  */
 export function followHistory(
   stage: Stage,
   hash: string,
   historyState: unknown,
 ): void {
-  const route = readStageRoute(hash, stage.defaults.home);
+  const route = readStageRoute(hash, stage.routing);
   const position = readHistoryPosition(historyState);
   if (position === null) {
     const change = openStageEntry(
       stage.state,
-      route.hash,
-      route.link,
-      null,
-      route.isHome,
+      buildRouteTarget(route, null),
+      readRouteSection(stage.routing, route),
     );
     applyStageChange(stage, change);
-    writeStageEntry(
-      stage.history,
-      "replace",
-      change.state.position,
-      route.hash,
-    );
+    writeCurrentEntry(stage, "replace");
   } else {
     applyStageChange(
       stage,
       restoreStageEntry(
         stage.state,
         position,
-        route.hash,
-        route.link,
-        route.isHome,
+        route,
+        readHistorySection(historyState),
       ),
     );
   }
@@ -337,8 +456,9 @@ export function followHistory(
 }
 
 /**
- * Opens a link a mod asked for, in a new sandbox with a new history entry.
- * Returns `false`, and opens nothing, when the opener is not the visible sandbox.
+ * Opens a link a mod asked for, in a new sandbox with a new history entry,
+ * in the opener's section. Returns `false`, and opens nothing, when the
+ * opener is not the visible sandbox.
  */
 export function openStageLink(
   stage: Stage,
@@ -348,35 +468,89 @@ export function openStageLink(
   if (readVisibleSandbox(stage.state)?.id !== openerId) {
     return false;
   }
-  const route = routeForLink(link);
   const change = openStageEntry(
     stage.state,
-    route.hash,
-    route.link,
-    openerId,
-    route.isHome,
+    buildRouteTarget(routeForLink(link), openerId),
+    readVisibleEntry(stage.state)?.section ?? null,
   );
   applyStageChange(stage, change);
-  writeStageEntry(stage.history, "push", change.state.position, route.hash);
+  writeCurrentEntry(stage, "push");
   publishStage(stage);
   return true;
 }
 
-/** Closes a sandbox and replaces the current entry with the one of the sandbox now shown. */
-export function closeSandbox(stage: Stage, id: string): void {
-  applyStageChange(
-    stage,
-    closeStageSandbox(stage.state, id, buildHomeLink(stage)),
-  );
-  const visible = readVisibleSandbox(stage.state);
-  if (visible !== null) {
-    writeStageEntry(
-      stage.history,
-      "replace",
-      stage.state.position,
-      visible.hash,
-    );
+/** A new sandbox for a mod section's link. The Home section's mod opens at `#/`. */
+function buildSectionSandbox(
+  routing: StageRouting,
+  section: string,
+  link: RunLink,
+): EntryTarget {
+  const target: EntryTarget = {
+    kind: "new-sandbox",
+    opening: {
+      hash: buildSectionHash(routing, section) ?? "#/",
+      link,
+      openerId: null,
+      isHomeMod: isHomeModSection(routing, section),
+    },
+  };
+  return target;
+}
+
+/**
+ * A section's start: the index page of a page section, or the root sandbox of
+ * a mod section while it is open, or a new one. `null` for an unknown section.
+ */
+function buildSectionStart(
+  routing: StageRouting,
+  section: string,
+  place: SectionPlace,
+): EntryTarget | null {
+  if (routing.pageSections.includes(section)) {
+    const indexTarget: EntryTarget = { kind: "page", section, page: null };
+    return indexTarget;
   }
+  const link = findSectionLink(routing, section);
+  if (link === null) {
+    return null;
+  }
+  if (place.root !== null) {
+    const rootTarget: EntryTarget = { kind: "sandbox", sandboxId: place.root };
+    return rootTarget;
+  }
+  return buildSectionSandbox(routing, section, link);
+}
+
+/**
+ * Activates a section, as a tab bar does: a new history entry shows the last
+ * view seen in the section when the user comes from another section, or the
+ * section's start when there is none or the section is the current one.
+ * Returns `false`, and opens nothing, for an unknown section.
+ */
+export function openStageSection(stage: Stage, section: string): boolean {
+  const place = readSectionPlace(stage.sections, section);
+  const isCurrent = readVisibleEntry(stage.state)?.section === section;
+  const target =
+    !isCurrent && place.last !== null
+      ? place.last
+      : buildSectionStart(stage.routing, section, place);
+  if (target === null) {
+    return false;
+  }
+  applyStageChange(stage, openStageEntry(stage.state, target, section));
+  writeCurrentEntry(stage, "push");
+  publishStage(stage);
+  return true;
+}
+
+/** Closes a sandbox and replaces the current entry with the one of what is now shown. */
+export function closeSandbox(stage: Stage, id: string): void {
+  const home: HomeFallback = {
+    route: buildHomeRoute(stage.routing),
+    section: stage.routing.home.section,
+  };
+  applyStageChange(stage, closeStageSandbox(stage.state, id, home));
+  writeCurrentEntry(stage, "replace");
   publishStage(stage);
 }
 

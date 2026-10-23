@@ -19,6 +19,8 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
+import { openModsSection, openSection, pageBody } from "./app_layout.ts";
+import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
 
 const SAMPLE_WITH_TILES =
   "#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
@@ -90,7 +92,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
   test("Encoded values", async function opensEncodedLink({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(`/${EXPLORER_LINK}`);
     const source = new URL("/samples/mods/book_list/mod_conf.yaml", page.url())
       .href;
 
@@ -101,7 +103,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
   });
 });
 
-test.describe("Home mod", function describeHomeMod(): void {
+test.describe("Home", function describeHome(): void {
   test("No hash", async function opensHome({ page }): Promise<void> {
     await page.goto("/");
 
@@ -109,8 +111,9 @@ test.describe("Home mod", function describeHomeMod(): void {
       page.getByRole("heading", { name: "OpenTesela" }),
     ).toBeVisible();
     await expect(
-      visibleSandbox(page).locator('iframe[title="Mods"]'),
+      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
     ).toBeVisible();
+    await expect(visibleSandbox(page)).toHaveCount(0);
     expect(new URL(page.url()).hash).toBe("#/");
   });
 
@@ -120,12 +123,22 @@ test.describe("Home mod", function describeHomeMod(): void {
     await page.goto("/#/mods/view");
 
     await expect(
+      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
+    ).toBeVisible();
+    expect(new URL(page.url()).hash).toBe("#/");
+  });
+
+  test("Home as a mod", async function opensHomeMod({ page }): Promise<void> {
+    await page.goto(`${HOME_MOD_PREVIEW_URL}/`);
+
+    await expect(
       visibleSandbox(page).locator('iframe[title="Mods"]'),
     ).toBeVisible();
+    await expect(pageBody(page)).toHaveCount(0);
   });
 });
 
-test.describe("Several sandboxes, one visible", function describeSandboxes(): void {
+test.describe("Several sandboxes, at most one visible", function describeSandboxes(): void {
   test("Second link hides the first mod", async function hidesFirstMod({
     page,
   }): Promise<void> {
@@ -219,7 +232,7 @@ test.describe("Close a sandbox", function describeClose(): void {
   test("Close the viewer", async function closesViewer({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(`/${EXPLORER_LINK}`);
     const explorer = await findModFrame(page, "Mods");
     await markFrame(explorer);
     await explorer.getByRole("button", { name: /Book List/ }).click();
@@ -230,7 +243,7 @@ test.describe("Close a sandbox", function describeClose(): void {
     await expect(page.locator('iframe[title="Mod Viewer"]')).toHaveCount(0);
     await expect(stageBar(page)).toContainText("Mods");
     expect(await isFrameMarked(explorer)).toBe(true);
-    expect(new URL(page.url()).hash).toBe("#/");
+    expect(new URL(page.url()).hash).toBe(EXPLORER_LINK);
   });
 
   test("Close a mod opened from a link", async function closesLinkedMod({
@@ -243,19 +256,127 @@ test.describe("Close a sandbox", function describeClose(): void {
 
     await expect(page.locator('iframe[title="Book List"]')).toHaveCount(0);
     await expect(
-      visibleSandbox(page).locator('iframe[title="Mods"]'),
+      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
     ).toBeVisible();
+    expect(new URL(page.url()).hash).toBe("#/");
   });
 
   test("Home mod has no close button", async function hidesHomeClose({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(`${HOME_MOD_PREVIEW_URL}/`);
     await expect(stageBar(page)).toContainText("Mods");
 
     await expect(
       stageBar(page).getByRole("button", { name: "Close" }),
     ).toHaveCount(0);
+  });
+
+  test("The explorer can be closed", async function closesExplorer({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+    await openModsSection(page);
+
+    await stageBar(page).getByRole("button", { name: "Close" }).click();
+
+    await expect(page.locator('iframe[title="Mods"]')).toHaveCount(0);
+    await expect(
+      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
+    ).toBeVisible();
+  });
+});
+
+test.describe("Pages in the history", function describePagesInHistory(): void {
+  test("A page hides the mods", async function hidesModsForPage({
+    page,
+  }): Promise<void> {
+    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    const frame = await findSandboxFrame(page, "sandbox-1");
+    await markFrame(frame);
+
+    await openSection(page, "Settings");
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Settings" }),
+    ).toBeVisible();
+    await expect(page.locator('iframe[title="Book List"]')).toBeHidden();
+    await expect(page.locator('iframe[title="Book List"]')).toHaveCount(1);
+    expect(await isFrameMarked(frame)).toBe(true);
+  });
+
+  test("Back from a page to a mod", async function goesBackToMod({
+    page,
+  }): Promise<void> {
+    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    const frame = await findSandboxFrame(page, "sandbox-1");
+    await frame.evaluate(rememberValue);
+    await openSection(page, "Settings");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Settings" }),
+    ).toBeVisible();
+
+    await page.goBack();
+
+    await expect(page.locator('iframe[title="Book List"]')).toBeVisible();
+    expect(await frame.evaluate(readRememberedValue)).toBe(42);
+  });
+
+  test("Forward to a page", async function goesForwardToPage({
+    page,
+  }): Promise<void> {
+    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await expect(stageBar(page)).toContainText("Book List");
+    await openSection(page, "Settings");
+    await page.goBack();
+    await expect(page.locator('iframe[title="Book List"]')).toBeVisible();
+
+    await page.goForward();
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Settings" }),
+    ).toBeVisible();
+  });
+
+  test("Reload on a page", async function reloadsOnPage({
+    page,
+  }): Promise<void> {
+    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await expect(stageBar(page)).toContainText("Book List");
+    await openSection(page, "About");
+    await expect(
+      pageBody(page).getByRole("heading", { level: 1, name: "About" }),
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(
+      pageBody(page).getByRole("heading", { level: 1, name: "About" }),
+    ).toBeVisible();
+    await page.goBack();
+
+    await expect(stageBar(page)).toContainText("Book List");
+  });
+
+  test("New section after going back", async function dropsForwardSandbox({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+    await followLink(page, SAMPLE_WITHOUT_TILES);
+    await expect(stageBar(page)).toContainText("Book List");
+    await openSection(page, "Settings");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Settings" }),
+    ).toBeVisible();
+    await page.goBack();
+    await expect(stageBar(page)).toContainText("Book List");
+    await page.goBack();
+    await expect(
+      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
+    ).toBeVisible();
+
+    await openModsSection(page);
+
+    await expect(page.locator('iframe[title="Book List"]')).toHaveCount(0);
   });
 });
 

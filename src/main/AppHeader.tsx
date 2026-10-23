@@ -1,17 +1,17 @@
 import type { ReactElement } from "react";
-import type { AppTheme } from "./theme/app_theme.ts";
-import { ThemeControl } from "./theme/ThemeControl.tsx";
+import { HamburgerButton } from "./sidebar/HamburgerButton.tsx";
+import type { SidebarLayoutStore } from "./sidebar/sidebar_layout.ts";
 
 interface AppHeaderProps {
-  appTheme: AppTheme;
+  layout: SidebarLayoutStore;
 }
 
-/** The app's name and the Theme control, above the stage. */
-export function AppHeader({ appTheme }: AppHeaderProps): ReactElement {
+/** The hamburger button and the app's name, above the sidebar and the main area. */
+export function AppHeader({ layout }: AppHeaderProps): ReactElement {
   return (
-    <header className="flex items-center justify-between gap-4 border-b px-4 py-2">
+    <header className="flex items-center gap-2 border-b px-2 py-2">
+      <HamburgerButton layout={layout} />
       <h1 className="text-xl font-semibold tracking-tight">OpenTesela</h1>
-      <ThemeControl appTheme={appTheme} />
     </header>
   );
 }

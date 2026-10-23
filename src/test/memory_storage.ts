@@ -43,3 +43,15 @@ export function createFullStorage(): MemoryStorage {
   fullStorage.setItem = throwQuotaError;
   return fullStorage;
 }
+
+function throwSecurityError(): never {
+  throw new DOMException("The storage is blocked.", "SecurityError");
+}
+
+/** A storage that can be neither read nor written, like a blocked `localStorage`. */
+export function createBlockedStorage(): MemoryStorage {
+  const blockedStorage = createMemoryStorage();
+  blockedStorage.getItem = throwSecurityError;
+  blockedStorage.setItem = throwSecurityError;
+  return blockedStorage;
+}

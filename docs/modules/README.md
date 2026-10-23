@@ -10,6 +10,6 @@ The global architecture of modules:
     - Viewer: for viewing a single instance of their object
     - Maker: for creating or editing instance of their object
 
-The Explore, Viewer and Maker components ship as default mods in `public/default_mods/`: ordinary sandboxed mods that use only the engine API, like any community mod, so an instantiation can switch them off or replace them. The default mods folder, the home mod (opened for `#/`) and the switched-off list are the default mod settings in `src/main/default_mods.ts`. This version ships the mod explorer ([mods/explorer](mods/explorer/README.md), the home mod) and the mod viewer ([mods/viewer](mods/viewer/README.md)). See the [stage](lib/core/stage/README.md) for how links open mods.
+The Explore, Viewer and Maker components ship as default mods in `public/default_mods/`: ordinary sandboxed mods that use only the engine API, like any community mod, so an instantiation can switch them off or replace them. The default mods folder and the switched-off list are the default mod settings in `src/main/default_mods.ts`; what `#/` shows is the Home section of the [section registry](main/README.md#the-section-registry). This version ships the mod explorer ([mods/explorer](mods/explorer/README.md), opened by the Mods section) and the mod viewer ([mods/viewer](mods/viewer/README.md)). See the [stage](lib/core/stage/README.md) for how links open mods.
 
 # TODO

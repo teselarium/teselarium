@@ -1,6 +1,6 @@
 import type { RunLink } from "../engine/index.ts";
 
-/** What an address hash means to the app: the home mod, or a mod to run. */
+/** Whether an address hash is a run link, and its link. `home` is any other hash. */
 export type AppRoute = { page: "home" } | { page: "run"; link: RunLink };
 
 const RUN_PATH = "#/run";

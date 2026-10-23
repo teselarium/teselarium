@@ -1,6 +1,6 @@
 # Mod Explorer
 
-The mod explorer is the Explore component for mods. It ships as the default mod `mod_explorer` in `public/default_mods/mod_explorer/`, and it is the vanilla app's home mod: the app opens it for `#/` and for any address that is not a run link.
+The mod explorer is the Explore component for mods. It ships as the default mod `mod_explorer` in `public/default_mods/mod_explorer/`, and the vanilla app's Mods section opens it. An instantiation can also make it the Home mod, shown at `#/`, by giving the Home section its link (see the [section registry](../../main/README.md#home-a-page-or-a-mod)).
 
 It is an ordinary sandboxed mod. It uses only the engine API: `mods.inspect` to read each mod's metadata and `mods.open` to open the viewer. An instantiation can switch it off or replace it by putting another mod in its folder.
 
@@ -45,7 +45,7 @@ For an app at `https://example.org/`:
 
 | Link | Shows |
 |---|---|
-| `https://example.org/` or `https://example.org/#/` | the explorer, as home mod (no close button) |
-| `https://example.org/#/run?mod=mod_explorer` | the explorer, opened from a link (with a close button) |
+| `https://example.org/#/run?mod=mod_explorer` | the explorer, in the Mods section (with a close button) |
+| `https://example.org/#/`, when the Home section's target is the explorer | the explorer, as the Home mod (no close button) |
 
 Selecting `Book List` opens `#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml`.

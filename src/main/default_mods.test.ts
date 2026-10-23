@@ -20,7 +20,6 @@ describe("default mods", function describeDefaultMods(): void {
   it("Vanilla settings", function readsVanillaSettings(): void {
     expect(DEFAULTS).toEqual({
       folder: "https://example.org/default_mods/",
-      home: "mod_explorer",
       switchedOff: [],
     });
   });
@@ -64,10 +63,10 @@ describe("default mods", function describeDefaultMods(): void {
     expect(viewer.code).toContain("export default async function mount");
   });
 
-  it("Explorer from the default folder", async function launchesHomeMod(): Promise<void> {
+  it("Explorer from the default folder", async function launchesExplorer(): Promise<void> {
     const launch = await prepareModLaunch(
       {
-        link: { mod: DEFAULTS.home, collection: null, params: {} },
+        link: { mod: "mod_explorer", collection: null, params: {} },
         appOrigin: APP_ORIGIN,
         defaults: DEFAULTS,
       },

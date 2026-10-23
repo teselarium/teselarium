@@ -78,7 +78,6 @@ function switchViewerOff(context: ModMethodContext): void {
   context.defaults = resolveDefaultModSettings(
     {
       folder: "./default_mods/",
-      home: "mod_explorer",
       switchedOff: ["mod_viewer"],
     },
     APP_BASE_URL,

@@ -162,12 +162,11 @@ The request stays pending while the dialog is open, for as long as the user need
 
 ### Default mod settings
 
-The app has default mod settings: the default mods folder, the home mod opened for `#/`, and the default mods that are switched off. The vanilla app (`src/main/default_mods.ts`) uses:
+The app has default mod settings: the default mods folder and the default mods that are switched off. What `#/` shows is not a default mod setting: it is the Home section of the app's [section registry](../../../main/README.md#home-a-page-or-a-mod). The vanilla app (`src/main/default_mods.ts`) uses:
 
 ```ts
 export const DEFAULT_MODS: DefaultModSettings = {
   folder: "./default_mods/",
-  home: "mod_explorer",
   switchedOff: [],
 };
 ```

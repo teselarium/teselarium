@@ -1,4 +1,5 @@
 import type { RunLink } from "../engine/index.ts";
+import type { StageRoute } from "./stage_routes.ts";
 
 /** One sandbox of the stage. `id` is given by the stage, never by a mod. */
 export interface StageSandbox {
@@ -8,17 +9,46 @@ export interface StageSandbox {
   link: RunLink;
   /** The sandbox whose mod opened this one, or `null` for a link the user followed. */
   openerId: string | null;
-  /** Opened for `#/`. The home mod at `#/` has no close button. */
-  isHome: boolean;
+  /** The section the sandbox was opened in, or `null`. */
+  section: string | null;
+  /** Opened for `#/` when Home is a mod. The Home mod has no close button. */
+  isHomeMod: boolean;
 }
 
-/** A history entry the stage wrote, and the sandbox it shows. */
+/** What a history entry shows: a sandbox, or a page of a page section (`page: null` is the index). */
+export type EntryView =
+  | { kind: "sandbox"; sandboxId: string }
+  | { kind: "page"; section: string; page: string | null };
+
+/** A history entry the stage wrote, what it shows and the section it belongs to. */
 export interface StageEntry {
   position: number;
-  sandboxId: string;
+  view: EntryView;
+  section: string | null;
 }
 
-/** The stage as plain data. The visible sandbox is the one of the entry at `position`. */
+/** A sandbox to open. */
+export interface SandboxOpening {
+  hash: string;
+  link: RunLink;
+  openerId: string | null;
+  isHomeMod: boolean;
+}
+
+/** What a new entry shows: a new sandbox, an open sandbox or a page. */
+export type EntryTarget =
+  { kind: "new-sandbox"; opening: SandboxOpening } | EntryView;
+
+/** What closing shows when the closed sandbox has no open opener: Home, and its section. */
+export interface HomeFallback {
+  route: StageRoute;
+  section: string;
+}
+
+/**
+ * The stage as plain data. What is visible is the view of the entry at
+ * `position`: at most one sandbox, and none while a page is shown.
+ */
 export interface StageState {
   /** In creation order, so rendering never moves a frame. */
   sandboxes: StageSandbox[];
@@ -54,7 +84,10 @@ function findEntry(state: StageState, position: number): StageEntry | null {
   return null;
 }
 
-function findSandbox(state: StageState, id: string): StageSandbox | null {
+export function findSandbox(
+  state: StageState,
+  id: string,
+): StageSandbox | null {
   for (const sandbox of state.sandboxes) {
     if (sandbox.id === id) {
       return sandbox;
@@ -63,30 +96,44 @@ function findSandbox(state: StageState, id: string): StageSandbox | null {
   return null;
 }
 
-/** The sandbox of the entry at the current position, or `null` before the first entry. */
+/** The entry at the current position, or `null` before the first entry. */
+export function readVisibleEntry(state: StageState): StageEntry | null {
+  return findEntry(state, state.position);
+}
+
+/** The sandbox of the entry at the current position, or `null` while a page or nothing is shown. */
 export function readVisibleSandbox(state: StageState): StageSandbox | null {
-  const entry = findEntry(state, state.position);
-  if (entry === null) {
+  const entry = readVisibleEntry(state);
+  if (entry === null || entry.view.kind !== "sandbox") {
     return null;
   }
-  return findSandbox(state, entry.sandboxId);
+  return findSandbox(state, entry.view.sandboxId);
+}
+
+/** Whether a view can be shown as it is: a page, or a sandbox that is still open. */
+function isViewOpen(state: StageState, view: EntryView): boolean {
+  return view.kind === "page" || findSandbox(state, view.sandboxId) !== null;
 }
 
 function buildSandbox(
   state: StageState,
-  hash: string,
-  link: RunLink,
-  openerId: string | null,
-  isHome: boolean,
+  opening: SandboxOpening,
+  section: string | null,
 ): StageSandbox {
   const sandbox: StageSandbox = {
     id: `sandbox-${state.nextNumber}`,
-    hash,
-    link: structuredClone(link),
-    openerId,
-    isHome,
+    hash: opening.hash,
+    link: structuredClone(opening.link),
+    openerId: opening.openerId,
+    section,
+    isHomeMod: opening.isHomeMod,
   };
   return sandbox;
+}
+
+function buildSandboxView(sandbox: StageSandbox): EntryView {
+  const view: EntryView = { kind: "sandbox", sandboxId: sandbox.id };
+  return view;
 }
 
 /** Entries sorted by position, with `entry` taking the place of any entry at its position. */
@@ -113,7 +160,9 @@ function keepReachedSandboxes(
 ): { kept: StageSandbox[]; closedIds: string[] } {
   const reachedIds = new Set<string>();
   for (const entry of entries) {
-    reachedIds.add(entry.sandboxId);
+    if (entry.view.kind === "sandbox") {
+      reachedIds.add(entry.view.sandboxId);
+    }
   }
   const kept: StageSandbox[] = [];
   const closedIds: string[] = [];
@@ -128,44 +177,43 @@ function keepReachedSandboxes(
   return split;
 }
 
-function buildOpeningChange(
+/**
+ * Places `entry` among `entries`, adds `opened` when a sandbox is opened, and
+ * closes every sandbox that no entry reaches any more.
+ */
+function buildPlacingChange(
   state: StageState,
-  sandbox: StageSandbox,
-  position: number,
   entries: StageEntry[],
+  entry: StageEntry,
+  opened: StageSandbox | null,
 ): StageChange {
-  const placedEntries = placeEntry(entries, {
-    position,
-    sandboxId: sandbox.id,
-  });
-  const split = keepReachedSandboxes(
-    [...state.sandboxes, sandbox],
-    placedEntries,
-  );
+  const placedEntries = placeEntry(entries, entry);
+  const sandboxes =
+    opened === null ? state.sandboxes : [...state.sandboxes, opened];
+  const split = keepReachedSandboxes(sandboxes, placedEntries);
   const change: StageChange = {
     state: {
       sandboxes: split.kept,
       entries: placedEntries,
-      position,
-      nextNumber: state.nextNumber + 1,
+      position: entry.position,
+      nextNumber: opened === null ? state.nextNumber : state.nextNumber + 1,
     },
-    opened: sandbox,
+    opened,
     closedIds: split.closedIds,
   };
   return change;
 }
 
 /**
- * Opens a link in a new sandbox at the next history position. Entries after
- * the current position are dropped, as a browser drops forward entries, and
- * every sandbox that no remaining entry points to is closed.
+ * Adds an entry at the next history position that shows `target`: a new
+ * sandbox, an open sandbox or a page. Entries after the current position are
+ * dropped, as a browser drops forward entries, and every sandbox that no
+ * remaining entry points to is closed.
  */
 export function openStageEntry(
   state: StageState,
-  hash: string,
-  link: RunLink,
-  openerId: string | null,
-  isHome: boolean,
+  target: EntryTarget,
+  section: string | null,
 ): StageChange {
   const keptEntries: StageEntry[] = [];
   for (const entry of state.entries) {
@@ -173,24 +221,34 @@ export function openStageEntry(
       keptEntries.push(entry);
     }
   }
-  const sandbox = buildSandbox(state, hash, link, openerId, isHome);
-  return buildOpeningChange(state, sandbox, state.position + 1, keptEntries);
+  const position = state.position + 1;
+  if (target.kind === "new-sandbox") {
+    const sandbox = buildSandbox(state, target.opening, section);
+    const entry: StageEntry = {
+      position,
+      view: buildSandboxView(sandbox),
+      section,
+    };
+    return buildPlacingChange(state, keptEntries, entry, sandbox);
+  }
+  const entry: StageEntry = { position, view: target, section };
+  return buildPlacingChange(state, keptEntries, entry, null);
 }
 
 /**
- * Goes to a history position. When its entry points to an open sandbox, that
- * sandbox becomes visible. Otherwise, after a reload or when its sandbox was
- * closed, a new sandbox takes the entry. Forward entries are kept.
+ * Goes to a history position. When its entry shows a page or an open
+ * sandbox, that is shown. Otherwise, after a reload or when its sandbox was
+ * closed, the entry takes the route's page, or a new sandbox for the route's
+ * link. Forward entries are kept.
  */
 export function restoreStageEntry(
   state: StageState,
   position: number,
-  hash: string,
-  link: RunLink,
-  isHome: boolean,
+  route: StageRoute,
+  section: string | null,
 ): StageChange {
   const entry = findEntry(state, position);
-  if (entry !== null && findSandbox(state, entry.sandboxId) !== null) {
+  if (entry !== null && isViewOpen(state, entry.view)) {
     const change: StageChange = {
       state: { ...state, position },
       opened: null,
@@ -198,12 +256,27 @@ export function restoreStageEntry(
     };
     return change;
   }
-  const sandbox = buildSandbox(state, hash, link, null, isHome);
-  return buildOpeningChange(state, sandbox, position, state.entries);
-}
-
-function pointCurrentEntry(state: StageState, sandboxId: string): StageEntry[] {
-  return placeEntry(state.entries, { position: state.position, sandboxId });
+  if (route.kind === "page") {
+    const pageEntry: StageEntry = {
+      position,
+      view: { kind: "page", section: route.section, page: route.page },
+      section,
+    };
+    return buildPlacingChange(state, state.entries, pageEntry, null);
+  }
+  const opening: SandboxOpening = {
+    hash: route.hash,
+    link: route.link,
+    openerId: null,
+    isHomeMod: route.isHomeMod,
+  };
+  const sandbox = buildSandbox(state, opening, section);
+  const sandboxEntry: StageEntry = {
+    position,
+    view: buildSandboxView(sandbox),
+    section,
+  };
+  return buildPlacingChange(state, state.entries, sandboxEntry, sandbox);
 }
 
 function removeSandbox(state: StageState, id: string): StageState {
@@ -239,34 +312,77 @@ function buildClosingChange(
   return change;
 }
 
+/** The current entry pointed to Home: its page, or a new Home mod sandbox. */
+function pointCurrentEntryHome(
+  remainingState: StageState,
+  home: HomeFallback,
+  id: string,
+): StageChange {
+  const position = remainingState.position;
+  if (home.route.kind === "page") {
+    const pageEntry: StageEntry = {
+      position,
+      view: {
+        kind: "page",
+        section: home.route.section,
+        page: home.route.page,
+      },
+      section: home.section,
+    };
+    const pageState: StageState = {
+      ...remainingState,
+      entries: placeEntry(remainingState.entries, pageEntry),
+    };
+    return buildClosingChange(pageState, null, id);
+  }
+  const opening: SandboxOpening = {
+    hash: home.route.hash,
+    link: home.route.link,
+    openerId: null,
+    isHomeMod: home.route.isHomeMod,
+  };
+  const homeSandbox = buildSandbox(remainingState, opening, home.section);
+  const homeEntry: StageEntry = {
+    position,
+    view: buildSandboxView(homeSandbox),
+    section: home.section,
+  };
+  const homeState: StageState = {
+    sandboxes: [...remainingState.sandboxes, homeSandbox],
+    entries: placeEntry(remainingState.entries, homeEntry),
+    position,
+    nextNumber: remainingState.nextNumber + 1,
+  };
+  return buildClosingChange(homeState, homeSandbox, id);
+}
+
 /**
  * Closes a sandbox. When it was visible, the current entry shows its opener
- * when the opener is still open, or a new home sandbox otherwise. Other
- * entries that pointed to it stay, and are restored when visited.
+ * when the opener is still open, or Home otherwise. Other entries that
+ * pointed to it stay, and are restored when visited.
  */
 export function closeStageSandbox(
   state: StageState,
   id: string,
-  homeLink: RunLink,
+  home: HomeFallback,
 ): StageChange {
   const remainingState = removeSandbox(state, id);
-  if (readVisibleSandbox(state)?.id !== id) {
+  const visibleEntry = readVisibleEntry(state);
+  if (visibleEntry === null || readVisibleSandbox(state)?.id !== id) {
     return buildClosingChange(remainingState, null, id);
   }
   const opener = findOpenOpener(state, remainingState, id);
-  if (opener !== null) {
-    const openerState: StageState = {
-      ...remainingState,
-      entries: pointCurrentEntry(remainingState, opener.id),
-    };
-    return buildClosingChange(openerState, null, id);
+  if (opener === null) {
+    return pointCurrentEntryHome(remainingState, home, id);
   }
-  const home = buildSandbox(remainingState, "#/", homeLink, null, true);
-  const homeState: StageState = {
-    sandboxes: [...remainingState.sandboxes, home],
-    entries: pointCurrentEntry(remainingState, home.id),
+  const openerEntry: StageEntry = {
     position: state.position,
-    nextNumber: state.nextNumber + 1,
+    view: buildSandboxView(opener),
+    section: visibleEntry.section,
   };
-  return buildClosingChange(homeState, home, id);
+  const openerState: StageState = {
+    ...remainingState,
+    entries: placeEntry(remainingState.entries, openerEntry),
+  };
+  return buildClosingChange(openerState, null, id);
 }

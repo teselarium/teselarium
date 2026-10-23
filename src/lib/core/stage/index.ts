@@ -7,6 +7,7 @@ export {
   followHistory,
   frameLoadedAgain,
   openStageLink,
+  openStageSection,
   readStageSnapshot,
   reloadTiles,
   subscribeStage,
@@ -17,6 +18,7 @@ export type {
   Stage,
   StageOptions,
   StageSnapshot,
+  VisibleView,
 } from "./stage_controller.ts";
 export type {
   AppAction,
@@ -26,4 +28,6 @@ export type {
 } from "../engine/index.ts";
 export type { ActionMod } from "./stage_actions.ts";
 export type { StageHistory } from "./stage_history.ts";
+export { buildSectionHash } from "./stage_routes.ts";
+export type { SectionLink, StageHome, StageRouting } from "./stage_routes.ts";
 export type { SandboxStatus } from "./stage_sandboxes.ts";

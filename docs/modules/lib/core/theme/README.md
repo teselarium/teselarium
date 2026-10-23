@@ -249,9 +249,9 @@ Inside a frame, `@media (prefers-color-scheme: dark)` and `matchMedia("(prefers-
 
 ### The theme choice
 
-The app header has a Theme control with System, Light and Dark. System, the default, follows the operating system and changes with it while the app is open. The choice is kept in the app's storage under the key `opentesela.theme-choice`, outside the `opentesela.mod-storage:` keys, so no mod can read or change it. A missing or unknown stored value counts as System. When the storage cannot be read or written, the choice still applies until the page is closed.
+The Settings page has a Theme control with System, Light and Dark (see [Settings](../../../main/settings/README.md)). System, the default, follows the operating system and changes with it while the app is open. The choice is kept in the app's storage under the key `opentesela.theme-choice`, outside the `opentesela.mod-storage:` keys, so no mod can read or change it. A missing or unknown stored value counts as System. When the storage cannot be read or written, the choice still applies until the page is closed.
 
-The app's own interface (header, stage bar, issue list, load errors, action dialog) uses the same tokens, through Tailwind CSS and shadcn/ui, so it always matches the mods.
+The app's own interface (header, sidebar, Settings page, stage bar, issue list, load errors, action dialog) uses the same tokens, through Tailwind CSS and shadcn/ui, so it always matches the mods. Markdown pages get the frames' own base stylesheet in a shadow root (see [Pages](../../../main/homepage/README.md#pages-look-like-mods)). The sidebar's colors are the app-only aliases `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`, `--sidebar-accent-foreground`, `--sidebar-border` and `--sidebar-ring` in `src/main/app.css`, from `--ot-card`, `--ot-card-foreground`, `--ot-accent`, `--ot-accent-foreground`, `--ot-border` and `--ot-ring`; mods do not get them.
 
 ## Module Details
 

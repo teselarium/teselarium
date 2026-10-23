@@ -14,4 +14,5 @@
 - react-i18next
 - ajv
 - @11ty/gray-matter
+- react-markdown, with remark-gfm, rehype-raw and rehype-sanitize (the markdown pages, see `docs/modules/main/homepage/README.md`)
 - js-yaml

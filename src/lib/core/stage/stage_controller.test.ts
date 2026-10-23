@@ -11,9 +11,14 @@ import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import { APP_ORIGIN, SAMPLE_MOD_SOURCE } from "../../../test/sample_mods.ts";
 import { fetchTestFile } from "../../../test/test_files.ts";
+import {
+  MOD_HOME_ROUTING,
+  PAGE_HOME_ROUTING,
+} from "../../../test/test_stages.ts";
 import type { AppAction } from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme } from "../theme/index.ts";
+import type { StageRouting } from "./stage_routes.ts";
 import {
   answerStageAction,
   attachFrame,
@@ -23,6 +28,7 @@ import {
   followHistory,
   frameLoadedAgain,
   openStageLink,
+  openStageSection,
   readStageSnapshot,
   requestStageAction,
   subscribeStage,
@@ -30,6 +36,9 @@ import {
 import type { SandboxSnapshot, Stage } from "./stage_controller.ts";
 
 const SAMPLE_HASH = "#/run?mod=.%2Fsamples%2Fmods%2Fbook_list";
+/** The sample mod with its collection: no section has this link. */
+const COLLECTION_HASH =
+  "#/run?mod=.%2Fsamples%2Fmods%2Fbook_list&collection=.%2Fsamples%2Ftiles%2Fbooks_collection.yaml";
 const VIEWER_LINK = {
   mod: "./samples/mods/book_list",
   collection: "./samples/tiles/books_collection.yaml",
@@ -45,17 +54,16 @@ afterEach(function closePorts(): void {
   openPorts.length = 0;
 });
 
+/** A stage whose Home is the sample mod, unless `routing` says otherwise. */
 function buildStage(
   history: FakeHistory,
   colorScheme: ColorScheme = "light",
+  routing: StageRouting = MOD_HOME_ROUTING,
 ): Stage {
   const stage = createStage({
     history,
-    defaults: {
-      folder: "./default_mods/",
-      home: "./samples/mods/book_list",
-      switchedOff: [],
-    },
+    defaults: { folder: "./default_mods/", switchedOff: [] },
+    routing,
     appOrigin: APP_ORIGIN,
     baseUrl: APP_BASE_URL,
     storage: createMemoryStorage(),
@@ -130,15 +138,73 @@ async function openViewerFromHome(history: FakeHistory): Promise<Stage> {
   return stage;
 }
 
+/** The history state the stage writes for an entry. */
+function stageState(position: number, section: string | null): unknown {
+  const historyState = { opentesela: { position, section } };
+  return historyState;
+}
+
+/** Starts the vanilla-like stage, whose Home is a page, at `hash`. */
+async function startPageStage(history: FakeHistory): Promise<Stage> {
+  const stage = buildStage(history, "light", PAGE_HOME_ROUTING);
+  await follow(stage, history.readNavigation());
+  return stage;
+}
+
+/** Activates a section, as the sidebar does, and waits for any launch. */
+async function openSection(stage: Stage, section: string): Promise<void> {
+  openStageSection(stage, section);
+  await settleStage(stage);
+}
+
+/** On the page stage: opens Mods, then the viewer from the explorer. */
+async function openViewerFromMods(history: FakeHistory): Promise<Stage> {
+  const stage = await startPageStage(history);
+  await openSection(stage, "mods");
+  openStageLink(stage, VIEWER_LINK, "sandbox-1");
+  await settleStage(stage);
+  return stage;
+}
+
 describe("followHistory", function describeFollowHistory(): void {
-  it("No hash", async function opensHome(): Promise<void> {
+  it("No hash", async function opensHomePage(): Promise<void> {
+    const history = new FakeHistory("");
+
+    const stage = await startPageStage(history);
+
+    expect(history.entries).toEqual([
+      { state: stageState(0, "home"), hash: "#/" },
+    ]);
+    expect(readStageSnapshot(stage)).toMatchObject({
+      sandboxes: [],
+      visible: { kind: "page", section: "home", page: null },
+      activeSection: "home",
+    });
+  });
+
+  it("Unknown hash", async function opensHomeForUnknownHash(): Promise<void> {
+    const history = new FakeHistory("#/mods/view");
+
+    const stage = await startPageStage(history);
+
+    expect(history.entries).toEqual([
+      { state: stageState(0, "home"), hash: "#/" },
+    ]);
+    expect(readStageSnapshot(stage).visible).toEqual({
+      kind: "page",
+      section: "home",
+      page: null,
+    });
+  });
+
+  it("Home as a mod", async function opensHomeMod(): Promise<void> {
     const history = new FakeHistory("");
     const stage = buildStage(history);
 
     await follow(stage, history.readNavigation());
 
     expect(history.entries).toEqual([
-      { state: { opentesela: { position: 0 } }, hash: "#/" },
+      { state: stageState(0, "home"), hash: "#/" },
     ]);
     const visible = readVisible(stage);
     expect(visible).toMatchObject({
@@ -149,6 +215,24 @@ describe("followHistory", function describeFollowHistory(): void {
       mod: { title: "Book List", version: "1.0.0", source: SAMPLE_MOD_SOURCE },
     });
     expect(visible.sandboxDocument).toContain("Content-Security-Policy");
+    expect(readStageSnapshot(stage).visible).toEqual({
+      kind: "sandbox",
+      id: "sandbox-1",
+    });
+  });
+
+  it("Sub-page", async function opensSubPage(): Promise<void> {
+    const history = new FakeHistory("#/guides/first_steps");
+
+    const stage = await startPageStage(history);
+
+    expect(history.entries).toEqual([
+      { state: stageState(0, "guides"), hash: "#/guides/first_steps" },
+    ]);
+    expect(readStageSnapshot(stage)).toMatchObject({
+      visible: { kind: "page", section: "guides", page: "first_steps" },
+      activeSection: "guides",
+    });
   });
 
   it("Second link hides the first mod", async function opensFollowedLink(): Promise<void> {
@@ -157,17 +241,39 @@ describe("followHistory", function describeFollowHistory(): void {
     await follow(stage, history.readNavigation());
     const firstRuntime = stage.runtimes.get("sandbox-1");
 
-    await follow(stage, history.followLink(SAMPLE_HASH));
+    await follow(stage, history.followLink(COLLECTION_HASH));
 
     expect(history.entries[1]).toEqual({
-      state: { opentesela: { position: 1 } },
-      hash: SAMPLE_HASH,
+      state: stageState(1, null),
+      hash: COLLECTION_HASH,
     });
     expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-2"]);
     expect(readVisible(stage).id).toBe("sandbox-2");
     expect(readVisible(stage).canClose).toBe(true);
     expect(stage.runtimes.get("sandbox-1")).toBe(firstRuntime);
     expect(firstRuntime?.status).toBe("running");
+  });
+
+  it("A page hides the mods", async function hidesModsForPage(): Promise<void> {
+    const history = new FakeHistory(SAMPLE_HASH);
+    const stage = await startPageStage(history);
+    const runtime = stage.runtimes.get("sandbox-1");
+
+    await openSection(stage, "settings");
+
+    const snapshot = readStageSnapshot(stage);
+    expect(snapshot.visible).toEqual({
+      kind: "page",
+      section: "settings",
+      page: null,
+    });
+    expect(snapshot.sandboxes).toHaveLength(1);
+    expect(snapshot.sandboxes[0].isVisible).toBe(false);
+    expect(runtime?.status).toBe("running");
+    expect(history.entries[1]).toEqual({
+      state: stageState(1, "settings"),
+      hash: "#/settings",
+    });
   });
 
   it("Back to the previous mod", async function goesBack(): Promise<void> {
@@ -184,6 +290,50 @@ describe("followHistory", function describeFollowHistory(): void {
     expect(stage.runtimes.get("sandbox-1")?.session).toBe(firstSession);
     expect(fakeFrame.posted).toHaveLength(1);
     expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-2"]);
+  });
+
+  it("Back from a page to a mod", async function goesBackFromPage(): Promise<void> {
+    const history = new FakeHistory(SAMPLE_HASH);
+    const stage = await startPageStage(history);
+    const runtime = stage.runtimes.get("sandbox-1");
+    await openSection(stage, "settings");
+
+    await follow(stage, history.goBack());
+
+    expect(readVisible(stage).id).toBe("sandbox-1");
+    expect(stage.runtimes.get("sandbox-1")).toBe(runtime);
+  });
+
+  it("Forward to a page", async function goesForwardToPage(): Promise<void> {
+    const history = new FakeHistory(SAMPLE_HASH);
+    const stage = await startPageStage(history);
+    await openSection(stage, "settings");
+    await follow(stage, history.goBack());
+
+    await follow(stage, history.goForward());
+
+    expect(readStageSnapshot(stage).visible).toEqual({
+      kind: "page",
+      section: "settings",
+      page: null,
+    });
+  });
+
+  it("Reload on a page", async function reloadsOnPage(): Promise<void> {
+    const history = new FakeHistory(SAMPLE_HASH);
+    const stage = await startPageStage(history);
+    await openSection(stage, "about");
+    const reloadedStage = buildStage(history, "light", PAGE_HOME_ROUTING);
+
+    await follow(reloadedStage, history.readNavigation());
+    expect(readStageSnapshot(reloadedStage)).toMatchObject({
+      visible: { kind: "page", section: "about", page: null },
+      activeSection: "about",
+    });
+    await follow(reloadedStage, history.goBack());
+
+    expect(readVisible(reloadedStage).hash).toBe(SAMPLE_HASH);
+    expect(readStageSnapshot(reloadedStage).sandboxes).toHaveLength(1);
   });
 
   it("Forward again", async function goesForward(): Promise<void> {
@@ -211,6 +361,7 @@ describe("followHistory", function describeFollowHistory(): void {
       id: "sandbox-2",
       hash: "#/",
       status: "running",
+      canClose: false,
     });
   });
 
@@ -238,6 +389,208 @@ describe("followHistory", function describeFollowHistory(): void {
     expect(stage.runtimes.has("sandbox-2")).toBe(false);
     expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-3"]);
   });
+
+  it("New section after going back", async function dropsForwardPages(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await startPageStage(history);
+    await follow(stage, history.followLink(SAMPLE_HASH));
+    const bookList = stage.runtimes.get("sandbox-1");
+    await openSection(stage, "settings");
+    await follow(stage, history.goBack());
+    await follow(stage, history.goBack());
+
+    await openSection(stage, "mods");
+
+    expect(bookList?.status).toBe("stopped");
+    expect(stage.runtimes.has("sandbox-1")).toBe(false);
+    expect(listIds(stage)).toEqual(["sandbox-2"]);
+    expect(history.entries).toHaveLength(2);
+  });
+});
+
+describe("openStageSection", function describeOpenStageSection(): void {
+  it("opens the section's mod with its run link", async function opensModSection(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await startPageStage(history);
+
+    await openSection(stage, "mods");
+
+    expect(history.entries[1]).toEqual({
+      state: stageState(1, "mods"),
+      hash: "#/run?mod=mod_explorer",
+    });
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-1",
+      canClose: true,
+      mod: { title: "Mods" },
+    });
+    expect(readStageSnapshot(stage).activeSection).toBe("mods");
+  });
+
+  it("does nothing for an unknown section", async function ignoresUnknown(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await startPageStage(history);
+
+    expect(openStageSection(stage, "atlas")).toBe(false);
+    expect(history.entries).toHaveLength(1);
+  });
+
+  it("Back where you left off", async function showsLastView(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromMods(history);
+    const viewerRuntime = stage.runtimes.get("sandbox-2");
+    await openSection(stage, "home");
+
+    await openSection(stage, "mods");
+
+    expect(readVisible(stage).id).toBe("sandbox-2");
+    expect(stage.runtimes.get("sandbox-2")).toBe(viewerRuntime);
+    expect(history.entries[4]).toEqual({
+      state: stageState(4, "mods"),
+      hash: readVisible(stage).hash,
+    });
+  });
+
+  it("Activating the current section returns to its start", async function showsRoot(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromMods(history);
+    const explorerRuntime = stage.runtimes.get("sandbox-1");
+
+    await openSection(stage, "mods");
+
+    expect(readVisible(stage).id).toBe("sandbox-1");
+    expect(stage.runtimes.get("sandbox-1")).toBe(explorerRuntime);
+    expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-2"]);
+  });
+
+  it("One explorer for repeated visits", async function keepsOneExplorer(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await startPageStage(history);
+
+    for (const section of ["mods", "home", "mods", "home", "mods"]) {
+      await openSection(stage, section);
+    }
+
+    expect(listIds(stage)).toEqual(["sandbox-1"]);
+    expect(readVisible(stage).id).toBe("sandbox-1");
+  });
+
+  it("Closed root opens a new one", async function opensNewRoot(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await startPageStage(history);
+    await openSection(stage, "mods");
+    closeSandbox(stage, "sandbox-1");
+
+    await openSection(stage, "mods");
+
+    expect(listIds(stage)).toEqual(["sandbox-2"]);
+    expect(readVisible(stage).id).toBe("sandbox-2");
+  });
+
+  it("Last page of a page section", async function showsLastPage(): Promise<void> {
+    const history = new FakeHistory("#/guides/first_steps");
+    const stage = await startPageStage(history);
+    await openSection(stage, "home");
+
+    await openSection(stage, "guides");
+
+    expect(history.hash).toBe("#/guides/first_steps");
+    expect(readStageSnapshot(stage).visible).toEqual({
+      kind: "page",
+      section: "guides",
+      page: "first_steps",
+    });
+  });
+
+  it("shows the index page when the page section is the current one", async function showsIndex(): Promise<void> {
+    const history = new FakeHistory("#/guides/first_steps");
+    const stage = await startPageStage(history);
+
+    await openSection(stage, "guides");
+
+    expect(history.hash).toBe("#/guides");
+  });
+
+  it("Back after switching sections", async function goesBackAcrossSections(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await startPageStage(history);
+    await openSection(stage, "mods");
+    await openSection(stage, "home");
+    await openSection(stage, "mods");
+
+    await follow(stage, history.goBack());
+    expect(readStageSnapshot(stage).visible).toEqual({
+      kind: "page",
+      section: "home",
+      page: null,
+    });
+    await follow(stage, history.goBack());
+
+    expect(readVisible(stage).id).toBe("sandbox-1");
+    expect(listIds(stage)).toEqual(["sandbox-1"]);
+  });
+
+  it("opens a Home mod at #/ without a close button", async function opensHomeModSection(): Promise<void> {
+    const history = new FakeHistory("#/settings");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    await openSection(stage, "home");
+
+    expect(history.hash).toBe("#/");
+    expect(readVisible(stage)).toMatchObject({ hash: "#/", canClose: false });
+  });
+});
+
+describe("active section", function describeActiveSection(): void {
+  it("Viewer keeps Mods active", async function inheritsSection(): Promise<void> {
+    const history = new FakeHistory("");
+
+    const stage = await openViewerFromMods(history);
+
+    expect(readVisible(stage).id).toBe("sandbox-2");
+    expect(readStageSnapshot(stage).activeSection).toBe("mods");
+    expect(stage.state.sandboxes[1].section).toBe("mods");
+  });
+
+  it("Kept after a reload", async function keepsAfterReload(): Promise<void> {
+    const history = new FakeHistory("");
+    await openViewerFromMods(history);
+    const reloadedStage = buildStage(history, "light", PAGE_HOME_ROUTING);
+
+    await follow(reloadedStage, history.readNavigation());
+
+    expect(readStageSnapshot(reloadedStage).activeSection).toBe("mods");
+  });
+
+  it("learns the root again after a reload", async function relearnsRoot(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await startPageStage(history);
+    await openSection(stage, "mods");
+    const reloadedStage = buildStage(history, "light", PAGE_HOME_ROUTING);
+    await follow(reloadedStage, history.readNavigation());
+
+    await openSection(reloadedStage, "mods");
+
+    expect(listIds(reloadedStage)).toEqual(["sandbox-1"]);
+  });
+
+  it("Link to another mod", async function belongsToNoSection(): Promise<void> {
+    const history = new FakeHistory("#/run?mod=./samples/mods/book_list");
+
+    const stage = await startPageStage(history);
+
+    expect(readStageSnapshot(stage).activeSection).toBeNull();
+    expect(history.entries[0].state).toEqual(stageState(0, null));
+  });
+
+  it("Typed link to a section's mod", async function matchesSectionLink(): Promise<void> {
+    const history = new FakeHistory("#/run?mod=mod_explorer");
+
+    const stage = await startPageStage(history);
+
+    expect(readStageSnapshot(stage).activeSection).toBe("mods");
+  });
 });
 
 describe("openStageLink", function describeOpenStageLink(): void {
@@ -247,9 +600,9 @@ describe("openStageLink", function describeOpenStageLink(): void {
     const stage = await openViewerFromHome(history);
 
     expect(history.entries).toEqual([
-      { state: { opentesela: { position: 0 } }, hash: "#/" },
+      { state: stageState(0, "home"), hash: "#/" },
       {
-        state: { opentesela: { position: 1 } },
+        state: stageState(1, "home"),
         hash: "#/run?mod=.%2Fsamples%2Fmods%2Fbook_list&collection=.%2Fsamples%2Ftiles%2Fbooks_collection.yaml&from=explorer",
       },
     ]);
@@ -270,6 +623,15 @@ describe("openStageLink", function describeOpenStageLink(): void {
     expect(history.entries).toHaveLength(2);
     expect(readVisible(stage).id).toBe("sandbox-2");
   });
+
+  it("refuses a mod hidden behind a page", async function refusesBehindPage(): Promise<void> {
+    const history = new FakeHistory(SAMPLE_HASH);
+    const stage = await startPageStage(history);
+    await openSection(stage, "settings");
+
+    expect(openStageLink(stage, VIEWER_LINK, "sandbox-1")).toBe(false);
+    expect(history.entries).toHaveLength(2);
+  });
 });
 
 describe("closeSandbox", function describeCloseSandbox(): void {
@@ -284,13 +646,29 @@ describe("closeSandbox", function describeCloseSandbox(): void {
     expect(listIds(stage)).toEqual(["sandbox-1"]);
     expect(readVisible(stage).id).toBe("sandbox-1");
     expect(history.entries[1]).toEqual({
-      state: { opentesela: { position: 1 } },
+      state: stageState(1, "home"),
       hash: "#/",
     });
   });
 
   it("Close a mod opened from a link", async function closesLinkedMod(): Promise<void> {
     const history = new FakeHistory(SAMPLE_HASH);
+    const stage = await startPageStage(history);
+
+    closeSandbox(stage, "sandbox-1");
+
+    expect(listIds(stage)).toEqual([]);
+    expect(readStageSnapshot(stage)).toMatchObject({
+      visible: { kind: "page", section: "home", page: null },
+      activeSection: "home",
+    });
+    expect(history.entries).toEqual([
+      { state: stageState(0, "home"), hash: "#/" },
+    ]);
+  });
+
+  it("opens the Home mod again when Home is a mod", async function opensHomeMod(): Promise<void> {
+    const history = new FakeHistory(COLLECTION_HASH);
     const stage = buildStage(history);
     await follow(stage, history.readNavigation());
 
@@ -300,8 +678,37 @@ describe("closeSandbox", function describeCloseSandbox(): void {
     expect(listIds(stage)).toEqual(["sandbox-2"]);
     expect(readVisible(stage)).toMatchObject({ hash: "#/", canClose: false });
     expect(history.entries).toEqual([
-      { state: { opentesela: { position: 0 } }, hash: "#/" },
+      { state: stageState(0, "home"), hash: "#/" },
     ]);
+  });
+
+  it("Home mod has no close button", async function hidesHomeClose(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+
+    await follow(stage, history.readNavigation());
+
+    expect(readVisible(stage)).toMatchObject({ hash: "#/", canClose: false });
+  });
+
+  it("The explorer can be closed", async function closesExplorer(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await startPageStage(history);
+    await openSection(stage, "mods");
+    expect(readVisible(stage).canClose).toBe(true);
+
+    closeSandbox(stage, "sandbox-1");
+
+    expect(listIds(stage)).toEqual([]);
+    expect(readStageSnapshot(stage).visible).toEqual({
+      kind: "page",
+      section: "home",
+      page: null,
+    });
+    expect(history.entries[1]).toEqual({
+      state: stageState(1, "home"),
+      hash: "#/",
+    });
   });
 });
 

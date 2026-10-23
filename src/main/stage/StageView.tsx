@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import type { ReactElement } from "react";
 import { Alert, AlertDescription } from "@/vendor/shadcn/ui/alert.tsx";
 import {
@@ -11,6 +11,7 @@ import type {
   Stage,
   StageSnapshot,
 } from "../../lib/core/stage/index.ts";
+import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { ActionDialog } from "./ActionDialog.tsx";
 import { SandboxFrame } from "./SandboxFrame.tsx";
 import { StageBar } from "./StageBar.tsx";
@@ -87,24 +88,13 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
 /**
  * Every sandbox of the stage, in creation order and keyed by id, so a frame
  * never moves in the DOM (moving an iframe reloads it). Only the visible one
- * is shown, under the stage bar. The action dialog shows the action the
+ * is shown, under the stage bar. While a page is shown, the whole view is
+ * hidden but stays mounted, so no frame reloads. The action dialog shows the action the
  * visible mod asked for, if any. When the visible sandbox changes, the page
  * leaves fullscreen.
  */
 export function StageView({ stage }: StageViewProps): ReactElement {
-  const subscribe = useMemo(
-    function bindSubscribe(): (listener: () => void) => () => void {
-      return subscribeStage.bind(undefined, stage);
-    },
-    [stage],
-  );
-  const getSnapshot = useMemo(
-    function bindGetSnapshot(): () => StageSnapshot {
-      return readStageSnapshot.bind(undefined, stage);
-    },
-    [stage],
-  );
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+  const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
 
   function handleActionAnswer(id: number, accepted: boolean): void {
     answerStageAction(stage, id, accepted);
@@ -123,12 +113,16 @@ export function StageView({ stage }: StageViewProps): ReactElement {
     sandboxes.push(renderSandbox(stage, sandbox));
   }
   return (
-    <main className="flex flex-col gap-2 px-4 pt-2 pb-4">
+    <div
+      className="flex flex-1 flex-col gap-2 px-4 pt-2 pb-4"
+      data-stage-view=""
+      hidden={snapshot.visible?.kind === "page"}
+    >
       {visibleSandbox === null ? null : (
         <StageBar stage={stage} sandbox={visibleSandbox} />
       )}
       <div className="flex flex-1 flex-col">{sandboxes}</div>
       <ActionDialog shown={snapshot.action} onAnswer={handleActionAnswer} />
-    </main>
+    </div>
   );
 }

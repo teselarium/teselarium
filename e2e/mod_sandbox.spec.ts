@@ -34,6 +34,7 @@ import {
 
 const SAMPLE_RUN_LINK =
   "/#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
+const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 const APP_PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const FOREIGN_PROBE_LINK = `/#/run?mod=${encodeURIComponent(`${FOREIGN_HOST}/probe/`)}`;
 const IMAGES_HOST = "https://images.example.net";
@@ -105,7 +106,7 @@ test.describe("Each mod runs in its own sandboxed frame", function describeFrame
   test("No storage access", async function blocksStorage({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     await page.evaluate(setAppStorageItem);
     const frame = await openAppProbe(page);
 
@@ -124,7 +125,7 @@ test.describe("Each mod runs in its own sandboxed frame", function describeFrame
   test("Mod opened by another mod", async function opensSiblingFrame({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     const explorer = await findModFrame(page, "Mods");
 
     await explorer.getByRole("button", { name: /Book List/ }).click();

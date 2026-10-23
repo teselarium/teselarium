@@ -4,8 +4,6 @@ import { resolveModReference } from "../../mod/index.ts";
 export interface DefaultModSettings {
   /** The default mods folder, e.g. `./default_mods/`. */
   folder: string;
-  /** The mod reference opened for `#/`. */
-  home: string;
   /** Default mod names that cannot be opened. */
   switchedOff: string[];
 }
@@ -19,7 +17,6 @@ export interface SwitchedOffMod {
 export interface ResolvedDefaultModSettings {
   /** Absolute URL with a trailing `/`. */
   folder: string;
-  home: string;
   switchedOff: SwitchedOffMod[];
 }
 
@@ -50,7 +47,6 @@ export function resolveDefaultModSettings(
   }
   const resolvedSettings: ResolvedDefaultModSettings = {
     folder,
-    home: settings.home,
     switchedOff,
   };
   return resolvedSettings;

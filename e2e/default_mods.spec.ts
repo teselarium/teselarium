@@ -9,6 +9,9 @@ import {
   stageBar,
 } from "./mod_routes.ts";
 import { listOwnLookDeclarations, readTokenAs } from "./theme_probes.ts";
+import { openModsSection, pageBody } from "./app_layout.ts";
+
+const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
 const EXPLORER_CODE = readFileSync(
   new URL("../public/default_mods/mod_explorer/main.js", import.meta.url),
@@ -78,6 +81,7 @@ test.describe("Default mods folder", function describeFolder(): void {
     page,
   }): Promise<void> {
     await page.goto("/");
+    await openModsSection(page);
 
     const explorerSource = new URL(
       "/default_mods/mod_explorer/mod_conf.yaml",
@@ -91,11 +95,24 @@ test.describe("Default mods folder", function describeFolder(): void {
 test.describe("Default mod settings", function describeSettings(): void {
   test("Vanilla settings", async function opensViewer({ page }): Promise<void> {
     await page.goto("/");
+    await openModsSection(page);
     const explorer = await findModFrame(page, "Mods");
 
     await explorer.getByRole("button", { name: /Book List/ }).click();
 
     await expect(stageBar(page)).toContainText("Mod Viewer");
+  });
+
+  test("Vanilla home is not a mod", async function showsHomePage({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+
+    await expect(
+      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
+    ).toBeVisible();
+    await expect(page.locator("[data-sandbox-id]")).toHaveCount(0);
+    await expect(page.locator("iframe")).toHaveCount(0);
   });
 });
 
@@ -103,7 +120,7 @@ test.describe("Default mods are ordinary mods", function describeOrdinary(): voi
   test("Explorer sandbox", async function sandboxesExplorer({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
 
     await expect(page.locator('iframe[title="Mods"]')).toHaveAttribute(
       "sandbox",
@@ -120,7 +137,7 @@ test.describe("Mod explorer", function describeExplorer(): void {
   test("Vanilla explorer lists the sample", async function listsSample({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     const explorer = page.frameLocator('iframe[title="Mods"]');
 
     const card = explorer.getByRole("article").filter({
@@ -132,7 +149,7 @@ test.describe("Mod explorer", function describeExplorer(): void {
   });
 
   test("Select a mod", async function selectsMod({ page }): Promise<void> {
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     const explorer = page.frameLocator('iframe[title="Mods"]');
 
     await explorer.getByRole("button", { name: /Book List/ }).click();
@@ -295,7 +312,7 @@ test.describe("Default mods show how to get the app's look", function describeEx
   test("Own styles are layout only", async function checksOwnStyles({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     const explorer = await findModFrame(page, "Mods");
     await expect(
       explorer.getByRole("button", { name: /Book List/ }),
@@ -317,7 +334,7 @@ test.describe("Default mods show how to get the app's look", function describeEx
   test("Explorer lists mods as cards", async function listsCards({
     page,
   }): Promise<void> {
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     const explorer = await findModFrame(page, "Mods");
 
     const card = explorer.getByRole("article").filter({ hasText: "Book List" });

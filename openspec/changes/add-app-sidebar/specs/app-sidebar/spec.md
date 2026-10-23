@@ -130,7 +130,7 @@ The collapsed sidebar SHALL show each item's icon only, in a rail wide enough fo
 - **THEN** a tooltip with the text `Guides` is shown
 
 ### Requirement: Resize the sidebar
-On viewports at least 768px wide, the expanded sidebar SHALL have a resize handle on its right edge. Dragging it SHALL set the width between 200px and the smaller of 400px and 40% of the viewport's width. Releasing it narrower than 160px SHALL collapse the sidebar. The handle SHALL be a focusable separator whose arrow keys change the width by 16px. The visible frame SHALL follow the width without reloading.
+On viewports at least 768px wide, the expanded sidebar SHALL have a resize handle on its right edge. Dragging it SHALL set the width between 200px and the smaller of 400px and 40% of the viewport's width. Dragging it narrower than 160px SHALL collapse the sidebar at once, without waiting for the release. The handle SHALL be a focusable separator whose arrow keys change the width by 16px. The visible frame SHALL follow the width without reloading.
 
 #### Scenario: Drag wider
 - **WHEN** the expanded sidebar is 240px wide on a 1280×800 viewport and the user drags its handle 100px to the right
@@ -141,16 +141,36 @@ On viewports at least 768px wide, the expanded sidebar SHALL have a resize handl
 - **THEN** the sidebar is 400px wide
 
 #### Scenario: Drag to collapse
-- **WHEN** the user drags the handle to 120px and releases it
-- **THEN** the sidebar is collapsed
+- **WHEN** the user drags the handle to 120px, still holding it
+- **THEN** the sidebar is collapsed, and it stays collapsed once the handle is released
+
+#### Scenario: Drag back before releasing
+- **WHEN** the user drags the handle to 120px and, still holding it, back to 300px, and releases it
+- **THEN** the sidebar is expanded and 300px wide
 
 #### Scenario: Resize with the keyboard
 - **WHEN** the handle has focus and the user presses the right arrow key
 - **THEN** the sidebar is 16px wider and the handle's `aria-valuenow` says the new width
 
+
 #### Scenario: Drag over a mod's frame
 - **WHEN** the user drags the handle to the right across the visible mod's frame
 - **THEN** the sidebar keeps following the pointer until it is released
+
+### Requirement: Expand the rail by dragging
+On viewports at least 768px wide, the collapsed sidebar SHALL have the same resize handle on the rail's right edge. Dragging it to 160px or wider SHALL expand the sidebar at once, which then follows the pointer as when resizing. Releasing it narrower than 160px SHALL leave the sidebar collapsed. The handle's right arrow key SHALL expand the sidebar.
+
+#### Scenario: Drag to expand
+- **WHEN** the sidebar is collapsed and the user drags its handle to 300px and releases it
+- **THEN** the sidebar is expanded and 300px wide
+
+#### Scenario: Short drag stays collapsed
+- **WHEN** the sidebar is collapsed and the user drags its handle to 120px and releases it
+- **THEN** the sidebar is collapsed
+
+#### Scenario: Expand with the keyboard
+- **WHEN** the sidebar is collapsed, its handle has focus and the user presses the right arrow key
+- **THEN** the sidebar is expanded
 
 ### Requirement: Sidebar layout is remembered
 On viewports at least 768px wide, the sidebar's state (expanded, collapsed or hidden), the state hidden came from, and its width SHALL be kept in the app's storage, under a key that no mod storage slot can use, and restored when the app is opened again. A missing or invalid stored value SHALL give an expanded sidebar of 240px. When the storage cannot be read or written, the layout SHALL still apply until the page is closed.

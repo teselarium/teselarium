@@ -167,7 +167,7 @@ interface SectionDefinition {
                  collapse / drag < 160 / Ctrl+B
    EXPANDED(width) ------------------------------> COLLAPSED
         ^  <------------------------------------      |
-        |       expand / Ctrl+B                       |
+        |  expand / drag >= 160 / -> key / Ctrl+B     |
         |                                             |
         +-- hamburger --> HIDDEN(from) <-- hamburger -+
                             | hamburger / Ctrl+B -> back to `from`
@@ -190,9 +190,10 @@ narrow (< 768px):   start COLLAPSED; expand = overlay drawer; nothing stored
 - **Icons.** `SectionIcon` renders a lucide component, or a `<span>` with `mask-image: url(...)` and `background-color: currentColor` for tinted images, or an `<img>` for `tint: false`. All icons are `aria-hidden`.
 - **Built from shadcn parts** (component policy rule 2): `Button` for the collapse toggle, `Tooltip` around each item in the rail, `Separator` above the footer group, `Sheet` (side `left`) for the narrow drawer. The drawer reuses the same item list. Its focus handling and Escape come from Radix.
 - **Colors.** This change adds the app-only `--sidebar*` aliases to `app.css`, which `adopt-ui-stack` D4 left for it. Like the shadcn aliases, they are set on `:root` and every `[data-ot-color-scheme]` element and exposed in `@theme inline`. Mods don't get them. The roles: sidebar `card`, item hover `accent`, current item `accent` + `accent-foreground`, border `border`.
-- **Resize handle.** `role="separator"`, `aria-orientation="vertical"`, `aria-valuemin`/`max`/`now`, `tabIndex=0`. Arrows change the width by 16px, and Enter toggles collapse.
+- **Resize handle.** On the expanded sidebar and on the rail (wide viewports only). `role="separator"`, `aria-orientation="vertical"`, `aria-valuemin`/`max`/`now`, `tabIndex=0`. The value is the sidebar's width, `0` with the text "Collapsed" on the rail. Arrows change the width by 16px, the right arrow expands the rail, and Enter toggles collapse.
   - A drag uses `setPointerCapture`. While dragging, the stage gets `pointer-events: none`, so a frame under the pointer can't take the events in browsers whose capture doesn't cross iframes.
-  - Releasing below 160px collapses the sidebar and keeps the last valid width for the next expand.
+  - The 160px threshold applies live, in both directions: while the handle is held, the sidebar collapses as soon as the pointer is narrower than 160px and expands again as soon as it is at 160px or wider. Releasing keeps the state the drag reached. A collapse keeps the last valid width for the next expand.
+  - A drag measures the sidebar's width when it starts, so it works the same from the rail. The handle stays mounted in both states, so its pointer capture survives a collapse or an expand during the drag.
 - **Hamburger.** At the header's left, `aria-controls` the sidebar, `aria-expanded`, named "Hide sidebar" or "Show sidebar".
 
 ### D8. App layout and page view

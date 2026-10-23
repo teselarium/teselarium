@@ -186,7 +186,6 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     const defaults = resolveDefaultModSettings(
       {
         folder: "./samples/mods/",
-        home: "book_list",
         switchedOff: ["book_list"],
       },
       APP_BASE_URL,

@@ -1,0 +1,88 @@
+import { followHistory } from "../lib/core/stage/index.ts";
+import type { Stage, StageRouting } from "../lib/core/stage/index.ts";
+import { buildStageRouting } from "../main/sections/section_registry.ts";
+import type { SectionDefinition } from "../main/sections/section_registry.ts";
+import { createSectionSwitches } from "../main/sections/section_switches.ts";
+import type { SectionSwitches } from "../main/sections/section_switches.ts";
+import { VANILLA_SECTIONS } from "../main/sections/vanilla_sections.ts";
+import { createSidebarLayout } from "../main/sidebar/sidebar_layout.ts";
+import type { SidebarLayoutStore } from "../main/sidebar/sidebar_layout.ts";
+import { createAppTheme } from "../main/theme/app_theme.ts";
+import type { AppTheme } from "../main/theme/app_theme.ts";
+import { createFakeColorSchemeQuery } from "./fake_color_scheme_queries.ts";
+import type { FakeColorSchemeQuery } from "./fake_color_scheme_queries.ts";
+import { FakeHistory } from "./fake_history.ts";
+import { createMemoryStorage } from "./memory_storage.ts";
+import type { MemoryStorage } from "./memory_storage.ts";
+import { buildTestStage, settleStage } from "./test_stages.ts";
+
+/** Everything `App` gets, built as `main.tsx` builds it, on fakes. */
+export interface AppFixture {
+  history: FakeHistory;
+  stage: Stage;
+  appTheme: AppTheme;
+  sections: readonly SectionDefinition[];
+  switches: SectionSwitches;
+  layout: SidebarLayoutStore;
+  storage: MemoryStorage;
+  narrowQuery: FakeColorSchemeQuery;
+}
+
+export interface AppFixtureOptions {
+  sections?: readonly SectionDefinition[];
+  /** Defaults to the routing of `sections`. */
+  routing?: StageRouting;
+  storage?: MemoryStorage;
+  isNarrow?: boolean;
+}
+
+function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
+  const optionalIds: string[] = [];
+  for (const section of sections) {
+    if (section.optional) {
+      optionalIds.push(section.id);
+    }
+  }
+  return optionalIds;
+}
+
+/** The vanilla app at `hash`, on a 1280px viewport unless `isNarrow`, after its first launch settled. */
+export async function startTestApp(
+  hash: string = "",
+  options: AppFixtureOptions = {},
+): Promise<AppFixture> {
+  const sections = options.sections ?? VANILLA_SECTIONS;
+  const storage = options.storage ?? createMemoryStorage();
+  const isNarrow = options.isNarrow ?? false;
+  const history = new FakeHistory(hash);
+  const stage = buildTestStage(
+    history,
+    options.routing ?? buildStageRouting(sections),
+  );
+  const narrowQuery = createFakeColorSchemeQuery(isNarrow);
+  const fixture: AppFixture = {
+    history,
+    stage,
+    appTheme: createAppTheme({
+      storage,
+      systemQuery: createFakeColorSchemeQuery(false),
+      stage,
+      root: document.createElement("div"),
+    }),
+    sections,
+    switches: createSectionSwitches({
+      storage,
+      optionalIds: listOptionalIds(sections),
+    }),
+    layout: createSidebarLayout({
+      storage,
+      narrowQuery,
+      viewportWidth: isNarrow ? 375 : 1280,
+    }),
+    storage,
+    narrowQuery,
+  };
+  followHistory(stage, history.hash, history.state);
+  await settleStage(stage);
+  return fixture;
+}

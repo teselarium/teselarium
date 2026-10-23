@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { currentItem, openSection, sidebar } from "./app_layout.ts";
 import {
   actionDialog,
   buildProbeFiles,
@@ -30,6 +31,7 @@ import {
 
 const SAMPLE_RUN_LINK =
   "/#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
+const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
 /** The bottom of the frame may sit this far above the viewport's bottom: the stage's padding and border. */
 const BOTTOM_TOLERANCE = 24;
@@ -43,6 +45,10 @@ async function openSample(page: Page): Promise<void> {
 
 function readStageBarColor(element: Element): string {
   return getComputedStyle(element).color;
+}
+
+function readBackgroundColor(element: Element): string {
+  return getComputedStyle(element).backgroundColor;
 }
 
 function readDialogColors(element: Element): {
@@ -64,12 +70,27 @@ function readPageMarker(): boolean {
 
 test.describe("Theme choice", function describeThemeChoice(): void {
   test("Default choice", async function showsSystem({ page }): Promise<void> {
-    await page.goto("/");
+    await page.goto("/#/settings");
 
     await expect(themeControl(page)).toHaveValue("system");
     await expect(themeControl(page).locator("option:checked")).toHaveText(
       "System",
     );
+  });
+
+  test("No Theme control in the header", async function hasNoHeaderControl({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+
+    const header = page.getByRole("banner");
+    await expect(
+      header.getByRole("button", { name: "Hide sidebar" }),
+    ).toBeVisible();
+    await expect(
+      header.getByRole("heading", { name: "OpenTesela" }),
+    ).toBeVisible();
+    await expect(header.getByLabel("Theme")).toHaveCount(0);
   });
 
   test("Choose Dark", async function choosesDark({ page }): Promise<void> {
@@ -81,6 +102,7 @@ test.describe("Theme choice", function describeThemeChoice(): void {
 
     await chooseTheme(page, "Dark");
 
+    await expect(page.locator('iframe[title="Book List"]')).toBeVisible();
     await waitForFrameColorScheme(frame, "dark");
     expect(await page.evaluate(readColorSchemeAttribute)).toBe("dark");
     expect(await frame.evaluate(readBodyColors)).toEqual({
@@ -109,7 +131,7 @@ test.describe("Resolve the color scheme", function describeResolve(): void {
     page,
   }): Promise<void> {
     await page.emulateMedia({ colorScheme: "dark" });
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
 
     await chooseTheme(page, "Light");
 
@@ -122,10 +144,11 @@ test.describe("The theme choice is remembered", function describeRemembered(): v
     page,
   }): Promise<void> {
     await page.emulateMedia({ colorScheme: "light" });
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     await chooseTheme(page, "Dark");
 
     await page.reload();
+    await openSection(page, "Settings");
 
     await expect(themeControl(page)).toHaveValue("dark");
     expect(await page.evaluate(readColorSchemeAttribute)).toBe("dark");
@@ -163,7 +186,7 @@ test.describe("The theme choice is remembered", function describeRemembered(): v
 test.describe("The app follows the color scheme", function describeApp(): void {
   test("Dark app", async function drawsDarkApp({ page }): Promise<void> {
     await page.emulateMedia({ colorScheme: "light" });
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
 
     await chooseTheme(page, "Dark");
 
@@ -195,9 +218,24 @@ test.describe("The app follows the color scheme", function describeApp(): void {
     });
   });
 
+  test("Dark sidebar", async function drawsDarkSidebar({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    await page.goto("/");
+
+    expect(await sidebar(page).evaluate(readBackgroundColor)).toBe(
+      DARK_COLORS.card.computed,
+    );
+    expect(await currentItem(page).evaluate(readStageBarColor)).toBe(
+      DARK_COLORS.accentForeground.computed,
+    );
+  });
+
   test("Back to light", async function returnsToLight({ page }): Promise<void> {
     await page.emulateMedia({ colorScheme: "light" });
-    await page.goto("/");
+    await page.goto(EXPLORER_RUN_LINK);
     await chooseTheme(page, "Dark");
     await page.evaluate(setPageMarker);
 

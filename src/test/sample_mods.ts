@@ -26,7 +26,6 @@ export const SAMPLE_COVERS_PERMISSION = {
 /** The vanilla default mod settings, resolved for the app at `APP_BASE_URL`. */
 export const TEST_DEFAULTS = {
   folder: `${APP_BASE_URL}default_mods/`,
-  home: "mod_explorer",
   switchedOff: [] as { name: string; source: string }[],
 };
 
