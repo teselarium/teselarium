@@ -11,6 +11,10 @@ This project follows the next principles:
 - Domain Driven Design
 - Test Driven Development
 
+UI and user experience must be coherent between the different pages and components of the application. The consistency helps to accelerate the user learning curve by making the interaction more intuitive.
+
+Code modules and components must be coherent, simple and with well defined boundaries (see the principles mentioned before). The application design and the code design should make the developer experience easier and reduce the learning curve, and also make the application more consistent, intuitive, robust and easy to evolve.
+
 ## Conventions
 
 AI is used in this project for accelerating development via OpenSpec (spec-driven development, not vibe coding), but AI is not authorized to create commits or push changes by it self.
