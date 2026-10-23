@@ -9,10 +9,10 @@ Current state:
 - **Stage state** (`src/lib/core/stage/stage_state.ts`): `StageState` holds `sandboxes` (creation order) and `entries` (`{ position, sandboxId }`) and `position`. `openStageEntry` drops forward entries and closes unreachable sandboxes (`keepReachedSandboxes`). `restoreStageEntry` shows the entry's sandbox, or opens a new one from the hash after a reload. `closeStageSandbox` points the current entry to the opener, or opens a new home sandbox. Several entries may already point to one sandbox, since `closeStageSandbox` re-points the current entry.
 - **Routes** (`stage_history.ts`, `run_links.ts`): `readStageRoute(hash, homeMod)` returns a run route, or the home mod at `#/` for every other hash. The history state is `{ opentesela: { position } }`.
 - **Controller** (`stage_controller.ts`): `followHistory` (start and `popstate`), `openStageLink` (`mods.open`), `closeSandbox`. A typed address or a link followed in the page has no stage state, so it opens at the next position and the entry is replaced with its position. `SandboxSnapshot.canClose` is `!isHome`. `Stage.defaults.home` comes from `DefaultModSettings.home`.
-- **App** (`App.tsx`): `AppHeader` (heading and Theme control) above `StageView`. `StageView` must never unmount, because unmounting or moving an iframe reloads it.
+- **App** (`src/App.tsx`): `AppHeader` (heading and Theme control) above `StageView`. `StageView` must never unmount, because unmounting or moving an iframe reloads it.
 - **Default mod settings**: `findSwitchedOffMod(source, resolvedDefaults)` and `resolveModReference` are exported, so the app can tell whether a section's mod is switched off.
 - **Files**: `fetchFile` and `parseMarkdown` (gray-matter: front matter and body) exist in `src/lib/files`.
-- **Tests**: 20 e2e tests `goto("/")` and expect the mod explorer (`app.spec.ts`, `app_theme.spec.ts`, `default_mods.spec.ts`, `mod_sandbox.spec.ts`, `mod_stage.spec.ts`, `mod_theme.spec.ts`).
+- **Tests**: 21 `goto("/")` calls in the e2e tests expect the mod explorer (`app.spec.ts`, `app_theme.spec.ts`, `default_mods.spec.ts`, `mod_sandbox.spec.ts`, `mod_stage.spec.ts`, `mod_theme.spec.ts`).
 
 ## Goals / Non-Goals
 
@@ -55,7 +55,9 @@ src/main/
     page_sanitize_schema.ts
   settings/
     SettingsPage.tsx      # Appearance + Sidebar cards (D10)
-  App.tsx, AppHeader.tsx  # layout (D8), hamburger in the header
+  AppHeader.tsx           # hamburger in the header
+  app.css                 # adds the --sidebar* aliases (D7)
+src/App.tsx               # layout (D8)
 public/pages/{home,guides,about}/index.md
 ```
 
@@ -187,7 +189,7 @@ narrow (< 768px):   start COLLAPSED; expand = overlay drawer; nothing stored
 - **Coming soon.** An `<a>` without `href`, `role="link"`, `aria-disabled="true"`, and the label "Coming soon" in its tooltip (always present) and as small text when expanded.
 - **Icons.** `SectionIcon` renders a lucide component, or a `<span>` with `mask-image: url(...)` and `background-color: currentColor` for tinted images, or an `<img>` for `tint: false`. All icons are `aria-hidden`.
 - **Built from shadcn parts** (component policy rule 2): `Button` for the collapse toggle, `Tooltip` around each item in the rail, `Separator` above the footer group, `Sheet` (side `left`) for the narrow drawer. The drawer reuses the same item list. Its focus handling and Escape come from Radix.
-- **Colors.** The app-only `--sidebar*` aliases in `app.css` (from `adopt-ui-stack` D4): sidebar `card`, item hover `accent`, current item `accent` + `accent-foreground`, border `border`.
+- **Colors.** This change adds the app-only `--sidebar*` aliases to `app.css`, which `adopt-ui-stack` D4 left for it. Like the shadcn aliases, they are set on `:root` and every `[data-ot-color-scheme]` element and exposed in `@theme inline`. Mods don't get them. The roles: sidebar `card`, item hover `accent`, current item `accent` + `accent-foreground`, border `border`.
 - **Resize handle.** `role="separator"`, `aria-orientation="vertical"`, `aria-valuemin`/`max`/`now`, `tabIndex=0`. Arrows change the width by 16px, and Enter toggles collapse.
   - A drag uses `setPointerCapture`. While dragging, the stage gets `pointer-events: none`, so a frame under the pointer can't take the events in browsers whose capture doesn't cross iframes.
   - Releasing below 160px collapses the sidebar and keeps the last valid width for the next expand.
@@ -269,7 +271,7 @@ Alternatives considered (explore): Tailwind typography, a third look; a selector
 ## Risks / Trade-offs
 
 - [**BREAKING** for links: `#/` no longer opens the mod explorer.] → Old `#/` links land on Home, which links to Mods. Run links keep working unchanged.
-- [Changing `#/` breaks about 20 e2e tests at once.] → A dedicated task moves them first, before the stage change, using `#/run?mod=mod_explorer`, which works both before and after.
+- [Changing `#/` breaks the 21 `goto("/")` calls in the e2e tests at once.] → A dedicated task moves them first, before the stage change, using `#/run?mod=mod_explorer`, which works both before and after.
 - [Tab-bar navigation makes entries point to sandboxes opened earlier, so "close unreachable sandboxes" must stay correct.] → It already supports several entries per sandbox. Unit tests cover dropping forward entries after a section switch.
 - [Section memory gets out of date when a sandbox closes or a reload loses memory.] → Memory is derived and cleared on close. After a reload, `last` is empty and `root` is re-learned from the first restored sandbox whose link matches, so the worst case is opening the section's start.
 - [Pointer capture across iframes varies by browser.] → `pointer-events: none` on the stage while dragging. An e2e test drags across a frame.

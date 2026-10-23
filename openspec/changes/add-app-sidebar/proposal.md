@@ -39,9 +39,10 @@ This change builds on `adopt-ui-stack`. It needs Tailwind, the shadcn components
 - **Changed code**:
   - `src/lib/core/stage/`: entries point to a sandbox or a page, sandboxes and entries carry their section, section navigation (`openStageSection`), the history state stores the section, routes read `#/<section>[/<page>]`, the snapshot says what is visible, and the close button and its fallback change. `StageOptions` takes the page ids and the Home target instead of `defaults.home`.
   - `src/lib/core/engine/default_mod_settings.ts`: no `home`.
-  - `src/main/`: a new section registry with its validation, sidebar layout state, sidebar view, settings page, page view with markdown in a shadow root, and section switches in storage. `App.tsx` gets the new layout. `AppHeader` gets the hamburger. `default_mods.ts` loses `home`.
+  - `src/main/`: a new section registry with its validation, sidebar layout state, sidebar view, settings page, page view with markdown in a shadow root, and section switches in storage. `app.css` gets the sidebar color aliases. `AppHeader` gets the hamburger. `default_mods.ts` loses `home`.
+  - `src/App.tsx`: the new layout.
   - `public/pages/{home,guides,about}/index.md`: new vanilla content.
-  - Tests: stage unit tests (entries, sections, close), `src/test/test_stages.ts`, component tests for the sidebar, settings and pages, and e2e tests. Tests that opened `/` to reach the explorer now open `#/run?mod=mod_explorer` (`app.spec.ts`, `mod_stage.spec.ts`, `default_mods.spec.ts` and the theme specs).
+  - Tests: stage unit tests (entries, sections, close), `src/test/test_stages.ts`, component tests for the sidebar, settings and pages, and e2e tests. Tests that opened `/` to reach the explorer now open `#/run?mod=mod_explorer` (`app.spec.ts`, `mod_stage.spec.ts`, `default_mods.spec.ts`, `mod_sandbox.spec.ts` and the theme specs).
 - **Dependencies added**: `react-markdown`, `remark-gfm`, `rehype-raw`, `rehype-sanitize`. shadcn components added to the vendored zone: `card`, `switch`, `label`, `separator`, `tooltip`, `sheet`.
 - **Storage**: new keys `opentesela.sidebar` (state and width) and `opentesela.sidebar-sections` (switches), outside the mods' storage slots.
 - **Mods**: no API change. Mods still open mods with `mods.open`, and never see pages or sections.

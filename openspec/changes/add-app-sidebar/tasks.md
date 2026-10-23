@@ -34,7 +34,7 @@ Apply after `adopt-ui-stack` is archived. Each group that changes behavior write
 
 ## 6. Sidebar, header and layout (design D7, D8, specs/app-sidebar)
 
-- [ ] 6.1 Build `Sidebar`, `SidebarItem`, `SectionIcon` and `HamburgerButton`, and the grid layout of D8 in `App.tsx` with `StageView` always mounted. Move the Theme control out of `AppHeader`. Write the component tests first for "Vanilla sidebar", "Lucide icon", "Full-color image", "Tiles is coming soon", "Hamburger state" and `aria-current` from `activeSection`. Verify with `npm test`.
+- [ ] 6.1 Build `Sidebar`, `SidebarItem`, `SectionIcon` and `HamburgerButton`, and the grid layout of D8 in `src/App.tsx` with `StageView` always mounted. Add the `--sidebar*` aliases to `src/main/app.css` (D7). Move the Theme control out of `AppHeader`. Write the component tests first for "Vanilla sidebar", "Lucide icon", "Full-color image", "Tiles is coming soon", "Hamburger state" and `aria-current` from `activeSection`. Verify with `npm test`.
 - [ ] 6.2 Add the collapsed rail with shadcn `Tooltip`s, the collapse button, the `Ctrl/Cmd+B` shortcut, and the narrow `Sheet` drawer. Write the component tests first for the tooltip being present on focus, "Toggle with the keyboard", and the drawer closing on Escape. Verify with `npm test`.
 - [ ] 6.3 Add `SidebarResizeHandle` (pointer capture, `pointer-events: none` on the stage while dragging, keyboard arrows, clamp, collapse under 160px). Write the component test first for "Resize with the keyboard". Verify with `npm test`.
 - [ ] 6.4 Add e2e tests for "Vanilla sidebar", "Tinted image follows the color scheme", "Tiles is coming soon", "Explorer switched off", every "Section navigation" and "Active section" scenario, "Hide and restore", "Collapse keeps mods running", "Tooltip on hover", every "Resize the sidebar" scenario (including "Drag over a mod's frame"), "Collapsed after a reload", "Width after a reload", "Mods cannot reach the layout", the three "Narrow viewports" scenarios, "Toggle with the keyboard", "Frame beside the sidebar", "The explorer can be closed" and "Dark sidebar". Verify with `npm run build && npm run test:e2e`.
@@ -45,13 +45,13 @@ Apply after `adopt-ui-stack` is archived. Each group that changes behavior write
 - [ ] 7.2 Add `MarkdownPage` (fetch, front matter dropped, react-markdown pipeline, shadow root with `THEME_FRAME_STYLES` and the host rules, error `Alert`) and `PageView`. Write the component tests first for "Front matter", "Missing page" and a stale fetch being ignored. Verify with `npm test`.
 - [ ] 7.3 Add `public/pages/home/index.md`, `public/pages/guides/index.md` and `public/pages/about/index.md` as in D9. Verify that each has a level 1 heading and a `role="status"` note.
 - [ ] 7.4 Add e2e tests for "Index page", "Sub-page", "Name with a path", "Index file", "Replaced page", "Same heading as a mod", "Card in a page", "Page styles stay inside", "Dark page", "Sibling page", "Run link", "Other site", "Image next to the page", "Missing page" and "Vanilla Home", plus "Script removed" in a real browser. Verify with `npm run build && npm run test:e2e`.
-- [ ] 7.5 Write `docs/modules/main/homepage/README.md` and `docs/modules/main/about/README.md` (or one pages doc linked from both): files and addresses, sub-pages and name rules, the allowed HTML with examples (card, alert, badge, details, color scheme section), links and images, and how pages share the mods' look. Verify that `npm run format:check` passes.
+- [ ] 7.5 Replace the `# TODO` stubs in `docs/modules/main/homepage/README.md` and `docs/modules/main/about/README.md` (or make one the pages doc and link it from the other): files and addresses, sub-pages and name rules, the allowed HTML with examples (card, alert, badge, details, color scheme section), links and images, and how pages share the mods' look. Verify that `npm run format:check` passes.
 
 ## 8. Settings page (design D10, specs/app-settings, specs/theme)
 
 - [ ] 8.1 Add `SettingsPage` with the Appearance card (`ThemeControl`) and the Sidebar card (rows, switches, "Always shown", "Coming soon"), and connect the sidebar to the switches. Write the component tests first for "Vanilla settings page", "Hide Guides", "Hide a coming-soon section" and "Show it again". Verify with `npm test`.
 - [ ] 8.2 Add e2e tests for "Vanilla settings page", "Hide Guides", "Explorer through a link while Mods is hidden", "Guides page while Guides is hidden", "Current again after switching on", "Kept after a reload" (switches), "Mods cannot reach the switches", and the theme scenarios "Default choice", "Choose Dark" and "No Theme control in the header". Update `e2e/app_theme.spec.ts`'s `chooseTheme` helper to open Settings first. Verify with `npm run build && npm run test:e2e -- app_theme`.
-- [ ] 8.3 Write `docs/modules/main/settings/README.md`: what the page holds, the stored keys, and what hiding a section does and does not do. Verify that `npm run format:check` passes.
+- [ ] 8.3 Replace the `# TODO` stub in `docs/modules/main/settings/README.md`: what the page holds, the stored keys, and what hiding a section does and does not do. Verify that `npm run format:check` passes.
 
 ## 9. Integration
 
@@ -62,3 +62,4 @@ Apply after `adopt-ui-stack` is archived. Each group that changes behavior write
 
 - The user reviews and commits the changes manually.
 - Archive the change with `/opsx:archive` after review.
+- After archiving, edit the Purpose of `openspec/specs/mod-stage/spec.md` by hand, since a delta can't change it: it says one sandbox is visible, and becomes at most one, with pages in between.
