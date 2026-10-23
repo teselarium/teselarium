@@ -23,10 +23,12 @@ import {
   readBodyMargin,
   readColorSchemeAttribute,
   readElementColors,
+  readElementLook,
   readOutlineColor,
   readPaintLog,
   readRootTokenValue,
   readThemeEvents,
+  readTokenAs,
   recordDefaultModThemes,
   recordPaints,
   waitForFrameColorScheme,
@@ -81,7 +83,7 @@ test.describe("Base stylesheet by default", function describeBaseStylesheet(): v
 
     expect(await frame.evaluate(readBodyColors)).toEqual({
       background: DARK_COLORS.background.computed,
-      color: DARK_COLORS.text.computed,
+      color: DARK_COLORS.foreground.computed,
     });
   });
 
@@ -112,7 +114,7 @@ test.describe("Base stylesheet by default", function describeBaseStylesheet(): v
 
     expect(
       await frame.evaluate(readOutlineColor, 'button[aria-pressed="true"]'),
-    ).toBe(LIGHT_COLORS.accent.computed);
+    ).toBe(LIGHT_COLORS.primary.computed);
   });
 
   test("Tokens are readable as CSS variables", async function readsVariables({
@@ -121,17 +123,17 @@ test.describe("Base stylesheet by default", function describeBaseStylesheet(): v
     const frame = await openThemeProbe(page, "light");
     await frame.evaluate(
       addModHtml,
-      '<p id="accent" style="color: var(--ot-color-accent)">Accent</p>',
+      '<p id="primary" style="color: var(--ot-primary)">Primary</p>',
     );
-    const lightColor = (await frame.evaluate(readElementColors, "#accent"))
+    const lightColor = (await frame.evaluate(readElementColors, "#primary"))
       .color;
 
     await chooseTheme(page, "Dark");
     await waitForFrameColorScheme(frame, "dark");
 
-    expect(lightColor).toBe(LIGHT_COLORS.accent.computed);
-    expect((await frame.evaluate(readElementColors, "#accent")).color).toBe(
-      DARK_COLORS.accent.computed,
+    expect(lightColor).toBe(LIGHT_COLORS.primary.computed);
+    expect((await frame.evaluate(readElementColors, "#primary")).color).toBe(
+      DARK_COLORS.primary.computed,
     );
   });
 
@@ -140,8 +142,18 @@ test.describe("Base stylesheet by default", function describeBaseStylesheet(): v
   }): Promise<void> {
     const frame = await openThemeProbe(page, "dark");
 
+    expect(await frame.evaluate(readRootTokenValue, "--ot-primary")).toBe(
+      DARK_COLORS.primary.value,
+    );
+  });
+
+  test("Old token names are not defined", async function dropsOldNames({
+    page,
+  }): Promise<void> {
+    const frame = await openThemeProbe(page, "light");
+
     expect(await frame.evaluate(readRootTokenValue, "--ot-color-accent")).toBe(
-      DARK_COLORS.accent.value,
+      "",
     );
   });
 });
@@ -154,14 +166,14 @@ test.describe("Color scheme sections", function describeSections(): void {
 
     await frame.evaluate(
       addModHtml,
-      '<section data-ot-color-scheme="dark"><p style="color: var(--ot-color-text)">Dark</p></section>',
+      '<section data-ot-color-scheme="dark"><p style="color: var(--ot-foreground)">Dark</p></section>',
     );
 
     expect(
       (await frame.evaluate(readElementColors, "section")).background,
     ).toBe(DARK_COLORS.background.computed);
     expect((await frame.evaluate(readElementColors, "section p")).color).toBe(
-      DARK_COLORS.text.computed,
+      DARK_COLORS.foreground.computed,
     );
   });
 
@@ -205,7 +217,7 @@ test.describe("Mod styles override the base stylesheet", function describeOverri
 
     await frame.evaluate(
       addModStyle,
-      ":root { --ot-color-accent: rgb(255, 0, 0); }",
+      ":root { --ot-primary: rgb(255, 0, 0); }",
     );
     await frame.evaluate(
       addModHtml,
@@ -224,9 +236,7 @@ test.describe("Opt out of the theme styles", function describeOptOut(): void {
   }): Promise<void> {
     const frame = await openThemeProbe(page, "dark", ['  theme: "none"']);
 
-    expect(await frame.evaluate(readRootTokenValue, "--ot-color-accent")).toBe(
-      "",
-    );
+    expect(await frame.evaluate(readRootTokenValue, "--ot-primary")).toBe("");
     expect(await frame.evaluate(readBodyMargin)).toBe("8px");
   });
 
@@ -343,7 +353,7 @@ test.describe("Sample and default mods follow the theme", function describeShipp
     await expect(kallocain).toHaveAttribute("aria-pressed", "true");
     expect(
       await frame.evaluate(readOutlineColor, 'button[aria-pressed="true"]'),
-    ).toBe(LIGHT_COLORS.accent.computed);
+    ).toBe(LIGHT_COLORS.primary.computed);
   });
 
   test("Dark default mods", async function drawsDarkDefaultMods({
@@ -363,3 +373,225 @@ test.describe("Sample and default mods follow the theme", function describeShipp
     );
   });
 });
+
+const COLOR_SCHEMES = ["light", "dark"] as const;
+
+/** Opens the theme probe in `colorScheme` and shows `html` in its frame, as a mod that adds no styles would. */
+async function showInProbe(
+  page: Page,
+  colorScheme: "light" | "dark",
+  html: string,
+): Promise<Frame> {
+  const frame = await openThemeProbe(page, colorScheme);
+  await frame.evaluate(addModHtml, html);
+  return frame;
+}
+
+/** The value `property: var(token)` computes to in the frame. */
+async function readToken(
+  frame: Frame,
+  token: string,
+  property: string = "color",
+): Promise<string> {
+  return frame.evaluate(readTokenAs, [token, property]);
+}
+
+/** Expects a plain button's look: background, border and text from the page. */
+async function expectPlainButton(
+  frame: Frame,
+  selector: string,
+): Promise<void> {
+  const look = await frame.evaluate(readElementLook, selector);
+  expect(look.background).toBe(await readToken(frame, "--ot-background"));
+  expect(look.borderColor).toBe(await readToken(frame, "--ot-border"));
+  expect(look.color).toBe(await readToken(frame, "--ot-foreground"));
+}
+
+function describeSemanticHtml(colorScheme: "light" | "dark"): void {
+  test("Buttons look like the app's buttons", async function drawsButtons({
+    page,
+  }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<button type="button">Cancel</button><button type="submit">Save</button>',
+    );
+
+    await expectPlainButton(frame, 'button[type="button"]');
+    const submit = await frame.evaluate(
+      readElementLook,
+      'button[type="submit"]',
+    );
+    expect(submit.background).toBe(await readToken(frame, "--ot-primary"));
+    expect(submit.color).toBe(
+      await readToken(frame, "--ot-primary-foreground"),
+    );
+  });
+
+  test("Article is a card", async function drawsCard({ page }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      "<article><h2>Book List</h2><p>Books.</p></article>",
+    );
+
+    const look = await frame.evaluate(readElementLook, "article");
+    expect(look.background).toBe(await readToken(frame, "--ot-card"));
+    expect(look.borderColor).toBe(await readToken(frame, "--ot-border"));
+    expect(look.borderRadius).toBe(
+      await readToken(frame, "--ot-radius", "border-top-left-radius"),
+    );
+  });
+
+  test("Alerts", async function drawsAlerts({ page }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<div role="alert">Failed</div><div role="status">Saved</div>',
+    );
+
+    const destructive = await readToken(frame, "--ot-destructive");
+    const alert = await frame.evaluate(readElementLook, '[role="alert"]');
+    expect(alert.borderColor).toBe(destructive);
+    expect(alert.color).toBe(destructive);
+    const status = await frame.evaluate(readElementLook, '[role="status"]');
+    expect(status.borderColor).toBe(await readToken(frame, "--ot-border"));
+    expect(status.color).toBe(await readToken(frame, "--ot-foreground"));
+  });
+
+  test("Switch", async function drawsSwitch({ page }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<label><input type="checkbox" role="switch" checked> Covers</label>',
+    );
+
+    const look = await frame.evaluate(readElementLook, '[role="switch"]');
+    expect(look.appearance).toBe("none");
+    expect(look.background).toBe(await readToken(frame, "--ot-primary"));
+  });
+
+  test("Invalid field", async function drawsInvalidField({
+    page,
+  }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<input aria-invalid="true" aria-label="Address">',
+    );
+
+    expect((await frame.evaluate(readElementLook, "input")).borderColor).toBe(
+      await readToken(frame, "--ot-destructive"),
+    );
+  });
+
+  test("A mod undoes a pattern", async function undoesPattern({
+    page,
+  }): Promise<void> {
+    const frame = await openThemeProbe(page, colorScheme);
+
+    await frame.evaluate(
+      addModStyle,
+      "article { background: none; border: none; }",
+    );
+    await frame.evaluate(addModHtml, "<article><p>Plain</p></article>");
+
+    const look = await frame.evaluate(readElementLook, "article");
+    expect(look.background).toBe("rgba(0, 0, 0, 0)");
+    expect(look.borderWidth).toBe("0px");
+  });
+}
+
+function describeVariantAttributes(colorScheme: "light" | "dark"): void {
+  test("Destructive button", async function drawsDestructive({
+    page,
+  }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<button type="button" data-ot-variant="destructive">Delete</button>',
+    );
+
+    expect((await frame.evaluate(readElementLook, "button")).background).toBe(
+      await readToken(frame, "--ot-destructive"),
+    );
+  });
+
+  test("Primary button that does not submit", async function drawsPrimary({
+    page,
+  }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<button type="button" data-ot-variant="primary">Run</button>',
+    );
+
+    const look = await frame.evaluate(readElementLook, "button");
+    expect(look.background).toBe(await readToken(frame, "--ot-primary"));
+    expect(look.color).toBe(await readToken(frame, "--ot-primary-foreground"));
+  });
+
+  test("Outline submit button", async function drawsOutlineSubmit({
+    page,
+  }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<button type="submit" data-ot-variant="outline">Run</button>',
+    );
+
+    await expectPlainButton(frame, "button");
+  });
+
+  test("Success badge", async function drawsBadge({ page }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<span data-ot-variant="success">granted</span>',
+    );
+
+    const success = await readToken(frame, "--ot-success");
+    const look = await frame.evaluate(readElementLook, "span");
+    expect(look.color).toBe(success);
+    expect(look.borderColor).toBe(success);
+    expect(parseFloat(look.borderRadius)).toBeGreaterThan(0);
+  });
+
+  test("Unknown variant", async function keepsPlainLook({
+    page,
+  }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<button type="button" data-ot-variant="sparkly">Odd</button><span data-ot-variant="sparkly">odd</span>',
+    );
+
+    await expectPlainButton(frame, "button");
+    const span = await frame.evaluate(readElementLook, "span");
+    expect(span.borderWidth).toBe("0px");
+    expect(span.background).toBe("rgba(0, 0, 0, 0)");
+  });
+
+  test("Unprefixed attribute is ignored", async function ignoresUnprefixed({
+    page,
+  }): Promise<void> {
+    const frame = await showInProbe(
+      page,
+      colorScheme,
+      '<button type="button" data-variant="destructive">Delete</button>',
+    );
+
+    await expectPlainButton(frame, "button");
+  });
+}
+
+for (const colorScheme of COLOR_SCHEMES) {
+  test.describe(
+    `Semantic HTML looks like the app (${colorScheme})`,
+    describeSemanticHtml.bind(undefined, colorScheme),
+  );
+  test.describe(
+    `Variant attributes (${colorScheme})`,
+    describeVariantAttributes.bind(undefined, colorScheme),
+  );
+}

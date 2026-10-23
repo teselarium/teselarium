@@ -1,59 +1,9 @@
-/* The stage fills the rest of the page: the stage bar, then the visible sandbox. */
-.stage {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ot-space-2);
-  padding: var(--ot-space-2) var(--ot-space-4) var(--ot-space-4);
-}
+/*
+ * The stage's layout contracts, which the components' utilities do not
+ * express. The look is in the components, from the theme tokens.
+ */
 
-.stage-bar {
-  border: 1px solid var(--ot-color-border);
-  border-radius: var(--ot-radius);
-  padding: var(--ot-space-2) var(--ot-space-3);
-}
-
-.stage-bar-header {
-  display: flex;
-  align-items: center;
-  gap: var(--ot-space-2);
-}
-
-.stage-bar-mod {
-  flex: 1;
-  overflow-wrap: anywhere;
-}
-
-.issues {
-  margin: var(--ot-space-2) 0 0;
-  padding-left: 1.25rem;
-}
-
-.issue-error strong {
-  color: var(--ot-color-danger);
-}
-
-.issue-warning strong {
-  color: var(--ot-color-warning);
-}
-
-.issues-empty {
-  margin: var(--ot-space-2) 0 0;
-  color: var(--ot-color-text-muted);
-}
-
-.stage-sandboxes {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-}
-
-.sandbox {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-}
-
-/* The `display` above would otherwise show hidden sandboxes. */
+/* A sandbox's `display` would otherwise show hidden sandboxes. */
 .sandbox[hidden] {
   display: none;
 }
@@ -65,8 +15,6 @@
   width: 100%;
   height: 100%;
   min-height: 16rem;
-  border: 1px solid var(--ot-color-border);
-  border-radius: var(--ot-radius);
 }
 
 /* Until the frame is connected and has its color scheme (see SandboxFrame). */
@@ -74,61 +22,8 @@
   visibility: hidden;
 }
 
-.sandbox-loading {
-  color: var(--ot-color-text-muted);
-}
-
-.sandbox-error {
-  color: var(--ot-color-danger);
-  overflow-wrap: anywhere;
-}
-
-/* The action dialog: drawn by the app in the top layer, over the stage and every frame. */
-.action-dialog {
-  box-sizing: border-box;
-  width: min(32rem, calc(100vw - 2 * var(--ot-space-4)));
-  padding: var(--ot-space-4);
-  border: 1px solid var(--ot-color-border);
-  border-radius: var(--ot-radius);
-  background-color: var(--ot-color-background);
-  color: var(--ot-color-text);
-  box-shadow: var(--ot-shadow);
-}
-
-.action-dialog::backdrop {
-  background-color: rgb(0 0 0 / 0.5);
-}
-
-.action-dialog-title {
-  margin: 0;
-  font-size: 1.25rem;
-  overflow-wrap: anywhere;
-}
-
-/* Under the title, so a mod that borrows another title still shows where it comes from. */
-.action-dialog-source {
-  display: block;
-  color: var(--ot-color-text-muted);
-  overflow-wrap: anywhere;
-}
-
-.action-dialog-lead {
-  margin: var(--ot-space-4) 0 var(--ot-space-1);
-}
-
-.action-dialog-url,
-.action-dialog-file,
-.action-dialog-message {
-  margin: 0;
-  padding: var(--ot-space-2);
-  border-radius: var(--ot-radius);
-  background-color: var(--ot-color-surface);
-  overflow-wrap: anywhere;
-}
-
 /* The full address, broken anywhere, so no part of it can be pushed out of sight. */
 .action-dialog-url {
-  font-family: var(--ot-font-mono);
   word-break: break-all;
 }
 
@@ -137,17 +32,4 @@
   max-height: 50vh;
   overflow-y: auto;
   white-space: pre-wrap;
-}
-
-.action-dialog-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ot-space-2);
-  margin-top: var(--ot-space-4);
-}
-
-.action-dialog-accept {
-  border-color: var(--ot-color-accent);
-  background-color: var(--ot-color-accent);
-  color: var(--ot-color-accent-text);
 }

@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import {
+  actionDialog,
+  buildProbeFiles,
   findModFrame,
   isFrameMarked,
   markFrame,
@@ -8,6 +10,7 @@ import {
   routeCovers,
   serveAppOriginMod,
   stageBar,
+  startProbeRequests,
   waitForProbe,
 } from "./mod_routes.ts";
 import {
@@ -42,6 +45,15 @@ function readStageBarColor(element: Element): string {
   return getComputedStyle(element).color;
 }
 
+function readDialogColors(element: Element): {
+  background: string;
+  color: string;
+} {
+  const style = getComputedStyle(element);
+  const colors = { background: style.backgroundColor, color: style.color };
+  return colors;
+}
+
 function setPageMarker(): void {
   (globalThis as { testMarker?: boolean }).testMarker = true;
 }
@@ -73,7 +85,7 @@ test.describe("Theme choice", function describeThemeChoice(): void {
     expect(await page.evaluate(readColorSchemeAttribute)).toBe("dark");
     expect(await frame.evaluate(readBodyColors)).toEqual({
       background: DARK_COLORS.background.computed,
-      color: DARK_COLORS.text.computed,
+      color: DARK_COLORS.foreground.computed,
     });
     expect(await isFrameMarked(frame)).toBe(true);
   });
@@ -159,8 +171,28 @@ test.describe("The app follows the color scheme", function describeApp(): void {
       DARK_COLORS.background.computed,
     );
     expect(await stageBar(page).evaluate(readStageBarColor)).toBe(
-      DARK_COLORS.text.computed,
+      DARK_COLORS.foreground.computed,
     );
+  });
+
+  test("Action dialog follows the color scheme", async function drawsDarkDialog({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await serveAppOriginMod(page, buildProbeFiles("probe"));
+    await page.goto("/#/run?mod=./test-mods/probe/");
+    const frame = await findModFrame(page, "probe");
+    await waitForProbe(frame);
+
+    await frame.evaluate(startProbeRequests, [
+      ["ui.confirm", { message: "Delete this list?" }],
+    ]);
+    await expect(actionDialog(page)).toBeVisible();
+
+    expect(await actionDialog(page).evaluate(readDialogColors)).toEqual({
+      background: DARK_COLORS.popover.computed,
+      color: DARK_COLORS.popoverForeground.computed,
+    });
   });
 
   test("Back to light", async function returnsToLight({ page }): Promise<void> {

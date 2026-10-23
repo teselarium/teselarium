@@ -1,16 +1,18 @@
 /*
  * The base stylesheet of mod frames: plain HTML styled from the theme tokens,
- * with element and attribute selectors only. It sits in the layer
- * `opentesela`, so any style a mod adds outside a layer wins. Inlined as text
- * in the frame document, so it must never contain a closing style tag.
+ * with element and attribute selectors only. Plain elements take the look of
+ * the app's shadcn/ui components, so a mod gets the app's look without
+ * classes. It sits in the layer `opentesela`, so any style a mod adds outside
+ * a layer wins. Inlined as text in the frame document, so it must never
+ * contain a closing style tag.
  */
 @layer opentesela {
   html {
     height: 100%;
-    background-color: var(--ot-color-background);
-    color: var(--ot-color-text);
-    accent-color: var(--ot-color-accent);
-    font-family: var(--ot-font-body);
+    background-color: var(--ot-background);
+    color: var(--ot-foreground);
+    accent-color: var(--ot-primary);
+    font-family: var(--ot-font-sans);
     font-size: var(--ot-font-size);
     line-height: var(--ot-line-height);
   }
@@ -20,14 +22,14 @@
     min-height: 100%;
     margin: 0;
     padding: var(--ot-space-4);
-    background-color: var(--ot-color-background);
-    color: var(--ot-color-text);
+    background-color: var(--ot-background);
+    color: var(--ot-foreground);
   }
 
   /* A color scheme section: the element gets its own color scheme's colors. */
   [data-ot-color-scheme] {
-    background-color: var(--ot-color-background);
-    color: var(--ot-color-text);
+    background-color: var(--ot-background);
+    color: var(--ot-foreground);
   }
 
   h1,
@@ -43,10 +45,12 @@
 
   h1 {
     font-size: 2rem;
+    letter-spacing: -0.025em;
   }
 
   h2 {
     font-size: 1.5rem;
+    letter-spacing: -0.025em;
   }
 
   h3 {
@@ -83,9 +87,10 @@
   }
 
   a {
-    color: var(--ot-color-accent);
+    color: var(--ot-secondary);
+    font-weight: 500;
     text-decoration: underline;
-    text-underline-offset: 0.15em;
+    text-underline-offset: 0.25em;
   }
 
   a:hover {
@@ -95,18 +100,18 @@
   hr {
     margin: var(--ot-space-6) 0;
     border: 0;
-    border-top: 1px solid var(--ot-color-border);
+    border-top: 1px solid var(--ot-border);
   }
 
   small {
-    color: var(--ot-color-text-muted);
+    color: var(--ot-muted-foreground);
     font-size: 0.875em;
   }
 
   blockquote {
     padding-left: var(--ot-space-4);
-    border-left: 3px solid var(--ot-color-border);
-    color: var(--ot-color-text-muted);
+    border-left: 3px solid var(--ot-border);
+    color: var(--ot-muted-foreground);
   }
 
   code,
@@ -122,18 +127,18 @@
   samp {
     padding: 0.1em 0.3em;
     border-radius: var(--ot-radius);
-    background-color: var(--ot-color-surface);
+    background-color: var(--ot-muted);
   }
 
   kbd {
-    border: 1px solid var(--ot-color-border);
+    border: 1px solid var(--ot-border);
   }
 
   pre {
     overflow: auto;
     padding: var(--ot-space-3) var(--ot-space-4);
     border-radius: var(--ot-radius);
-    background-color: var(--ot-color-surface);
+    background-color: var(--ot-muted);
   }
 
   pre code {
@@ -142,46 +147,97 @@
     font-size: inherit;
   }
 
-  button,
-  input,
-  select,
-  textarea {
-    box-sizing: border-box;
-    padding: var(--ot-space-1) var(--ot-space-3);
-    border: 1px solid var(--ot-color-border);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-color-surface);
-    color: var(--ot-color-text);
-    font: inherit;
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: var(--ot-color-text-muted);
-  }
-
+  /* A plain button is the app's outline button. */
   button {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ot-space-2);
+    min-height: 2.25rem;
+    padding: var(--ot-space-2) var(--ot-space-4);
+    border: 1px solid var(--ot-border);
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-background);
+    color: var(--ot-foreground);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
     cursor: pointer;
   }
 
   button:hover:not(:disabled) {
-    border-color: var(--ot-color-text-muted);
+    background-color: var(--ot-accent);
+    color: var(--ot-accent-foreground);
+  }
+
+  /* On a hover fill, muted or colored text inside the button would lose its contrast. */
+  button:hover:not(:disabled) * {
+    color: inherit;
+  }
+
+  /* A submit button is the app's default (primary) button. */
+  button[type="submit"] {
+    border-color: var(--ot-primary);
+    background-color: var(--ot-primary);
+    color: var(--ot-primary-foreground);
+  }
+
+  button[type="submit"]:hover:not(:disabled) {
+    background-color: var(--ot-primary);
+    color: var(--ot-primary-foreground);
+    opacity: 0.9;
+  }
+
+  /* Form fields: the app's input. Checkboxes, radios and ranges keep their native box. */
+  input:not([type="checkbox"], [type="radio"], [type="range"]),
+  select,
+  textarea {
+    box-sizing: border-box;
+    padding: var(--ot-space-1) var(--ot-space-3);
+    border: 1px solid var(--ot-input);
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-card);
+    color: var(--ot-foreground);
+    font: inherit;
+  }
+
+  input:not([type="checkbox"], [type="radio"], [type="range"]),
+  select {
+    min-height: 2.25rem;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ot-muted-foreground);
   }
 
   :disabled {
     cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  button[aria-pressed="true"],
-  [aria-current]:not([aria-current="false"]) {
-    outline: 3px solid var(--ot-color-accent);
-    outline-offset: 1px;
+    opacity: 0.5;
   }
 
   :focus-visible {
-    outline: 2px solid var(--ot-color-focus);
+    outline: 2px solid var(--ot-ring);
     outline-offset: 2px;
+  }
+
+  /* A solid ring: shadcn's translucent halo would need a color literal. */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    border-color: var(--ot-ring);
+    outline: 3px solid var(--ot-ring);
+    outline-offset: 0;
+  }
+
+  /* After the focus rings, so a pressed button keeps its outline when focused. */
+  button[aria-pressed="true"],
+  [aria-current]:not([aria-current="false"]) {
+    outline: 3px solid var(--ot-primary);
+    outline-offset: 1px;
   }
 
   ul,
@@ -198,19 +254,28 @@
   }
 
   table {
+    width: 100%;
     border-collapse: collapse;
   }
 
   th,
   td {
-    padding: var(--ot-space-1) var(--ot-space-3);
-    border: 1px solid var(--ot-color-border);
+    padding: var(--ot-space-2);
+    border-bottom: 1px solid var(--ot-border);
     text-align: start;
   }
 
   th {
-    background-color: var(--ot-color-surface);
-    font-weight: 600;
+    color: var(--ot-muted-foreground);
+    font-weight: 500;
+  }
+
+  tr:last-child > td {
+    border-bottom: 0;
+  }
+
+  tr:hover > td {
+    background-color: var(--ot-muted);
   }
 
   img,
@@ -227,16 +292,270 @@
 
   dialog {
     padding: var(--ot-space-6);
-    border: 1px solid var(--ot-color-border);
+    border: 1px solid var(--ot-border);
     border-radius: var(--ot-radius);
-    background-color: var(--ot-color-surface);
-    color: var(--ot-color-text);
+    background-color: var(--ot-popover);
+    color: var(--ot-popover-foreground);
     box-shadow: var(--ot-shadow);
   }
 
   dialog::backdrop {
-    background-color: var(--ot-color-background);
+    background-color: var(--ot-background);
     opacity: 0.75;
+  }
+
+  /*
+   * Semantic patterns: semantic HTML takes the look of the app's matching
+   * components. One unlayered rule of a mod undoes any of them.
+   */
+
+  /* An article is a card. */
+  article {
+    margin: 0 0 var(--ot-space-4);
+    padding: var(--ot-space-6);
+    border: 1px solid var(--ot-border);
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-card);
+    color: var(--ot-card-foreground);
+  }
+
+  article > * {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  article > * + * {
+    margin-top: var(--ot-space-2);
+  }
+
+  /* An alert is the destructive alert, a status the default one. Empty live regions draw nothing. */
+  [role="alert"]:not(:empty),
+  [role="status"]:not(:empty) {
+    box-sizing: border-box;
+    margin: 0 0 var(--ot-space-4);
+    padding: var(--ot-space-3) var(--ot-space-4);
+    border: 1px solid var(--ot-border);
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-card);
+    color: var(--ot-foreground);
+  }
+
+  [role="alert"]:not(:empty) {
+    border-color: var(--ot-destructive);
+    color: var(--ot-destructive);
+  }
+
+  /* A checkbox with role="switch" is a switch. Its thumb is drawn with ::before. */
+  input[type="checkbox"][role="switch"] {
+    position: relative;
+    box-sizing: border-box;
+    width: 2rem;
+    height: 1.15rem;
+    margin: 0;
+    border: 0;
+    border-radius: 9999px;
+    background-color: var(--ot-input);
+    vertical-align: middle;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  input[type="checkbox"][role="switch"]::before {
+    content: "";
+    position: absolute;
+    top: 0.075rem;
+    left: 0.075rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background-color: var(--ot-background);
+    transition: transform 150ms;
+  }
+
+  /* The dark track is dark too: the thumb takes the text color, as in the app. */
+  [data-ot-color-scheme="dark"] input[type="checkbox"][role="switch"]::before {
+    background-color: var(--ot-foreground);
+  }
+
+  input[type="checkbox"][role="switch"]:checked {
+    background-color: var(--ot-primary);
+  }
+
+  input[type="checkbox"][role="switch"]:checked::before {
+    background-color: var(--ot-primary-foreground);
+    transform: translateX(0.85rem);
+  }
+
+  input[aria-invalid="true"],
+  select[aria-invalid="true"],
+  textarea[aria-invalid="true"] {
+    border-color: var(--ot-destructive);
+  }
+
+  input[aria-invalid="true"]:focus-visible,
+  select[aria-invalid="true"]:focus-visible,
+  textarea[aria-invalid="true"]:focus-visible {
+    border-color: var(--ot-destructive);
+    outline-color: var(--ot-destructive);
+  }
+
+  /* Details are an accordion item. */
+  details {
+    border-bottom: 1px solid var(--ot-border);
+  }
+
+  summary {
+    padding: var(--ot-space-4) 0;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  summary:hover {
+    text-decoration: underline;
+  }
+
+  /* A busy element is loading: it pulses slowly. */
+  [aria-busy="true"] {
+    cursor: progress;
+    animation: ot-busy-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes ot-busy-pulse {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  /*
+   * Variants: `data-ot-variant` picks an app variant that has no semantic
+   * HTML. Only the exact values below match, so any other value keeps the
+   * plain look. The filled variants dim on hover, since a lighter fill would
+   * need a color literal.
+   */
+  button[data-ot-variant="primary"] {
+    border-color: var(--ot-primary);
+    background-color: var(--ot-primary);
+    color: var(--ot-primary-foreground);
+  }
+
+  /* A secondary action is drawn as an outline in the secondary role. */
+  button[data-ot-variant="secondary"] {
+    border-color: var(--ot-secondary);
+    background-color: var(--ot-background);
+    color: var(--ot-secondary);
+  }
+
+  button[data-ot-variant="destructive"] {
+    border-color: var(--ot-destructive);
+    background-color: var(--ot-destructive);
+    color: var(--ot-destructive-foreground);
+  }
+
+  /* Also turns a submit button back into an outline button. */
+  button[data-ot-variant="outline"] {
+    border-color: var(--ot-border);
+    background-color: var(--ot-background);
+    color: var(--ot-foreground);
+  }
+
+  button[data-ot-variant="ghost"] {
+    border: 0;
+    background: none;
+    color: var(--ot-foreground);
+  }
+
+  button[data-ot-variant="primary"]:hover:not(:disabled) {
+    background-color: var(--ot-primary);
+    color: var(--ot-primary-foreground);
+    opacity: 0.9;
+  }
+
+  button[data-ot-variant="destructive"]:hover:not(:disabled) {
+    background-color: var(--ot-destructive);
+    color: var(--ot-destructive-foreground);
+    opacity: 0.9;
+  }
+
+  button[data-ot-variant="secondary"]:hover:not(:disabled),
+  button[data-ot-variant="outline"]:hover:not(:disabled),
+  button[data-ot-variant="ghost"]:hover:not(:disabled) {
+    background-color: var(--ot-accent);
+    color: var(--ot-accent-foreground);
+    opacity: 1;
+  }
+
+  /* A span with a variant is a badge. */
+  span[data-ot-variant="primary"],
+  span[data-ot-variant="secondary"],
+  span[data-ot-variant="outline"],
+  span[data-ot-variant="destructive"],
+  span[data-ot-variant="success"],
+  span[data-ot-variant="warning"] {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem var(--ot-space-2);
+    border: 1px solid var(--ot-border);
+    border-radius: 9999px;
+    color: var(--ot-foreground);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+
+  span[data-ot-variant="primary"] {
+    border-color: var(--ot-primary);
+    background-color: var(--ot-primary);
+    color: var(--ot-primary-foreground);
+  }
+
+  /* A secondary badge is a tag, filled with the highlight color. */
+  span[data-ot-variant="secondary"] {
+    border-color: var(--ot-highlight);
+    background-color: var(--ot-highlight);
+    color: var(--ot-highlight-foreground);
+  }
+
+  /* No fill: status badges keep their role's color as text. */
+  span[data-ot-variant="destructive"] {
+    border-color: var(--ot-destructive);
+    color: var(--ot-destructive);
+  }
+
+  span[data-ot-variant="success"] {
+    border-color: var(--ot-success);
+    color: var(--ot-success);
+  }
+
+  span[data-ot-variant="warning"] {
+    border-color: var(--ot-warning);
+    color: var(--ot-warning);
+  }
+
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  summary {
+    transition:
+      color 150ms,
+      background-color 150ms,
+      border-color 150ms,
+      outline-color 150ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      transition: none;
+    }
+
+    [aria-busy="true"] {
+      animation: none;
+      opacity: 0.6;
+    }
   }
 
   [hidden] {

@@ -1,16 +1,102 @@
-/* The page: full height, colors and fonts from the theme tokens. */
-html,
-body {
-  height: 100%;
+/*
+ * The app's stylesheet: the Tailwind CSS entry. Every design value comes from
+ * the theme tokens (`--ot-*`, see src/lib/core/theme/): shadcn/ui's variables
+ * are aliases of them, and Tailwind's theme reads those aliases.
+ */
+
+/* The token layer first, so it is the weakest whatever order the styles load in. */
+@layer opentesela, theme, base, components, utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where([data-ot-color-scheme="dark"], [data-ot-color-scheme="dark"] *));
+
+/*
+ * shadcn/ui's variables, from the tokens. On every color scheme element, not
+ * only `:root`, so a section recomputes them from its own `--ot-*` values.
+ */
+:root,
+[data-ot-color-scheme] {
+  --background: var(--ot-background);
+  --foreground: var(--ot-foreground);
+  --card: var(--ot-card);
+  --card-foreground: var(--ot-card-foreground);
+  --popover: var(--ot-popover);
+  --popover-foreground: var(--ot-popover-foreground);
+  --primary: var(--ot-primary);
+  --primary-foreground: var(--ot-primary-foreground);
+  --secondary: var(--ot-secondary);
+  --secondary-foreground: var(--ot-secondary-foreground);
+  --muted: var(--ot-muted);
+  --muted-foreground: var(--ot-muted-foreground);
+  --accent: var(--ot-accent);
+  --accent-foreground: var(--ot-accent-foreground);
+  --highlight: var(--ot-highlight);
+  --highlight-foreground: var(--ot-highlight-foreground);
+  --destructive: var(--ot-destructive);
+  --destructive-foreground: var(--ot-destructive-foreground);
+  --warning: var(--ot-warning);
+  --success: var(--ot-success);
+  --border: var(--ot-border);
+  --input: var(--ot-input);
+  --ring: var(--ot-ring);
+  --radius: var(--ot-radius);
 }
 
-body {
-  margin: 0;
-  background-color: var(--ot-color-background);
-  color: var(--ot-color-text);
-  font-family: var(--ot-font-body);
-  font-size: var(--ot-font-size);
-  line-height: var(--ot-line-height);
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--ot-font-sans);
+  --font-mono: var(--ot-font-mono);
+  --shadow-lg: var(--ot-shadow);
+  /* `p-4` is 4 × `--ot-space-1`, which is `--ot-space-4`. */
+  --spacing: var(--ot-space-1);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-size: var(--ot-font-size);
+    line-height: var(--ot-line-height);
+  }
+
+  code {
+    font-size: 0.875em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ot-ring);
+    outline-offset: 2px;
+  }
 }
 
 /* The header, then the stage, which takes the rest of the viewport. */
@@ -18,53 +104,4 @@ body {
   display: grid;
   grid-template-rows: auto 1fr;
   height: 100dvh;
-}
-
-code {
-  font-family: var(--ot-font-mono);
-  font-size: 0.875em;
-}
-
-button,
-select {
-  padding: var(--ot-space-1) var(--ot-space-3);
-  border: 1px solid var(--ot-color-border);
-  border-radius: var(--ot-radius);
-  background-color: var(--ot-color-surface);
-  color: var(--ot-color-text);
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: var(--ot-color-text-muted);
-}
-
-:focus-visible {
-  outline: 2px solid var(--ot-color-focus);
-  outline-offset: 2px;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ot-space-4);
-  padding: var(--ot-space-2) var(--ot-space-4);
-  border-bottom: 1px solid var(--ot-color-border);
-}
-
-.app-header h1 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-.theme-control {
-  display: flex;
-  align-items: center;
-  gap: var(--ot-space-2);
-  color: var(--ot-color-text-muted);
 }

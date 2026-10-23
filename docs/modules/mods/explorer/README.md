@@ -6,8 +6,13 @@ It is an ordinary sandboxed mod. It uses only the engine API: `mods.inspect` to 
 
 ## What it does
 
-- For each reference in its config's `mods`, in order, it sends `mods.inspect` and lists a button with the mod's title and description. A reference that cannot be inspected is listed with the reference and the error message (for example a missing mod file and `404`).
+- While the mods load, its list region is busy (`aria-busy="true"`) and says "Loading mods…".
+- For each reference in its config's `mods`, in order, it sends `mods.inspect` and lists the mod as a card with its title, its description and a "View <title>" button. A reference that cannot be inspected is listed as an alert with the reference and the error message (for example a missing mod file and `404`).
 - When the user selects a mod, it sends `mods.open` for the mod in its config's `viewer`, with the selected mod's source as the `target` parameter. The stage opens the viewer in a new sandbox, and the explorer stays open behind it, so back returns to it as it was left.
+
+## An example of the app's look
+
+Its source, `public/default_mods/mod_explorer/main.js`, is a short example of how a mod gets the app's look from semantic HTML, with no classes and no styling library. Each mod is an `<article>`, which the theme's base stylesheet draws as a card, a failure is a `role="alert"` element, drawn as the app's destructive alert, and the loading list is `aria-busy`. Errors from opening the viewer go to a `role="status"` live region, which draws nothing while it is empty. The mod's own CSS sets layout only: the card grid and the button's place in the card. See "Write HTML, get the app's look" in the [theme module](../../lib/core/theme/README.md).
 
 ## Config
 

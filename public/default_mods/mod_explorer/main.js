@@ -1,10 +1,21 @@
-/** Default mod: lists the mods of its config and opens the viewer for the one the user picks. */
+/**
+ * Default mod: lists the mods of its config and opens the viewer for the one
+ * the user picks.
+ *
+ * It is also an example of getting the app's look without classes: the
+ * theme's base stylesheet styles semantic HTML like the app's components (an
+ * `<article>` is a card, `role="alert"` an alert, `aria-busy` a loading
+ * state), and this mod's own CSS sets layout only. See "Write HTML, get the
+ * app's look" in docs/modules/lib/core/theme/README.md.
+ */
 
-// Only the layout: the theme's base stylesheet gives the colors and fonts.
+// Layout only: the colors, borders and fonts come from the theme.
 const EXPLORER_STYLE = `
-  ul { list-style: none; padding: 0; display: grid; gap: var(--ot-space-2); }
-  button { display: block; width: 100%; text-align: left; padding: var(--ot-space-2); }
-  .mod-error { color: var(--ot-color-danger); }
+  ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: var(--ot-space-4); }
+  li { display: grid; }
+  li > * { margin: 0; }
+  article { display: grid; grid-template-rows: auto 1fr auto; }
+  article button { justify-self: start; }
 `;
 
 function describeError(error) {
@@ -50,39 +61,43 @@ function openViewer(view, inspection) {
   request.catch(showOpenError.bind(undefined, view));
 }
 
-function buildModButton(view, inspection) {
-  const button = document.createElement("button");
-  button.type = "button";
-  const title = document.createElement("strong");
+/** A mod as a card: an `<article>` with its title, description and a button. */
+function buildModCard(view, inspection) {
+  const card = document.createElement("article");
+  const title = document.createElement("h2");
   title.textContent = inspection.title;
-  const description = document.createElement("span");
+  const description = document.createElement("p");
   description.textContent = inspection.description;
-  button.append(title, document.createElement("br"), description);
-  button.addEventListener(
+  const viewButton = document.createElement("button");
+  viewButton.type = "button";
+  viewButton.textContent = `View ${inspection.title}`;
+  viewButton.addEventListener(
     "click",
     openViewer.bind(undefined, view, inspection),
   );
-  return button;
+  card.append(title, description, viewButton);
+  return card;
 }
 
-function buildFailedEntry(entry) {
-  const failure = document.createElement("p");
+/** A mod that cannot be inspected: `role="alert"` gives it the app's destructive alert look. */
+function buildFailureAlert(entry) {
+  const failure = document.createElement("div");
+  failure.setAttribute("role", "alert");
   const reference = document.createElement("code");
   reference.textContent = entry.reference;
-  const message = document.createElement("span");
-  message.className = "mod-error";
+  const message = document.createElement("p");
   message.textContent = entry.error;
-  failure.append(reference, document.createElement("br"), message);
+  failure.append(reference, message);
   return failure;
 }
 
 function buildModItem(view, entry) {
   const item = document.createElement("li");
   if (entry.inspection === null) {
-    item.append(buildFailedEntry(entry));
+    item.append(buildFailureAlert(entry));
     return item;
   }
-  item.append(buildModButton(view, entry.inspection));
+  item.append(buildModCard(view, entry.inspection));
   return item;
 }
 
@@ -92,6 +107,7 @@ function renderModList(view, entries) {
     list.append(buildModItem(view, entry));
   }
   view.content.replaceChildren(list);
+  view.content.removeAttribute("aria-busy");
 }
 
 function readModReferences(config) {
@@ -107,12 +123,14 @@ function readModReferences(config) {
   return references;
 }
 
+/** The page while the mods load: the region is busy, and the status region waits, empty. */
 function buildExplorerPage(view, title) {
   const style = document.createElement("style");
   style.textContent = EXPLORER_STYLE;
   document.head.append(style);
   const heading = document.createElement("h1");
   heading.textContent = title;
+  view.content.setAttribute("aria-busy", "true");
   view.content.textContent = "Loading mods…";
   document.body.replaceChildren(heading, view.content, view.status);
 }
@@ -122,10 +140,10 @@ export default async function mount(engine, context) {
   const view = {
     engine,
     viewer: String(context.config.viewer ?? "mod_viewer"),
-    content: document.createElement("div"),
+    content: document.createElement("section"),
     status: document.createElement("p"),
   };
-  view.status.className = "mod-error";
+  view.content.setAttribute("aria-label", "Mods");
   view.status.setAttribute("role", "status");
   buildExplorerPage(view, context.mod.title);
   const entries = await inspectMods(engine, readModReferences(context.config));

@@ -6,3 +6,4 @@ openspec/
 public/samples/tiles/
 public/samples/types/
 .claude/
+src/vendor/

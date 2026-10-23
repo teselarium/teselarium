@@ -14,15 +14,19 @@ export interface TokenColor {
  * the module loads its stylesheet through Vite.
  */
 export const LIGHT_COLORS = {
-  background: { value: "#ffffff", computed: "rgb(255, 255, 255)" },
-  text: { value: "#18181b", computed: "rgb(24, 24, 27)" },
-  accent: { value: "#2563eb", computed: "rgb(37, 99, 235)" },
+  background: { value: "#f6f1e7", computed: "rgb(246, 241, 231)" },
+  foreground: { value: "#1d2433", computed: "rgb(29, 36, 51)" },
+  primary: { value: "#1f4e9c", computed: "rgb(31, 78, 156)" },
+  popover: { value: "#ffffff", computed: "rgb(255, 255, 255)" },
+  popoverForeground: { value: "#1d2433", computed: "rgb(29, 36, 51)" },
 } as const satisfies Record<string, TokenColor>;
 
 export const DARK_COLORS = {
-  background: { value: "#18181b", computed: "rgb(24, 24, 27)" },
-  text: { value: "#fafafa", computed: "rgb(250, 250, 250)" },
-  accent: { value: "#60a5fa", computed: "rgb(96, 165, 250)" },
+  background: { value: "#0f141d", computed: "rgb(15, 20, 29)" },
+  foreground: { value: "#f2ede3", computed: "rgb(242, 237, 227)" },
+  primary: { value: "#78a6f2", computed: "rgb(120, 166, 242)" },
+  popover: { value: "#18202c", computed: "rgb(24, 32, 44)" },
+  popoverForeground: { value: "#f2ede3", computed: "rgb(242, 237, 227)" },
 } as const satisfies Record<string, TokenColor>;
 
 /**
@@ -307,4 +311,87 @@ export function readPaintLog(): PaintLog {
     throw new Error("Expected recordPaints to run as an init script");
   }
   return paintLog;
+}
+
+/** The computed look of an element, as the semantic and variant checks compare it. */
+export interface ElementLook {
+  background: string;
+  color: string;
+  borderColor: string;
+  borderWidth: string;
+  borderRadius: string;
+  appearance: string;
+}
+
+/**
+ * Runs in a frame: the computed look of the first element matching
+ * `selector`. Borders are read on the top side, because Firefox gives no
+ * computed value for the shorthands.
+ */
+export function readElementLook(selector: string): ElementLook {
+  const element = document.querySelector(selector);
+  if (element === null) {
+    throw new Error(`No element matches "${selector}"`);
+  }
+  const style = getComputedStyle(element);
+  const look: ElementLook = {
+    background: style.backgroundColor,
+    color: style.color,
+    borderColor: style.borderTopColor,
+    borderWidth: style.borderTopWidth,
+    borderRadius: style.borderTopLeftRadius,
+    appearance: style.appearance,
+  };
+  return look;
+}
+
+/**
+ * Runs in a frame: what `property: var(token)` computes to, read on a
+ * temporary element. So a check compares with the token's value in the
+ * frame's color scheme, in the form the browser computes it.
+ */
+export function readTokenAs(tokenAndProperty: string[]): string {
+  const [token, property] = tokenAndProperty;
+  const probe = document.createElement("div");
+  probe.style.setProperty(property, `var(${token})`);
+  if (property.startsWith("border")) {
+    probe.style.borderStyle = "solid";
+  }
+  document.body.append(probe);
+  const value = getComputedStyle(probe).getPropertyValue(property);
+  probe.remove();
+  return value;
+}
+
+/**
+ * Runs in a frame: every declaration outside the `opentesela` layer that
+ * sets a look property (a color, background, border or radius, font or
+ * shadow), as `selector { property }`. Empty when the frame's own styles are
+ * layout only. Self-contained, since it runs in the frame.
+ */
+export function listOwnLookDeclarations(): string[] {
+  const lookPattern = /^(background|border|font)|color$|shadow$/;
+  const found: string[] = [];
+  const rules: CSSRule[] = [];
+  for (const sheet of document.styleSheets) {
+    rules.push(...sheet.cssRules);
+  }
+  while (rules.length > 0) {
+    const rule = rules.shift() as CSSRule;
+    if (rule instanceof CSSLayerBlockRule && rule.name === "opentesela") {
+      continue;
+    }
+    if ("cssRules" in rule) {
+      rules.push(...(rule.cssRules as CSSRuleList));
+    }
+    if (!(rule instanceof CSSStyleRule)) {
+      continue;
+    }
+    for (const property of rule.style) {
+      if (lookPattern.test(property)) {
+        found.push(`${rule.selectorText} { ${property} }`);
+      }
+    }
+  }
+  return found;
 }

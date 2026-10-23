@@ -1,5 +1,9 @@
 import { useMemo, useSyncExternalStore } from "react";
 import type { ChangeEvent, ReactElement } from "react";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/vendor/shadcn/ui/native-select.tsx";
 import type { ThemeChoice } from "../../lib/core/theme/index.ts";
 import {
   chooseTheme,
@@ -34,13 +38,17 @@ function findThemeChoice(value: string): ThemeChoice | null {
 
 function renderThemeOption(option: ThemeOption): ReactElement {
   return (
-    <option key={option.choice} value={option.choice}>
+    <NativeSelectOption key={option.choice} value={option.choice}>
       {option.label}
-    </option>
+    </NativeSelectOption>
   );
 }
 
-/** The Theme control: System, Light or Dark, applied to the app and every mod at once. */
+/**
+ * The Theme control: System, Light or Dark, applied to the app and every mod
+ * at once. A native `<select>` (shadcn's NativeSelect), the better control on
+ * mobile (docs/code_conventions.md, "UI components", exception 3).
+ */
 export function ThemeControl({ appTheme }: ThemeControlProps): ReactElement {
   const subscribe = useMemo(
     function bindSubscribe(): (listener: () => void) => () => void {
@@ -68,11 +76,16 @@ export function ThemeControl({ appTheme }: ThemeControlProps): ReactElement {
     options.push(renderThemeOption(option));
   }
   return (
-    <label className="theme-control">
+    <label className="flex items-center gap-2 text-sm text-muted-foreground">
       Theme{" "}
-      <select value={snapshot.choice} onChange={handleThemeChange}>
+      <NativeSelect
+        size="sm"
+        className="text-foreground"
+        value={snapshot.choice}
+        onChange={handleThemeChange}
+      >
         {options}
-      </select>
+      </NativeSelect>
     </label>
   );
 }

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Frame, FrameLocator, Locator, Page } from "@playwright/test";
 import {
   findModFrame,
   readParentDocumentError,
@@ -8,6 +8,7 @@ import {
   serveAppOriginMod,
   stageBar,
 } from "./mod_routes.ts";
+import { listOwnLookDeclarations, readTokenAs } from "./theme_probes.ts";
 
 const EXPLORER_CODE = readFileSync(
   new URL("../public/default_mods/mod_explorer/main.js", import.meta.url),
@@ -16,6 +17,51 @@ const EXPLORER_CODE = readFileSync(
 
 function readSampleSource(page: Page): string {
   return new URL("/samples/mods/book_list/mod_conf.yaml", page.url()).href;
+}
+
+/** The explorer with `./samples/mods/missing` in its `mods` list, served on the app's origin. */
+async function openBrokenExplorer(page: Page): Promise<Frame> {
+  await serveAppOriginMod(page, {
+    "explorer/mod_conf.yaml": [
+      "mod:",
+      '  name: "mod_explorer"',
+      '  title: "Broken explorer"',
+      '  version: "0.1.0"',
+      '  entrypoint: "./main.js"',
+      "  config:",
+      '    viewer: "mod_viewer"',
+      "    mods:",
+      '      - "./samples/mods/missing"',
+      "  permissions:",
+      "    open:",
+      '      - host: "*"',
+      '        reason: "Opens the mods you pick"',
+    ].join("\n"),
+    "explorer/main.js": EXPLORER_CODE,
+  });
+  await page.goto("/#/run?mod=./test-mods/explorer/");
+  return findModFrame(page, "Broken explorer");
+}
+
+function readBackgroundColor(element: Element): string {
+  return getComputedStyle(element).backgroundColor;
+}
+
+/** The top border's color: Firefox gives no computed value for the shorthand. */
+function readBorderColor(element: Element): string {
+  return getComputedStyle(element).borderTopColor;
+}
+
+/** The value of a color token in the frame, as `getComputedStyle` gives a color. */
+async function readTokenColor(frame: Frame, token: string): Promise<string> {
+  return frame.evaluate(readTokenAs, [token, "color"]);
+}
+
+/** The row of the sample mod's `show` permission in the viewer's permission table. */
+function coverPermissionRow(viewer: FrameLocator): Locator {
+  return viewer
+    .getByRole("row")
+    .filter({ hasText: "https://upload.wikimedia.org" });
 }
 
 async function openViewerForSample(page: Page): Promise<void> {
@@ -77,9 +123,12 @@ test.describe("Mod explorer", function describeExplorer(): void {
     await page.goto("/");
     const explorer = page.frameLocator('iframe[title="Mods"]');
 
-    await expect(
-      explorer.getByRole("button", { name: /Book List/ }),
-    ).toContainText("A very simple list of books with their covers.");
+    const card = explorer.getByRole("article").filter({
+      has: explorer.getByRole("button", { name: /Book List/ }),
+    });
+    await expect(card).toContainText(
+      "A very simple list of books with their covers.",
+    );
   });
 
   test("Select a mod", async function selectsMod({ page }): Promise<void> {
@@ -102,30 +151,10 @@ test.describe("Mod explorer", function describeExplorer(): void {
   test("Mod that cannot be inspected", async function listsFailure({
     page,
   }): Promise<void> {
-    await serveAppOriginMod(page, {
-      "explorer/mod_conf.yaml": [
-        "mod:",
-        '  name: "mod_explorer"',
-        '  title: "Broken explorer"',
-        '  version: "0.1.0"',
-        '  entrypoint: "./main.js"',
-        "  config:",
-        '    viewer: "mod_viewer"',
-        "    mods:",
-        '      - "./samples/mods/missing"',
-        "  permissions:",
-        "    open:",
-        '      - host: "*"',
-        '        reason: "Opens the mods you pick"',
-      ].join("\n"),
-      "explorer/main.js": EXPLORER_CODE,
-    });
+    const explorer = await openBrokenExplorer(page);
 
-    await page.goto("/#/run?mod=./test-mods/explorer/");
-
-    const explorer = page.frameLocator('iframe[title="Broken explorer"]');
     await expect(explorer.getByText("./samples/mods/missing")).toBeVisible();
-    await expect(explorer.locator(".mod-error").first()).toContainText("404");
+    await expect(explorer.getByRole("alert")).toContainText("404");
   });
 });
 
@@ -144,11 +173,13 @@ test.describe("Mod viewer", function describeViewer(): void {
       viewer.getByText("A very simple list of books with their covers."),
     ).toBeVisible();
     await expect(viewer.getByText("show_covers: true")).toBeVisible();
-    await expect(
-      viewer.getByText(
-        "show https://upload.wikimedia.org: Shows the book covers (granted)",
-      ),
-    ).toBeVisible();
+    const permission = coverPermissionRow(viewer);
+    await expect(permission.getByRole("cell")).toHaveText([
+      "show",
+      "https://upload.wikimedia.org",
+      "Shows the book covers",
+      "granted",
+    ]);
   });
 
   test("No target", async function saysNoTarget({ page }): Promise<void> {
@@ -257,5 +288,86 @@ test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
     await expect(
       viewer.getByRole("button", { name: "Run with sample tiles" }),
     ).toHaveCount(0);
+  });
+});
+
+test.describe("Default mods show how to get the app's look", function describeExamples(): void {
+  test("Own styles are layout only", async function checksOwnStyles({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+    const explorer = await findModFrame(page, "Mods");
+    await expect(
+      explorer.getByRole("button", { name: /Book List/ }),
+    ).toBeVisible();
+    await openViewerForSample(page);
+    const viewer = await findModFrame(page, "Mod Viewer");
+    await routeCovers(page);
+    await viewer.getByRole("button", { name: "Run with sample tiles" }).click();
+    const bookList = await findModFrame(page, "Book List");
+    await expect(
+      bookList.getByRole("button", { name: /Kallocain/ }),
+    ).toBeVisible();
+
+    expect(await explorer.evaluate(listOwnLookDeclarations)).toEqual([]);
+    expect(await viewer.evaluate(listOwnLookDeclarations)).toEqual([]);
+    expect(await bookList.evaluate(listOwnLookDeclarations)).toEqual([]);
+  });
+
+  test("Explorer lists mods as cards", async function listsCards({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+    const explorer = await findModFrame(page, "Mods");
+
+    const card = explorer.getByRole("article").filter({ hasText: "Book List" });
+    await expect(card.getByRole("button", { name: /Book List/ })).toBeVisible();
+    expect(await card.evaluate(readBackgroundColor)).toBe(
+      await readTokenColor(explorer, "--ot-card"),
+    );
+  });
+
+  test("Viewer's main action is primary", async function drawsPrimaryAction({
+    page,
+  }): Promise<void> {
+    await openViewerForSample(page);
+    const viewer = await findModFrame(page, "Mod Viewer");
+
+    const runWithSample = viewer.getByRole("button", {
+      name: "Run with sample tiles",
+    });
+    const runWithout = viewer.getByRole("button", {
+      name: "Run without tiles",
+    });
+    expect(await runWithSample.evaluate(readBackgroundColor)).toBe(
+      await readTokenColor(viewer, "--ot-primary"),
+    );
+    expect(await runWithout.evaluate(readBackgroundColor)).toBe(
+      await readTokenColor(viewer, "--ot-background"),
+    );
+  });
+
+  test("Viewer shows permission statuses as badges", async function drawsBadges({
+    page,
+  }): Promise<void> {
+    await openViewerForSample(page);
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+
+    const badge = coverPermissionRow(viewer).locator("span[data-ot-variant]");
+    await expect(badge).toHaveText("granted");
+    await expect(badge).toHaveAttribute("data-ot-variant", "success");
+  });
+
+  test("Explorer shows a failure as an alert", async function showsAlert({
+    page,
+  }): Promise<void> {
+    const explorer = await openBrokenExplorer(page);
+
+    const alert = explorer.getByRole("alert");
+    await expect(alert).toContainText("./samples/mods/missing");
+    await expect(alert).toContainText("404");
+    expect(await alert.evaluate(readBorderColor)).toBe(
+      await readTokenColor(explorer, "--ot-destructive"),
+    );
   });
 });

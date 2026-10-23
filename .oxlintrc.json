@@ -14,5 +14,31 @@
     "typescript/explicit-function-return-type": "error",
     "unicorn/no-array-for-each": "error",
     "unicorn/no-array-reduce": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/vendor/**"],
+      "rules": {
+        "react/only-export-components": "off",
+        "func-style": "off",
+        "func-names": "off",
+        "typescript/explicit-function-return-type": "off",
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/**", "!@/vendor/**"],
+                "message": "Vendored code never imports project code (src/vendor/shadcn/README.md)."
+              },
+              {
+                "regex": "^(\\.\\./){3,}",
+                "message": "Vendored code never imports project code (src/vendor/shadcn/README.md)."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

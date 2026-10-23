@@ -10,6 +10,23 @@ import {
 const COLOR_LITERAL_PATTERN =
   /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\(|\b(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|transparent|currentcolor|canvas|canvastext|buttonface|buttontext)\b/i;
 
+/** The `data-ot-variant` values of the mod-theme spec, "Variant attributes". */
+const BUTTON_VARIANTS = [
+  "primary",
+  "secondary",
+  "outline",
+  "ghost",
+  "destructive",
+];
+const BADGE_VARIANTS = [
+  "primary",
+  "secondary",
+  "outline",
+  "destructive",
+  "success",
+  "warning",
+];
+
 const LIGHT_SELECTOR = ':root,\n  [data-ot-color-scheme="light"] {';
 const DARK_SELECTOR = '[data-ot-color-scheme="dark"] {';
 
@@ -168,9 +185,68 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       ":focus-visible",
       'button[aria-pressed="true"]',
       "[data-ot-color-scheme]",
+      'button[type="submit"]',
+      "@media (prefers-reduced-motion: reduce)",
     ];
     for (const element of elements) {
       expect(selectors).toContain(element);
+    }
+  });
+
+  it("styles the semantic patterns the spec lists", function coversPatterns(): void {
+    const selectors = listPreludes(BASE_STYLESHEET).join(",");
+
+    const patterns = [
+      "article",
+      '[role="alert"]',
+      '[role="status"]',
+      'input[type="checkbox"][role="switch"]',
+      '[aria-invalid="true"]',
+      "details",
+      "summary",
+      '[aria-busy="true"]',
+    ];
+    for (const pattern of patterns) {
+      expect(selectors).toContain(pattern);
+    }
+  });
+
+  it("styles every variant the spec lists", function coversVariants(): void {
+    const selectors = listPreludes(BASE_STYLESHEET).join(",");
+
+    for (const variant of BUTTON_VARIANTS) {
+      expect(selectors).toContain(`button[data-ot-variant="${variant}"]`);
+    }
+    for (const variant of BADGE_VARIANTS) {
+      expect(selectors).toContain(`span[data-ot-variant="${variant}"]`);
+    }
+  });
+
+  it("names only the spec's variant values", function checksVariantValues(): void {
+    const css = removeComments(BASE_STYLESHEET);
+    const knownValues = new Set([...BUTTON_VARIANTS, ...BADGE_VARIANTS]);
+
+    const attributes = [...css.matchAll(/\[data-ot-variant([^\]]*)\]/g)];
+    expect(attributes.length).toBeGreaterThan(0);
+    for (const attribute of attributes) {
+      expect(attribute[0]).toMatch(/^\[data-ot-variant="[a-z-]+"\]$/);
+      const value = /^="([a-z-]+)"$/.exec(attribute[1])?.[1] ?? "";
+      expect(knownValues.has(value)).toBe(true);
+    }
+    expect(css).not.toMatch(/\[data-variant/);
+  });
+
+  it("keeps each variant on its element", function checksVariantElements(): void {
+    const css = removeComments(BASE_STYLESHEET);
+
+    for (const match of css.matchAll(/(\S*)\[data-ot-variant="([a-z-]+)"\]/g)) {
+      const [, element, value] = match;
+      if (element.endsWith("button")) {
+        expect(BUTTON_VARIANTS).toContain(value);
+      } else {
+        expect(element).toMatch(/span$/);
+        expect(BADGE_VARIANTS).toContain(value);
+      }
     }
   });
 });

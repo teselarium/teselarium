@@ -1,9 +1,15 @@
+import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [tailwindcss(), react()],
+  // Only vendored code is imported through `@/` (docs/code_conventions.md).
+  resolve: {
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
   // The app routes with the hash, so dev and preview answer missing files with 404 like static hosts.
   appType: "mpa",
   server: { host: "127.0.0.1" },

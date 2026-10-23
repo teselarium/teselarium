@@ -32,24 +32,41 @@ function defineSharedToken(name: string, value: string): Readonly<ThemeToken> {
 }
 
 /**
- * The only source of the app's and the mods' colors, fonts and spacing. Every
- * text color has a contrast of at least 4.5:1 on the background and on the
- * surface of its color scheme, and so has the accent text on the accent.
+ * The only source of the app's and the mods' colors, fonts and spacing. The
+ * color tokens are shadcn/ui's role names under `--ot-`, plus `highlight`
+ * (the secondary badge's fill), `warning` and `success`. Gaudí's trencadís:
+ * cobalt and turquoise glazes, saffron and leaf-green shards, on stone and
+ * white ceramic by day and on night blue by night. Every text role has a
+ * contrast of at least 4.5:1 on the background, the card and the muted
+ * fill, and so has each `-foreground` on its role (the theme spec, "Token
+ * contrast").
  */
 export const THEME_TOKENS: readonly Readonly<ThemeToken>[] = Object.freeze([
-  defineColorToken("--ot-color-background", "#ffffff", "#18181b"),
-  defineColorToken("--ot-color-surface", "#f4f4f5", "#27272a"),
-  defineColorToken("--ot-color-text", "#18181b", "#fafafa"),
-  defineColorToken("--ot-color-text-muted", "#52525b", "#a1a1aa"),
-  defineColorToken("--ot-color-border", "#d4d4d8", "#3f3f46"),
-  defineColorToken("--ot-color-accent", "#2563eb", "#60a5fa"),
-  defineColorToken("--ot-color-accent-text", "#ffffff", "#18181b"),
-  defineColorToken("--ot-color-focus", "#1d4ed8", "#93c5fd"),
-  defineColorToken("--ot-color-danger", "#b91c1c", "#f87171"),
-  defineColorToken("--ot-color-warning", "#854d0e", "#facc15"),
-  defineColorToken("--ot-color-success", "#15803d", "#4ade80"),
+  defineColorToken("--ot-background", "#f6f1e7", "#0f141d"),
+  defineColorToken("--ot-foreground", "#1d2433", "#f2ede3"),
+  defineColorToken("--ot-card", "#ffffff", "#18202c"),
+  defineColorToken("--ot-card-foreground", "#1d2433", "#f2ede3"),
+  defineColorToken("--ot-popover", "#ffffff", "#18202c"),
+  defineColorToken("--ot-popover-foreground", "#1d2433", "#f2ede3"),
+  defineColorToken("--ot-primary", "#1f4e9c", "#78a6f2"),
+  defineColorToken("--ot-primary-foreground", "#ffffff", "#0f141d"),
+  defineColorToken("--ot-secondary", "#0b6f6c", "#4fc3bb"),
+  defineColorToken("--ot-secondary-foreground", "#ffffff", "#0f141d"),
+  defineColorToken("--ot-muted", "#f9f5ee", "#141a25"),
+  defineColorToken("--ot-muted-foreground", "#5b6170", "#a4abb9"),
+  defineColorToken("--ot-accent", "#f2c14e", "#e9b949"),
+  defineColorToken("--ot-accent-foreground", "#1d2433", "#0f141d"),
+  defineColorToken("--ot-highlight", "#9cc46f", "#8fbb62"),
+  defineColorToken("--ot-highlight-foreground", "#1d2433", "#0f141d"),
+  defineColorToken("--ot-destructive", "#b3261e", "#f08a7a"),
+  defineColorToken("--ot-destructive-foreground", "#ffffff", "#0f141d"),
+  defineColorToken("--ot-warning", "#8a5a00", "#f5b04a"),
+  defineColorToken("--ot-success", "#3a6f22", "#8fd18a"),
+  defineColorToken("--ot-border", "#e3d9c6", "#283245"),
+  defineColorToken("--ot-input", "#cbbfa8", "#3a465c"),
+  defineColorToken("--ot-ring", "#1f4e9c", "#78a6f2"),
   defineSharedToken(
-    "--ot-font-body",
+    "--ot-font-sans",
     'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   ),
   defineSharedToken(
@@ -63,8 +80,11 @@ export const THEME_TOKENS: readonly Readonly<ThemeToken>[] = Object.freeze([
   defineSharedToken("--ot-space-3", "0.75rem"),
   defineSharedToken("--ot-space-4", "1rem"),
   defineSharedToken("--ot-space-6", "1.5rem"),
-  defineSharedToken("--ot-radius", "0.375rem"),
-  defineSharedToken("--ot-shadow", "0 1px 3px rgb(0 0 0 / 0.25)"),
+  defineSharedToken("--ot-radius", "0.625rem"),
+  defineSharedToken(
+    "--ot-shadow",
+    "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+  ),
 ]);
 
 /** The value of a token for a color scheme. */

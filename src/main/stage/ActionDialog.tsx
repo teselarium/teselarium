@@ -1,11 +1,22 @@
 import { useEffect, useId, useRef } from "react";
 import type { ReactElement, SyntheticEvent } from "react";
+import { Button } from "@/vendor/shadcn/ui/button.tsx";
 import type { ActionSnapshot, AppAction } from "../../lib/core/stage/index.ts";
 import {
   downloadFile,
   formatFileSize,
   openLinkInNewTab,
 } from "./action_effects.ts";
+
+/**
+ * The dialog box: centered in the viewport (`m-auto` undoes Tailwind's
+ * margin reset of the native `<dialog>`), in the popover colors.
+ */
+const DIALOG_CLASSES =
+  "m-auto w-full max-w-[calc(100%-2rem)] rounded-lg border bg-popover p-6 text-popover-foreground shadow-lg backdrop:bg-black/50 sm:max-w-lg";
+
+/** The box of the action's detail: the address, the file or the message. */
+const DETAIL_CLASSES = "m-0 rounded-md bg-muted p-2 [overflow-wrap:anywhere]";
 
 interface ActionDialogProps {
   /** The action to show, or `null` to keep the dialog closed. */
@@ -25,7 +36,11 @@ function describeAction(action: AppAction): ActionTexts {
   if (action.kind === "link") {
     const linkTexts: ActionTexts = {
       lead: "wants to open this address in a new tab:",
-      detail: <p className="action-dialog-url">{action.url}</p>,
+      detail: (
+        <p className={`action-dialog-url font-mono ${DETAIL_CLASSES}`}>
+          {action.url}
+        </p>
+      ),
       acceptLabel: "Open",
       cancelLabel: "Cancel",
     };
@@ -35,7 +50,7 @@ function describeAction(action: AppAction): ActionTexts {
     const saveTexts: ActionTexts = {
       lead: "wants to save a file:",
       detail: (
-        <p className="action-dialog-file">
+        <p className={DETAIL_CLASSES}>
           <strong>{action.name}</strong>{" "}
           <span>{formatFileSize(action.bytes.length)}</span>
         </p>
@@ -47,7 +62,11 @@ function describeAction(action: AppAction): ActionTexts {
   }
   const confirmTexts: ActionTexts = {
     lead: "asks:",
-    detail: <p className="action-dialog-message">{action.message}</p>,
+    detail: (
+      <p className={`action-dialog-message ${DETAIL_CLASSES}`}>
+        {action.message}
+      </p>
+    ),
     acceptLabel: action.confirmLabel,
     cancelLabel: action.cancelLabel,
   };
@@ -138,7 +157,7 @@ export function ActionDialog({
     return (
       <dialog
         ref={dialogRef}
-        className="action-dialog"
+        className={DIALOG_CLASSES}
         onCancel={handleDialogCancel}
         onClose={handleDialogClose}
       />
@@ -148,28 +167,35 @@ export function ActionDialog({
   return (
     <dialog
       ref={dialogRef}
-      className="action-dialog"
+      className={DIALOG_CLASSES}
       aria-labelledby={titleId}
       onCancel={handleDialogCancel}
       onClose={handleDialogClose}
     >
-      <h2 id={titleId} className="action-dialog-title">
+      <h2
+        id={titleId}
+        className="text-lg font-semibold tracking-tight [overflow-wrap:anywhere]"
+      >
         {shown.mod.title}
       </h2>
-      <code className="action-dialog-source">{shown.mod.source}</code>
-      <p className="action-dialog-lead">{texts.lead}</p>
+      {/* Under the title, so a mod that borrows another title still shows where it comes from. */}
+      <code className="block text-sm text-muted-foreground [overflow-wrap:anywhere]">
+        {shown.mod.source}
+      </code>
+      <p className="mt-4 mb-1">{texts.lead}</p>
       {texts.detail}
-      <div className="action-dialog-buttons">
-        <button ref={cancelRef} type="button" onClick={handleCancelClick}>
-          {texts.cancelLabel}
-        </button>
-        <button
+      <div className="mt-4 flex justify-end gap-2">
+        <Button
+          ref={cancelRef}
           type="button"
-          className="action-dialog-accept"
-          onClick={handleAcceptClick}
+          variant="outline"
+          onClick={handleCancelClick}
         >
+          {texts.cancelLabel}
+        </Button>
+        <Button type="button" onClick={handleAcceptClick}>
           {texts.acceptLabel}
-        </button>
+        </Button>
       </div>
     </dialog>
   );

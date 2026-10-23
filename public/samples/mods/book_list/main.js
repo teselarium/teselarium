@@ -1,11 +1,21 @@
-/** Sample mod: lists the books it receives with their covers, and remembers the selected one. */
+/**
+ * Sample mod: lists the books it receives with their covers, and remembers
+ * the selected one.
+ *
+ * It is also an example of getting the app's look without classes: each book
+ * is a plain button, `aria-pressed` marks the selected one with the app's
+ * primary outline, `<small>` mutes the authors, and `role="status"` shows the
+ * empty list as a notice. This mod's own CSS sets layout only. See "Write
+ * HTML, get the app's look" in docs/modules/lib/core/theme/README.md.
+ */
 
 const SELECTED_KEY = "selected";
 
-// Only the layout: the theme's base stylesheet gives the colors, fonts and the selected book's outline.
+// Layout only: the colors, borders, fonts and the selected book's outline come from the theme.
 const BOOK_LIST_STYLE = `
   ul { list-style: none; padding: 0; display: grid; gap: var(--ot-space-2); }
-  button { display: flex; gap: var(--ot-space-3); align-items: center; width: 100%; text-align: left; padding: var(--ot-space-2); }
+  button { display: flex; justify-content: flex-start; gap: var(--ot-space-3); width: 100%; text-align: start; }
+  button > span { display: grid; gap: var(--ot-space-1); }
   img { width: 48px; height: 72px; object-fit: cover; }
 `;
 
@@ -39,13 +49,14 @@ function buildCover(tile) {
   return cover;
 }
 
+/** The title, and the authors in `<small>`, which the theme mutes. */
 function buildBookText(tile) {
   const bookText = document.createElement("span");
   const title = document.createElement("strong");
   title.textContent = readBookTitle(tile);
-  const authors = document.createElement("span");
+  const authors = document.createElement("small");
   authors.textContent = readBookAuthors(tile);
-  bookText.append(title, document.createElement("br"), authors);
+  bookText.append(title, authors);
   return bookText;
 }
 
@@ -58,6 +69,7 @@ async function selectBook(view, source) {
   });
 }
 
+/** A selectable book: a plain button, pressed when it is the selected one. */
 function buildBookButton(view, tile) {
   const button = document.createElement("button");
   button.type = "button";
@@ -86,6 +98,7 @@ function buildBookItems(view) {
 function buildBookContent(view) {
   if (view.tiles.length === 0) {
     const emptyMessage = document.createElement("p");
+    emptyMessage.setAttribute("role", "status");
     emptyMessage.textContent = "There are no books to show.";
     return emptyMessage;
   }

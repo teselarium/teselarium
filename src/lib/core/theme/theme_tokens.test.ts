@@ -2,19 +2,36 @@ import { describe, expect, it } from "vitest";
 import { buildTheme, THEME_TOKENS } from "./index.ts";
 import type { ColorScheme, ThemeTokens } from "./index.ts";
 
+/** The role colors: the only tokens with different light and dark values. */
+const COLOR_TOKEN_NAMES = [
+  "--ot-background",
+  "--ot-foreground",
+  "--ot-card",
+  "--ot-card-foreground",
+  "--ot-popover",
+  "--ot-popover-foreground",
+  "--ot-primary",
+  "--ot-primary-foreground",
+  "--ot-secondary",
+  "--ot-secondary-foreground",
+  "--ot-muted",
+  "--ot-muted-foreground",
+  "--ot-accent",
+  "--ot-accent-foreground",
+  "--ot-highlight",
+  "--ot-highlight-foreground",
+  "--ot-destructive",
+  "--ot-destructive-foreground",
+  "--ot-warning",
+  "--ot-success",
+  "--ot-border",
+  "--ot-input",
+  "--ot-ring",
+];
+
 const TOKEN_NAMES = [
-  "--ot-color-background",
-  "--ot-color-surface",
-  "--ot-color-text",
-  "--ot-color-text-muted",
-  "--ot-color-border",
-  "--ot-color-accent",
-  "--ot-color-accent-text",
-  "--ot-color-focus",
-  "--ot-color-danger",
-  "--ot-color-warning",
-  "--ot-color-success",
-  "--ot-font-body",
+  ...COLOR_TOKEN_NAMES,
+  "--ot-font-sans",
   "--ot-font-mono",
   "--ot-font-size",
   "--ot-line-height",
@@ -27,14 +44,29 @@ const TOKEN_NAMES = [
   "--ot-shadow",
 ];
 
-/** Text colors that must read on the background and on the surface. */
-const TEXT_COLOR_NAMES = [
-  "--ot-color-text",
-  "--ot-color-text-muted",
-  "--ot-color-accent",
-  "--ot-color-danger",
-  "--ot-color-warning",
-  "--ot-color-success",
+/** The text roles, drawn on each of the surfaces. */
+const TEXT_ROLE_NAMES = [
+  "--ot-foreground",
+  "--ot-muted-foreground",
+  "--ot-primary",
+  "--ot-secondary",
+  "--ot-destructive",
+  "--ot-warning",
+  "--ot-success",
+];
+
+const SURFACE_NAMES = ["--ot-background", "--ot-card", "--ot-muted"];
+
+/** Each `-foreground` token and the role it is drawn on. */
+const FOREGROUND_PAIRS = [
+  ["--ot-card-foreground", "--ot-card"],
+  ["--ot-popover-foreground", "--ot-popover"],
+  ["--ot-primary-foreground", "--ot-primary"],
+  ["--ot-secondary-foreground", "--ot-secondary"],
+  ["--ot-accent-foreground", "--ot-accent"],
+  ["--ot-highlight-foreground", "--ot-highlight"],
+  ["--ot-destructive-foreground", "--ot-destructive"],
+  ["--ot-muted-foreground", "--ot-muted"],
 ];
 
 const COLOR_SCHEMES: ColorScheme[] = ["light", "dark"];
@@ -95,6 +127,16 @@ function listLowContrasts(
   return lowContrasts;
 }
 
+function listLowForegroundContrasts(tokens: ThemeTokens): string[] {
+  const lowContrasts: string[] = [];
+  for (const [foregroundName, roleName] of FOREGROUND_PAIRS) {
+    lowContrasts.push(
+      ...listLowContrasts(tokens, [foregroundName], [roleName]),
+    );
+  }
+  return lowContrasts;
+}
+
 describe("theme tokens", function describeThemeTokens(): void {
   it("Token names", function listsTokenNames(): void {
     expect(readTokenNames()).toEqual(TOKEN_NAMES);
@@ -104,13 +146,23 @@ describe("theme tokens", function describeThemeTokens(): void {
     const light = buildTheme("light").tokens;
     const dark = buildTheme("dark").tokens;
 
+    expect(COLOR_TOKEN_NAMES).toHaveLength(23);
     for (const tokenName of TOKEN_NAMES) {
-      if (tokenName.startsWith("--ot-color-")) {
+      if (COLOR_TOKEN_NAMES.includes(tokenName)) {
         expect(dark[tokenName]).not.toBe(light[tokenName]);
       } else {
         expect(dark[tokenName]).toBe(light[tokenName]);
       }
     }
+  });
+
+  it("Old token names are gone", function dropsOldNames(): void {
+    const tokenNames = Object.keys(buildTheme("light").tokens);
+
+    for (const tokenName of tokenNames) {
+      expect(tokenName).not.toMatch(/^--ot-color-/);
+    }
+    expect(tokenNames).not.toContain("--ot-font-body");
   });
 
   it("Resolved tokens are plain data", function resolvesPlainData(): void {
@@ -130,8 +182,8 @@ describe("theme tokens", function describeThemeTokens(): void {
   });
 
   it("uses the light and dark values of the table", function readsTable(): void {
-    expect(buildTheme("light").tokens["--ot-color-background"]).toBe("#ffffff");
-    expect(buildTheme("dark").tokens["--ot-color-background"]).toBe("#18181b");
+    expect(buildTheme("light").tokens["--ot-background"]).toBe("#f6f1e7");
+    expect(buildTheme("dark").tokens["--ot-background"]).toBe("#0f141d");
   });
 
   it("has a frozen table", function freezesTable(): void {
@@ -141,23 +193,21 @@ describe("theme tokens", function describeThemeTokens(): void {
     }
   });
 
-  it("has text colors with a contrast of at least 4.5", function checksContrast(): void {
+  it("Text roles on the surfaces", function checksTextRoles(): void {
     for (const colorScheme of COLOR_SCHEMES) {
       const tokens = buildTheme(colorScheme).tokens;
 
-      const lowContrasts = [
-        ...listLowContrasts(tokens, TEXT_COLOR_NAMES, [
-          "--ot-color-background",
-          "--ot-color-surface",
-        ]),
-        ...listLowContrasts(
-          tokens,
-          ["--ot-color-accent-text"],
-          ["--ot-color-accent"],
-        ),
-      ];
+      expect(listLowContrasts(tokens, TEXT_ROLE_NAMES, SURFACE_NAMES)).toEqual(
+        [],
+      );
+    }
+  });
 
-      expect(lowContrasts).toEqual([]);
+  it("Foreground on its role", function checksForegrounds(): void {
+    for (const colorScheme of COLOR_SCHEMES) {
+      const tokens = buildTheme(colorScheme).tokens;
+
+      expect(listLowForegroundContrasts(tokens)).toEqual([]);
     }
   });
 });

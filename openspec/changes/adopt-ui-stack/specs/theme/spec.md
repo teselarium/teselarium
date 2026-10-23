@@ -7,11 +7,11 @@ The system SHALL define a fixed set of theme tokens. Each token SHALL be a CSS c
 
 #### Scenario: Token names
 - **WHEN** the tokens are listed
-- **THEN** their names are exactly `--ot-background`, `--ot-foreground`, `--ot-card`, `--ot-card-foreground`, `--ot-popover`, `--ot-popover-foreground`, `--ot-primary`, `--ot-primary-foreground`, `--ot-secondary`, `--ot-secondary-foreground`, `--ot-muted`, `--ot-muted-foreground`, `--ot-accent`, `--ot-accent-foreground`, `--ot-destructive`, `--ot-destructive-foreground`, `--ot-warning`, `--ot-success`, `--ot-border`, `--ot-input`, `--ot-ring`, `--ot-font-sans`, `--ot-font-mono`, `--ot-font-size`, `--ot-line-height`, `--ot-space-1`, `--ot-space-2`, `--ot-space-3`, `--ot-space-4`, `--ot-space-6`, `--ot-radius` and `--ot-shadow`
+- **THEN** their names are exactly `--ot-background`, `--ot-foreground`, `--ot-card`, `--ot-card-foreground`, `--ot-popover`, `--ot-popover-foreground`, `--ot-primary`, `--ot-primary-foreground`, `--ot-secondary`, `--ot-secondary-foreground`, `--ot-muted`, `--ot-muted-foreground`, `--ot-accent`, `--ot-accent-foreground`, `--ot-highlight`, `--ot-highlight-foreground`, `--ot-destructive`, `--ot-destructive-foreground`, `--ot-warning`, `--ot-success`, `--ot-border`, `--ot-input`, `--ot-ring`, `--ot-font-sans`, `--ot-font-mono`, `--ot-font-size`, `--ot-line-height`, `--ot-space-1`, `--ot-space-2`, `--ot-space-3`, `--ot-space-4`, `--ot-space-6`, `--ot-radius` and `--ot-shadow`
 
 #### Scenario: Color tokens differ between color schemes
 - **WHEN** the tokens are resolved for the light and for the dark color scheme
-- **THEN** each of the twenty-one tokens from `--ot-background` to `--ot-ring` in the list above has a different value in each, and every other token has the same value in both
+- **THEN** each of the twenty-three tokens from `--ot-background` to `--ot-ring` in the list above has a different value in each, and every other token has the same value in both
 
 #### Scenario: Old token names are gone
 - **WHEN** the tokens are resolved for the light color scheme
@@ -39,12 +39,12 @@ The app's own interface (the header, the stage bar, the issue list, the loading 
 ## ADDED Requirements
 
 ### Requirement: Token contrast
-In each color scheme, every text role SHALL have a contrast ratio of at least 4.5:1, as WCAG defines it, on each surface it is drawn on. The text roles `--ot-foreground`, `--ot-muted-foreground`, `--ot-primary`, `--ot-destructive`, `--ot-warning` and `--ot-success` are drawn on `--ot-background`, `--ot-card` and `--ot-muted`. Each role's `-foreground` token is drawn on that role.
+In each color scheme, every text role SHALL have a contrast ratio of at least 4.5:1, as WCAG defines it, on each surface it is drawn on. The text roles `--ot-foreground`, `--ot-muted-foreground`, `--ot-primary`, `--ot-secondary`, `--ot-destructive`, `--ot-warning` and `--ot-success` are drawn on `--ot-background`, `--ot-card` and `--ot-muted`. Each role's `-foreground` token is drawn on that role.
 
 #### Scenario: Text roles on the surfaces
 - **WHEN** the tokens are resolved for the light and for the dark color scheme
-- **THEN** each of `--ot-foreground`, `--ot-muted-foreground`, `--ot-primary`, `--ot-destructive`, `--ot-warning` and `--ot-success` has a contrast ratio of at least 4.5 on each of `--ot-background`, `--ot-card` and `--ot-muted`
+- **THEN** each of `--ot-foreground`, `--ot-muted-foreground`, `--ot-primary`, `--ot-secondary`, `--ot-destructive`, `--ot-warning` and `--ot-success` has a contrast ratio of at least 4.5 on each of `--ot-background`, `--ot-card` and `--ot-muted`
 
 #### Scenario: Foreground on its role
 - **WHEN** the tokens are resolved for the light and for the dark color scheme
-- **THEN** `--ot-card-foreground` on `--ot-card`, `--ot-popover-foreground` on `--ot-popover`, `--ot-primary-foreground` on `--ot-primary`, `--ot-secondary-foreground` on `--ot-secondary`, `--ot-accent-foreground` on `--ot-accent`, `--ot-destructive-foreground` on `--ot-destructive` and `--ot-muted-foreground` on `--ot-muted` each have a contrast ratio of at least 4.5
+- **THEN** `--ot-card-foreground` on `--ot-card`, `--ot-popover-foreground` on `--ot-popover`, `--ot-primary-foreground` on `--ot-primary`, `--ot-secondary-foreground` on `--ot-secondary`, `--ot-accent-foreground` on `--ot-accent`, `--ot-highlight-foreground` on `--ot-highlight`, `--ot-destructive-foreground` on `--ot-destructive` and `--ot-muted-foreground` on `--ot-muted` each have a contrast ratio of at least 4.5

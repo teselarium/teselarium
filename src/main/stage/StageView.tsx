@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
+import { Alert, AlertDescription } from "@/vendor/shadcn/ui/alert.tsx";
 import {
   answerStageAction,
   readStageSnapshot,
@@ -24,14 +25,18 @@ function renderSandboxContent(
   sandbox: SandboxSnapshot,
 ): ReactElement | null {
   if (sandbox.status === "failed") {
+    // shadcn's Alert has `role="alert"`. The border matches the mods' alerts.
     return (
-      <p className="sandbox-error" role="alert">
-        {sandbox.errorMessage}
-      </p>
+      <Alert
+        variant="destructive"
+        className="border-destructive [overflow-wrap:anywhere]"
+      >
+        <AlertDescription>{sandbox.errorMessage}</AlertDescription>
+      </Alert>
     );
   }
   if (sandbox.status === "loading") {
-    return <p className="sandbox-loading">Loading…</p>;
+    return <p className="text-muted-foreground">Loading…</p>;
   }
   if (sandbox.sandboxDocument === null) {
     return null;
@@ -49,7 +54,7 @@ function renderSandbox(stage: Stage, sandbox: SandboxSnapshot): ReactElement {
   return (
     <div
       key={sandbox.id}
-      className="sandbox"
+      className="sandbox flex flex-1 flex-col"
       data-sandbox-id={sandbox.id}
       hidden={!sandbox.isVisible}
     >
@@ -118,11 +123,11 @@ export function StageView({ stage }: StageViewProps): ReactElement {
     sandboxes.push(renderSandbox(stage, sandbox));
   }
   return (
-    <main className="stage">
+    <main className="flex flex-col gap-2 px-4 pt-2 pb-4">
       {visibleSandbox === null ? null : (
         <StageBar stage={stage} sandbox={visibleSandbox} />
       )}
-      <div className="stage-sandboxes">{sandboxes}</div>
+      <div className="flex flex-1 flex-col">{sandboxes}</div>
       <ActionDialog shown={snapshot.action} onAnswer={handleActionAnswer} />
     </main>
   );

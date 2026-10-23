@@ -249,6 +249,26 @@ test.describe("The action dialog names the mod", function describeNaming(): void
   });
 });
 
+test.describe("The action dialog is centered", function describeCentering(): void {
+  test("in the middle of the viewport", async function centersDialog({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const frame = await openProbe(page);
+
+    await ask(frame, "ui.confirm", { message: "Delete this list?" });
+    await expect(actionDialog(page)).toBeVisible();
+
+    const box = await actionDialog(page).boundingBox();
+    if (box === null) {
+      throw new Error("Expected the action dialog to have a box");
+    }
+    expect(box.x + box.width / 2).toBeCloseTo(640, 0);
+    expect(box.y + box.height / 2).toBeCloseTo(400, 0);
+    expect(box.width).toBeLessThanOrEqual(512);
+  });
+});
+
 test.describe("One action dialog at a time", function describeQueue(): void {
   test("Two confirmations", async function showsInOrder({
     page,
