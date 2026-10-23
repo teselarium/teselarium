@@ -26,16 +26,20 @@ The system SHALL define a fixed set of theme tokens. Each token SHALL be a CSS c
 - **THEN** the result is a mapping from each token name to a string, and a structured clone of it deep-equals it
 
 ### Requirement: Theme choice
-The app header SHALL have a Theme control with the choices System, Light and Dark. Changing the choice SHALL apply it to the app and to every running mod at once, without reloading the page or any mod's frame.
+The Settings page SHALL have a Theme control with the choices System, Light and Dark. The app header SHALL NOT have one. Changing the choice SHALL apply it to the app and to every running mod at once, visible or hidden, without reloading the page or any mod's frame.
 
 #### Scenario: Default choice
-- **WHEN** the app is opened for the first time
+- **WHEN** the app is opened for the first time at `#/settings`
 - **THEN** the Theme control shows System
 
 #### Scenario: Choose Dark
-- **WHEN** the operating system prefers light and the user chooses Dark while the sample book list mod is running
-- **THEN** the app and the mod's frame switch to the dark color scheme
+- **WHEN** the operating system prefers light, the sample book list mod is running, and the user opens Settings and chooses Dark
+- **THEN** the app switches to the dark color scheme, and going back shows the mod's frame in the dark color scheme
 - **AND** the mod's frame was not reloaded
+
+#### Scenario: No Theme control in the header
+- **WHEN** the app is opened
+- **THEN** the header holds the hamburger button and the `OpenTesela` heading, and no Theme control
 
 ### Requirement: Resolve the color scheme
 The system SHALL resolve the theme choice to a color scheme, `light` or `dark`. Light and Dark SHALL resolve to themselves. System SHALL resolve to the operating system's preference, and SHALL follow it when it changes while the app is open.
@@ -72,7 +76,7 @@ The system SHALL keep the theme choice in the app's storage, under a key that no
 - **THEN** the result is never the stored theme choice
 
 ### Requirement: The app follows the color scheme
-The app's own interface (the header, the stage bar, the issue list, the loading and load error messages and the action dialog) SHALL take its colors, fonts and spacing from the theme tokens of the current color scheme, so it matches the mods.
+The app's own interface (the header, the sidebar, the Settings page, the stage bar, the issue list, the loading and load error messages and the action dialog) SHALL take its colors, fonts and spacing from the theme tokens of the current color scheme, so it matches the mods.
 
 #### Scenario: Dark app
 - **WHEN** the color scheme is `dark`
@@ -85,6 +89,10 @@ The app's own interface (the header, the stage bar, the issue list, the loading 
 #### Scenario: Action dialog follows the color scheme
 - **WHEN** the color scheme is `dark` and a mod's action dialog is shown
 - **THEN** the dialog's background color is the dark value of `--ot-popover` and its text color is the dark value of `--ot-popover-foreground`
+
+#### Scenario: Dark sidebar
+- **WHEN** the color scheme is `dark`
+- **THEN** the sidebar's background color is the dark value of `--ot-card` and the current item's text color is the dark value of `--ot-accent-foreground`
 
 ### Requirement: Token contrast
 In each color scheme, every text role SHALL have a contrast ratio of at least 4.5:1, as WCAG defines it, on each surface it is drawn on. The text roles `--ot-foreground`, `--ot-muted-foreground`, `--ot-primary`, `--ot-secondary`, `--ot-destructive`, `--ot-warning` and `--ot-success` are drawn on `--ot-background`, `--ot-card` and `--ot-muted`. Each role's `-foreground` token is drawn on that role.
