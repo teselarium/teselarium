@@ -4,8 +4,8 @@ mod:
   version: "1.0.0"
   description: "A very simple list of books with their covers."
   entrypoint: "./main.js"
-  type_path: "../../types/book.md"
-  sample_collection: "../../tiles/books_collection.yaml"
+  type_path: "./book_type.md"
+  sample_collection: "./book_collection.yaml"
   config:
     show_covers: true
   permissions:
