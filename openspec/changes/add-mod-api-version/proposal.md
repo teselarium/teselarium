@@ -12,7 +12,7 @@ Nothing tells which version of the mod API a mod was written for. When the engin
 - **No range, a warning**: a mod without `api` runs, with a warning in the stage bar's issue list, so existing mods keep working.
 - **Mods see the version**: the mount context gets `api` with `version`.
 - **`mods.inspect`** also returns the mod's `api` range and whether it matches, and the mod viewer shows both.
-- **Sample and default mods** declare `api: "^0.1.0"`.
+- **Sample and default mods** declare `api: "^0.1.0"`, and so does the test fixture of the sample mod.
 - **Bump rule and guard**: the docs state how the version changes. While it is `0.x`, a breaking change bumps the minor version and an addition or a fix bumps the patch version. A unit test records the API's surface (method and event names, mount context keys, accepted mod file keys) together with the version, and fails when the surface changes and the version does not. A rule in `openspec/config.yaml` asks every proposal that changes the mod API's specs to state its version bump.
 
 ## Capabilities
@@ -35,7 +35,11 @@ Nothing tells which version of the mod API a mod was written for. When the engin
   - `src/lib/core/stage/` and `src/main/stage/`: the mismatch dialog before a mod starts, and the cancel error.
   - `public/default_mods/*/mod_conf.yaml` and `public/samples/mods/book_list/mod_conf.yaml`: `api: "^0.1.0"`. The mod viewer shows the range.
 - **Dependencies**: a semver range parser, to be chosen in the design (the `semver` package is the reference for npm's matching).
-- **Tests**: unit tests for the format, matching, context and inspection; the API surface guard test; e2e tests for the dialog. The fixture `book_list` mod of `bundle-mod-samples` declares the range too, so this change is applied after that one.
+- **Tests**:
+  - Unit tests for the format, matching, context and inspection; the API surface guard test; e2e tests for the dialog.
+  - `src/test/fixtures/mods/book_list/mod_conf.yaml` gets `api: "^0.1.0"`. In library and engine scenarios, "the sample book list mod" is this fixture, so the inspection, mount context and "no issues" scenarios need it to declare a matching range. The fixture then differs from the old sample it was copied from by that line, which `bundle-mod-samples` allows.
+  - The test helpers that build mods declare no range today: `serveUntypedMod` and `serveTestMod` in `src/test/sample_mods.ts`, `buildRequestingMod` in `src/test/method_contexts.ts` (a `LoadedMod`, which also needs the new `api` field) and `buildModConf` in `e2e/mod_routes.ts`. Without a range, existing tests that expect no issues would get the missing-range warning, so these helpers need a matching range by default. The design decides how a test leaves it out.
+  - New test mods (a range for another API, an invalid range, no range) are named through `src/test/sample_mods.ts` in unit tests and through `e2e/sample_mod.ts` and `e2e/mod_routes.ts` in e2e, as `centralize-test-sample-references` set up. No fixtures path is written outside `src/test/`.
 - **Docs**: `docs/mod_plugin_spec.md` (the `api` key), `docs/modules/lib/mod/README.md`, `docs/modules/lib/core/engine/README.md` (the version, `context.api`, the inspection fields, the bump rule) and `docs/modules/mods/viewer/README.md`.
 - **Workflow**: `openspec/config.yaml` gets the proposal rule about the API version bump.
 - **Mods**: no breaking change. Mods without `api` keep running, with a warning.

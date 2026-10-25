@@ -40,7 +40,10 @@ This change builds on `add-mod-api-version`: the check reports the API range, an
   - `src/lib/core/engine/`: `mods.check` in `mods_methods.ts`, the report, the API version constant, an in-memory `ModStorage`, recording of request errors and of requests that need the user.
   - `src/lib/core/stage/` and `src/lib/core/sandbox/`: a hidden check frame outside the history, with the 1-second settle time and the 10-second limit.
   - `public/default_mods/mod_viewer/`: the "Check mod" button and the report.
-- **Tests**: unit tests for the bundle check, the method's rules and the report; e2e tests for the mount check, the throwaway slot and the viewer; an e2e test that checks every shipped mod. The API surface guard test of `add-mod-api-version` gets `mods.check` and the new version.
+- **Tests**:
+  - Unit tests for the bundle check, the method's rules and the report; e2e tests for the mount check, the throwaway slot and the viewer; an e2e test that checks every shipped mod. The API surface guard test of `add-mod-api-version` gets `mods.check` and the new version.
+  - Unit tests check the fixture `book_list` mod (`./fixtures/mods/book_list`). It passes with no findings because `add-mod-api-version` gives it `api: "^0.1.0"`. The e2e tests check the shipped sample and default mods.
+  - New test mods (an entrypoint that answers 404, a mount that throws, an unknown method, a request that needs the user) are named through `src/test/sample_mods.ts` in unit tests and through `e2e/sample_mod.ts` and `e2e/mod_routes.ts` in e2e, as `centralize-test-sample-references` set up.
 - **Docs**: `docs/modules/lib/core/engine/README.md` (`mods.check`, the report, the version), `docs/modules/mods/viewer/README.md`, and `docs/mod_plugin_spec.md` (how to check a mod).
 - **Mods**: an API addition. Existing mods are unaffected.
 - **Out of scope**: tests written by mod authors (`add-mod-tests`), a command-line check, a CI workflow, checking a mod without the `open` permission, and remembering past reports.

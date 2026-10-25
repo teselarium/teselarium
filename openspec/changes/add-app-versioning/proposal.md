@@ -2,7 +2,7 @@
 
 ## Why
 
-The app has no version: `package.json` says `0.0.0`, there are no tags and no changelog, and nothing in the app says which build is running. Someone reporting a problem with a mod cannot say which OpenTesela they run, and a maintainer cannot tell what changed between two builds. The mod API now has its own version (`add-mod-api-version`), but it is only seen in the mismatch dialog. A simple, recorded way to bump the app's version, and one place in the app that shows both versions, closes that gap.
+The app has no version: `package.json` says `0.0.0`, there are no tags and no changelog, and nothing in the app says which build is running. Someone reporting a problem with a mod cannot say which OpenTesela they run, and a maintainer cannot tell what changed between two builds. The mod API now has its own version (`add-mod-api-version`), but people only see it in the mismatch dialog and the mod viewer. A simple, recorded way to bump the app's version, and one place in the app that shows both versions, closes that gap.
 
 This change builds on `add-mod-api-version`, whose version the Settings page shows.
 

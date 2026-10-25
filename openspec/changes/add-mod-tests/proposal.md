@@ -46,7 +46,9 @@ This change builds on `add-mod-check`: tests run as a third step of `mods.check`
   - `src/lib/core/sandbox/sandbox_loader.js`: import the test file next to the entrypoint, and build `t` and the case context, `expect` and `waitFor` included, in the frame.
   - `src/lib/core/stage/`: one hidden frame per case.
   - `public/samples/mods/book_list/`: `test.js` and `test_path`. `public/default_mods/mod_viewer/`: the case list.
-- **Tests**: unit tests for `test_path`, the report and the answers; e2e tests for the case context, isolation, limits and the sample mod's tests. The API surface guard test gets the test API and the new version.
-- **Docs**: a guide to writing mod tests in `docs/mod_plugin_spec.md`, with the sample's `test.js` as the example, and the test API in `docs/modules/lib/core/engine/README.md`.
+- **Tests**:
+  - Unit tests for `test_path`, the report and the answers; e2e tests for the case context, isolation, limits and the sample mod's tests. The API surface guard test gets the test API and the new version.
+  - Only the shipped sample gets `test.js`. The fixture `book_list` mod in `src/test/fixtures/` gets no `test_path`. Unit tests build their mods with tests through `src/test/sample_mods.ts`, and the sample's `test.js` runs in e2e tests through `e2e/sample_mod.ts`, as `centralize-test-sample-references` set up.
+- **Docs**: a guide to writing mod tests in `docs/mod_plugin_spec.md`, with the sample's `test.js` as the example, and the test API in `docs/modules/lib/core/engine/README.md`. `docs/modules/lib/mod/README.md` gets `test_path`, and its bundle convention and its list of the sample's files include the test file.
 - **Mods**: an API addition. Mods without `test_path` are checked as before.
 - **Out of scope**: declarative test files, third-party assertion libraries in the frame, snapshot or visual comparisons, running tests outside `mods.check`, a command-line runner and a CI workflow.

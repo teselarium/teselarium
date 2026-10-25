@@ -12,7 +12,7 @@ When a mod declares `test_path`, `mods.check` SHALL run its tests after the moun
 - **THEN** the report has `testsChecked` `true`, two tests with status `"pass"`, and status `"pass"`
 
 #### Scenario: Opening does not fetch the tests
-- **WHEN** the sample book list mod is opened, or inspected with `mods.inspect`
+- **WHEN** a mod with `test_path` is opened, or inspected with `mods.inspect`
 - **THEN** its test file is not requested
 
 #### Scenario: Mount error skips the tests
@@ -138,9 +138,14 @@ The check report's `testsChecked` SHALL say whether the mod's cases ran. `tests`
 ### Requirement: Inspect reports the test file
 The result of `mods.inspect` SHALL also have `testSource`, the resolved address of the mod's test file, or `null` when the mod declares none.
 
-#### Scenario: Inspect the sample mod
-- **WHEN** a mod with `open` granted for the app's origin inspects the sample book list mod
-- **THEN** the result's `testSource` is the address of `test.js` in the sample mod's folder
+#### Scenario: Inspect a mod with tests
+- **WHEN** a mod with `open` granted for the app's origin inspects the mod at `https://example.org/mods/clock/mod_conf.yaml`, which declares `test_path: "./test.js"`
+- **THEN** the result's `testSource` is `https://example.org/mods/clock/test.js`
+- **AND** the test file is not requested
+
+#### Scenario: Inspect a mod without tests
+- **WHEN** a mod with `open` granted for the app's origin inspects a mod file without `test_path`
+- **THEN** the result's `testSource` is `null`
 
 ### Requirement: Sample mod tests
 The sample mod `book_list` SHALL declare `test_path: "./test.js"`. Its test file SHALL have the cases `lists the sample books`, which mounts the mod and expects the three sample books, and `highlights the remembered book`, which seeds `selected` and expects that book to be highlighted.

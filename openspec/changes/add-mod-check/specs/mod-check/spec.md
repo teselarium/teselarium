@@ -8,8 +8,8 @@ Lets a mod ask the engine to check another mod without running it for the user: 
 `mods.check` with `{ mod, collection }`, where `mod` is a mod reference and `collection` an optional collection location, SHALL check the mod and return a report once the check is done. Relative references and locations SHALL be resolved against the app's address. The tiles SHALL come from `collection` when it is given, from the mod's sample collection otherwise, and there SHALL be none when the mod declares no sample collection.
 
 #### Scenario: Check the sample mod
-- **WHEN** the visible mod viewer sends `mods.check` with `{ "mod": "./samples/mods/book_list" }`
-- **THEN** the result is a report with source `https://example.org/samples/mods/book_list/mod_conf.yaml`, status `"pass"`, `mountChecked` `true` and no findings
+- **WHEN** the visible mod viewer sends `mods.check` with `{ "mod": "./fixtures/mods/book_list" }`
+- **THEN** the result is a report with source `https://example.org/fixtures/mods/book_list/mod_conf.yaml`, status `"pass"`, `mountChecked` `true` and no findings
 
 #### Scenario: Check with another collection
 - **WHEN** the visible mod viewer sends `mods.check` for the sample mod with a collection of two books
@@ -54,8 +54,8 @@ The report SHALL be plain data with `source` (the resolved mod file address), `s
 The check SHALL load the mod file, its entrypoint, its tile type and the collection, and validate the collection's tiles against the type. A file that cannot be loaded or has the wrong format SHALL be an error finding whose source is that file and whose message is the load error's message. The collection's issues SHALL be findings with their own level and source. A failure to load the mod file SHALL be a report, not an error response.
 
 #### Scenario: Missing mod file
-- **WHEN** the visible mod viewer checks `./samples/mods/missing`
-- **THEN** the result is a report with status `"fail"`, `mountChecked` `false` and one `bundle` error whose source is `https://example.org/samples/mods/missing/mod_conf.yaml` and whose message names `404`
+- **WHEN** the visible mod viewer checks `./fixtures/mods/missing`
+- **THEN** the result is a report with status `"fail"`, `mountChecked` `false` and one `bundle` error whose source is `https://example.org/fixtures/mods/missing/mod_conf.yaml` and whose message names `404`
 
 #### Scenario: Missing entrypoint
 - **WHEN** a mod whose entrypoint answers HTTP 404 is checked
