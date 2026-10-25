@@ -267,6 +267,34 @@ test.describe("Mod viewer", function describeViewer(): void {
   });
 });
 
+test.describe("Mod viewer reports a missing or failing target", function describeViewerTargetFailures(): void {
+  test("Empty target", async function saysEmptyTarget({ page }): Promise<void> {
+    await page.goto("/#/run?mod=mod_viewer&target=");
+
+    await expect(
+      page
+        .frameLocator('iframe[title="Mod Viewer"]')
+        .getByText("No mod was given."),
+    ).toBeVisible();
+  });
+
+  test("Target with a format error", async function showsFormatError({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(
+      page,
+      buildProbeFiles("bad_theme", ['  theme: "dark"']),
+    );
+
+    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/bad_theme/");
+
+    const alert = page
+      .frameLocator('iframe[title="Mod Viewer"]')
+      .getByRole("alert");
+    await expect(alert).toContainText('"theme" must be "default" or "none"');
+  });
+});
+
 test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
   test("Run with the sample tiles", async function runsWithSampleTiles({
     page,
