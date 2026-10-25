@@ -26,6 +26,13 @@ rules:
       and events, mod-app-actions), state the mod API version bump it needs
       (none, patch or minor while the version is 0.x) and why, following the
       "Mod API version" section of docs/modules/lib/core/engine/README.md
+  tasks:
+    - >-
+      End tasks.md with a task that adds .changeset/<change-name>.md with the
+      bump that fits the change (patch, minor or major), following the "Bump
+      rule" section of docs/releasing.md, and a one-line summary for the people
+      who use or instantiate the app. A change that bumps the mod API bumps the
+      app at least as much
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.

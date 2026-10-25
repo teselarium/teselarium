@@ -8,7 +8,7 @@ The two versions stay separate, as the `mod-api-version` spec requires, but a ch
 
 ## What Changes
 
-- **Changesets** (`@changesets/cli` 3, a dev dependency) manages the app's version in this single-package repository. Each piece of work adds a changeset: a small markdown file under `.changeset/` that gives the bump (`patch`, `minor` or `major`) and a line for the changelog. `npm run version` adds them up, bumps `package.json` and writes `CHANGELOG.md`. `npx changeset tag` tags the release as `v<version>`. Nothing is published.
+- **Changesets** (`@changesets/cli` 3, a dev dependency) manages the app's version in this single-package repository. Each piece of work adds a changeset: a small markdown file under `.changeset/` that gives the bump (`patch`, `minor` or `major`) and a line for the changelog. `npm run version` adds them up, bumps `package.json` and writes `CHANGELOG.md`. `npx changeset git-tag` tags the release as `v<version>`. Nothing is published.
 - **Config**: `.changeset/config.json` with the default changelog generator, which needs no GitHub token, `baseBranch: "main"`, and `privatePackages: { version: true, tag: true }`, because the app is a private package that Changesets 3 would otherwise not version.
 - **Scripts**: `npm run changeset` adds a changeset and `npm run version` applies them.
 - **First release**: the first changeset is a minor bump, so the app's first version is `0.1.0`.

@@ -6,6 +6,7 @@ The Settings section is always shown at the bottom of the sidebar. Its page, at 
 
 - **Appearance**: the Theme control, with System, Light and Dark. Changing it applies the choice to the app, to the pages and to every running mod at once, visible or hidden, without reloading the page or any mod's frame. System follows the operating system's preference. (The Theme control used to sit in the header.)
 - **Sidebar**: every section of the app, in the sidebar's order. Home, Settings and About say "Always shown". Each optional section, coming-soon ones included, has a switch labeled with its name, and a coming-soon section also says "Coming soon". A section whose mod the instantiation switched off is not listed (see the [section registry](../README.md#sections-of-switched-off-mods)).
+- **Version**: the app's version, labeled `OpenTesela`, and the app's mod API version, labeled `Mod API`. The app's version is the one in `package.json` when the app was built (`src/main/app_version.ts`, see the [release guide](../../../releasing.md)), and the mod API version is `MOD_API_VERSION` (see [the engine](../../lib/core/engine/README.md#mod-api-version)). Both are plain text, so the user can select them and copy them into a problem report.
 
 ## Stored keys
 

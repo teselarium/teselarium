@@ -16,3 +16,4 @@
 - @11ty/gray-matter
 - react-markdown, with remark-gfm, rehype-raw and rehype-sanitize (the markdown pages, see `docs/modules/main/homepage/README.md`)
 - js-yaml
+- Changesets (the app's version and `CHANGELOG.md`, see `docs/releasing.md`)

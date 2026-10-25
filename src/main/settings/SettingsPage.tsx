@@ -8,6 +8,8 @@ import {
 } from "@/vendor/shadcn/ui/card.tsx";
 import { Label } from "@/vendor/shadcn/ui/label.tsx";
 import { Switch } from "@/vendor/shadcn/ui/switch.tsx";
+import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
+import { APP_VERSION } from "../app_version.ts";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import {
   isSectionShown,
@@ -92,8 +94,9 @@ function SectionRow({
 }
 
 /**
- * The Settings section's page: the Theme control, and a switch for each
- * optional section of the sidebar. A switch only hides the sidebar item.
+ * The Settings section's page: the Theme control, a switch for each optional
+ * section of the sidebar, and the app's version and mod API version as text
+ * to copy. A switch only hides the sidebar item.
  */
 export function SettingsPage({
   appTheme,
@@ -143,6 +146,24 @@ export function SettingsPage({
           <ul aria-label="Sidebar sections" className="divide-y">
             {rows}
           </ul>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>
+            Version
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl
+            aria-label="Versions"
+            className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm"
+          >
+            <dt className="text-muted-foreground">OpenTesela</dt>
+            <dd>{APP_VERSION}</dd>
+            <dt className="text-muted-foreground">Mod API</dt>
+            <dd>{MOD_API_VERSION}</dd>
+          </dl>
         </CardContent>
       </Card>
     </div>

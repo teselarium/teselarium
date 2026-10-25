@@ -8,3 +8,4 @@ OpenTesela is an application for creating, sharing and viewing "Mosaics" of know
 - Stack (Languages, tools and frameworks): [stack.md](stack.md)
 - OpenTesela Format Specification (markdown structural typing): [opentesela_spec.md](opentesela_spec.md)
 - Code Conventions: [code_conventions.md](code_conventions.md)
+- Releasing (the app's version, changesets and the bump rule): [releasing.md](releasing.md)

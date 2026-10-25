@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -8,6 +9,21 @@ import type { ViteUserConfig } from "vitest/config";
 /** Resolves a path of the repository. */
 function resolveRepoPath(path: string): string {
   return fileURLToPath(new URL(path, import.meta.url));
+}
+
+/** The app's version, from `package.json`, which the build gives to `src/main/app_version.ts`. */
+function readAppVersion(): string {
+  const packagePath = resolveRepoPath("./package.json");
+  const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as {
+    version?: unknown;
+  };
+  const version = packageJson.version;
+  if (typeof version !== "string") {
+    throw new Error(
+      `Cannot read the app's version: "version" in ${packagePath} is not a string.`,
+    );
+  }
+  return version;
 }
 
 /**
@@ -50,6 +66,7 @@ export default defineConfig(function buildConfig({ mode }): ViteUserConfig {
   const config: ViteUserConfig = {
     plugins: [tailwindcss(), react()],
     resolve: { alias: buildAliases(mode) },
+    define: { __APP_VERSION__: JSON.stringify(readAppVersion()) },
     // The app routes with the hash, so dev and preview answer missing files with 404 like static hosts.
     appType: "mpa",
     server: { host: "127.0.0.1" },

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 import {
@@ -8,6 +9,7 @@ import {
   sectionsNav,
 } from "./app_layout.ts";
 import {
+  APP_MOD_API_VERSION,
   buildProbeFiles,
   findModFrame,
   isFrameMarked,
@@ -21,6 +23,31 @@ import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
 import { themeControl } from "./theme_probes.ts";
 
 const SECTION_SWITCHES_KEY = "opentesela.sidebar-sections";
+
+/** The version of the app's `package.json`, which the vanilla build read when Playwright built it. */
+const PACKAGE_VERSION = (
+  JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { version: string }
+).version;
+
+function versionsList(page: Page): Locator {
+  return page.getByLabel("Versions");
+}
+
+/** The `Versions` list as label-value pairs: each term with the definition after it. */
+function readVersions(list: Element): Record<string, string> {
+  const versions: Record<string, string> = {};
+  for (const term of list.querySelectorAll("dt")) {
+    versions[term.textContent ?? ""] =
+      term.nextElementSibling?.textContent ?? "";
+  }
+  return versions;
+}
+
+function readSelectedText(): string {
+  return getSelection()?.toString() ?? "";
+}
 
 function sectionSwitch(page: Page, name: string): Locator {
   return page.getByRole("switch", { name });
@@ -73,6 +100,32 @@ test.describe("Settings page", function describeSettingsPage(): void {
     }
     await expect(sectionRow(page, "Tiles")).toContainText("Coming soon");
     await expect(sectionRow(page, "Mosaics")).toContainText("Coming soon");
+  });
+});
+
+test.describe("Versions on the Settings page", function describeVersions(): void {
+  test("Vanilla versions", async function showsVersions({
+    page,
+  }): Promise<void> {
+    await page.goto("/#/settings");
+
+    await expect(versionsList(page)).toBeVisible();
+    expect(await versionsList(page).evaluate(readVersions)).toEqual({
+      OpenTesela: PACKAGE_VERSION,
+      "Mod API": APP_MOD_API_VERSION,
+    });
+  });
+
+  test("Copy the versions", async function copiesVersions({
+    page,
+  }): Promise<void> {
+    await page.goto("/#/settings");
+
+    await versionsList(page).selectText();
+
+    const selected = await page.evaluate(readSelectedText);
+    expect(selected).toContain(PACKAGE_VERSION);
+    expect(selected).toContain(APP_MOD_API_VERSION);
   });
 });
 

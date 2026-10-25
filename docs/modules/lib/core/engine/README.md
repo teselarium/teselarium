@@ -286,6 +286,8 @@ When it changes, while it is `0.x`:
 
 From `1.0.0` on, semver's usual rule applies: major for a breaking change, minor for an addition, patch for a fix.
 
+A change that bumps the mod API also bumps the app's version, at least as much (see the release guide's [bump rule](../../../../releasing.md#bump-rule)).
+
 Each bump also updates:
 
 - the surface guard, `mod_api_surface.test.ts`: it records, for each version, the API's surface by name (the method names, the event names, the mount context's keys and the keys of its `mod`, `api`, `permissions` and `theme` mappings, the mod file keys and the permission categories). It fails when the surface built from the code differs from the entry of `MOD_API_VERSION`, or when a recorded version is above it. A bump adds an entry for the new version; older entries are never edited, so the record shows how the API grew. The guard sees names, not params or results, so a change to those needs the bump without the guard's help. The test API is part of the mod API, but the guard does not record it: the guard builds its surface from the engine's code and never runs the frame loader, so the e2e tests of `e2e/mod_tests.spec.ts` pin the test API's names instead;

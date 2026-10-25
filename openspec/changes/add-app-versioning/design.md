@@ -5,7 +5,7 @@
 See proposal.md - Why. The current state that shapes the approach:
 
 - `package.json` is a single private package (`"private": true`, `"version": "0.0.0"`), and `package-lock.json` repeats the version twice. Prettier skips `package-lock.json`, `docs/` and `openspec/`, but not the repository root, so `.changeset/` and `CHANGELOG.md` are formatted.
-- `@changesets/cli` 3.0.3 is the latest release. Checked in the published package: it needs Node `^22.11 || ^24 || >=26` (the dev machine has 26) and npm `>=10.9.0`. `@changesets/config` 4 defaults `privatePackages` to `{ version: false, tag: false }`, so a private package is neither versioned nor tagged without the config the proposal gives. `changeset init` is interactive (it asks about the GitHub changelog, commits, access and the base branch). For a root package, `changeset tag` (an alias of `git-tag`) creates `v<version>`. `changeset version` does not touch `package-lock.json`.
+- `@changesets/cli` 3.0.3 is the latest release. Checked in the published package: it needs Node `^22.11 || ^24 || >=26` (the dev machine has 26) and npm `>=10.9.0`. `@changesets/config` 4 defaults `privatePackages` to `{ version: false, tag: false }`, so a private package is neither versioned nor tagged without the config the proposal gives. `changeset init` is interactive (it asks about the GitHub changelog, commits, access and the base branch). For a root package, `changeset git-tag` creates `v<version>`; its `tag` alias still works but is deprecated and prints a warning. `changeset version` does not touch `package-lock.json`.
 - `vite.config.ts` builds the app, the two e2e instantiation builds and Vitest's two projects from one `defineConfig`, so whatever it defines reaches every build and every test.
 - `src/main/settings/SettingsPage.tsx` lays out two shadcn `Card`s, Appearance and Sidebar, each with a `CardTitle` given `role="heading"` and `aria-level={2}`. `src/main/` already imports from `../../lib/core/engine/index.ts`, which exports `MOD_API_VERSION`.
 - Playwright builds every app it serves at each run (`reuseExistingServer: false`), and runs each test in Chromium, Firefox and WebKit.
@@ -114,6 +114,6 @@ This change's own changeset, `.changeset/add-app-versioning.md`, is a `minor` bu
 After this change is applied and reviewed:
 
 1. The maintainer commits the change, including `package.json` at `0.1.0` and `CHANGELOG.md`.
-2. `npx changeset tag` creates `v0.1.0` on that commit, and `git push origin v0.1.0` publishes it.
+2. `npx changeset git-tag` creates `v0.1.0` on that commit, and `git push origin v0.1.0` publishes it.
 
 Rollback: delete the tag (`git tag -d v0.1.0`, `git push origin :refs/tags/v0.1.0`) and revert the commit. Nothing is published to npm, so no registry needs cleaning.
