@@ -52,7 +52,7 @@ The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list e
 - **THEN** its frame lists `./samples/mods/missing` with a message that names `404`
 
 ### Requirement: Mod viewer
-The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the mod named by its `target` parameter, using `mods.inspect`: title, version, description, name, source, API range and whether it matches the app's mod API version, tile type, sample collection, config, and each declared permission with its reason and whether it would be granted. It SHALL NOT need a collection. Without `target`, it SHALL say that no mod was given. When the mod cannot be inspected, it SHALL show the error message.
+The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the mod named by its `target` parameter, using `mods.inspect`: title, version, description, name, source, API range and whether it matches the app's mod API version, tile type, sample collection, config, and each declared permission with its reason and whether it would be granted. It SHALL NOT need a collection.
 
 #### Scenario: View the sample mod
 - **WHEN** the app is opened at `#/run?mod=mod_viewer&target=./samples/mods/book_list`
@@ -74,6 +74,17 @@ The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the m
 #### Scenario: Missing target
 - **WHEN** the app is opened at `#/run?mod=mod_viewer&target=./samples/mods/missing`
 - **THEN** the viewer's frame shows an error that names `404`
+
+### Requirement: Mod viewer reports a missing or failing target
+Without `target`, or with an empty `target`, the mod viewer SHALL say that no mod was given. When the mod named by `target` cannot be inspected, for any reason, it SHALL show the error message.
+
+#### Scenario: Empty target
+- **WHEN** the app is opened at `#/run?mod=mod_viewer&target=`
+- **THEN** the viewer's frame says that no mod was given
+
+#### Scenario: Target with a format error
+- **WHEN** the viewer is opened with a target mod file that has `theme: "dark"` under `mod`
+- **THEN** the viewer's frame shows an error whose message says that `theme` must be `"default"` or `"none"`
 
 ### Requirement: Mod viewer runs the mod
 The mod viewer SHALL offer to run the viewed mod with its sample collection (only when the mod declares one), with a collection whose address the user types, or without tiles. Each choice SHALL send `mods.open` with the mod's source as `mod` and, when there is one, the chosen collection as `collection`.
