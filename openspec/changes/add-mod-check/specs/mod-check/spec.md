@@ -8,8 +8,8 @@ Lets a mod ask the engine to check another mod without running it for the user: 
 `mods.check` with `{ mod, collection }`, where `mod` is a mod reference and `collection` an optional collection location, SHALL check the mod and return a report once the check is done. Relative references and locations SHALL be resolved against the app's address. The tiles SHALL come from `collection` when it is given, from the mod's sample collection otherwise, and there SHALL be none when the mod declares no sample collection.
 
 #### Scenario: Check the sample mod
-- **WHEN** the visible mod viewer sends `mods.check` with `{ "mod": "./fixtures/mods/book_list" }`
-- **THEN** the result is a report with source `https://example.org/fixtures/mods/book_list/mod_conf.yaml`, status `"pass"`, `mountChecked` `true` and no findings
+- **WHEN** the visible mod viewer of the app at `https://example.org/` sends `mods.check` with `{ "mod": "./samples/mods/book_list" }`
+- **THEN** the result is a report with source `https://example.org/samples/mods/book_list/mod_conf.yaml`, status `"pass"`, `mountChecked` `true` and no findings
 
 #### Scenario: Check with another collection
 - **WHEN** the visible mod viewer sends `mods.check` for the sample mod with a collection of two books
@@ -53,8 +53,12 @@ The report SHALL be plain data with `source` (the resolved mod file address), `s
 ### Requirement: Bundle check
 The check SHALL load the mod file, its entrypoint, its tile type and the collection, and validate the collection's tiles against the type. A file that cannot be loaded or has the wrong format SHALL be an error finding whose source is that file and whose message is the load error's message. The collection's issues SHALL be findings with their own level and source. A failure to load the mod file SHALL be a report, not an error response.
 
+#### Scenario: Fixture mod
+- **WHEN** the bundle check runs on the mod at `https://example.org/fixtures/mods/book_list/mod_conf.yaml` with its sample collection
+- **THEN** it has no findings and gives the three books of the sample collection as the tiles to mount
+
 #### Scenario: Missing mod file
-- **WHEN** the visible mod viewer checks `./fixtures/mods/missing`
+- **WHEN** the visible mod, with `open` granted for the app's origin, sends `mods.check` with `{ "mod": "./fixtures/mods/missing" }`
 - **THEN** the result is a report with status `"fail"`, `mountChecked` `false` and one `bundle` error whose source is `https://example.org/fixtures/mods/missing/mod_conf.yaml` and whose message names `404`
 
 #### Scenario: Missing entrypoint
@@ -66,11 +70,15 @@ The check SHALL load the mod file, its entrypoint, its tile type and the collect
 - **THEN** the report has a `bundle` warning whose source is that tile's source, and the other tiles are given to the mod
 
 ### Requirement: API range in the check
-The bundle check SHALL compare the mod's `api` range with the app's mod API version. A missing range SHALL be a `bundle` warning that names `api`. A range that does not match SHALL be a `bundle` warning that names the range and the app's mod API version. No dialog SHALL be shown, and the mount check SHALL still run.
+The bundle check SHALL compare the mod's `api` range with the app's mod API version. A missing range SHALL be a `bundle` warning that names `api`. A range that does not match SHALL be a `bundle` warning that names the range and the app's mod API version. This finding SHALL come right after the mod file's, before the findings of the entrypoint, the tile type and the collection, as in the stage bar. No dialog SHALL be shown, and the mount check SHALL still run.
 
 #### Scenario: Mod for another API
 - **WHEN** a mod with `api: "^0.2.0"` and a valid bundle is checked
 - **THEN** no dialog is shown, the report has a `bundle` warning that names `^0.2.0` and the app's mod API version, and `mountChecked` is `true`
+
+#### Scenario: Range finding comes first
+- **WHEN** a mod without `api`, whose sample collection has a tile that does not match its type, is checked
+- **THEN** the first finding is the `bundle` warning about the missing `api` range, followed by the tile's warning
 
 ### Requirement: Mount check
 When the bundle check found no error, the check SHALL mount the mod in a hidden frame, with the content policy and permissions it would get if it were opened and with the tiles that match its type. The check SHALL end 1 second after the mod's `mount` call finished, and the frame SHALL then be removed. When the bundle check found an error, the mount check SHALL NOT run and the entrypoint SHALL NOT be run.
