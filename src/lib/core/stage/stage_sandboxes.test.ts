@@ -28,7 +28,12 @@ import {
   describeMissingApiRange,
   resolveDefaultModSettings,
 } from "../engine/index.ts";
-import type { AppAction, RunLink } from "../engine/index.ts";
+import type {
+  AppAction,
+  ModCheckReport,
+  ModCheckRequest,
+  RunLink,
+} from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { StageSandbox } from "./stage_state.ts";
@@ -73,6 +78,14 @@ function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
   const onRequestAction =
     vi.fn<(sandboxId: string, action: AppAction) => Promise<boolean> | null>();
   onRequestAction.mockResolvedValue(true);
+  const onCheckMod =
+    vi.fn<
+      (
+        requesterId: string,
+        request: ModCheckRequest,
+      ) => Promise<ModCheckReport> | null
+    >();
+  onCheckMod.mockReturnValue(null);
   const services: SandboxServices = {
     defaults: TEST_DEFAULTS,
     appOrigin,
@@ -81,6 +94,7 @@ function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
     onChange,
     onOpenLink,
     onRequestAction,
+    onCheckMod,
     readTheme: readLightTheme,
   };
   const spiedServices: SpiedServices = {

@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import type { Frame, FrameLocator, Locator, Page } from "@playwright/test";
 import {
   APP_MOD_API_VERSION,
+  buildMissingEntrypointFiles,
   buildProbeFiles,
+  buildSlowMountFiles,
   EXPLORER_CODE,
   findModFrame,
   OTHER_API_RANGE,
@@ -11,6 +13,7 @@ import {
   serveAppOriginMod,
   stageBar,
   TEST_MOD_API_RANGE,
+  visibleSandbox,
 } from "./mod_routes.ts";
 import {
   MISSING_MOD_REFERENCE,
@@ -380,6 +383,92 @@ test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
     await expect(
       viewer.getByRole("button", { name: "Run with sample tiles" }),
     ).toHaveCount(0);
+  });
+});
+
+/** The viewer's "Check report" section. */
+function checkReport(viewer: FrameLocator): Locator {
+  return viewer.getByRole("region", { name: "Check report" });
+}
+
+test.describe("Mod viewer checks the mod", function describeViewerChecks(): void {
+  test("Checking in progress", async function showsCheckInProgress({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(page, buildSlowMountFiles());
+    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/slow_mount/");
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+    const checkButton = viewer.getByRole("button", { name: "Check mod" });
+
+    await checkButton.click();
+
+    await expect(checkButton).toBeDisabled();
+    await expect(viewer.getByRole("status")).toContainText("Checking");
+    await expect(checkReport(viewer)).toHaveCount(0);
+    await expect(checkReport(viewer)).toBeVisible({ timeout: 10000 });
+    await expect(checkButton).toBeEnabled();
+    await expect(viewer.getByRole("status")).toHaveCount(0);
+  });
+
+  test("No button without a mod", async function hidesCheckWithoutMod({
+    page,
+  }): Promise<void> {
+    await page.goto("/#/run?mod=mod_viewer");
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+
+    await expect(viewer.getByText("No mod was given.")).toBeVisible();
+    await expect(viewer.getByRole("button", { name: "Check mod" })).toHaveCount(
+      0,
+    );
+  });
+});
+
+test.describe("Mod viewer shows the check report", function describeViewerReport(): void {
+  test("Sample mod passes", async function showsPassingReport({
+    page,
+  }): Promise<void> {
+    await routeCovers(page);
+    await openViewerForSample(page);
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+
+    await viewer.getByRole("button", { name: "Check mod" }).click();
+
+    const report = checkReport(viewer);
+    await expect(report.getByRole("heading")).toContainText("Check passed");
+    await expect(report.locator("span[data-ot-variant]")).toHaveAttribute(
+      "data-ot-variant",
+      "success",
+    );
+    await expect(report.getByText("No findings.")).toBeVisible();
+    await expect(report.getByRole("listitem")).toHaveCount(0);
+    await expect(
+      visibleSandbox(page).locator('iframe[title="Mod Viewer"]'),
+    ).toBeVisible();
+    await expect(stageBar(page)).toContainText("Mod Viewer");
+  });
+
+  test("Failing mod", async function showsFailingReport({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(page, buildMissingEntrypointFiles());
+    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/missing_code/");
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+    const entrypoint = new URL("/test-mods/missing_code/main.js", page.url())
+      .href;
+
+    await viewer.getByRole("button", { name: "Check mod" }).click();
+
+    const report = checkReport(viewer);
+    await expect(report.getByRole("heading")).toContainText("Check failed");
+    await expect(
+      report.getByRole("heading").locator("span[data-ot-variant]"),
+    ).toHaveAttribute("data-ot-variant", "destructive");
+    const finding = report.getByRole("listitem");
+    await expect(finding).toHaveCount(1);
+    await expect(finding).toContainText("bundle");
+    await expect(finding).toContainText("error");
+    await expect(finding).toContainText(entrypoint);
+    await expect(finding).toContainText("404");
   });
 });
 

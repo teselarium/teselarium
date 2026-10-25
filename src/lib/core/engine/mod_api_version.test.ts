@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeApiRangeMismatch,
   describeCancelledApiMismatch,
   describeMissingApiRange,
   isVersionInApiRange,
@@ -8,8 +9,8 @@ import {
 } from "./mod_api_version.ts";
 
 describe("MOD_API_VERSION", function describeModApiVersion(): void {
-  it("Version of this API", function isFirstVersion(): void {
-    expect(MOD_API_VERSION).toBe("0.1.0");
+  it("Version of this API", function isCurrentVersion(): void {
+    expect(MOD_API_VERSION).toBe("0.1.1");
   });
 });
 
@@ -45,6 +46,13 @@ describe("mod API texts", function describeModApiTexts(): void {
     const message = describeMissingApiRange();
 
     expect(message).toContain('"api"');
+    expect(message).toContain(MOD_API_VERSION);
+  });
+
+  it("names the range and the version in the mismatch warning", function describesMismatch(): void {
+    const message = describeApiRangeMismatch("^0.2.0");
+
+    expect(message).toContain('"^0.2.0"');
     expect(message).toContain(MOD_API_VERSION);
   });
 

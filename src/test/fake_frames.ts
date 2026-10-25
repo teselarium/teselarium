@@ -72,11 +72,14 @@ export function collectMessages(port: MessagePort): unknown[] {
   return received;
 }
 
+/** The real `setTimeout`, kept so waiting for messages works under Vitest's fake timers. */
+const realSetTimeout = globalThis.setTimeout;
+
 function resolveAfterTimeout(resolve: () => void): void {
-  setTimeout(resolve, 20);
+  realSetTimeout(resolve, 20);
 }
 
-/** Lets messages in flight on Node's `MessageChannel` arrive. */
+/** Lets messages in flight on Node's `MessageChannel` arrive, also under fake timers. */
 export function waitForMessages(): Promise<void> {
   return new Promise(resolveAfterTimeout);
 }

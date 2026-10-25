@@ -127,8 +127,8 @@ export async function serveAppOriginMod(
  */
 export const TEST_MOD_API_RANGE = "^0.1.0";
 
-/** `0.1.0`: the app's mod API version, as mods read it in `context.api.version`. */
-export const APP_MOD_API_VERSION = "0.1.0";
+/** `0.1.1`: the app's mod API version, as mods read it in `context.api.version`. */
+export const APP_MOD_API_VERSION = "0.1.1";
 
 /** `^0.2.0`: an `api` range for a later mod API, which the app's version does not match. */
 export const OTHER_API_RANGE = "^0.2.0";
@@ -594,4 +594,181 @@ export async function showAssetNextToMod(path: string): Promise<ShownAsset> {
   } catch {
     return { url, loaded: false };
   }
+}
+
+/** `#/run?mod=./test-mods/checker/`: a probe mod on the app's origin with `open` for `"*"`, which checks mods. */
+export const CHECKER_HASH = `#/run?mod=.${APP_ORIGIN_MOD_PATH}checker/`;
+export const CHECKER_TITLE = "Checker";
+
+/** The files of the checker probe mod. */
+export function buildCheckerFiles(): ModFiles {
+  return buildProbeFiles("checker", [
+    `  title: "${CHECKER_TITLE}"`,
+    "  permissions:",
+    "    open:",
+    '      - host: "*"',
+    '        reason: "Checks the mods of the tests"',
+  ]);
+}
+
+/** `beacon`: the path under `/test-mods/` where checked test mods report a value as the query of an image request. */
+const CHECK_BEACON_NAME = "beacon";
+
+/**
+ * Mod code: shows an image whose address carries `name` and `value`, on the
+ * app's origin, so a test reads what a checked mod saw from the URLs
+ * `serveAppOriginMod` returns, even after the check frame was removed.
+ */
+const REPORT_TO_TEST_CODE = `function reportToTest(context, name, value) {
+  const image = document.createElement("img");
+  const query = name + "=" + encodeURIComponent(JSON.stringify(value));
+  image.src = new URL("${APP_ORIGIN_MOD_PATH}${CHECK_BEACON_NAME}?" + query, context.mod.source).href;
+  document.body.append(image);
+}
+`;
+
+/** The code of a test mod whose `mount` runs `mountLines`, with `reportToTest` at hand. */
+function buildMountCode(mountLines: string[]): string {
+  const code = [
+    REPORT_TO_TEST_CODE,
+    "export default async function mount(engine, context) {",
+    ...mountLines,
+    "}",
+    "",
+  ].join("\n");
+  return code;
+}
+
+/** The files of a test mod in the folder `name/`, whose `mount` runs `mountLines`. */
+function buildCheckedModFiles(
+  name: string,
+  mountLines: string[],
+  extraLines: string[] = [],
+): ModFiles {
+  const files: ModFiles = {
+    [`${name}/mod_conf.yaml`]: buildModConf(name, extraLines),
+    [`${name}/main.js`]: buildMountCode(mountLines),
+  };
+  return files;
+}
+
+/** The value a checked mod reported with `reportToTest(context, name, value)`, or `undefined` before it did. */
+export function readReportedValue(seenUrls: string[], name: string): unknown {
+  for (const seenUrl of seenUrls) {
+    const url = new URL(seenUrl);
+    const value = url.searchParams.get(name);
+    if (url.pathname.endsWith(`/${CHECK_BEACON_NAME}`) && value !== null) {
+      return JSON.parse(value);
+    }
+  }
+  return undefined;
+}
+
+/** `./test-mods/<name>/`: a test mod served by `serveAppOriginMod`, as `mods.check` names it. */
+export function buildTestModReference(name: string): string {
+  return `.${APP_ORIGIN_MOD_PATH}${name}/`;
+}
+
+/** A mod whose entrypoint answers `404 Not Found`: its folder has no `main.js`. */
+export function buildMissingEntrypointFiles(): ModFiles {
+  const files: ModFiles = {
+    "missing_code/mod_conf.yaml": buildModConf("missing_code"),
+  };
+  return files;
+}
+
+/** A mod whose tile type answers `404 Not Found`. Its code would report `"ran"`. */
+export function buildMissingTypeFiles(): ModFiles {
+  return buildCheckedModFiles(
+    "missing_type",
+    ['  reportToTest(context, "ran", true);'],
+    ['  type_path: "./missing_type.md"'],
+  );
+}
+
+/** A mod whose `mount` throws `new Error("map failed")`. */
+export function buildThrowingFiles(): ModFiles {
+  return buildCheckedModFiles("throwing", ['  throw new Error("map failed");']);
+}
+
+/** A mod whose `mount` returns a promise that never settles. */
+export function buildNeverMountedFiles(): ModFiles {
+  return buildCheckedModFiles("never_mounted", [
+    "  return new Promise(function waitForever() {});",
+  ]);
+}
+
+/** A mod whose `mount` sends `tiles.delete`, which the engine does not know. */
+export function buildUnknownMethodFiles(): ModFiles {
+  return buildCheckedModFiles("unknown_method", [
+    '  await engine.request("tiles.delete").catch(function ignoreError() {});',
+  ]);
+}
+
+/** A mod whose `mount` sends `ui.confirm` and reports the answer as `confirmed`. */
+export function buildConfirmingFiles(): ModFiles {
+  return buildCheckedModFiles("confirming", [
+    '  const confirmed = await engine.request("ui.confirm", { message: "Delete this list?" });',
+    '  reportToTest(context, "confirmed", confirmed);',
+  ]);
+}
+
+/** The host a test mod requests an image from without declaring it. */
+export const UNDECLARED_IMAGE_HOST = "https://images.example.net";
+
+/** A mod whose `mount` shows an image from `UNDECLARED_IMAGE_HOST`, which its policy blocks. */
+export function buildUndeclaredImageFiles(): ModFiles {
+  return buildCheckedModFiles("undeclared_image", [
+    '  const image = document.createElement("img");',
+    `  image.src = "${UNDECLARED_IMAGE_HOST}/cover.png";`,
+    "  document.body.append(image);",
+    "  await image.decode().catch(function ignoreError() {});",
+  ]);
+}
+
+/** A mod whose `mount` awaits an animation frame, as a mod that measures its layout does. */
+export function buildAnimationFrameFiles(): ModFiles {
+  return buildCheckedModFiles("animation_frame", [
+    "  await new Promise(function waitForFrame(resolve) {",
+    "    requestAnimationFrame(resolve);",
+    "  });",
+  ]);
+}
+
+/** How long the `mount` of `buildSlowMountFiles` takes. */
+export const SLOW_MOUNT_MS = 3000;
+
+/** A mod whose `mount` takes `SLOW_MOUNT_MS`. */
+export function buildSlowMountFiles(): ModFiles {
+  return buildCheckedModFiles("slow_mount", [
+    "  await new Promise(function waitForTimer(resolve) {",
+    `    setTimeout(resolve, ${SLOW_MOUNT_MS});`,
+    "  });",
+  ]);
+}
+
+async function answerSelectionReportingSample(route: Route): Promise<void> {
+  const response = await route.fetch();
+  const code = await response.text();
+  if (!code.includes(SAMPLE_MOUNT_LINE)) {
+    throw new Error("The sample mod's mount line changed");
+  }
+  const reportingLines = [
+    SAMPLE_MOUNT_LINE,
+    '  const checkedSelection = await engine.request("storage.get", { key: "selected" });',
+    '  reportToTest(context, "selected", checkedSelection);',
+  ].join("\n");
+  await route.fulfill({
+    response,
+    body: `${REPORT_TO_TEST_CODE}\n${code.replace(SAMPLE_MOUNT_LINE, reportingLines)}`,
+  });
+}
+
+/**
+ * Serves the sample book list mod with a `mount` that first reads
+ * `storage.get` for `selected` and reports it as `selected`. Until
+ * `page.unroute(SAMPLE_ENTRYPOINT_GLOB)`.
+ */
+export async function serveSelectionReportingSample(page: Page): Promise<void> {
+  await page.route(SAMPLE_ENTRYPOINT_GLOB, answerSelectionReportingSample);
 }

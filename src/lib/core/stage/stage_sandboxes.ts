@@ -12,6 +12,8 @@ import {
 } from "../engine/index.ts";
 import type {
   AppAction,
+  ModCheckReport,
+  ModCheckRequest,
   ModLaunch,
   ModSession,
   ResolvedDefaultModSettings,
@@ -36,6 +38,11 @@ export interface SandboxServices {
     sandboxId: string,
     action: AppAction,
   ) => Promise<boolean> | null;
+  /** Asks the stage to check a mod for the requesting sandbox. `null` when it is not the visible one. */
+  onCheckMod: (
+    requesterId: string,
+    request: ModCheckRequest,
+  ) => Promise<ModCheckReport> | null;
   /** The stage's current theme, read when a session connects. */
   readTheme: () => Theme;
 }
@@ -218,6 +225,7 @@ export function attachSandboxFrame(
     onIssue: addRuntimeIssue.bind(undefined, runtime, services),
     onOpenLink: services.onOpenLink.bind(undefined, runtime.id),
     onRequestAction: services.onRequestAction.bind(undefined, runtime.id),
+    onCheckMod: services.onCheckMod.bind(undefined, runtime.id),
     theme: services.readTheme(),
   });
 }

@@ -22,14 +22,19 @@ import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
 import { prepareModLaunch } from "./mod_launch.ts";
+import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModContext, ModLaunch, RunLink } from "./mod_launch.ts";
+import type { ModCheckRequest } from "./mod_methods.ts";
 import {
   connectModSession,
   pushThemeChanged,
   pushTilesChanged,
   stopModSession,
 } from "./mod_session.ts";
-import type { ModSession } from "./mod_session.ts";
+import type { ModSession, ModSessionOptions } from "./mod_session.ts";
+import type { ResponseError } from "./mod_messages.ts";
+
+type SessionHooks = Pick<ModSessionOptions, "onMounted" | "onErrorResponse">;
 
 interface PlayedSession {
   session: ModSession;
@@ -68,6 +73,7 @@ function launchSampleMod(): Promise<ModLaunch> {
 /** Connects a session for the sample mod (granted `open` for `"*"`), and plays the mod side. */
 async function playSession(
   theme: Theme = buildTheme("light"),
+  hooks: SessionHooks = {},
 ): Promise<PlayedSession> {
   const sampleLaunch = await launchSampleMod();
   const openPermission = {
@@ -104,7 +110,10 @@ async function playSession(
     onIssue,
     onOpenLink,
     onRequestAction,
+    onCheckMod:
+      vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
     theme,
+    ...hooks,
   });
   const modPort = readModPort(fakeFrame);
   openPorts.push(modPort, session.port);
@@ -169,6 +178,8 @@ describe("connectModSession", function describeConnectModSession(): void {
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
+      onCheckMod:
+        vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
       theme: buildTheme("light"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
@@ -196,6 +207,8 @@ describe("connectModSession", function describeConnectModSession(): void {
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
+      onCheckMod:
+        vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
       theme: buildTheme("dark"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
@@ -217,6 +230,8 @@ describe("connectModSession", function describeConnectModSession(): void {
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
+      onCheckMod:
+        vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
       theme: buildTheme("dark"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
@@ -477,6 +492,104 @@ describe("connectModSession", function describeConnectModSession(): void {
       source: SAMPLE_MOD_SOURCE,
       message: "The mod could not be mounted: map failed",
     });
+  });
+});
+
+describe("session hooks", function describeSessionHooks(): void {
+  it("calls onMounted for sandbox.mounted", async function callsOnMounted(): Promise<void> {
+    const onMounted = vi.fn<() => void>();
+    const played = await playSession(buildTheme("light"), { onMounted });
+
+    sendNotification(played, "sandbox.mounted", {});
+    await waitForMessages();
+
+    expect(onMounted).toHaveBeenCalledOnce();
+    expect(played.onIssue).not.toHaveBeenCalled();
+    expect(played.received).toEqual([]);
+  });
+
+  it("calls onMounted for sandbox.mountFailed after the issue", async function callsOnMountedAfterFailure(): Promise<void> {
+    const onMounted = vi.fn<() => void>();
+    const played = await playSession(buildTheme("light"), { onMounted });
+
+    sendNotification(played, "sandbox.mountFailed", { message: "map failed" });
+    await waitForMessages();
+
+    expect(onMounted).toHaveBeenCalledOnce();
+    expect(played.onIssue).toHaveBeenCalledOnce();
+    expect(played.onIssue.mock.invocationCallOrder[0]).toBeLessThan(
+      onMounted.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("calls onErrorResponse for an unknown method", async function reportsUnknownMethod(): Promise<void> {
+    const onErrorResponse =
+      vi.fn<(method: string | null, error: ResponseError) => void>();
+    const played = await playSession(buildTheme("light"), { onErrorResponse });
+
+    sendRequest(played, 8, "tiles.delete", {});
+    await waitForReceived(played, 1);
+
+    expect(onErrorResponse).toHaveBeenCalledExactlyOnceWith("tiles.delete", {
+      code: -32601,
+      message: 'Unknown method "tiles.delete"',
+    });
+  });
+
+  it("calls onErrorResponse for bad params", async function reportsBadParams(): Promise<void> {
+    const onErrorResponse =
+      vi.fn<(method: string | null, error: ResponseError) => void>();
+    const played = await playSession(buildTheme("light"), { onErrorResponse });
+
+    sendRequest(played, 5, "storage.get", { key: 3 });
+    await waitForReceived(played, 1);
+
+    expect(onErrorResponse).toHaveBeenCalledExactlyOnceWith("storage.get", {
+      code: -32602,
+      message: 'storage.get: "key" must be a non-empty string',
+    });
+  });
+
+  it("calls onErrorResponse with null for a message that is not a request", async function reportsInvalidRequest(): Promise<void> {
+    const onErrorResponse =
+      vi.fn<(method: string | null, error: ResponseError) => void>();
+    const played = await playSession(buildTheme("light"), { onErrorResponse });
+
+    played.modPort.postMessage({ id: 4, method: 12 });
+    await waitForReceived(played, 1);
+
+    expect(onErrorResponse).toHaveBeenCalledExactlyOnceWith(null, {
+      code: -32600,
+      message: "Not a valid JSON-RPC 2.0 request",
+    });
+  });
+
+  it("does not call onErrorResponse for a result", async function skipsResults(): Promise<void> {
+    const onErrorResponse =
+      vi.fn<(method: string | null, error: ResponseError) => void>();
+    const played = await playSession(buildTheme("light"), { onErrorResponse });
+
+    sendRequest(played, 1, "storage.get", { key: "selected" });
+    await waitForReceived(played, 1);
+
+    expect(onErrorResponse).not.toHaveBeenCalled();
+  });
+
+  it("a session without the hooks behaves as before", async function ignoresMountedWithoutHook(): Promise<void> {
+    const played = await playSession();
+
+    sendNotification(played, "sandbox.mounted", {});
+    sendRequest(played, 8, "tiles.delete", {});
+    await waitForReceived(played, 1);
+
+    expect(played.onIssue).not.toHaveBeenCalled();
+    expect(played.received).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: 8,
+        error: { code: -32601, message: 'Unknown method "tiles.delete"' },
+      },
+    ]);
   });
 });
 

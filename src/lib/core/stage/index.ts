@@ -1,8 +1,10 @@
 export {
   answerApiMismatch,
   answerStageAction,
+  attachCheckFrame,
   attachFrame,
   changeStageColorScheme,
+  checkFrameLoadedAgain,
   closeSandbox,
   createStage,
   followHistory,
@@ -15,6 +17,7 @@ export {
 } from "./stage_controller.ts";
 export type {
   ActionSnapshot,
+  CheckSnapshot,
   SandboxSnapshot,
   Stage,
   StageOptions,

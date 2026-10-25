@@ -70,3 +70,16 @@ schema:
 
 Tiles with a title and the country they are located in.
 ```
+
+## Checking a mod
+
+A mod can be checked before anyone runs it, with no code from its author. Open the mod in the mod viewer (`#/run?mod=mod_viewer&target=<mod reference>`) and press "Check mod". The viewer sends `mods.check` with the mod's source, and with the collection field's address when it holds one; otherwise the mod's sample collection is used. Any visible mod with an `open` permission for the mod's site can send `mods.check` the same way.
+
+The check has two steps:
+
+- **Bundle check**: the mod file, the entrypoint, the tile type and the collection must load, and the collection's tiles are validated against the tile type. A file that cannot be loaded or has the wrong format is an error naming that file. A tile that does not match the type is a warning naming the tile. A missing `api` range, or one that does not match the app's mod API version, is a warning: the check asks nothing.
+- **Mount check**: when the bundle check found no error, the mod is mounted in a hidden frame, with the permissions it would get if it were opened, the tiles of its type and an empty storage slot that is thrown away afterwards; the mod's real slot is never read nor written. The check records a `mount` that throws or rejects, a mod that left its page, blocked requests and blocked browser dialogs, every request answered with `-32600`, `-32601` or `-32602` (a message that is not a request, an unknown method, bad params), and the requests that would need the user (`links.open`, `files.save` and `ui.confirm` answer `false`, `mods.open` and `mods.check` are refused), without showing any dialog. A `mount` that has not finished after 10 seconds is an error.
+
+Only the start of the mod is watched: the check ends 1 second after `mount` finished, so timers and requests that start later are not recorded.
+
+The report's status is `pass` when there are no findings, `warn` when there are only warnings and `fail` when a finding is an error. Each finding names its step (`bundle` or `mount`), its level, the file or mod it is about and a message. The check leaves the app as it was: no new sandbox, history entry or stage bar item.

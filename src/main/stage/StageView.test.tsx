@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { attachFrame, openStageLink } from "../../lib/core/stage/index.ts";
+import {
+  attachFrame,
+  checkFrameLoadedAgain,
+  openStageLink,
+  readStageSnapshot,
+} from "../../lib/core/stage/index.ts";
 import type { Stage } from "../../lib/core/stage/index.ts";
 import {
   collectMessages,
@@ -19,7 +24,11 @@ import {
   serveOtherApiMod,
 } from "../../test/sample_mods.ts";
 import { testTexts } from "../../test/test_files.ts";
-import { settleStage, startTestStage } from "../../test/test_stages.ts";
+import {
+  PAGE_HOME_ROUTING,
+  settleStage,
+  startTestStage,
+} from "../../test/test_stages.ts";
 import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
 import { StageView } from "./StageView.tsx";
 
@@ -72,6 +81,18 @@ async function openFromVisible(stage: Stage, openerId: string): Promise<void> {
     openStageLink(stage, SAMPLE_LINK, openerId);
     await settleStage(stage);
   });
+}
+
+/** Waits until the stage lists a check, after its bundle check. */
+async function waitForCheck(stage: Stage): Promise<string> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const entry = readStageSnapshot(stage).checks[0];
+    if (entry !== undefined) {
+      return entry.id;
+    }
+    await act(waitForMessages);
+  }
+  throw new Error("Expected the stage to list a check");
 }
 
 describe("StageView", function describeStageView(): void {
@@ -296,3 +317,50 @@ function postNotification(
 ): void {
   port.postMessage({ jsonrpc: "2.0", method, params });
 }
+
+describe("CheckFrame", function describeCheckFrame(): void {
+  it("renders a hidden frame per check, outside the sandboxes, until the check ends", async function rendersCheckFrame(): Promise<void> {
+    const stage = await startTestStage(
+      "#/run?mod=mod_viewer",
+      PAGE_HOME_ROUTING,
+    );
+    const viewerId = readStageSnapshot(stage).sandboxes[0].id;
+    const fakeFrame = createFakeFrame();
+    attachFrame(stage, viewerId, fakeFrame.target);
+    const viewerPort = readModPort(fakeFrame);
+    openPorts.push(viewerPort);
+    const received = collectMessages(viewerPort);
+    const { container } = render(<StageView stage={stage} />);
+
+    viewerPort.postMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "mods.check",
+      params: { mod: SAMPLE_MOD_REFERENCE },
+    });
+    const checkId = await waitForCheck(stage);
+    const checkFrame = container.querySelector<HTMLIFrameElement>(
+      `iframe[data-check-id="${checkId}"]`,
+    );
+
+    expect(checkFrame).not.toBeNull();
+    expect(checkFrame?.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(checkFrame?.getAttribute("srcdoc")).toContain(
+      "Content-Security-Policy",
+    );
+    expect(checkFrame?.hasAttribute("inert")).toBe(true);
+    expect(checkFrame?.getAttribute("aria-hidden")).toBe("true");
+    expect(checkFrame?.closest("[data-sandbox-id]")).toBeNull();
+    expect(checkFrame?.hidden).toBe(false);
+
+    await act(async function endCheck(): Promise<void> {
+      checkFrameLoadedAgain(stage, checkId);
+      await waitForMessages();
+    });
+
+    expect(container.querySelector("iframe[data-check-id]")).toBeNull();
+    expect(received).toMatchObject([
+      { id: 1, result: { status: "fail", mountChecked: true } },
+    ]);
+  });
+});

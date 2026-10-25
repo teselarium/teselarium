@@ -1,6 +1,6 @@
 /**
  * Default mod: shows the metadata of the mod named by the `target`
- * parameter, and runs it.
+ * parameter, runs it, and checks it.
  *
  * It is also an example of getting the app's look without classes: the
  * theme's base stylesheet styles semantic HTML like the app's components (a
@@ -24,6 +24,20 @@ const VIEWER_STYLE = `
 `;
 
 const COLLECTION_FIELD_ID = "collection-address";
+
+/** The badge variant of each check status. */
+const CHECK_STATUS_VARIANTS = {
+  pass: "success",
+  warn: "warning",
+  fail: "destructive",
+};
+
+/** The heading of each check status. */
+const CHECK_STATUS_TITLES = {
+  pass: "Check passed",
+  warn: "Check passed with warnings",
+  fail: "Check failed",
+};
 
 function describeError(error) {
   if (error instanceof Error) {
@@ -88,6 +102,96 @@ function runWithTypedCollection(view, input, event) {
   }
   input.removeAttribute("aria-invalid");
   openMod(view, collection);
+}
+
+/** The collection field's value when it holds a full address, the rule of "Run with this collection", or `null`. */
+function readCheckCollection(view) {
+  const collection = view.collectionInput?.value.trim() ?? "";
+  if (collection === "" || !URL.canParse(collection)) {
+    return null;
+  }
+  return collection;
+}
+
+/** A finding: its level as a badge, its step and message, and its source. */
+function buildFindingItem(finding) {
+  const item = document.createElement("li");
+  const variant = finding.level === "error" ? "destructive" : "warning";
+  const source = document.createElement("code");
+  source.textContent = finding.source;
+  item.append(
+    buildBadge(finding.level, variant),
+    ` ${finding.step}: ${finding.message} `,
+    source,
+  );
+  return item;
+}
+
+function buildFindingList(findings) {
+  if (findings.length === 0) {
+    const none = document.createElement("p");
+    none.textContent = "No findings.";
+    return none;
+  }
+  const list = document.createElement("ul");
+  list.setAttribute("aria-label", "Findings");
+  for (const finding of findings) {
+    list.append(buildFindingItem(finding));
+  }
+  return list;
+}
+
+/** The report of `mods.check`: its status as a badge, then its findings. */
+function buildCheckReport(report) {
+  const section = document.createElement("section");
+  section.setAttribute("aria-label", "Check report");
+  const heading = document.createElement("h2");
+  heading.append(
+    CHECK_STATUS_TITLES[report.status] ?? report.status,
+    " ",
+    buildBadge(
+      report.status,
+      CHECK_STATUS_VARIANTS[report.status] ?? "outline",
+    ),
+  );
+  section.append(heading);
+  if (!report.mountChecked) {
+    const notice = document.createElement("p");
+    notice.textContent = "The mod was not mounted: its files have errors.";
+    section.append(notice);
+  }
+  section.append(buildFindingList(report.findings));
+  return section;
+}
+
+function showCheckReport(view, button, report) {
+  button.disabled = false;
+  view.messages.replaceChildren(buildCheckReport(report));
+}
+
+function showCheckError(view, button, error) {
+  button.disabled = false;
+  showError(view, error);
+}
+
+/** Sends `mods.check` for the viewed mod. The button is disabled until the report arrives. */
+function checkMod(view, event) {
+  const button = event.currentTarget;
+  button.disabled = true;
+  view.messages.replaceChildren(
+    buildStatusMessage(`Checking ${view.inspection.title}…`),
+  );
+  const params = { mod: view.inspection.source };
+  const collection = readCheckCollection(view);
+  if (collection !== null) {
+    params.collection = collection;
+  }
+  view.engine
+    .request("mods.check", params)
+    .then(
+      showCheckReport.bind(undefined, view, button),
+      showCheckError.bind(undefined, view, button),
+    );
 }
 
 function clearInvalidField(input) {
@@ -273,7 +377,10 @@ function buildButton(label, handleClick) {
   return button;
 }
 
-/** The run choices: running with the sample tiles is the page's one primary action, a submit button. */
+/**
+ * The run choices, and "Check mod" next to them: running with the sample
+ * tiles is the page's one primary action, a submit button.
+ */
 function buildRunChoices(view) {
   const form = document.createElement("form");
   form.setAttribute("aria-label", "Run");
@@ -289,6 +396,7 @@ function buildRunChoices(view) {
   }
   form.append(
     buildButton("Run without tiles", runWithoutTiles.bind(undefined, view)),
+    buildButton("Check mod", checkMod.bind(undefined, view)),
   );
   return form;
 }
@@ -309,6 +417,7 @@ function buildCollectionForm(view) {
   input.type = "url";
   input.placeholder = "https://example.org/collection.yaml";
   input.addEventListener("input", clearInvalidField.bind(undefined, input));
+  view.collectionInput = input;
   const runButton = document.createElement("button");
   runButton.type = "submit";
   runButton.dataset.otVariant = "outline";
@@ -355,6 +464,7 @@ export default async function mount(engine, context) {
     engine,
     apiVersion: context.api.version,
     inspection: null,
+    collectionInput: null,
     messages: document.createElement("div"),
   };
   try {

@@ -110,6 +110,19 @@ A mod asks the app to open a link, save a file or confirm something with `links.
 - Each queued action has an id from the stage, `1`, `2`, …, and the page answers the id it shows, so a double click or a late answer cannot answer the next action. An unknown id does nothing.
 - After every stage change (back, forward, a followed or opened link, a close) and when a mod navigates its frame, every action whose sandbox is no longer visible or no longer running is removed and answers `false`. A stopped mod's session drops that answer, so the mod gets none.
 
+### Mod checks
+
+A mod asks the stage to check another mod with `mods.check` (see the [engine module](../engine/README.md#inspecting-and-opening-mods)). Only the visible sandbox can ask: for any other, `checkStageMod` returns `null` and the engine answers `-32002`.
+
+- The stage runs the bundle check first (`checkModBundle`). With an error finding, or when the requester stopped running meanwhile, the report resolves at once with `mountChecked` `false`, and the mod's code is never run.
+- Otherwise it builds the launch with `buildModLaunch`, as opening the mod would, with the bundle check's mod and tiles and no params, and adds a check to `stage.checks`. Checks are kept apart from `state.sandboxes`, `runtimes` and the history: a check has no history entry, no sandbox snapshot and no stage bar item, it never changes the address, the visible sandbox or its issues, and it never becomes `asking`. A mod written for another API is mounted without a question: its range is a bundle warning in the report.
+- The snapshot's `checks` lists one `{ id, sandboxDocument, title }` per running check. The page renders a hidden frame for each, outside the sandboxes, and calls `attachCheckFrame(stage, id, frameTarget)` on its first `load` and `checkFrameLoadedAgain(stage, id)` on any later one.
+- `attachCheckFrame` connects the check's session with a throwaway slot (`createMemoryStorage()`, one per check, dropped with it; the stage's storage is never read nor written) and the current theme, and starts the limit: `CHECK_MOUNT_LIMIT_MS`, 10 seconds. When `mount` finishes (`sandbox.mounted`, or `sandbox.mountFailed`), the limit is cleared and the settle time starts: `CHECK_SETTLE_MS`, 1 second, after which the check ends. When the limit fires first, the check gets the `mount` error `The mod's mount did not finish within 10 seconds.` and ends. Only these first seconds are watched.
+- While it runs, the check records `mount` findings: every issue of its session (a mount failure, blocked requests and dialogs), each request answered with `-32600`, `-32601` or `-32602`, and the requests that would need the user. `links.open`, `files.save` and `ui.confirm` resolve with `false` as if the user cancelled, `mods.open` and `mods.check` are refused with `-32002`, and each is a warning naming the method. No action is queued, so no dialog is shown.
+- A check frame that loads again ends its check with the `mount` error `The mod left its page and was stopped.`
+- A check ends when it settles, times out, its frame loads again, or its requester is closed. Its timers are cleared, its session is stopped, it leaves `stage.checks` so the page removes its frame, and the report resolves with `mountChecked` `true`. The report of a closed requester goes nowhere, since its session is stopped.
+- Checks get no `theme.changed`: one lasts at most about 11 seconds.
+
 ### The theme
 
 The stage keeps the app's current theme, built from the resolved color scheme (see the [theme module](../theme/README.md)). It does not know where the color scheme comes from: the app tells it with `changeStageColorScheme`.
@@ -136,6 +149,7 @@ The work behind the public API is split so each file has one reason to change:
 | `stage_sections.ts` | The section memory: each section's root and last view. |
 | `stage_sandboxes.ts` | The runtime of one sandbox: launch, frame, session, issues, reload and stop. |
 | `stage_actions.ts` | The queue of actions waiting for the user: add, show the oldest, answer by id, drop. |
+| `stage_checks.ts` | The mod checks: the bundle check, the check's session and its answers, the settle time and the limit, and ending a check. |
 | `stage_controller.ts` | Connects them: applies each state change by writing history, starting and stopping runtimes, and publishing a snapshot. |
 
 `stage_state.ts` holds the pure stage state (sandboxes, entries with their view and section, position): each function returns the new state with the sandboxes to open and close, and the controller applies them. All of these are browser-free apart from the `postMessage` targets and the `History` subset they receive, so they are tested in Node.
@@ -150,12 +164,15 @@ The work behind the public API is split so each file has one reason to change:
 - `reloadTiles(stage, id)`: the "Reload tiles" button.
 - `attachFrame(stage, id, frameTarget)`: on a frame's first `load`, connects its mod's session.
 - `frameLoadedAgain(stage, id)`: on any later `load` of a frame: its mod navigated, so it is stopped with the issue `The mod left its page and was stopped.` and its frame removed.
+- `attachCheckFrame(stage, id, frameTarget)`: on a check frame's first `load`, connects the checked mod's session and starts the 10-second limit.
+- `checkFrameLoadedAgain(stage, id)`: on any later `load` of a check frame: the check ends with the error `The mod left its page and was stopped.`
+- `checkStageMod(stage, requesterId, request)`, not exported: checks the mod of a `ModCheckRequest` (`source`, `collection`) and resolves with its `ModCheckReport`, or returns `null` when the requester is not the visible sandbox. The sessions call it through their `onCheckMod`.
 - `answerStageAction(stage, id, accepted)`: answers the action the page shows, so the mod's request resolves with `accepted` and the next action is shown. Does nothing for an unknown id.
 - `answerApiMismatch(stage, sandboxId, runAnyway)`: answers the question of the visible `asking` sandbox: `true` starts the mod, `false` fails the sandbox with the cancel error. Does nothing for a sandbox that is not visible or not asking.
 - `requestStageAction(stage, sandboxId, action)`, not exported: queues an action and resolves with the user's answer, or returns `null` when the sandbox is not the visible one or not running. The sessions call it through their `onRequestAction`.
 - `changeStageColorScheme(stage, colorScheme)`: switches the stage's theme and pushes `theme.changed` to every running mod, visible or hidden. Does nothing when the color scheme is the current one. The stage's current `Theme` is `stage.theme`.
 - `readStageSnapshot(stage)` and `subscribeStage(stage, listener)`: a frozen `StageSnapshot` that is new after every change, for React's `useSyncExternalStore`. `subscribeStage` returns the function that unsubscribes.
-- Types: `Stage`, `StageOptions`, `StageRouting`, `StageHome`, `SectionLink`, `StageSnapshot` (`sandboxes`, `action`, `visible` and `activeSection`), `VisibleView` (`{ kind: "sandbox", id }`, `{ kind: "page", section, page }` with `page: null` for the index, or `null` before the first entry), `ActionSnapshot` (`id`, `mod` with `title` and `source`, and `action`), `ActionMod`, the engine's `AppAction`, `LinkAction`, `SaveFileAction` and `ConfirmAction` re-exported as types, so the page imports them from the stage, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, `sandboxDocument`, `canReloadTiles`, `issues`, `errorMessage`, `apiMismatch` with `range` and `apiVersion` only while asking, otherwise `null`), `SandboxStatus` (`loading`, `asking`, `failed`, `running` or `stopped`), `StageHistory`.
+- Types: `Stage`, `StageOptions`, `StageRouting`, `StageHome`, `SectionLink`, `StageSnapshot` (`sandboxes`, `checks`, `action`, `visible` and `activeSection`), `CheckSnapshot` (`id`, `sandboxDocument`, `title`), `VisibleView` (`{ kind: "sandbox", id }`, `{ kind: "page", section, page }` with `page: null` for the index, or `null` before the first entry), `ActionSnapshot` (`id`, `mod` with `title` and `source`, and `action`), `ActionMod`, the engine's `AppAction`, `LinkAction`, `SaveFileAction` and `ConfirmAction` re-exported as types, so the page imports them from the stage, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, `sandboxDocument`, `canReloadTiles`, `issues`, `errorMessage`, `apiMismatch` with `range` and `apiVersion` only while asking, otherwise `null`), `SandboxStatus` (`loading`, `asking`, `failed`, `running` or `stopped`), `StageHistory`.
 
 ### Routing options
 
@@ -196,7 +213,7 @@ window.addEventListener("popstate", function followPopState(): void {
 });
 ```
 
-Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. `App` then renders the page the snapshot's `visible` names, if any, and `StageView`, which stays mounted, reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`. Its `ActionDialog` shows the snapshot's `action`, performs it from the accept button's click and calls `answerStageAction`. Its `ApiMismatchDialog` shows the visible sandbox's `apiMismatch` while it is asking, and calls `answerApiMismatch`.
+Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. `App` then renders the page the snapshot's `visible` names, if any, and `StageView`, which stays mounted, reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`. Apart from them, it renders a hidden `CheckFrame` per entry of the snapshot's `checks`, which calls `attachCheckFrame` and `checkFrameLoadedAgain`. Its `ActionDialog` shows the snapshot's `action`, performs it from the accept button's click and calls `answerStageAction`. Its `ApiMismatchDialog` shows the visible sandbox's `apiMismatch` while it is asking, and calls `answerApiMismatch`.
 
 ### Why no router library
 

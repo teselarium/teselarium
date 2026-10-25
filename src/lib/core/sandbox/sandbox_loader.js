@@ -6,6 +6,7 @@
 const CONNECT_METHOD = "sandbox.connect";
 const BLOCKED_METHOD = "sandbox.blocked";
 const MOUNT_FAILED_METHOD = "sandbox.mountFailed";
+const MOUNTED_METHOD = "sandbox.mounted";
 const DIALOG_BLOCKED_METHOD = "sandbox.dialogBlocked";
 const THEME_CHANGED_METHOD = "theme.changed";
 
@@ -210,6 +211,8 @@ async function mountMod(code) {
   }
   loader.mounted = true;
   await modModule.default(engine, loader.context);
+  // Sent only once `mount` resolved: a failure is reported as mountFailed instead.
+  sendNotification(MOUNTED_METHOD, {});
 }
 
 function reportMountFailure(error) {

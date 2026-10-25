@@ -8,6 +8,7 @@ import {
   subscribeStage,
 } from "../../lib/core/stage/index.ts";
 import type {
+  CheckSnapshot,
   SandboxSnapshot,
   Stage,
   StageSnapshot,
@@ -15,6 +16,7 @@ import type {
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { ActionDialog } from "./ActionDialog.tsx";
 import { ApiMismatchDialog } from "./ApiMismatchDialog.tsx";
+import { CheckFrame } from "./CheckFrame.tsx";
 import { SandboxFrame } from "./SandboxFrame.tsx";
 import { StageBar } from "./StageBar.tsx";
 import "./stage.css";
@@ -69,6 +71,10 @@ function renderSandbox(stage: Stage, sandbox: SandboxSnapshot): ReactElement {
   );
 }
 
+function renderCheckFrame(stage: Stage, check: CheckSnapshot): ReactElement {
+  return <CheckFrame key={check.id} stage={stage} check={check} />;
+}
+
 function ignoreExitError(): void {
   // The document left fullscreen meanwhile.
 }
@@ -97,7 +103,8 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
  * hidden but stays mounted, so no frame reloads. The action dialog shows the action the
  * visible mod asked for, if any, and the API mismatch dialog asks about the
  * visible sandbox while its mod waits for an answer. When the visible sandbox
- * changes, the page leaves fullscreen.
+ * changes, the page leaves fullscreen. The frames of running mod checks sit
+ * behind the sandboxes, hidden by layout (see CheckFrame).
  */
 export function StageView({ stage }: StageViewProps): ReactElement {
   const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
@@ -125,6 +132,10 @@ export function StageView({ stage }: StageViewProps): ReactElement {
   for (const sandbox of snapshot.sandboxes) {
     sandboxes.push(renderSandbox(stage, sandbox));
   }
+  const checkFrames: ReactElement[] = [];
+  for (const check of snapshot.checks) {
+    checkFrames.push(renderCheckFrame(stage, check));
+  }
   return (
     <div
       className="flex flex-1 flex-col gap-2 px-4 pt-2 pb-4"
@@ -134,7 +145,10 @@ export function StageView({ stage }: StageViewProps): ReactElement {
       {visibleSandbox === null ? null : (
         <StageBar stage={stage} sandbox={visibleSandbox} />
       )}
-      <div className="flex flex-1 flex-col">{sandboxes}</div>
+      <div className="relative flex flex-1 flex-col">
+        {sandboxes}
+        {checkFrames}
+      </div>
       <ActionDialog shown={snapshot.action} onAnswer={handleActionAnswer} />
       {visibleSandbox?.status === "asking" ? (
         <ApiMismatchDialog

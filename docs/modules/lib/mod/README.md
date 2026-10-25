@@ -90,7 +90,8 @@ Implemented in `src/lib/mod/`. Other modules import only from the public entry p
 
 - `resolveModReference(reference, options)`: resolves a mod reference to the URL of its mod file. `options` are `{ baseUrl?, defaultModsFolder? }`. Raises `FileFetchError` when it cannot, for example for a default mod name without a default mods folder.
 - `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `name`, `title`, `version`, `api`, `description`, `entrypoint`, `typeSource`, `sampleCollection`, `config`, `permissions`, `theme`). The entrypoint, the tile type and the sample collection are not fetched.
-- `loadMod(reference, options?)`: `loadModFile`, then fetches the entrypoint. Returns a `LoadedMod`: a `ModFile` with `code`, the entrypoint text.
+- `loadModCode(modFile, options?)`: fetches the entrypoint of a `ModFile`. Returns a `LoadedMod`: the `ModFile` with `code`, the entrypoint text. An entrypoint that cannot be fetched raises `FileFetchError`, whose `source` is the entrypoint. The engine's mod check uses it to tell a failing entrypoint apart from a failing mod file.
+- `loadMod(reference, options?)`: `loadModFile`, then `loadModCode`. Returns the `LoadedMod`.
 - `ModLoadOptions`: the `FileFetchOptions` of the [files module](../files/README.md) plus `defaultModsFolder`. Relative references are resolved against `baseUrl`, by default the page's document base URL.
 - Errors: `ModFormatError` (the file does not follow the mod file format). It exposes the failing `source`. A mod file or entrypoint that cannot be fetched raises `FileFetchError`, and a mod file that is not plain YAML raises `YamlParseError`.
 - Constants: `MOD_FILE_KEYS`, the keys of the `mod` mapping the loader reads, and `PERMISSION_CATEGORIES`, the permission categories in their order. The engine's mod API surface guard reads both.
@@ -101,7 +102,7 @@ Loaded mods are plain data, and two loads of the same mod never share objects.
 Example:
 
 ```ts
-import { loadMod, loadModFile } from "./lib/mod/index.ts";
+import { loadMod, loadModCode, loadModFile } from "./lib/mod/index.ts";
 
 const modFile = await loadModFile("./samples/mods/book_list", {
   baseUrl: "https://example.org/",
@@ -109,6 +110,9 @@ const modFile = await loadModFile("./samples/mods/book_list", {
 // modFile.source === "https://example.org/samples/mods/book_list/mod_conf.yaml"
 // modFile.typeSource === "https://example.org/samples/mods/book_list/book_type.md"
 // modFile.sampleCollection === "https://example.org/samples/mods/book_list/book_collection.yaml"
+
+const sampleMod = await loadModCode(modFile);
+// sampleMod.code is the text of the sample's main.js
 
 const mod = await loadMod("mod_viewer", {
   baseUrl: "https://example.org/",

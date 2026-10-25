@@ -78,6 +78,9 @@ export const NO_COUNTRY_TILE_SOURCE = `${FIXTURES_BASE_URL}tiles/books/no_countr
 /** A collection with two of the sample books. */
 export const TWO_BOOKS_SOURCE = `${FIXTURES_BASE_URL}tiles/two_books.yaml`;
 
+/** `./fixtures/tiles/two_books.yaml`: `TWO_BOOKS_SOURCE` as a request names it, relative to the app. */
+export const TWO_BOOKS_REFERENCE = `${FIXTURES_REFERENCE}tiles/two_books.yaml`;
+
 /**
  * `^0.1.0`: the `api` range the test mods declare unless a test asks for
  * another one, so they match the mod API version and get no missing-range
@@ -197,4 +200,55 @@ export function serveTwoBooks(): void {
       '    - path: "./books/fictions.md"',
     ].join("\n"),
   );
+}
+
+/** A mod whose entrypoint answers `404 Not Found`, served by `fetchTestFile` once `serveMissingEntrypointMod` ran. */
+export const MISSING_ENTRYPOINT_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/missing_entrypoint/mod_conf.yaml`;
+export const MISSING_ENTRYPOINT_SOURCE = `${FIXTURES_BASE_URL}mods/missing_entrypoint/missing.js`;
+
+export function serveMissingEntrypointMod(): void {
+  serveTestMod(MISSING_ENTRYPOINT_MOD_SOURCE, [
+    '  name: "missing_entrypoint"',
+    '  version: "0.1.0"',
+    '  entrypoint: "./missing.js"',
+  ]);
+}
+
+/** A mod whose tile type file answers `404 Not Found`, served by `fetchTestFile` once `serveMissingTypeMod` ran. */
+export const MISSING_TYPE_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/missing_type/mod_conf.yaml`;
+export const MISSING_TYPE_SOURCE = `${FIXTURES_BASE_URL}mods/missing_type/book_type.md`;
+
+export function serveMissingTypeMod(): void {
+  serveTestMod(MISSING_TYPE_MOD_SOURCE, [
+    '  name: "missing_type"',
+    '  version: "0.1.0"',
+    '  entrypoint: "./main.js"',
+    '  type_path: "./book_type.md"',
+    '  sample_collection: "../../tiles/books_collection.yaml"',
+  ]);
+}
+
+/**
+ * A mod of the sample book type whose sample collection is `FOUR_BOOKS_SOURCE`,
+ * where the tile at `NO_COUNTRY_TILE_SOURCE` misses `country`. Served by
+ * `fetchTestFile` once `serveMismatchedSampleMod` ran, declaring `apiRange`
+ * unless it is `null`.
+ */
+export const MISMATCHED_SAMPLE_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/mismatched_sample/mod_conf.yaml`;
+
+export function serveMismatchedSampleMod(
+  apiRange: string | null = TEST_MOD_API_RANGE,
+): void {
+  serveTestMod(
+    MISMATCHED_SAMPLE_MOD_SOURCE,
+    [
+      '  name: "mismatched_sample"',
+      '  version: "0.1.0"',
+      '  entrypoint: "./main.js"',
+      '  type_path: "../../types/book.md"',
+      '  sample_collection: "../../tiles/four_books.yaml"',
+    ],
+    apiRange,
+  );
+  serveFourBooks();
 }

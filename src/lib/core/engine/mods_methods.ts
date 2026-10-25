@@ -8,6 +8,7 @@ import {
   ModMethodError,
   ModSwitchedOffError,
 } from "./engine_errors.ts";
+import type { ModCheckReport } from "./mod_check_report.ts";
 import { inspectMod } from "./mod_inspection.ts";
 import type { ModInspection } from "./mod_inspection.ts";
 import type { RunLink } from "./mod_launch.ts";
@@ -75,14 +76,18 @@ async function inspectRequestedMod(
   }
 }
 
-function readOpenCollection(params: YamlMapping): string | null {
+/** Reads an optional collection location, or raises `INVALID_PARAMS` naming `method`. */
+function readOpenCollection(
+  params: YamlMapping,
+  method: string,
+): string | null {
   const collection: YamlValue | undefined = params.collection;
   if (collection === undefined || collection === null) {
     return null;
   }
   if (typeof collection !== "string" || collection === "") {
     throwInvalidParams(
-      "mods.open",
+      method,
       '"collection" must be null or a non-empty string',
     );
   }
@@ -110,7 +115,7 @@ function readLinkParams(params: YamlMapping): Record<string, string> {
 export function readOpenParams(params: YamlMapping): RunLink {
   const link: RunLink = {
     mod: readRequiredText(params, "mod", "mods.open"),
-    collection: readOpenCollection(params),
+    collection: readOpenCollection(params, "mods.open"),
     params: readLinkParams(params),
   };
   return link;
@@ -137,8 +142,31 @@ async function openRequestedMod(
   return null;
 }
 
-/** The `mods.*` requests: inspecting and opening other mods. */
+/**
+ * `mods.check { mod, collection? }`: asks the stage to check the mod, after
+ * the same checks as `mods.inspect`, and answers the report.
+ */
+async function checkRequestedMod(
+  context: ModMethodContext,
+  params: YamlMapping,
+): Promise<ModCheckReport> {
+  const reference = readRequiredText(params, "mod", "mods.check");
+  const collection = readOpenCollection(params, "mods.check");
+  const source = resolveRequestedMod(context, reference, "mods.check");
+  checkModAccess(context, source);
+  const report = context.onCheckMod({ source, collection });
+  if (report === null) {
+    throw new ModMethodError(
+      PERMISSION_DENIED,
+      "mods.check: only the visible mod can check mods",
+    );
+  }
+  return report;
+}
+
+/** The `mods.*` requests: inspecting, opening and checking other mods. */
 export const MODS_METHODS: ModMethodTable = {
   "mods.inspect": inspectRequestedMod,
   "mods.open": openRequestedMod,
+  "mods.check": checkRequestedMod,
 };

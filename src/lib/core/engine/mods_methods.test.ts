@@ -6,6 +6,7 @@ import {
 } from "../../../test/method_contexts.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
+  APP_ORIGIN,
   MISSING_MOD_REFERENCE,
   MISSING_MOD_SOURCE,
   OTHER_API_MOD_SOURCE,
@@ -22,6 +23,9 @@ import {
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
+import { checkModBundle } from "./mod_bundle_check.ts";
+import { buildModCheckReport } from "./mod_check_report.ts";
+import type { ModCheckReport } from "./mod_check_report.ts";
 import type { RunLink } from "./mod_launch.ts";
 import {
   INVALID_PARAMS,
@@ -29,7 +33,7 @@ import {
   MOD_SWITCHED_OFF,
   PERMISSION_DENIED,
 } from "./mod_messages.ts";
-import type { ModMethodContext } from "./mod_methods.ts";
+import type { ModCheckRequest, ModMethodContext } from "./mod_methods.ts";
 import { MODS_METHODS } from "./mods_methods.ts";
 
 const VIEWER_TARGET = SAMPLE_MOD_SOURCE;
@@ -44,6 +48,10 @@ function inspect(context: ModMethodContext, params: object): Promise<unknown> {
 
 function open(context: ModMethodContext, params: object): Promise<unknown> {
   return MODS_METHODS["mods.open"](context, params as never);
+}
+
+function check(context: ModMethodContext, params: object): Promise<unknown> {
+  return MODS_METHODS["mods.check"](context, params as never);
 }
 
 async function catchMethodError(
@@ -91,6 +99,60 @@ function switchViewerOff(context: ModMethodContext): void {
     },
     APP_BASE_URL,
   );
+}
+
+type CheckModSpy = Mock<
+  (request: ModCheckRequest) => Promise<ModCheckReport> | null
+>;
+
+function buildPassingReport(source: string): ModCheckReport {
+  return buildModCheckReport(source, [], true);
+}
+
+/** A context whose `onCheckMod` is a spy: it answers a passing report, or `null` for a hidden mod. */
+function buildCheckingContext(
+  hosts: string[],
+  isVisible: boolean = true,
+): {
+  context: ModMethodContext;
+  fetchSpy: Mock<typeof fetch>;
+  checkSpy: CheckModSpy;
+} {
+  const { context, fetchSpy } = buildSpiedContext(hosts);
+  const checkSpy: CheckModSpy =
+    vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>();
+  if (isVisible) {
+    checkSpy.mockImplementation(resolvePassingReport);
+  } else {
+    checkSpy.mockReturnValue(null);
+  }
+  context.onCheckMod = checkSpy;
+  const checkingContext = { context, fetchSpy, checkSpy };
+  return checkingContext;
+}
+
+function resolvePassingReport(
+  request: ModCheckRequest,
+): Promise<ModCheckReport> {
+  return Promise.resolve(buildPassingReport(request.source));
+}
+
+/** An `onCheckMod` that runs only the bundle check, as the stage does before mounting. */
+async function checkBundleOnly(
+  context: ModMethodContext,
+  request: ModCheckRequest,
+): Promise<ModCheckReport> {
+  const bundleCheck = await checkModBundle(
+    request.source,
+    request.collection,
+    context.fetchOptions,
+  );
+  const report = buildModCheckReport(
+    request.source,
+    bundleCheck.findings,
+    false,
+  );
+  return report;
 }
 
 describe("mods.inspect", function describeModsInspect(): void {
@@ -360,5 +422,128 @@ describe("mods.open", function describeModsOpen(): void {
     expect(error.code).toBe(MOD_SWITCHED_OFF);
     expect(error.message).toContain("mod_viewer");
     expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("Check a mod", function describeCheckMod(): void {
+  it("asks the stage with the resolved source and answers the report", async function checksMod(): Promise<void> {
+    const { context, checkSpy } = buildCheckingContext(["*"]);
+
+    const report = await check(context, {
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: SAMPLE_COLLECTION_REFERENCE,
+    });
+
+    expect(checkSpy).toHaveBeenCalledExactlyOnceWith({
+      source: SAMPLE_MOD_SOURCE,
+      collection: SAMPLE_COLLECTION_REFERENCE,
+    });
+    expect(report).toEqual(buildPassingReport(SAMPLE_MOD_SOURCE));
+  });
+
+  it("defaults the collection to null", async function defaultsCollection(): Promise<void> {
+    const { context, checkSpy } = buildCheckingContext(["*"]);
+
+    await check(context, { mod: SAMPLE_MOD_REFERENCE, collection: null });
+
+    expect(checkSpy).toHaveBeenCalledExactlyOnceWith({
+      source: SAMPLE_MOD_SOURCE,
+      collection: null,
+    });
+  });
+});
+
+describe("Check requests follow the inspect rules", function describeCheckRules(): void {
+  it("Mod without the open permission", async function refusesWithoutGrant(): Promise<void> {
+    const { context, fetchSpy, checkSpy } = buildCheckingContext([]);
+
+    const error = await catchMethodError(
+      check(context, { mod: "https://mods.example.net/clock/" }),
+    );
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toContain("https://mods.example.net");
+    expect(error.message).toContain("permissions.open");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(checkSpy).not.toHaveBeenCalled();
+  });
+
+  it("Hidden mod asks for a check", async function refusesHiddenMod(): Promise<void> {
+    const { context } = buildCheckingContext(["*"], false);
+
+    const error = await catchMethodError(
+      check(context, { mod: SAMPLE_MOD_REFERENCE }),
+    );
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toBe(
+      "mods.check: only the visible mod can check mods",
+    );
+  });
+
+  it("Switched-off mod", async function refusesSwitchedOff(): Promise<void> {
+    const { context, fetchSpy, checkSpy } = buildCheckingContext(["*"]);
+    switchViewerOff(context);
+
+    const error = await catchMethodError(
+      check(context, { mod: "./default_mods/mod_viewer/" }),
+    );
+
+    expect(error.code).toBe(MOD_SWITCHED_OFF);
+    expect(error.message).toContain("mod_viewer");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(checkSpy).not.toHaveBeenCalled();
+  });
+
+  it("Missing mod reference", async function rejectsMissingReference(): Promise<void> {
+    const { context, checkSpy } = buildCheckingContext(["*"]);
+
+    const error = await catchMethodError(check(context, {}));
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe('mods.check: "mod" must be a non-empty string');
+    expect(checkSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects a collection that is not a non-empty string", async function rejectsBadCollection(): Promise<void> {
+    const { context, checkSpy } = buildCheckingContext(["*"]);
+
+    const emptyError = await catchMethodError(
+      check(context, { mod: SAMPLE_MOD_REFERENCE, collection: "" }),
+    );
+    const numberError = await catchMethodError(
+      check(context, { mod: SAMPLE_MOD_REFERENCE, collection: 3 }),
+    );
+
+    for (const error of [emptyError, numberError]) {
+      expect(error.code).toBe(INVALID_PARAMS);
+      expect(error.message).toBe(
+        'mods.check: "collection" must be null or a non-empty string',
+      );
+    }
+    expect(checkSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("Bundle check", function describeBundleCheck(): void {
+  it("Missing mod file", async function reportsMissingModFile(): Promise<void> {
+    const context = buildMethodContext([buildOpenPermission(APP_ORIGIN)]);
+    context.onCheckMod = checkBundleOnly.bind(undefined, context);
+
+    const report = await check(context, { mod: MISSING_MOD_REFERENCE });
+
+    expect(report).toMatchObject({
+      source: MISSING_MOD_SOURCE,
+      status: "fail",
+      mountChecked: false,
+    });
+    const findings = (report as ModCheckReport).findings;
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({
+      step: "bundle",
+      level: "error",
+      source: MISSING_MOD_SOURCE,
+    });
+    expect(findings[0].message).toContain("404");
   });
 });

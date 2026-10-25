@@ -281,6 +281,15 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     expect(launch.fileIssues).toEqual([]);
   });
 
+  it("Mods for 0.1.0 still match", async function matchesFirstVersionRange(): Promise<void> {
+    serveUntypedMod("^0.1.0");
+
+    const launch = await launchMod({ ...SAMPLE_LINK, mod: UNTYPED_MOD_SOURCE });
+
+    expect(launch.apiCompatible).toBe(true);
+    expect(launch.fileIssues).toEqual([]);
+  });
+
   it("Mod without a range", async function warnsWithoutRange(): Promise<void> {
     serveUntypedMod(null);
 

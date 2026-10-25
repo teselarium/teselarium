@@ -5,7 +5,7 @@ import satisfies from "semver/functions/satisfies.js";
  * context and the mod file format. It is separate from the app's own version.
  * See "Mod API version" in the engine's README for when it changes.
  */
-export const MOD_API_VERSION = "0.1.0";
+export const MOD_API_VERSION = "0.1.1";
 
 /** Whether `version` is in `range`, by npm's semver range rules. */
 export function isVersionInApiRange(version: string, range: string): boolean {
@@ -26,6 +26,11 @@ export function matchModApiRange(range: string | null): boolean | null {
 /** The message of the warning of a mod that declares no `api` range. */
 export function describeMissingApiRange(): string {
   return `the mod declares no "api" range, so it may not work with mod API ${MOD_API_VERSION}`;
+}
+
+/** The message of the warning of a mod whose `api` range does not match `MOD_API_VERSION`. */
+export function describeApiRangeMismatch(range: string): string {
+  return `the mod was written for mod API "${range}", so it may not work with mod API ${MOD_API_VERSION}`;
 }
 
 /** The error of a sandbox whose mod, written for `range`, the user did not run. */

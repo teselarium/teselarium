@@ -11,6 +11,7 @@ import {
   SANDBOX_BLOCKED_METHOD,
   SANDBOX_DIALOG_BLOCKED_METHOD,
   SANDBOX_MOUNT_FAILED_METHOD,
+  SANDBOX_MOUNTED_METHOD,
 } from "../sandbox/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
@@ -38,9 +39,15 @@ import type {
   ErrorResponse,
   ModNotification,
   ModRequest,
+  ResponseError,
   ResultResponse,
 } from "./mod_messages.ts";
-import type { ModMethodContext, ModMethodTable } from "./mod_methods.ts";
+import type { ModCheckReport } from "./mod_check_report.ts";
+import type {
+  ModCheckRequest,
+  ModMethodContext,
+  ModMethodTable,
+} from "./mod_methods.ts";
 import { MODS_METHODS } from "./mods_methods.ts";
 import { STORAGE_METHODS } from "./storage_methods.ts";
 import { UI_METHODS } from "./ui_methods.ts";
@@ -60,8 +67,20 @@ export interface ModSessionOptions {
    * answer, or is `null` when the sandbox is not the visible one.
    */
   onRequestAction: (action: AppAction) => Promise<boolean> | null;
+  /** Asks the stage to check a mod. `null` when the sandbox is not the visible one. */
+  onCheckMod: (request: ModCheckRequest) => Promise<ModCheckReport> | null;
   /** The theme the mod mounts with: the one current when the frame connects. */
   theme: Theme;
+  /**
+   * Called when the mod's `mount` finished: for `sandbox.mounted`, and for
+   * `sandbox.mountFailed` after its issue is reported. Running sandboxes pass none.
+   */
+  onMounted?: () => void;
+  /**
+   * Called for every error response sent, with the request's method, or
+   * `null` for a message that is not a request, and the response's error.
+   */
+  onErrorResponse?: (method: string | null, error: ResponseError) => void;
 }
 
 /** The engine's side of one running mod. Mutable, because a channel is state. */
@@ -71,6 +90,9 @@ export interface ModSession {
   onIssue: (issue: ModIssue) => void;
   /** Keys of the issues already reported, so each is reported once. */
   reportedIssueKeys: Set<string>;
+  onMounted: (() => void) | null;
+  onErrorResponse:
+    ((method: string | null, error: ResponseError) => void) | null;
   stopped: boolean;
 }
 
@@ -114,6 +136,21 @@ function sendToMod(session: ModSession, message: object): void {
   session.port.postMessage(message);
 }
 
+/** Sends a response, and tells `onErrorResponse` about an error response that was sent. */
+function sendResponse(
+  session: ModSession,
+  method: string | null,
+  response: ResultResponse | ErrorResponse,
+): void {
+  if (session.stopped) {
+    return;
+  }
+  session.port.postMessage(response);
+  if ("error" in response && session.onErrorResponse !== null) {
+    session.onErrorResponse(method, response.error);
+  }
+}
+
 function buildMethodErrorResponse(
   request: ModRequest,
   error: unknown,
@@ -155,7 +192,7 @@ async function answerRequest(
   request: ModRequest,
 ): Promise<void> {
   const response = await buildRequestResponse(session, request);
-  sendToMod(session, response);
+  sendResponse(session, request.method, response);
 }
 
 function reportBlockedRequest(session: ModSession, params: unknown): void {
@@ -190,7 +227,16 @@ function reportMountFailure(session: ModSession, params: unknown): void {
   });
 }
 
-/** The frame loader's notifications become issues. Any other notification is ignored. */
+function reportMounted(session: ModSession): void {
+  if (session.onMounted !== null) {
+    session.onMounted();
+  }
+}
+
+/**
+ * The frame loader's notifications become issues, and a finished mount is
+ * told to `onMounted`. Any other notification is ignored.
+ */
 function handleModNotification(
   session: ModSession,
   notification: ModNotification,
@@ -200,6 +246,10 @@ function handleModNotification(
   }
   if (notification.method === SANDBOX_MOUNT_FAILED_METHOD) {
     reportMountFailure(session, notification.params);
+    reportMounted(session);
+  }
+  if (notification.method === SANDBOX_MOUNTED_METHOD) {
+    reportMounted(session);
   }
   if (notification.method === SANDBOX_DIALOG_BLOCKED_METHOD) {
     reportBlockedDialog(session, notification.params);
@@ -216,8 +266,9 @@ function handleModPortMessage(session: ModSession, event: MessageEvent): void {
     return;
   }
   if (message.kind === "invalid") {
-    sendToMod(
+    sendResponse(
       session,
+      null,
       buildErrorResponse(
         message.id,
         INVALID_REQUEST,
@@ -265,9 +316,12 @@ export function connectModSession(
       fetchOptions: options.fetchOptions,
       onOpenLink: options.onOpenLink,
       onRequestAction: options.onRequestAction,
+      onCheckMod: options.onCheckMod,
     },
     onIssue: options.onIssue,
     reportedIssueKeys: new Set(),
+    onMounted: options.onMounted ?? null,
+    onErrorResponse: options.onErrorResponse ?? null,
     stopped: false,
   };
   port.onmessage = handleModPortMessage.bind(undefined, session);

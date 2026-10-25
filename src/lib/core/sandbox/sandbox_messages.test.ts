@@ -7,6 +7,7 @@ import {
   SANDBOX_CONNECT_METHOD,
   SANDBOX_DIALOG_BLOCKED_METHOD,
   SANDBOX_MOUNT_FAILED_METHOD,
+  SANDBOX_MOUNTED_METHOD,
 } from "./index.ts";
 import { THEME_CHANGED_METHOD } from "../engine/index.ts";
 import SANDBOX_LOADER from "./sandbox_loader.js?raw";
@@ -84,6 +85,7 @@ describe("frame loader message names", function describeMethodNames(): void {
       SANDBOX_CONNECT_METHOD,
       SANDBOX_BLOCKED_METHOD,
       SANDBOX_MOUNT_FAILED_METHOD,
+      SANDBOX_MOUNTED_METHOD,
       SANDBOX_DIALOG_BLOCKED_METHOD,
     ];
 
@@ -94,8 +96,21 @@ describe("frame loader message names", function describeMethodNames(): void {
       "sandbox.connect",
       "sandbox.blocked",
       "sandbox.mountFailed",
+      "sandbox.mounted",
       "sandbox.dialogBlocked",
     ]);
+  });
+
+  it("sandbox.mounted is sent once mount resolved", function sendsMountedAfterMount(): void {
+    const mountCall = SANDBOX_LOADER.indexOf(
+      "await modModule.default(engine, loader.context);",
+    );
+    const mountedNotification = SANDBOX_LOADER.indexOf(
+      "sendNotification(MOUNTED_METHOD, {});",
+    );
+
+    expect(mountCall).toBeGreaterThan(-1);
+    expect(mountedNotification).toBeGreaterThan(mountCall);
   });
 
   it("include the engine's theme.changed event", function matchesThemeChanged(): void {

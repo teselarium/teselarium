@@ -6,9 +6,11 @@ describe("stage module entry point", function describeEntryPoint(): void {
     expect(Object.keys(stageModule).sort()).toEqual([
       "answerApiMismatch",
       "answerStageAction",
+      "attachCheckFrame",
       "attachFrame",
       "buildSectionHash",
       "changeStageColorScheme",
+      "checkFrameLoadedAgain",
       "closeSandbox",
       "createStage",
       "followHistory",

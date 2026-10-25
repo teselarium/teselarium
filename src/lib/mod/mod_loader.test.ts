@@ -12,7 +12,7 @@ import {
 } from "../../test/test_files.ts";
 import { FileFetchError, YamlParseError } from "../files/index.ts";
 import * as modModule from "./index.ts";
-import { loadMod, loadModFile, ModFormatError } from "./index.ts";
+import { loadMod, loadModCode, loadModFile, ModFormatError } from "./index.ts";
 import type { LoadedMod, ModFile } from "./index.ts";
 
 const SAMPLE_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/book_list/mod_conf.yaml`;
@@ -310,6 +310,35 @@ describe("loadModFile", function describeLoadModFile(): void {
   });
 });
 
+describe("loadModCode", function describeLoadModCode(): void {
+  it("fetches only the entrypoint of a loaded mod file", async function loadsCode(): Promise<void> {
+    const modFile = await loadModFile(SAMPLE_MOD_SOURCE, {
+      fetch: fetchFixture,
+    });
+    const testFetch = createTestFetch();
+
+    const mod = await loadModCode(modFile, { fetch: testFetch });
+
+    expect(listRequestedUrls(testFetch)).toEqual([SAMPLE_ENTRYPOINT]);
+    expect(mod.code).toBe(readFixtureText("mods/book_list/main.js"));
+  });
+
+  it("Entrypoint HTTP 404", async function rejectsMissingEntrypoint(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, MINIMAL_MOD_TEXT);
+    const modFile = await loadModFile(BROKEN_MOD_SOURCE, {
+      fetch: fetchTestFile,
+    });
+
+    const error = await catchLoadError(
+      loadModCode(modFile, { fetch: fetchTestFile }),
+    );
+
+    expect(error).toBeInstanceOf(FileFetchError);
+    expect((error as FileFetchError).source).toBe(BROKEN_ENTRYPOINT);
+    expect((error as FileFetchError).message).toContain("404");
+  });
+});
+
 describe("mod module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(modModule).sort()).toEqual([
@@ -317,6 +346,7 @@ describe("mod module entry point", function describeEntryPoint(): void {
       "ModFormatError",
       "PERMISSION_CATEGORIES",
       "loadMod",
+      "loadModCode",
       "loadModFile",
       "resolveModReference",
     ]);

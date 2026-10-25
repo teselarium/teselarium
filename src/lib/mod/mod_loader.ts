@@ -89,6 +89,19 @@ export async function loadModFile(
 }
 
 /**
+ * Fetches the entrypoint of a loaded mod file and returns the mod with its
+ * code. Raises `FileFetchError`, whose source is the entrypoint.
+ */
+export async function loadModCode(
+  modFile: ModFile,
+  options: ModLoadOptions = {},
+): Promise<LoadedMod> {
+  const entrypointFile = await fetchFile(modFile.entrypoint, options);
+  const loadedMod: LoadedMod = { ...modFile, code: entrypointFile.content };
+  return loadedMod;
+}
+
+/**
  * Loads a mod file and the code of its entrypoint. Raises `FileFetchError`,
  * `YamlParseError` or `ModFormatError`. Two loads never share objects.
  */
@@ -97,7 +110,6 @@ export async function loadMod(
   options: ModLoadOptions = {},
 ): Promise<LoadedMod> {
   const modFile = await loadModFile(reference, options);
-  const entrypointFile = await fetchFile(modFile.entrypoint, options);
-  const loadedMod: LoadedMod = { ...modFile, code: entrypointFile.content };
+  const loadedMod = await loadModCode(modFile, options);
   return loadedMod;
 }

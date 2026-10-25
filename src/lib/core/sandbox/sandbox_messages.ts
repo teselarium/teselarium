@@ -9,6 +9,12 @@ export const SANDBOX_BLOCKED_METHOD = "sandbox.blocked";
 /** Frame to engine: the mod could not be imported or mounted. */
 export const SANDBOX_MOUNT_FAILED_METHOD = "sandbox.mountFailed";
 
+/**
+ * Frame to engine: the mod's `mount` resolved. Part of the loader's protocol,
+ * not of the mod API. Sent at most once, and never after `sandbox.mountFailed`.
+ */
+export const SANDBOX_MOUNTED_METHOD = "sandbox.mounted";
+
 /** Frame to engine: the mod called a browser dialog function the sandbox blocks. */
 export const SANDBOX_DIALOG_BLOCKED_METHOD = "sandbox.dialogBlocked";
 

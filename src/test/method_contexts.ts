@@ -2,7 +2,10 @@ import { vi } from "vitest";
 import type { Mock } from "vitest";
 import type { AppAction } from "../lib/core/engine/app_actions.ts";
 import { ModMethodError } from "../lib/core/engine/engine_errors.ts";
-import type { ModMethodContext } from "../lib/core/engine/mod_methods.ts";
+import type {
+  ModCheckRequest,
+  ModMethodContext,
+} from "../lib/core/engine/mod_methods.ts";
 import type { LoadedMod, ModPermission } from "../lib/mod/index.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
@@ -68,6 +71,13 @@ function acceptAction(): Promise<boolean> {
   return Promise.resolve(true);
 }
 
+/** The default `onCheckMod` of handler tests: a test that checks a mod sets its own. */
+function failOnCheckMod(request: ModCheckRequest): never {
+  throw new Error(
+    `onCheckMod was called for "${request.source}", but the test does not expect a check`,
+  );
+}
+
 /**
  * A method context for a mod on the app's origin with the given granted
  * permissions, a `Map`-backed storage and `fetchTestFile`. The mod is
@@ -83,6 +93,7 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     onOpenLink: acceptOpenLink,
     onRequestAction: acceptAction,
+    onCheckMod: failOnCheckMod,
   };
   return context;
 }

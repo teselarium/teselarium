@@ -15,8 +15,10 @@ import type { ModIssue } from "../../mod/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
 import { MOD_API_VERSION } from "./mod_api_version.ts";
+import type { ModCheckReport } from "./mod_check_report.ts";
 import { prepareModLaunch } from "./mod_launch.ts";
 import type { RunLink } from "./mod_launch.ts";
+import type { ModCheckRequest } from "./mod_methods.ts";
 import {
   connectModSession,
   ENGINE_METHODS,
@@ -53,6 +55,49 @@ const SURFACE_BY_VERSION: Record<string, ModApiSurface> = {
     methods: [
       "files.save",
       "links.open",
+      "mods.inspect",
+      "mods.open",
+      "storage.get",
+      "storage.set",
+      "ui.confirm",
+    ],
+    events: ["theme.changed", "tiles.changed"],
+    contextKeys: [
+      "api",
+      "config",
+      "issues",
+      "mod",
+      "params",
+      "permissions",
+      "theme",
+      "tiles",
+    ],
+    contextMappingKeys: {
+      mod: ["description", "name", "source", "title", "version"],
+      api: ["version"],
+      permissions: ["denied", "granted"],
+      theme: ["colorScheme", "tokens"],
+    },
+    modFileKeys: [
+      "api",
+      "config",
+      "description",
+      "entrypoint",
+      "name",
+      "permissions",
+      "sample_collection",
+      "theme",
+      "title",
+      "type_path",
+      "version",
+    ],
+    permissionCategories: ["code", "connect", "embed", "open", "show"],
+  },
+  "0.1.1": {
+    methods: [
+      "files.save",
+      "links.open",
+      "mods.check",
       "mods.inspect",
       "mods.open",
       "storage.get",
@@ -132,6 +177,8 @@ async function readSampleMountContext(): Promise<Record<string, object>> {
     onIssue: vi.fn<(issue: ModIssue) => void>(),
     onOpenLink: vi.fn<(link: RunLink) => boolean>(),
     onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
+    onCheckMod:
+      vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
     theme: buildTheme("light"),
   });
   openPorts.push(session.port, readModPort(fakeFrame));

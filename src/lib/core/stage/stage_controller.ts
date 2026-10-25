@@ -4,6 +4,8 @@ import { MOD_API_VERSION, resolveDefaultModSettings } from "../engine/index.ts";
 import type {
   AppAction,
   DefaultModSettings,
+  ModCheckReport,
+  ModCheckRequest,
   ModLaunch,
   ResolvedDefaultModSettings,
   RunLink,
@@ -19,6 +21,14 @@ import {
   readShownAction,
 } from "./stage_actions.ts";
 import type { ActionMod, StageActions } from "./stage_actions.ts";
+import {
+  attachStageCheckFrame,
+  createStageChecks,
+  endRequesterChecks,
+  failStageCheck,
+  runStageCheck,
+} from "./stage_checks.ts";
+import type { CheckServices, StageChecks } from "./stage_checks.ts";
 import {
   readHistoryPosition,
   readHistorySection,
@@ -108,6 +118,15 @@ export interface SandboxSnapshot {
   apiMismatch: { range: string; apiVersion: string } | null;
 }
 
+/** What the page renders of one check: a hidden frame. Frozen. */
+export interface CheckSnapshot {
+  id: string;
+  /** The frame's `srcdoc`. */
+  sandboxDocument: string;
+  /** The checked mod's title, for the frame's `title`. */
+  title: string;
+}
+
 /** The action the page shows in its dialog. Frozen, except the bytes of a save. */
 export interface ActionSnapshot {
   /** Passed back to `answerStageAction`. */
@@ -126,6 +145,8 @@ export type VisibleView =
 /** What the page renders of the stage. Frozen, and new after every change. */
 export interface StageSnapshot {
   sandboxes: readonly SandboxSnapshot[];
+  /** The running checks, whose hidden frames the page renders apart from the sandboxes. */
+  checks: readonly CheckSnapshot[];
   /** The oldest action waiting for the user, or `null`. Later ones wait their turn. */
   action: ActionSnapshot | null;
   visible: VisibleView;
@@ -149,6 +170,8 @@ export interface Stage {
   theme: Theme;
   /** The actions the visible mod asked for, oldest first. */
   actions: StageActions;
+  /** The running mod checks, apart from the sandboxes and the history. */
+  checks: StageChecks;
   listeners: Set<() => void>;
   snapshot: StageSnapshot;
 }
@@ -157,6 +180,7 @@ const LEFT_PAGE_MESSAGE = "The mod left its page and was stopped.";
 
 const EMPTY_SNAPSHOT: StageSnapshot = Object.freeze({
   sandboxes: Object.freeze([]),
+  checks: Object.freeze([]),
   action: null,
   visible: null,
   activeSection: null,
@@ -183,7 +207,24 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     onChange: publishStage.bind(undefined, stage),
     onOpenLink: openLinkFromSandbox.bind(undefined, stage),
     onRequestAction: requestStageAction.bind(undefined, stage),
+    onCheckMod: checkStageMod.bind(undefined, stage),
     readTheme: readStageTheme.bind(undefined, stage),
+  };
+  return services;
+}
+
+function isSandboxRunning(stage: Stage, sandboxId: string): boolean {
+  return stage.runtimes.get(sandboxId)?.status === "running";
+}
+
+function buildCheckServices(stage: Stage): CheckServices {
+  const services: CheckServices = {
+    appOrigin: stage.appOrigin,
+    defaults: stage.defaults,
+    fetchOptions: stage.fetchOptions,
+    readTheme: readStageTheme.bind(undefined, stage),
+    isSandboxRunning: isSandboxRunning.bind(undefined, stage),
+    onChange: publishStage.bind(undefined, stage),
   };
   return services;
 }
@@ -282,6 +323,19 @@ function buildVisibleView(state: StageState): VisibleView {
   return Object.freeze(sandboxView);
 }
 
+function buildCheckSnapshots(checks: StageChecks): readonly CheckSnapshot[] {
+  const snapshots: CheckSnapshot[] = [];
+  for (const check of checks.entries.values()) {
+    const snapshot: CheckSnapshot = {
+      id: check.id,
+      sandboxDocument: check.launch.sandboxDocument,
+      title: check.launch.mod.title,
+    };
+    snapshots.push(Object.freeze(snapshot));
+  }
+  return Object.freeze(snapshots);
+}
+
 function buildStageSnapshot(stage: Stage): StageSnapshot {
   const visibleId = readVisibleSandbox(stage.state)?.id ?? null;
   const sandboxes: SandboxSnapshot[] = [];
@@ -292,6 +346,7 @@ function buildStageSnapshot(stage: Stage): StageSnapshot {
   }
   const snapshot: StageSnapshot = {
     sandboxes: Object.freeze(sandboxes),
+    checks: buildCheckSnapshots(stage.checks),
     action: buildActionSnapshot(stage),
     visible: buildVisibleView(stage.state),
     activeSection: readVisibleEntry(stage.state)?.section ?? null,
@@ -326,8 +381,8 @@ function dropLeftActions(stage: Stage): void {
 
 /**
  * Applies a state change: stops the closed sandboxes, launches the opened
- * one, updates the section memory and drops the actions of the sandboxes
- * that left.
+ * one, updates the section memory, drops the actions of the sandboxes that
+ * left and ends the checks the closed sandboxes asked for.
  */
 function applyStageChange(stage: Stage, change: StageChange): void {
   stage.state = change.state;
@@ -350,6 +405,9 @@ function applyStageChange(stage: Stage, change: StageChange): void {
     );
   }
   dropLeftActions(stage);
+  for (const closedId of change.closedIds) {
+    endRequesterChecks(stage.checks, buildCheckServices(stage), closedId);
+  }
 }
 
 export function createStage(options: StageOptions): Stage {
@@ -365,6 +423,7 @@ export function createStage(options: StageOptions): Stage {
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
     actions: createStageActions(),
+    checks: createStageChecks(),
     listeners: new Set(),
     snapshot: EMPTY_SNAPSHOT,
   };
@@ -672,6 +731,53 @@ export function frameLoadedAgain(stage: Stage, id: string): void {
   stopSandbox(runtime, { level: "error", source, message: LEFT_PAGE_MESSAGE });
   dropLeftActions(stage);
   publishStage(stage);
+}
+
+/**
+ * Checks a mod for the sandbox `requesterId`, outside the sandboxes and the
+ * history: the bundle check, then, without a bundle error, the mount check
+ * in a hidden frame the snapshot lists in `checks`. Resolves with the
+ * report. Returns `null`, and checks nothing, when the requester is not the
+ * visible sandbox.
+ */
+export function checkStageMod(
+  stage: Stage,
+  requesterId: string,
+  request: ModCheckRequest,
+): Promise<ModCheckReport> | null {
+  if (readVisibleSandbox(stage.state)?.id !== requesterId) {
+    return null;
+  }
+  return runStageCheck(
+    stage.checks,
+    buildCheckServices(stage),
+    requesterId,
+    request,
+  );
+}
+
+/** Connects a check's frame, on the frame's first `load`, and starts its mount limit. */
+export function attachCheckFrame(
+  stage: Stage,
+  id: string,
+  frameTarget: Pick<Window, "postMessage">,
+): void {
+  attachStageCheckFrame(
+    stage.checks,
+    buildCheckServices(stage),
+    id,
+    frameTarget,
+  );
+}
+
+/** A check frame loaded another document: the checked mod is stopped, and its check ends with an error. */
+export function checkFrameLoadedAgain(stage: Stage, id: string): void {
+  failStageCheck(
+    stage.checks,
+    buildCheckServices(stage),
+    id,
+    LEFT_PAGE_MESSAGE,
+  );
 }
 
 /**

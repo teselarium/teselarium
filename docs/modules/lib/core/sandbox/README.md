@@ -120,22 +120,23 @@ The frame loader (`sandbox_loader.js`) is the only script the app puts in a mod'
 5. On connect, it sets `data-ot-color-scheme` on `<html>` to `context.theme.colorScheme`, before importing the mod, so the attribute is there before `mount`.
 6. On a `theme.changed` notification, it sets the attribute to the params' `colorScheme` before calling the mod's handlers. If `mount` has not been called yet, it also replaces `context.theme` with the params, so a mod whose code is still being imported mounts with the newest theme. A `colorScheme` other than `"light"` or `"dark"` is ignored. The attribute is set for mods that opted out of the theme styles too.
 7. Before importing the mod, it replaces `alert`, `confirm`, `prompt` and `print` on `window` with functions that send `sandbox.dialogBlocked` and return what the blocked originals return: `undefined`, `false`, `null` and `undefined`.
-8. It turns the mod's code into a `blob:` URL, `import()`s it, revokes the URL, checks that the default export is a function and calls `mount(engine, context)`, awaiting the result. A missing default export, an import error, a throw or a rejection becomes `sandbox.mountFailed`.
+8. It turns the mod's code into a `blob:` URL, `import()`s it, revokes the URL, checks that the default export is a function and calls `mount(engine, context)`, awaiting the result. A missing default export, an import error, a throw or a rejection becomes `sandbox.mountFailed`. When `mount` resolves, and only then, it sends `sandbox.mounted`.
 
 ### Frame loader messages
 
-The frame loader and the engine use four notifications, whose names start with the reserved `sandbox.` prefix:
+The frame loader and the engine use five notifications, whose names start with the reserved `sandbox.` prefix. They are the loader's protocol, not the mod API: mods never send or receive them through the engine API object, the mod API surface guard does not record them, and adding one needs no mod API version bump.
 
 | Message | Direction | Params |
 |---|---|---|
 | `sandbox.connect` | engine to frame, on `window`, with the port | `{ code, context }`: the entrypoint text and the mount context |
 | `sandbox.blocked` | frame to engine, on the port | `{ blockedUrl, directive }` of a `securitypolicyviolation` |
 | `sandbox.mountFailed` | frame to engine, on the port | `{ message }` of the mount error |
+| `sandbox.mounted` | frame to engine, on the port | `{}`, once the mod's `mount` resolved. Never sent after `sandbox.mountFailed` |
 | `sandbox.dialogBlocked` | frame to engine, on the port | `{ name }`: `"alert"`, `"confirm"`, `"prompt"` or `"print"`, the blocked function the mod called |
 
 The frame loader also knows the engine's `theme.changed` event (see the [engine module](../engine/README.md)), to keep the color scheme attribute up to date. The name test in `sandbox_messages.test.ts` checks it against the engine's `THEME_CHANGED_METHOD`.
 
-The engine turns `sandbox.blocked` into a blocked request report, `sandbox.dialogBlocked` into a blocked dialog report and `sandbox.mountFailed` into the error issue `The mod could not be mounted: <message>`, each reported once. Params of the wrong shape, and unknown function names, are ignored. A mod could send these notifications itself, but they only add issues to its own list.
+The engine turns `sandbox.blocked` into a blocked request report, `sandbox.dialogBlocked` into a blocked dialog report and `sandbox.mountFailed` into the error issue `The mod could not be mounted: <message>`, each reported once. A session that was given `onMounted` (the mod check, see the [engine module](../engine/README.md#session)) calls it for `sandbox.mounted`, and for `sandbox.mountFailed` after the issue; running sandboxes ignore `sandbox.mounted`. Params of the wrong shape, and unknown function names, are ignored. A mod could send these notifications itself, but they only add issues to its own list, or end its own check sooner.
 
 ### Dialogs in mods
 
@@ -212,7 +213,7 @@ const policy = buildSandboxPolicy(contentHosts, grants.granted);
 - `buildSandboxDocument(policy, theme)`: the `srcdoc` HTML of a mod's frame, with the policy, then the theme styles when `theme` (the mod's `ModThemeSetting`) is `"default"`, then the frame loader.
 - `openSandboxChannel(frameTarget, params)`: posts `sandbox.connect` with `params` (`SandboxConnectParams`: `code`, `context`) and one port to the frame, and returns the engine's port.
 - `readBlockedRequest(params)`, `readMountFailure(params)` and `readBlockedDialog(params)`: read the params of `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked`, or `null` for params of the wrong shape or an unknown function name.
-- `SANDBOX_CONNECT_METHOD`, `SANDBOX_BLOCKED_METHOD`, `SANDBOX_MOUNT_FAILED_METHOD`, `SANDBOX_DIALOG_BLOCKED_METHOD`: the message names, shared with the frame loader.
+- `SANDBOX_CONNECT_METHOD`, `SANDBOX_BLOCKED_METHOD`, `SANDBOX_MOUNT_FAILED_METHOD`, `SANDBOX_MOUNTED_METHOD`, `SANDBOX_DIALOG_BLOCKED_METHOD`: the message names, shared with the frame loader.
 - Types: `SandboxConnectParams`.
 
 Example:

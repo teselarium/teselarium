@@ -102,6 +102,12 @@ The stage view has two dialogs, drawn by the app outside every mod frame. Both a
 - **Action dialog** (`ActionDialog`): shows the action the visible mod asked for (`links.open`, `files.save`, `ui.confirm`), with the mod's title and source. Its accept button ("Open", "Save" or the confirmation's label) performs the action inside its own click.
 - **API mismatch dialog** (`ApiMismatchDialog`): asks before starting a mod whose `api` range does not match the app's mod API version. It shows the mod's title, source and version, the mod's range and the app's mod API version. "Run anyway" starts the mod; "Cancel" (or Escape) leaves the sandbox with an error naming both versions and no frame. While it asks, the sandbox shows "Waiting for your answer…" in place of the frame. Going back hides the sandbox and the dialog without answering. See the [stage module](../lib/core/stage/README.md#mods-written-for-another-api).
 
+## Check frames
+
+A mod check (`mods.check`, see the [stage module](../lib/core/stage/README.md#mod-checks)) mounts the checked mod in a frame the user never sees. `StageView` renders one `CheckFrame` (`stage/CheckFrame.tsx`) per entry of the snapshot's `checks`, apart from the sandboxes and outside every `[data-sandbox-id]` wrapper, so a check is not a sandbox and has no stage bar item. Its frame has the same `sandbox="allow-scripts"` and `srcdoc` as a mod's frame. Its first `load` calls `attachCheckFrame`, and a later one `checkFrameLoadedAgain`. When the check ends, its entry leaves the snapshot and React removes the frame.
+
+The frame is hidden by layout, not by `display: none` or a size of zero: it fills the stage area behind the sandboxes (`absolute inset-0 -z-10 size-full`), is transparent (`opacity-0`) and lets every pointer event through (`pointer-events-none`). A frame that is not rendered may get no animation frames, and a mod that waits for one or measures its layout while mounting would hang or see a size of zero. It also has `inert`, so the checked mod cannot take the focus from the visible mod, `aria-hidden="true"` and `tabIndex={-1}`.
+
 ## What lives where
 
 | File | Owns |
@@ -112,6 +118,6 @@ The stage view has two dialogs, drawn by the app outside every mod frame. Both a
 | `sidebar/` | The sidebar's layout state and its view. |
 | `pages/` | The page view: markdown pages and the Settings page (see [pages](homepage/README.md)). |
 | `settings/` | The Settings page. |
-| `stage/` | The stage view: the stage bar, the frames, the action dialog and the API mismatch dialog. |
+| `stage/` | The stage view: the stage bar, the frames, the hidden check frames, the action dialog and the API mismatch dialog. |
 | `theme/` | The app's theme and the Theme control. |
 | `default_mods.ts` | The default mod settings: the default mods folder and the switched-off mods. |

@@ -8,6 +8,9 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "ModMethodError",
       "ModSwitchedOffError",
       "THEME_CHANGED_METHOD",
+      "buildModCheckReport",
+      "buildModLaunch",
+      "checkModBundle",
       "connectModSession",
       "describeCancelledApiMismatch",
       "describeMissingApiRange",
@@ -19,6 +22,7 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "pushThemeChanged",
       "pushTilesChanged",
       "resolveDefaultModSettings",
+      "selectModTiles",
       "stopModSession",
     ]);
   });

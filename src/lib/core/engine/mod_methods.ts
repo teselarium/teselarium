@@ -5,8 +5,15 @@ import type { ModStorage } from "../storage/index.ts";
 import type { AppAction } from "./app_actions.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
+import type { ModCheckReport } from "./mod_check_report.ts";
 import type { RunLink } from "./mod_launch.ts";
 import { INVALID_PARAMS, PERMISSION_DENIED } from "./mod_messages.ts";
+
+/** What `mods.check` asks the stage: the resolved mod file and the collection as the request gave it. */
+export interface ModCheckRequest {
+  source: string;
+  collection: string | null;
+}
 
 /** What a request handler knows about the mod that sent the request and the app. */
 export interface ModMethodContext {
@@ -24,6 +31,11 @@ export interface ModMethodContext {
    * answer, or is `null` when the sandbox is not the visible one.
    */
   onRequestAction: (action: AppAction) => Promise<boolean> | null;
+  /**
+   * Asks the stage to check a mod. Resolves with the report, or is `null`
+   * when the sandbox is not the visible one.
+   */
+  onCheckMod: (request: ModCheckRequest) => Promise<ModCheckReport> | null;
 }
 
 /**

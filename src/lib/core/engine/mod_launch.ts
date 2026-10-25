@@ -6,7 +6,12 @@ import {
   loadTileCollection,
   validateTileCollection,
 } from "../../tile/index.ts";
-import type { Tile, TileCollection, TileIssue } from "../../tile/index.ts";
+import type {
+  Tile,
+  TileCollection,
+  TileIssue,
+  TileValidator,
+} from "../../tile/index.ts";
 import {
   describeDeniedPermission,
   grantModPermissions,
@@ -111,9 +116,29 @@ function buildModTiles(collection: TileCollection, tiles: Tile[]): ModTiles {
 }
 
 /**
- * Loads a collection for a mod. When the mod has a tile type, the collection
- * is validated with it and only the tiles of that type are kept; the others
- * appear as warnings in the issues. Load errors propagate.
+ * Selects the tiles a mod receives from a loaded collection. With a tile
+ * validator, the collection is validated with it and only the tiles of its
+ * type are kept; the others appear as warnings in the issues. Without one,
+ * every tile is kept.
+ */
+export function selectModTiles(
+  collection: TileCollection,
+  tileValidator: TileValidator | null,
+): ModTiles {
+  if (tileValidator === null) {
+    return buildModTiles(collection, collection.tiles);
+  }
+  const validatedCollection = validateTileCollection(collection, tileValidator);
+  const typedTiles = keepTilesOfType(
+    validatedCollection.tiles,
+    tileValidator.typeName,
+  );
+  return buildModTiles(validatedCollection, typedTiles);
+}
+
+/**
+ * Loads a collection for a mod and selects its tiles with the mod's tile
+ * type (`selectModTiles`). Load errors propagate.
  */
 export async function loadModTiles(
   mod: LoadedMod,
@@ -122,15 +147,11 @@ export async function loadModTiles(
 ): Promise<ModTiles> {
   const collection = await loadTileCollection(collectionLocation, options);
   if (mod.typeSource === null) {
-    return buildModTiles(collection, collection.tiles);
+    return selectModTiles(collection, null);
   }
   const tileValidator = await buildTileValidator(mod.typeSource, options);
-  const validatedCollection = validateTileCollection(collection, tileValidator);
-  const typedTiles = keepTilesOfType(
-    validatedCollection.tiles,
-    tileValidator.typeName,
-  );
-  return buildModTiles(validatedCollection, typedTiles);
+  const modTiles = selectModTiles(collection, tileValidator);
+  return modTiles;
 }
 
 function resolveLaunchSource(
@@ -225,10 +246,37 @@ function buildModContext(
 }
 
 /**
+ * Builds everything a loaded mod's frame needs from its tiles: grants its
+ * permissions and builds its policy, its frame document, its mount context
+ * and its issues. Requests nothing.
+ */
+export function buildModLaunch(
+  mod: LoadedMod,
+  link: RunLink,
+  modTiles: ModTiles | null,
+  appOrigin: string,
+): ModLaunch {
+  const grants = grantModPermissions(mod, appOrigin);
+  const contentHosts = collectContentHosts(listContentSources(mod, modTiles));
+  const policy = buildSandboxPolicy(contentHosts, grants.granted);
+  const launch: ModLaunch = {
+    mod,
+    collectionSource: modTiles === null ? null : modTiles.collectionSource,
+    context: buildModContext(mod, link, modTiles, grants),
+    contentHosts,
+    sandboxDocument: buildSandboxDocument(policy, mod.theme),
+    apiCompatible: matchModApiRange(mod.api),
+    fileIssues: buildFileIssues(mod),
+    issues: buildPermissionIssues(mod, grants),
+  };
+  return launch;
+}
+
+/**
  * Prepares everything a mod's frame needs: refuses a switched-off default mod
  * before any request, loads the mod and, when the link names one, its
- * collection; then grants its permissions and builds its policy, its frame
- * document and its mount context. Every error propagates.
+ * collection; then builds the launch (`buildModLaunch`). Every error
+ * propagates.
  */
 export async function prepareModLaunch(
   request: ModLaunchRequest,
@@ -237,18 +285,6 @@ export async function prepareModLaunch(
   const source = resolveLaunchSource(request, options);
   const mod = await loadMod(source, options);
   const modTiles = await loadLinkTiles(mod, request.link, options);
-  const grants = grantModPermissions(mod, request.appOrigin);
-  const contentHosts = collectContentHosts(listContentSources(mod, modTiles));
-  const policy = buildSandboxPolicy(contentHosts, grants.granted);
-  const launch: ModLaunch = {
-    mod,
-    collectionSource: modTiles === null ? null : modTiles.collectionSource,
-    context: buildModContext(mod, request.link, modTiles, grants),
-    contentHosts,
-    sandboxDocument: buildSandboxDocument(policy, mod.theme),
-    apiCompatible: matchModApiRange(mod.api),
-    fileIssues: buildFileIssues(mod),
-    issues: buildPermissionIssues(mod, grants),
-  };
+  const launch = buildModLaunch(mod, request.link, modTiles, request.appOrigin);
   return launch;
 }

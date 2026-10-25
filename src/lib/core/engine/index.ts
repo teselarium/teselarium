@@ -20,9 +20,23 @@ export {
   matchModApiRange,
   MOD_API_VERSION,
 } from "./mod_api_version.ts";
+export { checkModBundle } from "./mod_bundle_check.ts";
+export type { ModBundleCheck } from "./mod_bundle_check.ts";
+export { buildModCheckReport } from "./mod_check_report.ts";
+export type {
+  ModCheckFinding,
+  ModCheckReport,
+  ModCheckStatus,
+  ModCheckStep,
+} from "./mod_check_report.ts";
 export { inspectMod } from "./mod_inspection.ts";
 export type { ModInspection } from "./mod_inspection.ts";
-export { loadModTiles, prepareModLaunch } from "./mod_launch.ts";
+export {
+  buildModLaunch,
+  loadModTiles,
+  prepareModLaunch,
+  selectModTiles,
+} from "./mod_launch.ts";
 export type {
   LaunchContext,
   ModContext,
@@ -31,7 +45,9 @@ export type {
   ModTiles,
   RunLink,
 } from "./mod_launch.ts";
+export type { ResponseError } from "./mod_messages.ts";
 export type {
+  ModCheckRequest,
   ModMethod,
   ModMethodContext,
   ModMethodTable,
