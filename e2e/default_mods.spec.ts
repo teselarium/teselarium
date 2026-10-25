@@ -5,7 +5,9 @@ import {
   buildMissingEntrypointFiles,
   buildProbeFiles,
   buildSlowMountFiles,
+  buildTestedProbeFiles,
   EXPLORER_CODE,
+  FAILING_CASE_TEST_CODE,
   findModFrame,
   OTHER_API_RANGE,
   readParentDocumentError,
@@ -435,12 +437,24 @@ test.describe("Mod viewer shows the check report", function describeViewerReport
 
     const report = checkReport(viewer);
     await expect(report.getByRole("heading")).toContainText("Check passed");
-    await expect(report.locator("span[data-ot-variant]")).toHaveAttribute(
-      "data-ot-variant",
-      "success",
-    );
+    await expect(
+      report.getByRole("heading").locator("span[data-ot-variant]"),
+    ).toHaveAttribute("data-ot-variant", "success");
     await expect(report.getByText("No findings.")).toBeVisible();
-    await expect(report.getByRole("listitem")).toHaveCount(0);
+    await expect(report.getByRole("list", { name: "Findings" })).toHaveCount(0);
+    const cases = report
+      .getByRole("list", { name: "Tests" })
+      .getByRole("listitem");
+    await expect(cases).toHaveText([
+      "pass lists the sample books",
+      "pass highlights the remembered book",
+    ]);
+    for (const caseItem of await cases.all()) {
+      await expect(caseItem.locator("span[data-ot-variant]")).toHaveAttribute(
+        "data-ot-variant",
+        "success",
+      );
+    }
     await expect(
       visibleSandbox(page).locator('iframe[title="Mod Viewer"]'),
     ).toBeVisible();
@@ -469,6 +483,33 @@ test.describe("Mod viewer shows the check report", function describeViewerReport
     await expect(finding).toContainText("error");
     await expect(finding).toContainText(entrypoint);
     await expect(finding).toContainText("404");
+  });
+
+  test("Failing case", async function showsFailingCase({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(
+      page,
+      buildTestedProbeFiles("failing_case", FAILING_CASE_TEST_CODE),
+    );
+    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/failing_case/");
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+
+    await viewer.getByRole("button", { name: "Check mod" }).click();
+
+    const report = checkReport(viewer);
+    await expect(report.getByRole("heading")).toContainText("Check failed");
+    await expect(
+      report.getByRole("heading").locator("span[data-ot-variant]"),
+    ).toHaveAttribute("data-ot-variant", "destructive");
+    const caseItem = report
+      .getByRole("list", { name: "Tests" })
+      .getByRole("listitem");
+    await expect(caseItem).toHaveText("fail lists books: no books");
+    await expect(caseItem.locator("span[data-ot-variant]")).toHaveAttribute(
+      "data-ot-variant",
+      "destructive",
+    );
   });
 });
 

@@ -8,10 +8,16 @@ import {
   readBlockedDialog,
   readBlockedRequest,
   readMountFailure,
+  readSandboxTestReport,
   SANDBOX_BLOCKED_METHOD,
   SANDBOX_DIALOG_BLOCKED_METHOD,
   SANDBOX_MOUNT_FAILED_METHOD,
   SANDBOX_MOUNTED_METHOD,
+} from "../sandbox/index.ts";
+import type {
+  SandboxConnectParams,
+  SandboxTestParams,
+  SandboxTestReport,
 } from "../sandbox/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
@@ -81,6 +87,16 @@ export interface ModSessionOptions {
    * `null` for a message that is not a request, and the response's error.
    */
   onErrorResponse?: (method: string | null, error: ResponseError) => void;
+  /**
+   * What a frame of a check's tests runs: the test file's code and the case
+   * to run, or `null` to list the cases. Only checks pass it.
+   */
+  test?: SandboxTestParams;
+  /**
+   * Called with each test notification of a check's frame
+   * (`readSandboxTestReport`). Running sandboxes pass none, and ignore them.
+   */
+  onTestReport?: (report: SandboxTestReport) => void;
 }
 
 /** The engine's side of one running mod. Mutable, because a channel is state. */
@@ -93,6 +109,7 @@ export interface ModSession {
   onMounted: (() => void) | null;
   onErrorResponse:
     ((method: string | null, error: ResponseError) => void) | null;
+  onTestReport: ((report: SandboxTestReport) => void) | null;
   stopped: boolean;
 }
 
@@ -233,14 +250,32 @@ function reportMounted(session: ModSession): void {
   }
 }
 
+function reportTestNotification(
+  session: ModSession,
+  notification: ModNotification,
+): void {
+  if (session.onTestReport === null) {
+    return;
+  }
+  const report = readSandboxTestReport(
+    notification.method,
+    notification.params,
+  );
+  if (report !== null) {
+    session.onTestReport(report);
+  }
+}
+
 /**
- * The frame loader's notifications become issues, and a finished mount is
- * told to `onMounted`. Any other notification is ignored.
+ * The frame loader's notifications become issues, a finished mount is told
+ * to `onMounted`, and the test runner's to `onTestReport`. Any other
+ * notification is ignored.
  */
 function handleModNotification(
   session: ModSession,
   notification: ModNotification,
 ): void {
+  reportTestNotification(session, notification);
   if (notification.method === SANDBOX_BLOCKED_METHOD) {
     reportBlockedRequest(session, notification.params);
   }
@@ -292,19 +327,34 @@ function buildMountContext(
   return context;
 }
 
+function buildConnectParams(
+  launch: ModLaunch,
+  options: ModSessionOptions,
+): SandboxConnectParams {
+  const connectParams: SandboxConnectParams = {
+    code: launch.mod.code,
+    context: buildMountContext(launch.context, options.theme),
+  };
+  if (options.test !== undefined) {
+    connectParams.test = options.test;
+  }
+  return connectParams;
+}
+
 /**
  * Opens the private channel to a mod's frame, sends it the mod's code and
- * its mount context with the session's theme, and answers the mod's requests until the session is stopped.
+ * its mount context with the session's theme (and, in a check's test frames,
+ * the test params), and answers the mod's requests until the session is stopped.
  */
 export function connectModSession(
   frameTarget: Pick<Window, "postMessage">,
   launch: ModLaunch,
   options: ModSessionOptions,
 ): ModSession {
-  const port = openSandboxChannel(frameTarget, {
-    code: launch.mod.code,
-    context: buildMountContext(launch.context, options.theme),
-  });
+  const port = openSandboxChannel(
+    frameTarget,
+    buildConnectParams(launch, options),
+  );
   const session: ModSession = {
     port,
     methodContext: {
@@ -322,6 +372,7 @@ export function connectModSession(
     reportedIssueKeys: new Set(),
     onMounted: options.onMounted ?? null,
     onErrorResponse: options.onErrorResponse ?? null,
+    onTestReport: options.onTestReport ?? null,
     stopped: false,
   };
   port.onmessage = handleModPortMessage.bind(undefined, session);

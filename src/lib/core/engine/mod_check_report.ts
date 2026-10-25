@@ -1,7 +1,7 @@
 import type { IssueLevel } from "../../tile/index.ts";
 
-/** The part of a check that found a problem: loading the files, or mounting the mod. */
-export type ModCheckStep = "bundle" | "mount";
+/** The part of a check that found a problem: loading the files, mounting the mod, or running its tests. */
+export type ModCheckStep = "bundle" | "mount" | "test";
 
 /** `"fail"` with an error finding, `"warn"` with warnings only, `"pass"` without findings. */
 export type ModCheckStatus = "pass" | "warn" | "fail";
@@ -14,6 +14,13 @@ export interface ModCheckFinding {
   message: string;
 }
 
+/** The result of one test case of a mod. `message` is `null` for a passing case. */
+export interface ModTestResult {
+  name: string;
+  status: "pass" | "fail";
+  message: string | null;
+}
+
 /** The result of a mod check. Plain data. */
 export interface ModCheckReport {
   /** Resolved URL of the checked mod file. */
@@ -21,6 +28,10 @@ export interface ModCheckReport {
   status: ModCheckStatus;
   /** Whether the mod was mounted, which needs a bundle without errors. */
   mountChecked: boolean;
+  /** Whether the mod's test cases ran. */
+  testsChecked: boolean;
+  /** The result of each test case, in order. */
+  tests: ModTestResult[];
   /** The findings in the order they were found. */
   findings: ModCheckFinding[];
 }
@@ -44,16 +55,34 @@ function copyFindings(findings: ModCheckFinding[]): ModCheckFinding[] {
   return findingCopies;
 }
 
-/** Builds the report of a check, with its status read from the findings' levels. */
+function copyTestResults(tests: ModTestResult[] | null): ModTestResult[] {
+  const testCopies: ModTestResult[] = [];
+  if (tests === null) {
+    return testCopies;
+  }
+  for (const test of tests) {
+    testCopies.push({ ...test });
+  }
+  return testCopies;
+}
+
+/**
+ * Builds the report of a check, with its status read from the findings'
+ * levels, which already hold each failed case. `tests` is `null` when the
+ * cases did not run.
+ */
 export function buildModCheckReport(
   source: string,
   findings: ModCheckFinding[],
   mountChecked: boolean,
+  tests: ModTestResult[] | null,
 ): ModCheckReport {
   const report: ModCheckReport = {
     source,
     status: readCheckStatus(findings),
     mountChecked,
+    testsChecked: tests !== null,
+    tests: copyTestResults(tests),
     findings: copyFindings(findings),
   };
   return report;

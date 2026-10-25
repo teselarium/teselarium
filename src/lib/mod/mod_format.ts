@@ -18,6 +18,7 @@ export const MOD_FILE_KEYS: readonly string[] = [
   "api",
   "type_path",
   "sample_collection",
+  "test_path",
   "config",
   "permissions",
   "theme",
@@ -34,6 +35,7 @@ export interface ModFormat {
   entrypoint: string;
   typePath: string | null;
   sampleCollection: string | null;
+  testPath: string | null;
   config: YamlMapping;
   permissions: ModPermission[];
   theme: ModThemeSetting;
@@ -153,7 +155,7 @@ function checkNoInlineSchema(mod: YamlMapping, source: string): void {
  * Checks the structure of a parsed mod file: a `mod` mapping with non-empty
  * string `name`, `version` and `entrypoint`, optional string `title` (defaults
  * to `name`) and `description` (defaults to `""`), an optional `api` semver
- * range, optional non-empty `type_path` and `sample_collection`, an optional
+ * range, optional non-empty `type_path`, `sample_collection` and `test_path`, an optional
  * `config` mapping, optional `permissions` and an optional `theme`
  * (`"default"` or `"none"`). These keys are listed in `MOD_FILE_KEYS`. Other
  * keys are ignored, and an inline `schema` is rejected. Raises
@@ -170,6 +172,7 @@ export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
   const api = readModApiRange(mod, source);
   const typePath = readOptionalPath(mod, "type_path", source);
   const sampleCollection = readOptionalPath(mod, "sample_collection", source);
+  const testPath = readOptionalPath(mod, "test_path", source);
   const config = readModConfig(mod, source);
   checkNoInlineSchema(mod, source);
   const modFormat: ModFormat = {
@@ -181,6 +184,7 @@ export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
     entrypoint,
     typePath,
     sampleCollection,
+    testPath,
     config,
     permissions: readModPermissions(mod.permissions, source),
     theme: readModTheme(mod, source),

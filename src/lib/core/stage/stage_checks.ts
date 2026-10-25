@@ -1,9 +1,11 @@
 import type { FileFetchOptions } from "../../files/index.ts";
+import { loadModTestCode } from "../../mod/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
 import type { IssueLevel } from "../../tile/index.ts";
 import {
   buildModCheckReport,
   buildModLaunch,
+  buildModTestDocument,
   checkModBundle,
   connectModSession,
   stopModSession,
@@ -15,12 +17,32 @@ import type {
   ModCheckRequest,
   ModLaunch,
   ModSession,
+  ModSessionOptions,
+  ModTestResult,
   ResolvedDefaultModSettings,
   ResponseError,
   RunLink,
 } from "../engine/index.ts";
 import { createMemoryStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
+import {
+  ACTION_METHODS,
+  API_MISUSE_CODES,
+  buildCaseFrameHooks,
+  buildListFrameHooks,
+  buildTestFileError,
+  CASE_LIMIT_MESSAGE,
+  CHECK_CASE_LIMIT_MS,
+  createCheckCase,
+  describeErrorResponse,
+  finishCheckCase,
+  LIST_LIMIT_MESSAGE,
+} from "./stage_check_cases.ts";
+import type {
+  CaseListing,
+  CheckCase,
+  CheckFrameHooks,
+} from "./stage_check_cases.ts";
 
 /** How long a check keeps watching the mod after its `mount` finished. */
 export const CHECK_SETTLE_MS = 1000;
@@ -30,20 +52,27 @@ export const CHECK_MOUNT_LIMIT_MS = 10000;
 
 const MOUNT_LIMIT_MESSAGE = `The mod's mount did not finish within ${CHECK_MOUNT_LIMIT_MS / 1000} seconds.`;
 
+/** What a check's frame does: mount the mod, list the cases of its test file, or run one case. */
+export type CheckPhase = "mount" | "list" | "case";
+
 /**
- * The error codes that tell a mod used the mod API wrongly: a message that is
- * not a request (-32600), an unknown method (-32601) and bad params (-32602).
+ * The frame a check runs now. Each new frame gets a new key, so the page
+ * makes a new iframe for it, and a late `load` of a replaced frame is
+ * ignored. Mutable, because it follows a session and timers.
  */
-const API_MISUSE_CODES: ReadonlySet<number> = new Set([-32600, -32601, -32602]);
+export interface StageCheckFrame {
+  key: string;
+  /** The frame's `srcdoc`: the mod's frame document, or the test runner's. */
+  sandboxDocument: string;
+  session: ModSession | null;
+  limitTimer: ReturnType<typeof setTimeout> | null;
+  settleTimer: ReturnType<typeof setTimeout> | null;
+}
 
-/** The request that asked for each kind of action. */
-const ACTION_METHODS: Record<AppAction["kind"], string> = {
-  link: "links.open",
-  save: "files.save",
-  confirm: "ui.confirm",
-};
-
-/** A check whose bundle passed: its mod is mounted in a hidden frame. Mutable, because it follows a session and timers. */
+/**
+ * A check whose bundle passed: its mod is mounted in a hidden frame, then its
+ * tests run, one frame at a time. Mutable.
+ */
 export interface StageCheck {
   id: string;
   /** The sandbox that asked for the check. */
@@ -51,11 +80,21 @@ export interface StageCheck {
   /** The checked mod file's source, as the report names it. */
   source: string;
   launch: ModLaunch;
-  session: ModSession | null;
-  /** The bundle findings, then the mount findings in the order they were found. */
+  phase: CheckPhase;
+  /** The frame running now, or `null` while the test file is fetched. */
+  frame: StageCheckFrame | null;
+  /** How many frames the check started, for the next frame's key. */
+  frameCount: number;
+  /** The bundle findings, then the mount and test findings in the order they were found. */
   findings: ModCheckFinding[];
-  limitTimer: ReturnType<typeof setTimeout> | null;
-  settleTimer: ReturnType<typeof setTimeout> | null;
+  /** The test file's code, once fetched. */
+  testCode: string | null;
+  /** The case names the list frame reported, in order. */
+  caseNames: string[];
+  /** The results of the cases that ended, or `null` until the cases start. */
+  testResults: ModTestResult[] | null;
+  /** The case whose frame runs now. */
+  currentCase: CheckCase | null;
   resolveReport: (report: ModCheckReport) => void;
 }
 
@@ -73,11 +112,16 @@ export interface CheckServices {
   fetchOptions: FileFetchOptions;
   /** The stage's current theme, read when a check frame connects. */
   readTheme: () => Theme;
-  /** Whether a sandbox is open and running, so a check whose requester left mounts nothing. */
+  /** Whether a sandbox is open and running, so a check whose requester left mounts and tests nothing. */
   isSandboxRunning: (sandboxId: string) => boolean;
-  /** Called when a check started or ended, so the stage publishes a snapshot. */
+  /** Called when a check started, changed its frame or ended, so the stage publishes a snapshot. */
   onChange: () => void;
 }
+
+type CheckDraft = Pick<
+  StageCheck,
+  "requesterId" | "source" | "launch" | "findings"
+>;
 
 export function createStageChecks(): StageChecks {
   const checks: StageChecks = { entries: new Map(), nextId: 1 };
@@ -99,26 +143,75 @@ function buildCheckLink(source: string, collection: string | null): RunLink {
   return link;
 }
 
+function isCheckRunning(checks: StageChecks, check: StageCheck): boolean {
+  return checks.entries.get(check.id) === check;
+}
+
+/** Gives the check a new frame with `sandboxDocument`, which the page renders. */
+function startCheckFrame(
+  services: CheckServices,
+  check: StageCheck,
+  phase: CheckPhase,
+  sandboxDocument: string,
+): void {
+  check.frameCount += 1;
+  check.phase = phase;
+  check.frame = {
+    key: `${check.id}-frame-${check.frameCount}`,
+    sandboxDocument,
+    session: null,
+    limitTimer: null,
+    settleTimer: null,
+  };
+  services.onChange();
+}
+
+/** Clears the frame's timers, stops its session and drops it, so the page removes it. */
+function stopCheckFrame(check: StageCheck): void {
+  const frame = check.frame;
+  if (frame === null) {
+    return;
+  }
+  if (frame.limitTimer !== null) {
+    clearTimeout(frame.limitTimer);
+  }
+  if (frame.settleTimer !== null) {
+    clearTimeout(frame.settleTimer);
+  }
+  if (frame.session !== null) {
+    stopModSession(frame.session);
+  }
+  check.frame = null;
+}
+
 function placeStageCheck(
   checks: StageChecks,
   services: CheckServices,
-  draft: Omit<StageCheck, "id" | "resolveReport">,
+  draft: CheckDraft,
   resolveReport: (report: ModCheckReport) => void,
 ): void {
   const check: StageCheck = {
     ...draft,
     id: `check-${checks.nextId}`,
+    phase: "mount",
+    frame: null,
+    frameCount: 0,
+    testCode: null,
+    caseNames: [],
+    testResults: null,
+    currentCase: null,
     resolveReport,
   };
   checks.nextId += 1;
   checks.entries.set(check.id, check);
-  services.onChange();
+  startCheckFrame(services, check, "mount", check.launch.sandboxDocument);
 }
 
 /**
  * Checks a mod for the sandbox `requesterId`: runs the bundle check and, when
- * it found no error and the requester still runs, adds a check whose frame
- * the page renders. Resolves with the report once the check ended.
+ * it found no error and the requester still runs, adds a check whose frames
+ * the page renders: the mount check, then the mod's tests. Resolves with the
+ * report once the check ended.
  */
 export async function runStageCheck(
   checks: StageChecks,
@@ -136,7 +229,12 @@ export async function runStageCheck(
     hasErrorFinding(bundleCheck.findings) ||
     !services.isSandboxRunning(requesterId)
   ) {
-    return buildModCheckReport(request.source, bundleCheck.findings, false);
+    return buildModCheckReport(
+      request.source,
+      bundleCheck.findings,
+      false,
+      null,
+    );
   }
   const launch = buildModLaunch(
     bundleCheck.mod,
@@ -144,14 +242,11 @@ export async function runStageCheck(
     bundleCheck.modTiles,
     services.appOrigin,
   );
-  const draft: Omit<StageCheck, "id" | "resolveReport"> = {
+  const draft: CheckDraft = {
     requesterId,
     source: request.source,
     launch,
-    session: null,
     findings: [...bundleCheck.findings],
-    limitTimer: null,
-    settleTimer: null,
   };
   const report = await new Promise<ModCheckReport>(
     placeStageCheck.bind(undefined, checks, services, draft),
@@ -179,16 +274,6 @@ function recordCheckIssue(check: StageCheck, issue: ModIssue): void {
     source: issue.source,
     message: issue.message,
   });
-}
-
-function describeErrorResponse(
-  method: string | null,
-  error: ResponseError,
-): string {
-  if (method === null) {
-    return `The mod sent a message that is not a request, answered with error ${error.code}: ${error.message}`;
-  }
-  return `The mod's request "${method}" was answered with error ${error.code}: ${error.message}`;
 }
 
 function recordErrorResponse(
@@ -235,102 +320,381 @@ function refuseCheckedCheck(check: StageCheck): null {
   return null;
 }
 
-function clearCheckTimers(check: StageCheck): void {
-  if (check.limitTimer !== null) {
-    clearTimeout(check.limitTimer);
-    check.limitTimer = null;
-  }
-  if (check.settleTimer !== null) {
-    clearTimeout(check.settleTimer);
-    check.settleTimer = null;
-  }
-}
-
 /**
- * Ends a check: clears its timers, stops its session, removes it so the page
- * removes its frame, and resolves its report. Does nothing for a check that
- * already ended.
+ * Ends a check: stops its frame, removes it so the page removes the frame,
+ * and resolves its report. Does nothing for a check that already ended.
  */
 function endStageCheck(
   checks: StageChecks,
   services: CheckServices,
   check: StageCheck,
 ): void {
-  if (checks.entries.get(check.id) !== check) {
+  if (!isCheckRunning(checks, check)) {
     return;
   }
-  clearCheckTimers(check);
-  if (check.session !== null) {
-    stopModSession(check.session);
-  }
+  stopCheckFrame(check);
   checks.entries.delete(check.id);
   services.onChange();
-  check.resolveReport(buildModCheckReport(check.source, check.findings, true));
+  check.resolveReport(
+    buildModCheckReport(check.source, check.findings, true, check.testResults),
+  );
 }
 
-/** Adds a `mount` error to the check `id`, and ends it. Does nothing for an unknown id. */
-export function failStageCheck(
+/** Adds a `mount` error to the check, and ends it, so its tests do not run. */
+function failMountCheck(
   checks: StageChecks,
   services: CheckServices,
-  id: string,
+  check: StageCheck,
   message: string,
 ): void {
-  const check = checks.entries.get(id);
-  if (check === undefined) {
+  if (!isCheckRunning(checks, check)) {
     return;
   }
   addMountFinding(check, "error", message);
   endStageCheck(checks, services, check);
 }
 
-/** The mod's `mount` finished: the limit is cleared, and the check ends after the settle time. */
-function startSettleTime(
+/** The test file's address. Only a mod with tests reaches the test phases. */
+function readTestSource(check: StageCheck): string {
+  return check.launch.mod.testSource ?? check.source;
+}
+
+/** Adds a `test` error about the test file, and ends the check without case results. */
+function failTestFile(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  message: string,
+): void {
+  if (!isCheckRunning(checks, check)) {
+    return;
+  }
+  check.findings.push(buildTestFileError(readTestSource(check), message));
+  endStageCheck(checks, services, check);
+}
+
+function describeLoadError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function failTestFileLoad(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  error: unknown,
+): void {
+  failTestFile(checks, services, check, describeLoadError(error));
+}
+
+/** The test file is fetched: its list frame starts. */
+function startListFrame(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  testCode: string,
+): void {
+  if (!isCheckRunning(checks, check)) {
+    return;
+  }
+  check.testCode = testCode;
+  startCheckFrame(services, check, "list", buildModTestDocument(check.launch));
+}
+
+/**
+ * The mount check ended. When the mod has a test file, the mount check found
+ * no error and the requester still runs, the test file is fetched and the
+ * tests start; otherwise the check ends.
+ */
+function endMountPhase(
   checks: StageChecks,
   services: CheckServices,
   check: StageCheck,
 ): void {
-  if (check.settleTimer !== null || !checks.entries.has(check.id)) {
+  if (!isCheckRunning(checks, check)) {
     return;
   }
-  clearCheckTimers(check);
-  check.settleTimer = setTimeout(
-    endStageCheck.bind(undefined, checks, services, check),
+  if (
+    check.launch.mod.testSource === null ||
+    hasErrorFinding(check.findings) ||
+    !services.isSandboxRunning(check.requesterId)
+  ) {
+    endStageCheck(checks, services, check);
+    return;
+  }
+  stopCheckFrame(check);
+  check.phase = "list";
+  services.onChange();
+  loadModTestCode(check.launch.mod, services.fetchOptions).then(
+    startListFrame.bind(undefined, checks, services, check),
+    failTestFileLoad.bind(undefined, checks, services, check),
+  );
+}
+
+/** The mod's `mount` finished: the limit is cleared, and the mount check ends after the settle time. */
+function startSettleTime(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  frame: StageCheckFrame,
+): void {
+  if (check.frame !== frame || frame.settleTimer !== null) {
+    return;
+  }
+  if (frame.limitTimer !== null) {
+    clearTimeout(frame.limitTimer);
+    frame.limitTimer = null;
+  }
+  frame.settleTimer = setTimeout(
+    endMountPhase.bind(undefined, checks, services, check),
     CHECK_SETTLE_MS,
   );
 }
 
+function startCase(services: CheckServices, check: StageCheck): void {
+  const caseIndex = check.testResults?.length ?? 0;
+  check.currentCase = createCheckCase(
+    check.caseNames[caseIndex],
+    check.source,
+    readTestSource(check),
+    check.findings,
+  );
+  startCheckFrame(services, check, "case", buildModTestDocument(check.launch));
+}
+
+/** A case ended: its result is kept, and the next case starts, or the check ends after the last one. */
+function finishCase(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  checkCase: CheckCase,
+  status: ModTestResult["status"],
+  message: string | null,
+): void {
+  if (!isCheckRunning(checks, check) || check.currentCase !== checkCase) {
+    return;
+  }
+  const result = finishCheckCase(checkCase, status, message);
+  const testResults = check.testResults ?? [];
+  testResults.push(result);
+  check.testResults = testResults;
+  check.currentCase = null;
+  stopCheckFrame(check);
+  if (testResults.length < check.caseNames.length) {
+    startCase(services, check);
+    return;
+  }
+  endStageCheck(checks, services, check);
+}
+
+/** The list frame reported: the cases start, or a listing error ends the check. */
+function receiveListing(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  listing: CaseListing,
+): void {
+  if (!isCheckRunning(checks, check) || check.phase !== "list") {
+    return;
+  }
+  if (listing.kind === "failed") {
+    failTestFile(
+      checks,
+      services,
+      check,
+      `The tests could not be listed: ${listing.message}`,
+    );
+    return;
+  }
+  if (listing.names.length === 0) {
+    failTestFile(
+      checks,
+      services,
+      check,
+      "The tests could not be listed: the test file registers no test",
+    );
+    return;
+  }
+  stopCheckFrame(check);
+  check.caseNames = [...listing.names];
+  check.testResults = [];
+  startCase(services, check);
+}
+
+/** Connects a frame's session with the check's services, the frame's own hooks and a throwaway storage slot. */
+function connectCheckSession(
+  services: CheckServices,
+  check: StageCheck,
+  frameTarget: Pick<Window, "postMessage">,
+  hooks: CheckFrameHooks & Pick<ModSessionOptions, "onMounted" | "test">,
+): ModSession {
+  return connectModSession(frameTarget, check.launch, {
+    storage: createMemoryStorage(),
+    appOrigin: services.appOrigin,
+    defaults: services.defaults,
+    fetchOptions: services.fetchOptions,
+    theme: services.readTheme(),
+    ...hooks,
+  });
+}
+
+function attachMountFrame(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  frame: StageCheckFrame,
+  frameTarget: Pick<Window, "postMessage">,
+): void {
+  frame.session = connectCheckSession(services, check, frameTarget, {
+    onIssue: recordCheckIssue.bind(undefined, check),
+    onOpenLink: refuseCheckedOpen.bind(undefined, check),
+    onRequestAction: cancelCheckedAction.bind(undefined, check),
+    onCheckMod: refuseCheckedCheck.bind(undefined, check),
+    onMounted: startSettleTime.bind(undefined, checks, services, check, frame),
+    onErrorResponse: recordErrorResponse.bind(undefined, check),
+  });
+  frame.limitTimer = setTimeout(
+    failMountCheck.bind(
+      undefined,
+      checks,
+      services,
+      check,
+      MOUNT_LIMIT_MESSAGE,
+    ),
+    CHECK_MOUNT_LIMIT_MS,
+  );
+}
+
+function attachListFrame(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  frame: StageCheckFrame,
+  frameTarget: Pick<Window, "postMessage">,
+): void {
+  frame.session = connectCheckSession(services, check, frameTarget, {
+    ...buildListFrameHooks(
+      receiveListing.bind(undefined, checks, services, check),
+    ),
+    test: { code: check.testCode ?? "", caseName: null },
+  });
+  frame.limitTimer = setTimeout(
+    failTestFile.bind(undefined, checks, services, check, LIST_LIMIT_MESSAGE),
+    CHECK_CASE_LIMIT_MS,
+  );
+}
+
+function attachCaseFrame(
+  checks: StageChecks,
+  services: CheckServices,
+  check: StageCheck,
+  frame: StageCheckFrame,
+  frameTarget: Pick<Window, "postMessage">,
+): void {
+  const checkCase = check.currentCase;
+  if (checkCase === null) {
+    return;
+  }
+  const onFinished = finishCase.bind(
+    undefined,
+    checks,
+    services,
+    check,
+    checkCase,
+  );
+  frame.session = connectCheckSession(services, check, frameTarget, {
+    ...buildCaseFrameHooks(checkCase, onFinished),
+    test: { code: check.testCode ?? "", caseName: checkCase.name },
+  });
+  frame.limitTimer = setTimeout(
+    finishCase.bind(
+      undefined,
+      checks,
+      services,
+      check,
+      checkCase,
+      "fail",
+      CASE_LIMIT_MESSAGE,
+    ),
+    CHECK_CASE_LIMIT_MS,
+  );
+}
+
+/** The check `id`'s frame with `key`, or `null` when the check ended or its frame was replaced. */
+function findCheckFrame(
+  checks: StageChecks,
+  id: string,
+  key: string,
+): { check: StageCheck; frame: StageCheckFrame } | null {
+  const check = checks.entries.get(id);
+  if (check === undefined || check.frame === null) {
+    return null;
+  }
+  if (check.frame.key !== key) {
+    return null;
+  }
+  const found = { check, frame: check.frame };
+  return found;
+}
+
 /**
- * Connects the session of the check `id` to its frame, on the frame's first
- * load, with a throwaway storage slot and the check's own answers to the
- * requests that would need the user. Starts the mount limit.
+ * Connects the session of the check `id`'s frame `key`, on the frame's first
+ * load, with a throwaway storage slot and the phase's own answers to the
+ * requests that would need the user, and starts the phase's limit. A frame
+ * that was replaced, or is already connected, is ignored.
  */
 export function attachStageCheckFrame(
   checks: StageChecks,
   services: CheckServices,
   id: string,
+  key: string,
   frameTarget: Pick<Window, "postMessage">,
 ): void {
-  const check = checks.entries.get(id);
-  if (check === undefined || check.session !== null) {
+  const found = findCheckFrame(checks, id, key);
+  if (found === null || found.frame.session !== null) {
     return;
   }
-  check.session = connectModSession(frameTarget, check.launch, {
-    storage: createMemoryStorage(),
-    appOrigin: services.appOrigin,
-    defaults: services.defaults,
-    fetchOptions: services.fetchOptions,
-    onIssue: recordCheckIssue.bind(undefined, check),
-    onOpenLink: refuseCheckedOpen.bind(undefined, check),
-    onRequestAction: cancelCheckedAction.bind(undefined, check),
-    onCheckMod: refuseCheckedCheck.bind(undefined, check),
-    onMounted: startSettleTime.bind(undefined, checks, services, check),
-    onErrorResponse: recordErrorResponse.bind(undefined, check),
-    theme: services.readTheme(),
-  });
-  check.limitTimer = setTimeout(
-    failStageCheck.bind(undefined, checks, services, id, MOUNT_LIMIT_MESSAGE),
-    CHECK_MOUNT_LIMIT_MS,
-  );
+  const { check, frame } = found;
+  if (check.phase === "mount") {
+    attachMountFrame(checks, services, check, frame, frameTarget);
+  }
+  if (check.phase === "list") {
+    attachListFrame(checks, services, check, frame, frameTarget);
+  }
+  if (check.phase === "case") {
+    attachCaseFrame(checks, services, check, frame, frameTarget);
+  }
+}
+
+/**
+ * The check `id`'s frame `key` loaded another document: the mod left its
+ * page. The mount check ends the check with a `mount` error, the list frame
+ * with a `test` error, and a case fails with `message`. A frame that was
+ * replaced is ignored.
+ */
+export function stopReloadedCheckFrame(
+  checks: StageChecks,
+  services: CheckServices,
+  id: string,
+  key: string,
+  message: string,
+): void {
+  const found = findCheckFrame(checks, id, key);
+  if (found === null) {
+    return;
+  }
+  const check = found.check;
+  if (check.phase === "mount") {
+    failMountCheck(checks, services, check, message);
+  }
+  if (check.phase === "list") {
+    failTestFile(checks, services, check, message);
+  }
+  if (check.phase === "case" && check.currentCase !== null) {
+    finishCase(checks, services, check, check.currentCase, "fail", message);
+  }
 }
 
 /** Ends every check the sandbox `requesterId` asked for, when it is closed. */

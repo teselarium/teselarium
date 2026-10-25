@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { THEME_FRAME_STYLES } from "../theme/index.ts";
 import { buildSandboxDocument, buildSandboxPolicy } from "./index.ts";
+import SANDBOX_ASSERTIONS from "./sandbox_assertions.js?raw";
 import SANDBOX_LOADER from "./sandbox_loader.js?raw";
+import SANDBOX_TEST_RUNNER from "./sandbox_test_runner.js?raw";
 
 const POLICY = buildSandboxPolicy(["https://example.org"], []);
+
+const TOP_LEVEL_NAME =
+  /^(?:export )?(?:async )?(?:function|const|let) ([A-Za-z_$][\w$]*)/gm;
+
+/** The names a frame script declares at its top level. */
+function listTopLevelNames(script: string): string[] {
+  const names: string[] = [];
+  for (const match of script.matchAll(TOP_LEVEL_NAME)) {
+    names.push(match[1]);
+  }
+  return names;
+}
 
 describe("buildSandboxDocument", function describeBuildSandboxDocument(): void {
   it("puts the policy before the frame loader", function ordersPolicyFirst(): void {
@@ -59,5 +73,47 @@ describe("buildSandboxDocument", function describeBuildSandboxDocument(): void {
     expect(buildSandboxDocument(POLICY, "default")).toBe(
       buildSandboxDocument(POLICY, "default"),
     );
+  });
+
+  it("has no test runner without the option", function omitsRunner(): void {
+    const sandboxDocument = buildSandboxDocument(POLICY, "default");
+
+    expect(sandboxDocument).not.toContain(SANDBOX_ASSERTIONS);
+    expect(sandboxDocument).not.toContain(SANDBOX_TEST_RUNNER);
+    expect(buildSandboxDocument(POLICY, "default", {})).toBe(sandboxDocument);
+  });
+
+  it("inlines the assertions and the test runner after the loader in one script", function inlinesRunner(): void {
+    const sandboxDocument = buildSandboxDocument(POLICY, "default", {
+      testRunner: true,
+    });
+
+    expect(sandboxDocument).toContain(
+      `<script type="module">${SANDBOX_LOADER}\n${SANDBOX_ASSERTIONS}\n${SANDBOX_TEST_RUNNER}</script>`,
+    );
+    expect(sandboxDocument.match(/<script/g)).toHaveLength(1);
+    expect(sandboxDocument).toContain(`content="${POLICY}">`);
+  });
+
+  it("has frame scripts without a closing script tag", function checksScriptTexts(): void {
+    for (const script of [
+      SANDBOX_LOADER,
+      SANDBOX_ASSERTIONS,
+      SANDBOX_TEST_RUNNER,
+    ]) {
+      expect(script.toLowerCase()).not.toContain("</script");
+    }
+  });
+
+  it("has frame scripts that declare different names", function checksNames(): void {
+    const names = [
+      ...listTopLevelNames(SANDBOX_LOADER),
+      ...listTopLevelNames(SANDBOX_ASSERTIONS),
+      ...listTopLevelNames(SANDBOX_TEST_RUNNER),
+    ];
+
+    expect(names).toContain("frameModes");
+    expect(names).toContain("waitFor");
+    expect(new Set(names).size).toBe(names.length);
   });
 });

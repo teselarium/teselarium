@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import type { Frame, Locator, Page, Route } from "@playwright/test";
-import { SAMPLE_ENTRYPOINT_GLOB } from "./sample_mod.ts";
+import {
+  SAMPLE_COLLECTION_PATH,
+  SAMPLE_ENTRYPOINT_CODE,
+  SAMPLE_ENTRYPOINT_GLOB,
+  SAMPLE_TYPE_PATH,
+} from "./sample_mod.ts";
 
 /** The code of the default mod explorer, to serve a copy with another config. */
 export const EXPLORER_CODE = readFileSync(
@@ -127,8 +132,8 @@ export async function serveAppOriginMod(
  */
 export const TEST_MOD_API_RANGE = "^0.1.0";
 
-/** `0.1.1`: the app's mod API version, as mods read it in `context.api.version`. */
-export const APP_MOD_API_VERSION = "0.1.1";
+/** `0.1.2`: the app's mod API version, as mods read it in `context.api.version`. */
+export const APP_MOD_API_VERSION = "0.1.2";
 
 /** `^0.2.0`: an `api` range for a later mod API, which the app's version does not match. */
 export const OTHER_API_RANGE = "^0.2.0";
@@ -772,3 +777,488 @@ async function answerSelectionReportingSample(route: Route): Promise<void> {
 export async function serveSelectionReportingSample(page: Page): Promise<void> {
   await page.route(SAMPLE_ENTRYPOINT_GLOB, answerSelectionReportingSample);
 }
+
+export interface CheckFinding {
+  step: string;
+  level: string;
+  source: string;
+  message: string;
+}
+
+export interface CheckTestResult {
+  name: string;
+  status: string;
+  message: string | null;
+}
+
+export interface CheckReport {
+  source: string;
+  status: string;
+  mountChecked: boolean;
+  testsChecked: boolean;
+  tests: CheckTestResult[];
+  findings: CheckFinding[];
+}
+
+/** Every frame of a running check: hidden frames outside the sandboxes. */
+export const CHECK_FRAME_SELECTOR = "iframe[data-check-id]";
+
+/** Serves the checker and `files` on the app's origin, and opens the checker. Returns the URLs the route saw. */
+export async function openChecker(
+  page: Page,
+  files: ModFiles,
+): Promise<string[]> {
+  await routeCovers(page);
+  const seenUrls = await serveAppOriginMod(page, {
+    ...buildCheckerFiles(),
+    ...files,
+  });
+  await page.goto(`/${CHECKER_HASH}`);
+  await waitForProbe(await findModFrame(page, CHECKER_TITLE));
+  return seenUrls;
+}
+
+/** Sends `mods.check` from the checker and returns the report. */
+export async function checkFromChecker(
+  page: Page,
+  mod: string,
+): Promise<CheckReport> {
+  const checkerFrame = await findModFrame(page, CHECKER_TITLE);
+  const answer: ProbeAnswer = await checkerFrame.evaluate(requestFromProbe, [
+    "mods.check",
+    { mod },
+  ]);
+  if (answer.result === undefined) {
+    throw new Error(
+      `Expected a report for "${mod}", got error ${answer.code}: ${answer.message}`,
+    );
+  }
+  return answer.result as CheckReport;
+}
+
+/** The source of the test mod in `folder/`, served by `serveAppOriginMod` on the page's origin. */
+export function readTestModSource(page: Page, folder: string): string {
+  const source = new URL(
+    `${APP_ORIGIN_MOD_PATH}${folder}/mod_conf.yaml`,
+    page.url(),
+  ).href;
+  return source;
+}
+
+/** The address of the test file of the test mod in `folder/`. */
+export function readTestFileSource(page: Page, folder: string): string {
+  const source = new URL(`${APP_ORIGIN_MOD_PATH}${folder}/test.js`, page.url())
+    .href;
+  return source;
+}
+
+/** The mod file line of a test mod with tests: its test file is `test.js`, next to it. */
+const TEST_PATH_LINE = '  test_path: "./test.js"';
+
+/** Adds `test.js` with `testCode` to a test mod's files, or leaves it out (`404 Not Found`) for `null`. */
+function addTestFile(
+  files: ModFiles,
+  name: string,
+  testCode: string | null,
+): ModFiles {
+  if (testCode === null) {
+    return files;
+  }
+  const testedFiles: ModFiles = { ...files, [`${name}/test.js`]: testCode };
+  return testedFiles;
+}
+
+/**
+ * The files of a probe mod named `name` with `test_path`, whose test file is
+ * `testCode`, or answers `404 Not Found` for `null`. In a case, the mounted
+ * probe keeps the recording engine API object on `globalThis.probe`.
+ */
+export function buildTestedProbeFiles(
+  name: string,
+  testCode: string | null,
+): ModFiles {
+  return addTestFile(buildProbeFiles(name, [TEST_PATH_LINE]), name, testCode);
+}
+
+/**
+ * The files of a mod named `name` that runs the sample mod's entrypoint on
+ * the sample's tile type and collection, with its config and its covers
+ * permission, and `testCode` as its test file.
+ */
+export function buildSampleCaseFiles(name: string, testCode: string): ModFiles {
+  const files: ModFiles = {
+    [`${name}/mod_conf.yaml`]: buildModConf(name, [
+      `  title: "Book List"`,
+      `  type_path: "${SAMPLE_TYPE_PATH}"`,
+      `  sample_collection: "${SAMPLE_COLLECTION_PATH}"`,
+      TEST_PATH_LINE,
+      "  config:",
+      "    show_covers: true",
+      "  permissions:",
+      "    show:",
+      `      - host: "${COVER_HOST}"`,
+      '        reason: "Shows the book covers"',
+    ]),
+    [`${name}/main.js`]: SAMPLE_ENTRYPOINT_CODE,
+    [`${name}/test.js`]: testCode,
+  };
+  return files;
+}
+
+/** The text of a test file whose default export registers `cases`: pairs of a case name and the name of a function of `functionLines`. */
+export function buildTestCode(
+  functionLines: string[],
+  cases: [string, string][],
+): string {
+  const registrationLines: string[] = [];
+  for (const [caseName, functionName] of cases) {
+    registrationLines.push(
+      `  t.test(${JSON.stringify(caseName)}, ${functionName});`,
+    );
+  }
+  const testCode = [
+    ...functionLines,
+    "",
+    "export default function registerTests(t) {",
+    ...registrationLines,
+    "}",
+    "",
+  ].join("\n");
+  return testCode;
+}
+
+/** A test file with a syntax error. */
+export const SYNTAX_ERROR_TEST_CODE =
+  'export default function registerTests(t) {\n  t.test("lists books", function listsBooks() {}\n';
+
+/** A test file that registers two cases named `lists books`. */
+export const REPEATED_NAME_TEST_CODE = buildTestCode(
+  ["function listsBooks() {}"],
+  [
+    ["lists books", "listsBooks"],
+    ["lists books", "listsBooks"],
+  ],
+);
+
+/** A test file whose default export registers no case. */
+export const NO_CASE_TEST_CODE = "export default function registerTests() {}\n";
+
+/** Three cases, where the second throws `new Error("no books")`. */
+export const ONE_FAILING_TEST_CODE = buildTestCode(
+  [
+    "function passes() {}",
+    "function throwsNoBooks() {",
+    '  throw new Error("no books");',
+    "}",
+  ],
+  [
+    ["first", "passes"],
+    ["second", "throwsNoBooks"],
+    ["third", "passes"],
+  ],
+);
+
+/** One case, `lists books`, that throws `new Error("no books")`. */
+export const FAILING_CASE_TEST_CODE = buildTestCode(
+  ["function listsBooks() {", '  throw new Error("no books");', "}"],
+  [["lists books", "listsBooks"]],
+);
+
+/** A case that awaits a promise that never settles. */
+export const ENDLESS_TEST_CODE = buildTestCode(
+  [
+    "function waitForever() {",
+    "  return new Promise(function neverSettle() {});",
+    "}",
+  ],
+  [["waits forever", "waitForever"]],
+);
+
+/** The case context on the sample mod: seeded storage, the request record, a config override, other tiles and mounting twice. */
+export const SAMPLE_CONTEXT_TEST_CODE = buildTestCode(
+  [
+    "async function highlightsTheRememberedBook(context) {",
+    '  await context.storage.set("selected", context.tiles[1].source);',
+    "  await context.mount();",
+    "  const pressed = context.root.querySelector('button[aria-pressed=\"true\"]');",
+    '  context.expect(pressed.textContent).toContain("Kallocain");',
+    "}",
+    "",
+    "function hasTwoSettledRequests(context) {",
+    "  const requests = context.requests;",
+    '  return requests.length === 2 && Object.hasOwn(requests[1], "result");',
+    "}",
+    "",
+    "async function recordsTheRequests(context) {",
+    "  await context.mount();",
+    '  context.root.querySelector("button").click();',
+    "  await context.waitFor(hasTwoSettledRequests.bind(undefined, context));",
+    "  context.expect(context.requests).toEqual([",
+    '    { method: "storage.get", params: { key: "selected" }, result: null },',
+    "    {",
+    '      method: "storage.set",',
+    '      params: { key: "selected", value: context.tiles[0].source },',
+    "      result: null,",
+    "    },",
+    "  ]);",
+    "}",
+    "",
+    "async function hidesTheCovers(context) {",
+    "  await context.mount({ config: { show_covers: false } });",
+    '  context.expect(context.root.querySelectorAll("li").length).toBe(3);',
+    '  context.expect(context.root.querySelectorAll("img").length).toBe(0);',
+    "}",
+    "",
+    "async function showsTheCovers(context) {",
+    "  await context.mount();",
+    '  context.expect(context.root.querySelectorAll("img").length).toBe(3);',
+    "}",
+    "",
+    "async function showsNoBooks(context) {",
+    "  await context.mount({ tiles: [] });",
+    "  const status = context.root.querySelector('[role=\"status\"]');",
+    '  context.expect(status.textContent).toBe("There are no books to show.");',
+    "}",
+    "",
+    "async function mountsTwice(context) {",
+    "  await context.mount();",
+    "  await context.mount();",
+    "}",
+  ],
+  [
+    ["highlights the remembered book", "highlightsTheRememberedBook"],
+    ["records the requests", "recordsTheRequests"],
+    ["hides the covers", "hidesTheCovers"],
+    ["shows the covers", "showsTheCovers"],
+    ["shows no books", "showsNoBooks"],
+    ["mounts twice", "mountsTwice"],
+  ],
+);
+
+/** The expectations and `waitFor` on the sample mod. */
+export const EXPECTATION_TEST_CODE = buildTestCode(
+  [
+    "function expectsTwoToBeThree(context) {",
+    "  context.expect(2).toBe(3);",
+    "}",
+    "",
+    "function expectsNoThree(context) {",
+    "  context.expect([1, 2]).not.toContain(3);",
+    "}",
+    "",
+    "function hasThreeBooks(context) {",
+    '  return context.root.querySelectorAll("li").length === 3;',
+    "}",
+    "",
+    "async function waitsForTheList(context) {",
+    "  await context.mount();",
+    "  await context.waitFor(hasThreeBooks.bind(undefined, context));",
+    "}",
+    "",
+    "function staysFalse() {",
+    "  return false;",
+    "}",
+    "",
+    "async function waitsTooLong(context) {",
+    "  const startedAt = Date.now();",
+    "  try {",
+    "    await context.waitFor(staysFalse, 100);",
+    "  } catch (error) {",
+    "    throw new Error(`rejected after ${Date.now() - startedAt} ms: ${error.message}`);",
+    "  }",
+    "}",
+  ],
+  [
+    ["fails equality", "expectsTwoToBeThree"],
+    ["negates", "expectsNoThree"],
+    ["waits for the list", "waitsForTheList"],
+    ["waits too long", "waitsTooLong"],
+  ],
+);
+
+/** Scripted answers through the probe, which keeps the recording engine API object. */
+export const ANSWER_TEST_CODE = buildTestCode(
+  [
+    "function requestFromMod(method, params) {",
+    "  return globalThis.probe.engine.request(method, params);",
+    "}",
+    "",
+    "async function confirmsYes(context) {",
+    "  await context.mount();",
+    '  context.answer("ui.confirm", true);',
+    '  const confirmed = await requestFromMod("ui.confirm", { message: "Delete this list?" });',
+    "  context.expect(confirmed).toBe(true);",
+    "}",
+    "",
+    "async function confirmsNoWithoutAnswer(context) {",
+    "  await context.mount();",
+    '  const confirmed = await requestFromMod("ui.confirm", { message: "Delete this list?" });',
+    "  context.expect(confirmed).toBe(false);",
+    "}",
+    "",
+    "async function opensNothing(context) {",
+    "  await context.mount();",
+    '  context.answer("links.open", true);',
+    '  context.answer("files.save", false);',
+    '  context.expect(await requestFromMod("links.open", { url: "https://example.org/" })).toBe(true);',
+    '  context.expect(await requestFromMod("files.save", { name: "a.txt", content: "x" })).toBe(false);',
+    "  context.expect(context.requests.length).toBe(2);",
+    "}",
+  ],
+  [
+    ["confirms yes", "confirmsYes"],
+    ["confirms no without an answer", "confirmsNoWithoutAnswer"],
+    ["opens nothing", "opensNothing"],
+  ],
+);
+
+/** A case that scripts an answer of the wrong type. */
+export const WRONG_ANSWER_TEST_CODE = buildTestCode(
+  [
+    "function answersWithText(context) {",
+    '  context.answer("ui.confirm", "yes");',
+    "}",
+  ],
+  [["answers with text", "answersWithText"]],
+);
+
+/** Two cases that change the storage and the page, and two that read them before mounting. */
+export const ISOLATION_TEST_CODE = buildTestCode(
+  [
+    "async function changesStorageAndPage(context) {",
+    "  await context.mount();",
+    '  await context.storage.set("selected", "kallocain");',
+    '  context.root.append(document.createElement("section"));',
+    "}",
+    "",
+    "async function readsStorage(context) {",
+    '  context.expect(await context.storage.get("selected")).toBe(null);',
+    "}",
+    "",
+    "function readsPage(context) {",
+    "  context.expect(context.root.children.length).toBe(0);",
+    "}",
+  ],
+  [
+    ["changes the storage and the page", "changesStorageAndPage"],
+    ["reads the storage", "readsStorage"],
+    ["reads the page", "readsPage"],
+  ],
+);
+
+/**
+ * The mount lines of a mod that runs `caseLines` only when a case mounts it
+ * with `params.inCase` `"yes"`, so its mount check records nothing and its
+ * tests run.
+ */
+function buildCaseOnlyLines(caseLines: string[]): string[] {
+  const lines = [
+    '  if (context.params.inCase !== "yes") {',
+    "    return;",
+    "  }",
+    ...caseLines,
+  ];
+  return lines;
+}
+
+/** The lines of a case function named `functionName` that mounts the mod with `params.inCase` `"yes"`. */
+function buildMountInCaseLines(functionName: string): string[] {
+  const lines = [
+    `async function ${functionName}(context) {`,
+    '  await context.mount({ params: { inCase: "yes" } });',
+    "}",
+  ];
+  return lines;
+}
+
+/** A case named `deletes a book` that mounts a mod sending `tiles.delete`. */
+export function buildUnknownMethodCaseFiles(): ModFiles {
+  return addTestFile(
+    buildCheckedModFiles(
+      "unknown_method_case",
+      buildCaseOnlyLines([
+        '  await engine.request("tiles.delete").catch(function ignoreError() {});',
+      ]),
+      [TEST_PATH_LINE],
+    ),
+    "unknown_method_case",
+    buildTestCode(buildMountInCaseLines("deletesABook"), [
+      ["deletes a book", "deletesABook"],
+    ]),
+  );
+}
+
+/** A case named `shows covers` that mounts a mod showing an image from `UNDECLARED_IMAGE_HOST`. */
+export function buildUndeclaredImageCaseFiles(): ModFiles {
+  return addTestFile(
+    buildCheckedModFiles(
+      "undeclared_image_case",
+      buildCaseOnlyLines([
+        '  const image = document.createElement("img");',
+        `  image.src = "${UNDECLARED_IMAGE_HOST}/cover.png";`,
+        "  document.body.append(image);",
+        "  await image.decode().catch(function ignoreError() {});",
+      ]),
+      [TEST_PATH_LINE],
+    ),
+    "undeclared_image_case",
+    buildTestCode(buildMountInCaseLines("showsCovers"), [
+      ["shows covers", "showsCovers"],
+    ]),
+  );
+}
+
+/**
+ * A case that expects `mount()` to reject, for a mod whose `mount` throws
+ * `new Error("map failed")` when a case mounts it.
+ */
+export function buildExpectedFailureCaseFiles(): ModFiles {
+  return addTestFile(
+    buildCheckedModFiles(
+      "expected_failure_case",
+      buildCaseOnlyLines(['  throw new Error("map failed");']),
+      [TEST_PATH_LINE],
+    ),
+    "expected_failure_case",
+    buildTestCode(
+      [
+        "async function expectsMountFailure(context) {",
+        "  try {",
+        '    await context.mount({ params: { inCase: "yes" } });',
+        "  } catch (error) {",
+        '    context.expect(error.message).toBe("map failed");',
+        "    return;",
+        "  }",
+        '  throw new Error("mount did not reject");',
+        "}",
+      ],
+      [["expects a mount failure", "expectsMountFailure"]],
+    ),
+  );
+}
+
+/**
+ * A probe test file whose case fails with the keys of `t`, of the case
+ * context, of `expect(value)` and of `expect(value).not`, as JSON.
+ */
+export const KEYS_PROBE_TEST_CODE = [
+  "let testKeys = [];",
+  "",
+  "function reportKeys(context) {",
+  "  const expectation = context.expect(1);",
+  "  const keys = {",
+  "    t: testKeys,",
+  "    context: Object.keys(context).sort(),",
+  "    storage: Object.keys(context.storage).sort(),",
+  "    expect: Object.keys(expectation).sort(),",
+  "    not: Object.keys(expectation.not).sort(),",
+  "  };",
+  "  throw new Error(JSON.stringify(keys));",
+  "}",
+  "",
+  "export default function registerTests(t) {",
+  "  testKeys = Object.keys(t).sort();",
+  '  t.test("reports the keys", reportKeys);',
+  "}",
+  "",
+].join("\n");

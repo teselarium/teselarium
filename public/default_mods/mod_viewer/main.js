@@ -141,7 +141,27 @@ function buildFindingList(findings) {
   return list;
 }
 
-/** The report of `mods.check`: its status as a badge, then its findings. */
+/** A test case: its status as a badge, its name and, for a failed case, its message. */
+function buildTestItem(test) {
+  const item = document.createElement("li");
+  const variant = test.status === "pass" ? "success" : "destructive";
+  item.append(buildBadge(test.status, variant), ` ${test.name}`);
+  if (test.message !== null) {
+    item.append(`: ${test.message}`);
+  }
+  return item;
+}
+
+function buildTestList(tests) {
+  const list = document.createElement("ul");
+  list.setAttribute("aria-label", "Tests");
+  for (const test of tests) {
+    list.append(buildTestItem(test));
+  }
+  return list;
+}
+
+/** The report of `mods.check`: its status as a badge, then its test cases, if any ran, and its findings. */
 function buildCheckReport(report) {
   const section = document.createElement("section");
   section.setAttribute("aria-label", "Check report");
@@ -159,6 +179,9 @@ function buildCheckReport(report) {
     const notice = document.createElement("p");
     notice.textContent = "The mod was not mounted: its files have errors.";
     section.append(notice);
+  }
+  if (report.tests.length > 0) {
+    section.append(buildTestList(report.tests));
   }
   section.append(buildFindingList(report.findings));
   return section;

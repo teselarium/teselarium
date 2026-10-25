@@ -72,7 +72,7 @@ function renderSandbox(stage: Stage, sandbox: SandboxSnapshot): ReactElement {
 }
 
 function renderCheckFrame(stage: Stage, check: CheckSnapshot): ReactElement {
-  return <CheckFrame key={check.id} stage={stage} check={check} />;
+  return <CheckFrame key={check.key} stage={stage} check={check} />;
 }
 
 function ignoreExitError(): void {

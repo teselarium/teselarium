@@ -33,8 +33,15 @@ import {
 } from "./mod_session.ts";
 import type { ModSession, ModSessionOptions } from "./mod_session.ts";
 import type { ResponseError } from "./mod_messages.ts";
+import type { SandboxTestReport } from "../sandbox/index.ts";
 
-type SessionHooks = Pick<ModSessionOptions, "onMounted" | "onErrorResponse">;
+const TEST_CODE =
+  'export default function register(t) { t.test("lists books", function listsBooks() {}); }';
+
+type SessionHooks = Pick<
+  ModSessionOptions,
+  "onMounted" | "onErrorResponse" | "test" | "onTestReport"
+>;
 
 interface PlayedSession {
   session: ModSession;
@@ -127,6 +134,23 @@ async function playSession(
     launch,
   };
   return playedSession;
+}
+
+/** Session options whose callbacks do nothing. */
+function buildPlainOptions(): ModSessionOptions {
+  const options: ModSessionOptions = {
+    storage: createMemoryStorage(),
+    appOrigin: APP_ORIGIN,
+    defaults: TEST_DEFAULTS,
+    fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    onIssue: vi.fn<(issue: ModIssue) => void>(),
+    onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+    onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
+    onCheckMod:
+      vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
+    theme: buildTheme("light"),
+  };
+  return options;
 }
 
 /** The mount context of a posted `sandbox.connect`. */
@@ -590,6 +614,105 @@ describe("session hooks", function describeSessionHooks(): void {
         error: { code: -32601, message: 'Unknown method "tiles.delete"' },
       },
     ]);
+  });
+});
+
+describe("test frames", function describeTestFrames(): void {
+  it("posts no test params without the test option", async function postsNoTest(): Promise<void> {
+    const fakeFrame = createFakeFrame();
+    const launch = await launchSampleMod();
+
+    const session = connectModSession(fakeFrame.target, launch, {
+      ...buildPlainOptions(),
+    });
+    openPorts.push(session.port, readModPort(fakeFrame));
+
+    const connect = fakeFrame.posted[0].message as { params: object };
+    expect(connect.params).not.toHaveProperty("test");
+  });
+
+  it("posts the test params with the test option", async function postsTest(): Promise<void> {
+    const fakeFrame = createFakeFrame();
+    const launch = await launchSampleMod();
+
+    const session = connectModSession(fakeFrame.target, launch, {
+      ...buildPlainOptions(),
+      test: { code: TEST_CODE, caseName: "lists books" },
+    });
+    openPorts.push(session.port, readModPort(fakeFrame));
+
+    expect(fakeFrame.posted[0].message).toEqual({
+      jsonrpc: "2.0",
+      method: "sandbox.connect",
+      params: {
+        code: launch.mod.code,
+        context: { ...launch.context, theme: buildTheme("light") },
+        test: { code: TEST_CODE, caseName: "lists books" },
+      },
+    });
+  });
+
+  it("calls onTestReport with each test notification", async function reportsTests(): Promise<void> {
+    const onTestReport = vi.fn<(report: SandboxTestReport) => void>();
+    const played = await playSession(buildTheme("light"), {
+      test: { code: TEST_CODE, caseName: null },
+      onTestReport,
+    });
+
+    sendNotification(played, "sandbox.testsListed", { names: ["lists books"] });
+    sendNotification(played, "sandbox.testsFailed", { message: "no test" });
+    sendNotification(played, "sandbox.answerQueued", {
+      method: "ui.confirm",
+      value: true,
+    });
+    sendNotification(played, "sandbox.caseFinished", {
+      status: "fail",
+      message: "no books",
+    });
+    await waitForMessages();
+
+    expect(onTestReport.mock.calls).toEqual([
+      [{ kind: "listed", names: ["lists books"] }],
+      [{ kind: "listFailed", message: "no test" }],
+      [{ kind: "answerQueued", method: "ui.confirm", value: true }],
+      [{ kind: "caseFinished", status: "fail", message: "no books" }],
+    ]);
+    expect(played.onIssue).not.toHaveBeenCalled();
+    expect(played.received).toEqual([]);
+  });
+
+  it("ignores a test notification of the wrong shape", async function ignoresWrongShape(): Promise<void> {
+    const onTestReport = vi.fn<(report: SandboxTestReport) => void>();
+    const played = await playSession(buildTheme("light"), { onTestReport });
+
+    sendNotification(played, "sandbox.testsListed", { names: "lists books" });
+    sendNotification(played, "sandbox.answerQueued", {
+      method: "ui.confirm",
+      value: "yes",
+    });
+    await waitForMessages();
+
+    expect(onTestReport).not.toHaveBeenCalled();
+    expect(played.received).toEqual([]);
+  });
+
+  it("a session without onTestReport ignores the test notifications", async function ignoresWithoutHook(): Promise<void> {
+    const played = await playSession();
+
+    sendNotification(played, "sandbox.caseFinished", {
+      status: "pass",
+      message: null,
+    });
+    sendNotification(played, "sandbox.answerQueued", {
+      method: "ui.confirm",
+      value: true,
+    });
+    sendRequest(played, 3, "ui.confirm", { message: "Delete?" });
+    await waitForReceived(played, 1);
+
+    expect(played.onIssue).not.toHaveBeenCalled();
+    expect(played.onRequestAction).toHaveBeenCalledOnce();
+    expect(played.received).toEqual([{ jsonrpc: "2.0", id: 3, result: true }]);
   });
 });
 

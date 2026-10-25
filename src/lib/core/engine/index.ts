@@ -28,11 +28,13 @@ export type {
   ModCheckReport,
   ModCheckStatus,
   ModCheckStep,
+  ModTestResult,
 } from "./mod_check_report.ts";
 export { inspectMod } from "./mod_inspection.ts";
 export type { ModInspection } from "./mod_inspection.ts";
 export {
   buildModLaunch,
+  buildModTestDocument,
   loadModTiles,
   prepareModLaunch,
   selectModTiles,

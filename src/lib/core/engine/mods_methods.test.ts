@@ -37,6 +37,8 @@ import type { ModCheckRequest, ModMethodContext } from "./mod_methods.ts";
 import { MODS_METHODS } from "./mods_methods.ts";
 
 const VIEWER_TARGET = SAMPLE_MOD_SOURCE;
+const CLOCK_MOD_SOURCE = "https://example.org/mods/clock/mod_conf.yaml";
+const CLOCK_TEST_SOURCE = "https://example.org/mods/clock/test.js";
 
 afterEach(function clearTestTexts(): void {
   testTexts.clear();
@@ -106,7 +108,7 @@ type CheckModSpy = Mock<
 >;
 
 function buildPassingReport(source: string): ModCheckReport {
-  return buildModCheckReport(source, [], true);
+  return buildModCheckReport(source, [], true, null);
 }
 
 /** A context whose `onCheckMod` is a spy: it answers a passing report, or `null` for a hidden mod. */
@@ -151,6 +153,7 @@ async function checkBundleOnly(
     request.source,
     bundleCheck.findings,
     false,
+    null,
   );
   return report;
 }
@@ -171,6 +174,28 @@ describe("mods.inspect", function describeModsInspect(): void {
       api: "^0.1.0",
       apiCompatible: true,
     });
+  });
+
+  it("Inspect a mod with tests", async function inspectsModWithTests(): Promise<void> {
+    const { context, fetchSpy } = buildSpiedContext(["https://example.org"]);
+    testTexts.set(
+      CLOCK_MOD_SOURCE,
+      'mod:\n  name: "clock"\n  version: "1.0.0"\n  entrypoint: "./main.js"\n  test_path: "./test.js"',
+    );
+
+    const inspection = await inspect(context, { mod: CLOCK_MOD_SOURCE });
+
+    expect(inspection).toMatchObject({ testSource: CLOCK_TEST_SOURCE });
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it("Inspect a mod without tests", async function inspectsModWithoutTests(): Promise<void> {
+    const { context } = buildSpiedContext(["https://example.org"]);
+    serveUntypedMod();
+
+    const inspection = await inspect(context, { mod: UNTYPED_MOD_SOURCE });
+
+    expect(inspection).toMatchObject({ testSource: null });
   });
 
   it("Inspect a mod for another API", async function inspectsOtherApiMod(): Promise<void> {

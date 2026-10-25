@@ -94,7 +94,7 @@ Each mod runs in its own `<iframe sandbox="allow-scripts">` whose document is bu
 - The frame has `allow="fullscreen *"`, so `element.requestFullscreen()` works after a click inside the mod, with the browser's own exit notice. This is a permissions policy of the `<iframe>`, not a sandbox flag: the `sandbox` value stays `allow-scripts`. The `*` is needed: a bare `allow="fullscreen"` only allows the origin the frame was declared with, which for a `srcdoc` frame is the app's, never the sandbox's opaque origin, so Firefox and WebKit refuse the request. When the visible sandbox changes, the app leaves fullscreen, so a hidden frame never keeps the screen.
 - Without `allow-modals`, `alert`, `confirm`, `prompt` and `print` show nothing (see [Dialogs in mods](#dialogs-in-mods)). Without `allow-downloads`, a mod cannot start a download, and without `allow-popups` it cannot open a tab: it asks the app with `files.save` and `links.open` (see the [engine module](../engine/README.md)).
 
-The frame document holds only the policy, the theme styles and the frame loader:
+The frame document holds only the policy, the theme styles and the frame loader (in the frames of a check's tests, the loader is followed by the assertions and the test runner, in the same script, see [Frames of a check's tests](#frames-of-a-checks-tests)):
 
 ```html
 <!doctype html>
@@ -111,7 +111,7 @@ The document is fixed for the life of the mod, because changing `srcdoc` reloads
 
 ### The frame loader
 
-The frame loader (`sandbox_loader.js`) is the only script the app puts in a mod's frame. It is plain browser JavaScript, inlined as text. It is not the mod loader, which fetches mod files in the app.
+The frame loader (`sandbox_loader.js`) is the only script the app puts in a running mod's frame. It is plain browser JavaScript, inlined as text. It is not the mod loader, which fetches mod files in the app.
 
 1. While the document loads, it listens for `securitypolicyviolation` on `document` (it keeps the reports until it is connected) and for `message` on `window`.
 2. It accepts only the first message whose `source` is the app's window (`window.parent`), whose data is a `sandbox.connect` notification and which carries exactly one port. Later messages are ignored.
@@ -120,23 +120,47 @@ The frame loader (`sandbox_loader.js`) is the only script the app puts in a mod'
 5. On connect, it sets `data-ot-color-scheme` on `<html>` to `context.theme.colorScheme`, before importing the mod, so the attribute is there before `mount`.
 6. On a `theme.changed` notification, it sets the attribute to the params' `colorScheme` before calling the mod's handlers. If `mount` has not been called yet, it also replaces `context.theme` with the params, so a mod whose code is still being imported mounts with the newest theme. A `colorScheme` other than `"light"` or `"dark"` is ignored. The attribute is set for mods that opted out of the theme styles too.
 7. Before importing the mod, it replaces `alert`, `confirm`, `prompt` and `print` on `window` with functions that send `sandbox.dialogBlocked` and return what the blocked originals return: `undefined`, `false`, `null` and `undefined`.
-8. It turns the mod's code into a `blob:` URL, `import()`s it, revokes the URL, checks that the default export is a function and calls `mount(engine, context)`, awaiting the result. A missing default export, an import error, a throw or a rejection becomes `sandbox.mountFailed`. When `mount` resolves, and only then, it sends `sandbox.mounted`.
+8. It starts the frame's mode, read from the connect params: `mount` without a `test` param, `list` for a `test` whose `caseName` is `null`, and `case` for a `test` with a case name. The modes live in a table, `frameModes`. The loader has only `mount`; the test runner adds `list` and `case`, so the loader does not depend on it. A mode the frame does not have (a `test` param in a frame without the runner) becomes `sandbox.mountFailed`.
+9. In the `mount` mode, it turns the mod's code into a `blob:` URL, `import()`s it, revokes the URL, checks that the default export is a function and calls `mount(engine, context)`, awaiting the result. A missing default export, an import error, a throw or a rejection becomes `sandbox.mountFailed`. When `mount` resolves, and only then, it sends `sandbox.mounted`.
+
+### Frames of a check's tests
+
+A mod's tests run only in the hidden frames of a mod check (see the [stage module](../stage/README.md#mod-checks)). Their document, `buildSandboxDocument(policy, theme, { testRunner: true })`, has the same policy and theme styles as the mod's own frame, and its module script holds the frame loader followed by two more plain browser scripts, so the three share one scope and their names stay out of the mod's global scope:
+
+- `sandbox_assertions.js`: `expect(actual)` with `toBe` (by `Object.is`), `toEqual` (deep equality of plain data: lists by their items in order, mappings by their keys in any order), `toContain` (a string's substring, or a list's item by `toEqual`), `toBeTruthy` and `not`; the descriptions of values in failure messages (`Expected 2 to be 3`, at most 200 characters per value); and `waitFor(fn, timeout = 2000)`, which calls `fn` every 50 milliseconds until it returns a truthy value without throwing, and rejects with `The condition was not met within <timeout> ms`, plus `. Last error: <message>` when `fn` threw. Its functions are exported, so Vitest imports them; nothing in the frame does.
+- `sandbox_test_runner.js`: adds the `list` and `case` modes to `frameModes`. Both import the test file from a `blob:` URL, check that its default export is a function and call it with `t`, whose `test(name, fn)` registers a case, and await it. An empty or repeated name, a missing function, or a call after the default export settled throws, and is kept, so a test file that catches it still fails. A test file that registers no case fails with `the test file registers no test`.
+  - `list` sends `sandbox.testsListed` with the names in registration order, or `sandbox.testsFailed` with the error's message. It never imports the entrypoint.
+  - `case` runs the case named in the connect params with its context, and sends `sandbox.caseFinished` when the case's function settles: `pass`, or `fail` with the error's message. A name the test file no longer registers fails with a message that says so.
+
+The case context:
+
+- `mount(options?)` copies the mount context, replaces `tiles` with `options.tiles`, merges `options.config` into `config` and sets `params` to `options.params`, then imports the entrypoint and calls its default export with an engine API object whose `request` records each request, and that context. A failing mount rejects `mount` and is not sent as `sandbox.mountFailed`. A second call rejects with `the mod is already mounted`, and options of the wrong shape reject with a message that names the option.
+- `requests` lists each request the mod sent through that object, in order, as `{ method, params }`, which gets its `result`, or its `error` (`{ code, message }`), when the request settles.
+- `storage.get(key)` and `storage.set(key, value)` send `storage.get` and `storage.set` on the frame's port, so the engine's rules apply. They are not recorded, and work before `mount`.
+- `answer(method, value)` checks the method and the value at once (`the answer to ui.confirm must be a boolean`; `mods.open` takes `null`), then sends `sandbox.answerQueued`. The engine queues the answer for the next request for that method.
+- `root` is `document.body`, `tiles` the mount context's tiles, and `expect` and `waitFor` the assertions.
+
+The runner, the assertions and their notifications are the loader's protocol, outside the mod API: running mods' frames do not carry them, and a running session ignores the notifications. What a test file gets (`t`, the case context and the matchers) is the test API, which is part of the mod API (see the [engine module](../engine/README.md#mod-api-version)).
 
 ### Frame loader messages
 
-The frame loader and the engine use five notifications, whose names start with the reserved `sandbox.` prefix. They are the loader's protocol, not the mod API: mods never send or receive them through the engine API object, the mod API surface guard does not record them, and adding one needs no mod API version bump.
+The frame loader and the engine use five notifications, and the test runner four more, whose names start with the reserved `sandbox.` prefix. They are the loader's protocol, not the mod API: mods never send or receive them through the engine API object, the mod API surface guard does not record them, and adding one needs no mod API version bump.
 
 | Message | Direction | Params |
 |---|---|---|
-| `sandbox.connect` | engine to frame, on `window`, with the port | `{ code, context }`: the entrypoint text and the mount context |
+| `sandbox.connect` | engine to frame, on `window`, with the port | `{ code, context, test? }`: the entrypoint text, the mount context and, in a check's test frames, `test`: `{ code, caseName }`, the test file's text and the case to run, or `null` to list the cases |
 | `sandbox.blocked` | frame to engine, on the port | `{ blockedUrl, directive }` of a `securitypolicyviolation` |
 | `sandbox.mountFailed` | frame to engine, on the port | `{ message }` of the mount error |
 | `sandbox.mounted` | frame to engine, on the port | `{}`, once the mod's `mount` resolved. Never sent after `sandbox.mountFailed` |
 | `sandbox.dialogBlocked` | frame to engine, on the port | `{ name }`: `"alert"`, `"confirm"`, `"prompt"` or `"print"`, the blocked function the mod called |
+| `sandbox.testsListed` | list frame to engine, on the port | `{ names }`: the names of the cases, in registration order |
+| `sandbox.testsFailed` | list frame to engine, on the port | `{ message }`: why the test file gives no cases |
+| `sandbox.answerQueued` | case frame to engine, on the port | `{ method, value }`: a scripted answer, a boolean for `links.open`, `files.save` and `ui.confirm`, and `null` for `mods.open` |
+| `sandbox.caseFinished` | case frame to engine, on the port | `{ status, message }`: `"pass"` with `null`, or `"fail"` with the error's message |
 
 The frame loader also knows the engine's `theme.changed` event (see the [engine module](../engine/README.md)), to keep the color scheme attribute up to date. The name test in `sandbox_messages.test.ts` checks it against the engine's `THEME_CHANGED_METHOD`.
 
-The engine turns `sandbox.blocked` into a blocked request report, `sandbox.dialogBlocked` into a blocked dialog report and `sandbox.mountFailed` into the error issue `The mod could not be mounted: <message>`, each reported once. A session that was given `onMounted` (the mod check, see the [engine module](../engine/README.md#session)) calls it for `sandbox.mounted`, and for `sandbox.mountFailed` after the issue; running sandboxes ignore `sandbox.mounted`. Params of the wrong shape, and unknown function names, are ignored. A mod could send these notifications itself, but they only add issues to its own list, or end its own check sooner.
+The engine turns `sandbox.blocked` into a blocked request report, `sandbox.dialogBlocked` into a blocked dialog report and `sandbox.mountFailed` into the error issue `The mod could not be mounted: <message>`, each reported once. A session that was given `onMounted` (the mod check, see the [engine module](../engine/README.md#session)) calls it for `sandbox.mounted`, and for `sandbox.mountFailed` after the issue; running sandboxes ignore `sandbox.mounted`. A session that was given `onTestReport` (a check's list and case frames) hands it the four test notifications; running sandboxes ignore them. Params of the wrong shape, and unknown function names, are ignored. A mod could send these notifications itself, but they only add issues to its own list, end its own check sooner, or change its own tests' results.
 
 ### Dialogs in mods
 
@@ -210,11 +234,12 @@ const policy = buildSandboxPolicy(contentHosts, grants.granted);
 
 ### Frame document, messages and channel
 
-- `buildSandboxDocument(policy, theme)`: the `srcdoc` HTML of a mod's frame, with the policy, then the theme styles when `theme` (the mod's `ModThemeSetting`) is `"default"`, then the frame loader.
-- `openSandboxChannel(frameTarget, params)`: posts `sandbox.connect` with `params` (`SandboxConnectParams`: `code`, `context`) and one port to the frame, and returns the engine's port.
+- `buildSandboxDocument(policy, theme, options?)`: the `srcdoc` HTML of a mod's frame, with the policy, then the theme styles when `theme` (the mod's `ModThemeSetting`) is `"default"`, then the frame loader. With `options.testRunner` `true` (`SandboxDocumentOptions`), the assertions and the test runner follow the loader in the same script.
+- `openSandboxChannel(frameTarget, params)`: posts `sandbox.connect` with `params` (`SandboxConnectParams`: `code`, `context` and the optional `test`, a `SandboxTestParams`: `code`, `caseName`) and one port to the frame, and returns the engine's port.
 - `readBlockedRequest(params)`, `readMountFailure(params)` and `readBlockedDialog(params)`: read the params of `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked`, or `null` for params of the wrong shape or an unknown function name.
-- `SANDBOX_CONNECT_METHOD`, `SANDBOX_BLOCKED_METHOD`, `SANDBOX_MOUNT_FAILED_METHOD`, `SANDBOX_MOUNTED_METHOD`, `SANDBOX_DIALOG_BLOCKED_METHOD`: the message names, shared with the frame loader.
-- Types: `SandboxConnectParams`.
+- `readSandboxTestReport(method, params)`: reads a test notification as a `SandboxTestReport`: `{ kind: "listed", names }`, `{ kind: "listFailed", message }`, `{ kind: "answerQueued", method, value }` (with `method` an `AnswerMethod` and a value of the right type for it) or `{ kind: "caseFinished", status, message }`. Returns `null` for another method or params of the wrong shape.
+- `SANDBOX_CONNECT_METHOD`, `SANDBOX_BLOCKED_METHOD`, `SANDBOX_MOUNT_FAILED_METHOD`, `SANDBOX_MOUNTED_METHOD`, `SANDBOX_DIALOG_BLOCKED_METHOD`, `SANDBOX_TESTS_LISTED_METHOD`, `SANDBOX_TESTS_FAILED_METHOD`, `SANDBOX_ANSWER_QUEUED_METHOD`, `SANDBOX_CASE_FINISHED_METHOD`: the message names, shared with the frame loader and the test runner.
+- Types: `SandboxConnectParams`, `SandboxTestParams`, `SandboxTestReport`, `AnswerMethod`, `SandboxDocumentOptions`.
 
 Example:
 

@@ -36,7 +36,15 @@ import { CollectionFormatError, TileTypeError } from "../../tile/index.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
 import { ModSwitchedOffError } from "./engine_errors.ts";
 import { MOD_API_VERSION } from "./mod_api_version.ts";
-import { loadModTiles, prepareModLaunch } from "./mod_launch.ts";
+import {
+  buildSandboxDocument,
+  SANDBOX_CASE_FINISHED_METHOD,
+} from "../sandbox/index.ts";
+import {
+  buildModTestDocument,
+  loadModTiles,
+  prepareModLaunch,
+} from "./mod_launch.ts";
 import type { ModLaunch, ModLaunchRequest, RunLink } from "./mod_launch.ts";
 
 const SAMPLE_LINK: RunLink = {
@@ -223,6 +231,32 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     );
     expect(deniedLaunch.sandboxDocument).toContain(
       "img-src data: blob: https://example.org;",
+    );
+  });
+
+  it("keeps the policy of the frame document", async function keepsPolicy(): Promise<void> {
+    const launch = await launchMod(SAMPLE_LINK);
+
+    expect(launch.policy).toContain("https://upload.wikimedia.org");
+    expect(launch.sandboxDocument).toBe(
+      buildSandboxDocument(launch.policy, launch.mod.theme),
+    );
+  });
+
+  it("builds a test document with the policy of the frame document and the runner", async function buildsTestDocument(): Promise<void> {
+    const launch = await launchMod(SAMPLE_LINK, OTHER_APP_ORIGIN);
+
+    const testDocument = buildModTestDocument(launch);
+
+    expect(testDocument).toContain(`content="${launch.policy}">`);
+    expect(launch.sandboxDocument).toContain(`content="${launch.policy}">`);
+    expect(testDocument).toContain("<style>");
+    expect(testDocument).toContain(`"${SANDBOX_CASE_FINISHED_METHOD}"`);
+    expect(launch.sandboxDocument).not.toContain(
+      `"${SANDBOX_CASE_FINISHED_METHOD}"`,
+    );
+    expect(testDocument).toBe(
+      buildSandboxDocument(launch.policy, "default", { testRunner: true }),
     );
   });
 

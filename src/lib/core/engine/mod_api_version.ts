@@ -2,10 +2,10 @@ import satisfies from "semver/functions/satisfies.js";
 
 /**
  * The version of the mod API: the engine methods and events, the mount
- * context and the mod file format. It is separate from the app's own version.
+ * context, the mod file format and the test API. It is separate from the app's own version.
  * See "Mod API version" in the engine's README for when it changes.
  */
-export const MOD_API_VERSION = "0.1.1";
+export const MOD_API_VERSION = "0.1.2";
 
 /** Whether `version` is in `range`, by npm's semver range rules. */
 export function isVersionInApiRange(version: string, range: string): boolean {

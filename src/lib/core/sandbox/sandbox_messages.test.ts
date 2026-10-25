@@ -3,14 +3,20 @@ import {
   readBlockedDialog,
   readBlockedRequest,
   readMountFailure,
+  readSandboxTestReport,
+  SANDBOX_ANSWER_QUEUED_METHOD,
   SANDBOX_BLOCKED_METHOD,
+  SANDBOX_CASE_FINISHED_METHOD,
   SANDBOX_CONNECT_METHOD,
   SANDBOX_DIALOG_BLOCKED_METHOD,
   SANDBOX_MOUNT_FAILED_METHOD,
   SANDBOX_MOUNTED_METHOD,
+  SANDBOX_TESTS_FAILED_METHOD,
+  SANDBOX_TESTS_LISTED_METHOD,
 } from "./index.ts";
 import { THEME_CHANGED_METHOD } from "../engine/index.ts";
 import SANDBOX_LOADER from "./sandbox_loader.js?raw";
+import SANDBOX_TEST_RUNNER from "./sandbox_test_runner.js?raw";
 
 describe("readBlockedRequest", function describeReadBlockedRequest(): void {
   it("reads the params the frame loader sends", function readsParams(): void {
@@ -79,6 +85,163 @@ describe("readBlockedDialog", function describeReadBlockedDialog(): void {
   });
 });
 
+describe("readSandboxTestReport", function describeReadTestReport(): void {
+  it("reads the listed case names", function readsListed(): void {
+    const report = readSandboxTestReport("sandbox.testsListed", {
+      names: ["lists books", "highlights a book"],
+    });
+
+    expect(report).toEqual({
+      kind: "listed",
+      names: ["lists books", "highlights a book"],
+    });
+  });
+
+  it("gives null for listed names of the wrong shape", function rejectsNames(): void {
+    expect(readSandboxTestReport("sandbox.testsListed", {})).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.testsListed", { names: "lists books" }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.testsListed", { names: ["a", 3] }),
+    ).toBeNull();
+  });
+
+  it("reads why there are no cases", function readsListFailure(): void {
+    const report = readSandboxTestReport("sandbox.testsFailed", {
+      message: "the test file registers no test",
+    });
+
+    expect(report).toEqual({
+      kind: "listFailed",
+      message: "the test file registers no test",
+    });
+  });
+
+  it("gives null for a list failure without a message", function rejectsListFailure(): void {
+    expect(readSandboxTestReport("sandbox.testsFailed", {})).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.testsFailed", { message: 3 }),
+    ).toBeNull();
+  });
+
+  it("reads a boolean answer to each method that asks the user", function readsBooleanAnswers(): void {
+    for (const method of ["links.open", "files.save", "ui.confirm"]) {
+      const report = readSandboxTestReport("sandbox.answerQueued", {
+        method,
+        value: true,
+      });
+
+      expect(report).toEqual({ kind: "answerQueued", method, value: true });
+    }
+  });
+
+  it("reads a null answer to mods.open", function readsModsOpenAnswer(): void {
+    const report = readSandboxTestReport("sandbox.answerQueued", {
+      method: "mods.open",
+      value: null,
+    });
+
+    expect(report).toEqual({
+      kind: "answerQueued",
+      method: "mods.open",
+      value: null,
+    });
+  });
+
+  it("gives null for an answer whose value has the wrong type for its method", function rejectsAnswerType(): void {
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "ui.confirm",
+        value: "yes",
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "links.open",
+        value: null,
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "mods.open",
+        value: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("gives null for an answer to another method", function rejectsAnswerMethod(): void {
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "storage.get",
+        value: true,
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "toString",
+        value: true,
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", { value: true }),
+    ).toBeNull();
+  });
+
+  it("reads a passing case", function readsPassingCase(): void {
+    const report = readSandboxTestReport("sandbox.caseFinished", {
+      status: "pass",
+      message: null,
+    });
+
+    expect(report).toEqual({
+      kind: "caseFinished",
+      status: "pass",
+      message: null,
+    });
+  });
+
+  it("reads a failing case", function readsFailingCase(): void {
+    const report = readSandboxTestReport("sandbox.caseFinished", {
+      status: "fail",
+      message: "no books",
+    });
+
+    expect(report).toEqual({
+      kind: "caseFinished",
+      status: "fail",
+      message: "no books",
+    });
+  });
+
+  it("gives null for a finished case of the wrong shape", function rejectsCase(): void {
+    expect(
+      readSandboxTestReport("sandbox.caseFinished", {
+        status: "skip",
+        message: null,
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.caseFinished", {
+        status: "fail",
+        message: null,
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.caseFinished", {
+        status: "pass",
+        message: "passed",
+      }),
+    ).toBeNull();
+    expect(readSandboxTestReport("sandbox.caseFinished", null)).toBeNull();
+  });
+
+  it("gives null for a method that is not a test report", function rejectsMethod(): void {
+    expect(readSandboxTestReport("sandbox.mounted", {})).toBeNull();
+    expect(readSandboxTestReport("toString", {})).toBeNull();
+  });
+});
+
 describe("frame loader message names", function describeMethodNames(): void {
   it("match the ones the frame loader uses", function matchesLoader(): void {
     const methodNames = [
@@ -99,6 +262,31 @@ describe("frame loader message names", function describeMethodNames(): void {
       "sandbox.mounted",
       "sandbox.dialogBlocked",
     ]);
+  });
+
+  it("name the test notifications", function namesTestNotifications(): void {
+    expect([
+      SANDBOX_TESTS_LISTED_METHOD,
+      SANDBOX_TESTS_FAILED_METHOD,
+      SANDBOX_ANSWER_QUEUED_METHOD,
+      SANDBOX_CASE_FINISHED_METHOD,
+    ]).toEqual([
+      "sandbox.testsListed",
+      "sandbox.testsFailed",
+      "sandbox.answerQueued",
+      "sandbox.caseFinished",
+    ]);
+  });
+
+  it("match the ones the test runner uses", function matchesRunner(): void {
+    for (const methodName of [
+      SANDBOX_TESTS_LISTED_METHOD,
+      SANDBOX_TESTS_FAILED_METHOD,
+      SANDBOX_ANSWER_QUEUED_METHOD,
+      SANDBOX_CASE_FINISHED_METHOD,
+    ]) {
+      expect(SANDBOX_TEST_RUNNER).toContain(`"${methodName}"`);
+    }
   });
 
   it("sandbox.mounted is sent once mount resolved", function sendsMountedAfterMount(): void {

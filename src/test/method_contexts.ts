@@ -40,6 +40,7 @@ export function buildRequestingMod(permissions: ModPermission[]): LoadedMod {
     entrypoint: `${APP_BASE_URL}default_mods/mod_explorer/main.js`,
     typeSource: null,
     sampleCollection: null,
+    testSource: null,
     config: {},
     permissions,
     theme: "default",

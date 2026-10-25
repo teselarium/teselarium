@@ -25,8 +25,8 @@ import {
   attachStageCheckFrame,
   createStageChecks,
   endRequesterChecks,
-  failStageCheck,
   runStageCheck,
+  stopReloadedCheckFrame,
 } from "./stage_checks.ts";
 import type { CheckServices, StageChecks } from "./stage_checks.ts";
 import {
@@ -118,9 +118,11 @@ export interface SandboxSnapshot {
   apiMismatch: { range: string; apiVersion: string } | null;
 }
 
-/** What the page renders of one check: a hidden frame. Frozen. */
+/** What the page renders of one check: its hidden frame running now. Frozen. */
 export interface CheckSnapshot {
   id: string;
+  /** The frame's key. It changes for each new frame of the check, so the page makes a new iframe. */
+  key: string;
   /** The frame's `srcdoc`. */
   sandboxDocument: string;
   /** The checked mod's title, for the frame's `title`. */
@@ -326,9 +328,13 @@ function buildVisibleView(state: StageState): VisibleView {
 function buildCheckSnapshots(checks: StageChecks): readonly CheckSnapshot[] {
   const snapshots: CheckSnapshot[] = [];
   for (const check of checks.entries.values()) {
+    if (check.frame === null) {
+      continue;
+    }
     const snapshot: CheckSnapshot = {
       id: check.id,
-      sandboxDocument: check.launch.sandboxDocument,
+      key: check.frame.key,
+      sandboxDocument: check.frame.sandboxDocument,
       title: check.launch.mod.title,
     };
     snapshots.push(Object.freeze(snapshot));
@@ -736,7 +742,8 @@ export function frameLoadedAgain(stage: Stage, id: string): void {
 /**
  * Checks a mod for the sandbox `requesterId`, outside the sandboxes and the
  * history: the bundle check, then, without a bundle error, the mount check
- * in a hidden frame the snapshot lists in `checks`. Resolves with the
+ * and the mod's tests in hidden frames the snapshot lists in `checks`, one at
+ * a time. Resolves with the
  * report. Returns `null`, and checks nothing, when the requester is not the
  * visible sandbox.
  */
@@ -756,26 +763,40 @@ export function checkStageMod(
   );
 }
 
-/** Connects a check's frame, on the frame's first `load`, and starts its mount limit. */
+/**
+ * Connects the check `id`'s frame `key`, on the frame's first `load`, and
+ * starts its limit. A frame the check already replaced is ignored.
+ */
 export function attachCheckFrame(
   stage: Stage,
   id: string,
+  key: string,
   frameTarget: Pick<Window, "postMessage">,
 ): void {
   attachStageCheckFrame(
     stage.checks,
     buildCheckServices(stage),
     id,
+    key,
     frameTarget,
   );
 }
 
-/** A check frame loaded another document: the checked mod is stopped, and its check ends with an error. */
-export function checkFrameLoadedAgain(stage: Stage, id: string): void {
-  failStageCheck(
+/**
+ * The check `id`'s frame `key` loaded another document: the checked mod is
+ * stopped. The mount check ends with an error, and a case fails. A frame the
+ * check already replaced is ignored.
+ */
+export function checkFrameLoadedAgain(
+  stage: Stage,
+  id: string,
+  key: string,
+): void {
+  stopReloadedCheckFrame(
     stage.checks,
     buildCheckServices(stage),
     id,
+    key,
     LEFT_PAGE_MESSAGE,
   );
 }

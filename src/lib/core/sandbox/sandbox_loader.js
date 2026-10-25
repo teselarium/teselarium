@@ -1,7 +1,9 @@
-// The frame loader: the only script the app puts in a mod's frame. It
-// receives the mod's code and context from the engine, gives the mod its
-// engine API object and mounts the mod. Inlined as text in the sandbox
-// document, so it must never contain a closing script tag.
+// The frame loader: the only script the app puts in a running mod's frame.
+// It receives the mod's code and context from the engine, gives the mod its
+// engine API object and mounts the mod. In the frames of a check's tests,
+// the assertions and the test runner follow it in the same module script and
+// add their modes to `frameModes`. Inlined as text in the sandbox document,
+// so it must never contain a closing script tag.
 
 const CONNECT_METHOD = "sandbox.connect";
 const BLOCKED_METHOD = "sandbox.blocked";
@@ -226,6 +228,39 @@ function flushPendingReports() {
   loader.pendingReports = [];
 }
 
+function startMountMode(params) {
+  mountMod(params.code).catch(reportMountFailure);
+}
+
+// What the frame does once connected, by mode. The loader has `mount`; the
+// test runner adds `list` and `case`, so the loader does not depend on it.
+const frameModes = { mount: startMountMode };
+
+// `mount` without a `test` param, `list` for a test without a case name, and
+// `case` for a test with one.
+function readFrameMode(params) {
+  const test = params.test;
+  if (typeof test !== "object" || test === null) {
+    return "mount";
+  }
+  if (test.caseName === null) {
+    return "list";
+  }
+  return "case";
+}
+
+function startFrameMode(params) {
+  const modeName = readFrameMode(params);
+  const startMode = frameModes[modeName];
+  if (typeof startMode !== "function") {
+    reportMountFailure(
+      new Error(`this frame cannot run the "${modeName}" mode`),
+    );
+    return;
+  }
+  startMode(params);
+}
+
 function connectToEngine(event) {
   if (loader.port !== null || !isConnectMessage(event)) {
     return;
@@ -238,7 +273,7 @@ function connectToEngine(event) {
   loader.context = params.context;
   applyColorScheme(params.context?.theme);
   replaceBlockedDialogs();
-  mountMod(params.code).catch(reportMountFailure);
+  startFrameMode(params);
 }
 
 document.addEventListener("securitypolicyviolation", reportViolation);

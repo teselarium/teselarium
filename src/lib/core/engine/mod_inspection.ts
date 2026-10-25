@@ -17,6 +17,8 @@ export interface ModInspection {
   apiCompatible: boolean | null;
   typeSource: string | null;
   sampleCollection: string | null;
+  /** The resolved address of the mod's test file, or `null`. It is not fetched. */
+  testSource: string | null;
   config: YamlMapping;
   permissions: ModGrants;
 }
@@ -41,6 +43,7 @@ export async function inspectMod(
     apiCompatible: matchModApiRange(modFile.api),
     typeSource: modFile.typeSource,
     sampleCollection: modFile.sampleCollection,
+    testSource: modFile.testSource,
     config: structuredClone(modFile.config),
     permissions: grantModPermissions(modFile, appOrigin),
   };

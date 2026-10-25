@@ -12,8 +12,11 @@ interface CheckFrameProps {
 }
 
 /**
- * The frame of a mod check: sandboxed like a mod's frame, with the same
- * document. It is hidden by layout, not by `display: none`: it has the stage
+ * The frame a mod check runs now (the mount check, the listing of the mod's
+ * tests or one test case): sandboxed like a mod's frame, with the document
+ * the check gives, which has the mod's content policy. The page keys it by
+ * the frame's key, so each frame of a check is a new iframe with a fresh
+ * page. It is hidden by layout, not by `display: none`: it has the stage
  * area's size, sits behind the stage, is transparent and lets every pointer
  * event through. A frame that is not rendered may get no animation frames,
  * and a mod that waits for one or measures its layout while mounting would
@@ -29,10 +32,10 @@ export function CheckFrame({ stage, check }: CheckFrameProps): ReactElement {
     loadCount.current += 1;
     const frameWindow = event.currentTarget.contentWindow;
     if (loadCount.current === 1 && frameWindow !== null) {
-      attachCheckFrame(stage, check.id, frameWindow);
+      attachCheckFrame(stage, check.id, check.key, frameWindow);
       return;
     }
-    checkFrameLoadedAgain(stage, check.id);
+    checkFrameLoadedAgain(stage, check.id, check.key);
   }
 
   return (

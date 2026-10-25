@@ -12,7 +12,13 @@ import {
 } from "../../test/test_files.ts";
 import { FileFetchError, YamlParseError } from "../files/index.ts";
 import * as modModule from "./index.ts";
-import { loadMod, loadModCode, loadModFile, ModFormatError } from "./index.ts";
+import {
+  loadMod,
+  loadModCode,
+  loadModFile,
+  loadModTestCode,
+  ModFormatError,
+} from "./index.ts";
 import type { LoadedMod, ModFile } from "./index.ts";
 
 const SAMPLE_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/book_list/mod_conf.yaml`;
@@ -21,6 +27,9 @@ const SAMPLE_COLLECTION = `${FIXTURES_BASE_URL}tiles/books_collection.yaml`;
 const BROKEN_MOD_SOURCE = "https://example.org/mods/broken/mod_conf.yaml";
 const BROKEN_ENTRYPOINT = "https://example.org/mods/broken/main.js";
 const MISSING_MOD_SOURCE = "https://example.org/mods/missing/mod_conf.yaml";
+const CLOCK_MOD_SOURCE = "https://example.org/mods/clock/mod_conf.yaml";
+const CLOCK_ENTRYPOINT = "https://example.org/mods/clock/main.js";
+const CLOCK_TEST_SOURCE = "https://example.org/mods/clock/test.js";
 
 const MINIMAL_MOD_TEXT = [
   "mod:",
@@ -28,6 +37,13 @@ const MINIMAL_MOD_TEXT = [
   '  version: "0.1.0"',
   '  entrypoint: "./main.js"',
   '  author: "Alice"',
+].join("\n");
+
+const CLOCK_MOD_TEXT = [
+  "mod:",
+  '  name: "clock"',
+  '  version: "0.1.0"',
+  '  entrypoint: "./main.js"',
 ].join("\n");
 
 afterEach(function clearTestTexts(): void {
@@ -55,6 +71,12 @@ function catchLoadError(
 
 function failOnLoadedMod(mod: LoadedMod | ModFile): never {
   throw new Error(`Expected loading "${mod.source}" to fail, but it passed`);
+}
+
+function failOnTestCode(testCode: string): never {
+  throw new Error(
+    `Expected loading the test file to fail, but got "${testCode}"`,
+  );
 }
 
 function returnLoadError(error: unknown): unknown {
@@ -121,6 +143,44 @@ describe("loadMod", function describeLoadMod(): void {
 
     expect(mod.sampleCollection).toBe(SAMPLE_COLLECTION);
     expect(listRequestedUrls(testFetch)).not.toContain(SAMPLE_COLLECTION);
+  });
+
+  it("Test file next to the mod file", async function resolvesTestPath(): Promise<void> {
+    testTexts.set(
+      CLOCK_MOD_SOURCE,
+      `${CLOCK_MOD_TEXT}\n  test_path: "./test.js"`,
+    );
+    testTexts.set(CLOCK_ENTRYPOINT, "export default function mount() {}");
+    const testFetch = createTestFetch();
+
+    const mod = await loadMod(CLOCK_MOD_SOURCE, { fetch: testFetch });
+
+    expect(mod.testSource).toBe(CLOCK_TEST_SOURCE);
+    expect(listRequestedUrls(testFetch)).toEqual([
+      CLOCK_MOD_SOURCE,
+      CLOCK_ENTRYPOINT,
+    ]);
+  });
+
+  it("No test file", async function readsNoTestPath(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, MINIMAL_MOD_TEXT);
+
+    const mod = await loadModFile(BROKEN_MOD_SOURCE, { fetch: fetchTestFile });
+
+    expect(mod.testSource).toBeNull();
+  });
+
+  it("Empty test path", async function rejectsEmptyTestPath(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, `${MINIMAL_MOD_TEXT}\n  test_path: ""`);
+
+    const error = await catchLoadError(
+      loadModFile(BROKEN_MOD_SOURCE, { fetch: fetchTestFile }),
+    );
+
+    expect(error).toBeInstanceOf(ModFormatError);
+    expect((error as ModFormatError).message).toContain(
+      '"test_path" must be a non-empty string',
+    );
   });
 
   it("Mod without a tile type", async function readsNoTypePath(): Promise<void> {
@@ -339,6 +399,43 @@ describe("loadModCode", function describeLoadModCode(): void {
   });
 });
 
+describe("loadModTestCode", function describeLoadModTestCode(): void {
+  it("fetches only the test file of a loaded mod file", async function loadsTestCode(): Promise<void> {
+    testTexts.set(
+      CLOCK_MOD_SOURCE,
+      `${CLOCK_MOD_TEXT}\n  test_path: "./test.js"`,
+    );
+    testTexts.set(CLOCK_TEST_SOURCE, "export default function register() {}");
+    const modFile = await loadModFile(CLOCK_MOD_SOURCE, {
+      fetch: fetchTestFile,
+    });
+    const testFetch = createTestFetch();
+
+    const testCode = await loadModTestCode(modFile, { fetch: testFetch });
+
+    expect(listRequestedUrls(testFetch)).toEqual([CLOCK_TEST_SOURCE]);
+    expect(testCode).toBe("export default function register() {}");
+  });
+
+  it("Test file HTTP 404", async function rejectsMissingTestFile(): Promise<void> {
+    testTexts.set(
+      CLOCK_MOD_SOURCE,
+      `${CLOCK_MOD_TEXT}\n  test_path: "./test.js"`,
+    );
+    const modFile = await loadModFile(CLOCK_MOD_SOURCE, {
+      fetch: fetchTestFile,
+    });
+
+    const error = await loadModTestCode(modFile, {
+      fetch: fetchTestFile,
+    }).then(failOnTestCode, returnLoadError);
+
+    expect(error).toBeInstanceOf(FileFetchError);
+    expect((error as FileFetchError).source).toBe(CLOCK_TEST_SOURCE);
+    expect((error as FileFetchError).message).toContain("404");
+  });
+});
+
 describe("mod module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(modModule).sort()).toEqual([
@@ -348,6 +445,7 @@ describe("mod module entry point", function describeEntryPoint(): void {
       "loadMod",
       "loadModCode",
       "loadModFile",
+      "loadModTestCode",
       "resolveModReference",
     ]);
   });

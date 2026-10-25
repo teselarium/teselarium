@@ -10,6 +10,7 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "THEME_CHANGED_METHOD",
       "buildModCheckReport",
       "buildModLaunch",
+      "buildModTestDocument",
       "checkModBundle",
       "connectModSession",
       "describeCancelledApiMismatch",

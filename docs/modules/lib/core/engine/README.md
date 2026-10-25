@@ -89,7 +89,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.1"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.2"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. |
@@ -117,29 +117,34 @@ Before any file is requested, the engine checks:
 
 Then:
 
-- `mods.inspect` loads the mod file, without its entrypoint, and answers `source`, `name`, `title`, `version`, `description`, `api` (the mod's `api` range as written, or `null` when it declares none), `apiCompatible` (`true` when the range matches the mod API version, `false` when it does not, `null` without a range), `typeSource`, `sampleCollection`, `config` and `permissions` (the `granted` and `denied` lists that mod would get if it were opened). Inspecting a mod for another API asks the user nothing. A load failure is `-32001` with the load error's message.
+- `mods.inspect` loads the mod file, without its entrypoint, and answers `source`, `name`, `title`, `version`, `description`, `api` (the mod's `api` range as written, or `null` when it declares none), `apiCompatible` (`true` when the range matches the mod API version, `false` when it does not, `null` without a range), `typeSource`, `sampleCollection`, `testSource` (the resolved address of the mod's test file, or `null` when it declares none; the test file is not requested), `config` and `permissions` (the `granted` and `denied` lists that mod would get if it were opened). Inspecting a mod for another API asks the user nothing. A load failure is `-32001` with the load error's message.
 - `mods.open` asks the stage to open the link in a new sandbox, with the requesting sandbox as its opener, and answers `null`. Only the visible mod can open mods: a hidden one gets `-32002` with `mods.open: only the visible mod can open mods`. The new mod's load failures belong to its own sandbox, not to the response.
 - `mods.check` asks the stage to check the mod without running it for the user, and answers the report once the check is done. `collection`, resolved against the app's address, gives the tiles to mount; without it, the mod's sample collection does, and a mod without one is mounted with no tiles. Only the visible mod can check mods: a hidden one gets `-32002` with `mods.check: only the visible mod can check mods`. A mod file that cannot be loaded is a report with status `"fail"`, not an error response. Checking a mod for another API asks the user nothing.
 
-The check has two steps. The bundle check loads the mod file, the entrypoint, the tile type and the collection, and validates the tiles (see [Mod check](#mod-check)). When it found no error, the mount check mounts the mod in a hidden frame, with the content policy and permissions it would get if it were opened, the tiles of its type and a throwaway storage slot, and records what happens until 1 second after `mount` finished (see the [stage module](../stage/README.md#mod-checks)). The report is plain data:
+The check has three steps. The bundle check loads the mod file, the entrypoint, the tile type and the collection, and validates the tiles (see [Mod check](#mod-check)). When it found no error, the mount check mounts the mod in a hidden frame, with the content policy and permissions it would get if it were opened, the tiles of its type and a throwaway storage slot, and records what happens until 1 second after `mount` finished (see the [stage module](../stage/README.md#mod-checks)). When the mod declares `test_path` and the mount check found no error either, the test step fetches the test file and runs each of its cases in a fresh hidden frame of its own (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). The report is plain data:
 
 ```json
 {
   "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
   "status": "warn",
   "mountChecked": true,
+  "testsChecked": true,
+  "tests": [
+    { "name": "lists the sample books", "status": "pass", "message": null },
+    { "name": "highlights the remembered book", "status": "pass", "message": null }
+  ],
   "findings": [
     {
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.1"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.2"
     }
   ]
 }
 ```
 
-`status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none. `mountChecked` is `false` when a bundle error skipped the mount. Findings are in the order they were found, and `step` is `"bundle"` or `"mount"`.
+`status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none. `mountChecked` is `false` when a bundle error skipped the mount. `testsChecked` is `true` when the mod's cases ran, and `false` for a mod without `test_path`, when a bundle or mount error skipped the tests, or when the test file could not be loaded. `tests` lists each case the test file registers, in order, as `{ name, status, message }`, with `status` `"pass"` or `"fail"` and `message` `null` for a passing case and the failure's message otherwise; it is empty when the cases did not run. Findings are in the order they were found, and `step` is `"bundle"`, `"mount"` or `"test"`. A `test` finding comes from the tests: a test file that cannot be loaded or registers no valid case, a failed case (`The test "<name>" failed: <message>`, whose source is the test file), or what a case's mod did that the mount check would record, with the message prefixed by `In the test "<name>": `.
 
 Mods never build app addresses: they send what to run, and only the stage turns it into a run link and a history entry (see the [stage module](../stage/README.md)).
 
@@ -272,7 +277,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context and the mod file format (see the [mod module](../../mod/README.md)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.1` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#mods-written-for-another-api)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.2` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#mods-written-for-another-api)).
 
 When it changes, while it is `0.x`:
 
@@ -283,7 +288,7 @@ From `1.0.0` on, semver's usual rule applies: major for a breaking change, minor
 
 Each bump also updates:
 
-- the surface guard, `mod_api_surface.test.ts`: it records, for each version, the API's surface by name (the method names, the event names, the mount context's keys and the keys of its `mod`, `api`, `permissions` and `theme` mappings, the mod file keys and the permission categories). It fails when the surface built from the code differs from the entry of `MOD_API_VERSION`, or when a recorded version is above it. A bump adds an entry for the new version; older entries are never edited, so the record shows how the API grew. The guard sees names, not params or results, so a change to those needs the bump without the guard's help;
+- the surface guard, `mod_api_surface.test.ts`: it records, for each version, the API's surface by name (the method names, the event names, the mount context's keys and the keys of its `mod`, `api`, `permissions` and `theme` mappings, the mod file keys and the permission categories). It fails when the surface built from the code differs from the entry of `MOD_API_VERSION`, or when a recorded version is above it. A bump adds an entry for the new version; older entries are never edited, so the record shows how the API grew. The guard sees names, not params or results, so a change to those needs the bump without the guard's help. The test API is part of the mod API, but the guard does not record it: the guard builds its surface from the engine's code and never runs the frame loader, so the e2e tests of `e2e/mod_tests.spec.ts` pin the test API's names instead;
 - the shipped mods' `api` ranges, and `TEST_MOD_API_RANGE` in `src/test/sample_mods.ts` and `e2e/mod_routes.ts`, on a breaking bump.
 
 An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `openspec/config.yaml` asks.
@@ -360,7 +365,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.1"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.2"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.7` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -370,9 +375,10 @@ Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `a
 
 ### Launch
 
-- `prepareModLaunch(request, options)`: prepares everything a mod's frame needs. `request` is a `ModLaunchRequest` (`link`, `appOrigin`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `params`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` before any request, loads the mod and its entrypoint, loads the collection when `link.collection` is not `null`, grants the permissions, collects the content hosts and builds the policy and the frame document. Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. Every error propagates, and each names its source.
+- `prepareModLaunch(request, options)`: prepares everything a mod's frame needs. `request` is a `ModLaunchRequest` (`link`, `appOrigin`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `params`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` before any request, loads the mod and its entrypoint, loads the collection when `link.collection` is not `null`, grants the permissions, collects the content hosts and builds the policy and the frame document. Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `policy`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. Every error propagates, and each names its source.
   It resolves and loads, then calls `buildModLaunch`.
 - `buildModLaunch(mod, link, modTiles, appOrigin)`: builds the `ModLaunch` of a loaded mod and its `ModTiles` (or `null`), without requesting anything: grants the permissions, collects the content hosts, builds the policy, the frame document, the mount context and the issues. Opening a mod and checking it both call it, so a checked mod gets the frame it would get if it were opened.
+- `buildModTestDocument(launch)`: the `srcdoc` HTML of a frame of the mod's tests: the launch's `policy` (the frame's Content-Security-Policy) and the mod's theme setting, as in `sandboxDocument`, with the assertions and the test runner after the frame loader (see the [sandbox module](../sandbox/README.md#frames-of-a-checks-tests)). So a case runs the mod with the content policy it gets when it is opened.
 - `loadModTiles(mod, collectionLocation, options?)`: loads a collection for a mod and selects its tiles with `selectModTiles`. Returns `ModTiles` (`collectionSource`, `tiles`, `issues`). The stage's "Reload tiles" calls it again.
 - `selectModTiles(collection, tileValidator)`: the `ModTiles` of a loaded collection. With a validator, the collection is validated and only the tiles of its type are kept, the others appearing as warnings in `issues`. With `null`, every tile is kept.
 
@@ -407,8 +413,8 @@ The bundle check and the report of `mods.check`. Neither needs a DOM, so a Node 
   5. The collection: `collectionLocation`, or else the mod's `sampleCollection`, or none. It is loaded and its tiles are selected with `selectModTiles`. Each of its issues becomes a finding with the issue's level and source. When the tile type failed, the collection is not loaded, since it could not be validated.
 
   A file that cannot be loaded, or has the wrong format, is an error finding whose source is the error's `source` (the failing file) and whose message is the error's message.
-- `buildModCheckReport(source, findings, mountChecked)`: the `ModCheckReport` of a check. Its `status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none. The findings are copied.
-- Types: `ModCheckFinding` (`step`, `level`, `source`, `message`), with `step` a `ModCheckStep` (`"bundle"` or `"mount"`) and `level` `"error"` or `"warning"`; `ModCheckReport` (`source`, `status`, `mountChecked`, `findings`), plain data; `ModCheckStatus` (`"pass" | "warn" | "fail"`); `ModBundleCheck`.
+- `buildModCheckReport(source, findings, mountChecked, tests)`: the `ModCheckReport` of a check. `tests` is the list of `ModTestResult`, or `null` when the cases did not run, which gives `testsChecked` `false` and an empty `tests`. Its `status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none: it is read from the findings alone, which already hold an error for each failed case. The findings and the test results are copied.
+- Types: `ModCheckFinding` (`step`, `level`, `source`, `message`), with `step` a `ModCheckStep` (`"bundle"`, `"mount"` or `"test"`) and `level` `"error"` or `"warning"`; `ModTestResult` (`name`, `status` `"pass"` or `"fail"`, `message`); `ModCheckReport` (`source`, `status`, `mountChecked`, `testsChecked`, `tests`, `findings`), plain data; `ModCheckStatus` (`"pass" | "warn" | "fail"`); `ModBundleCheck`.
 
 ```ts
 import { buildModCheckReport, checkModBundle } from "./lib/core/engine/index.ts";
@@ -416,8 +422,8 @@ import { buildModCheckReport, checkModBundle } from "./lib/core/engine/index.ts"
 const source = "https://example.org/samples/mods/book_list/mod_conf.yaml";
 const bundleCheck = await checkModBundle(source, null, { baseUrl: "https://example.org/" });
 // bundleCheck.findings is [] and bundleCheck.modTiles.tiles has the three sample books
-const report = buildModCheckReport(source, bundleCheck.findings, false);
-// report.status === "pass"
+const report = buildModCheckReport(source, bundleCheck.findings, false, null);
+// report.status === "pass" and report.testsChecked === false
 ```
 
 ### Request handlers
@@ -442,8 +448,10 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
 
 ### Session
 
-- `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `onIssue`, `onOpenLink`, `onRequestAction`, `theme`, and the optional `onMounted` and `onErrorResponse`). Returns a `ModSession`.
+- `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `onIssue`, `onOpenLink`, `onRequestAction`, `onCheckMod`, `theme`, and the optional `onMounted`, `onErrorResponse`, `test` and `onTestReport`). Returns a `ModSession`.
   - `onMounted()`: called when the mod's `mount` finished: for `sandbox.mounted`, and for `sandbox.mountFailed` after its issue is reported. The mod check uses it to start its settle time. Running sandboxes pass none, and ignore `sandbox.mounted`.
+  - `test`: `{ code, caseName }` (`SandboxTestParams`), sent in `sandbox.connect` so the frame lists the cases of the test file (`caseName` `null`) or runs one. Only the frames of a check's tests, built with `buildModTestDocument`, pass it.
+  - `onTestReport(report)`: called with each test notification of the frame, read as a `SandboxTestReport` (`listed`, `listFailed`, `answerQueued` or `caseFinished`, see the [sandbox module](../sandbox/README.md#frame-loader-messages)). Notifications of the wrong shape are ignored. Running sandboxes pass none, so a mod that sends them outside a check changes nothing.
   - `onErrorResponse(method, error)`: called for every error response the session sends, with the request's method, or `null` for a message that is not a request (`-32600`), and the response's `error` (`ResponseError`: `code`, `message`). The mod check keeps `-32600`, `-32601` and `-32602`, the signal that a mod uses the API wrongly. Without it, nothing outside the session sees the responses.
 - `pushTilesChanged(session, tiles, issues)`: pushes `tiles.changed`.
 - `pushThemeChanged(session, theme)`: pushes `theme.changed` with the `Theme`.
@@ -454,7 +462,7 @@ Lifecycle:
 
 1. The stage launches the mod with `prepareModLaunch` and renders its frame with `launch.sandboxDocument`.
 2. On the frame's first `load`, the stage calls `connectModSession` with the frame's window.
-3. The session answers each request once with the same `id`. `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked` from the frame loader become issues through `onIssue`, each reported once. `sandbox.mounted` and `sandbox.mountFailed` call `onMounted`, when given.
+3. The session answers each request once with the same `id`. `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked` from the frame loader become issues through `onIssue`, each reported once. `sandbox.mounted` and `sandbox.mountFailed` call `onMounted`, and the test runner's notifications `onTestReport`, when given.
 4. "Reload tiles" calls `loadModTiles` and `pushTilesChanged`. A color scheme change calls `pushThemeChanged` for every running session.
 5. Closing the sandbox, or the frame loading another document, calls `stopModSession`.
 

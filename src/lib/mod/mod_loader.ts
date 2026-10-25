@@ -21,6 +21,8 @@ export interface ModFile {
   typeSource: string | null;
   /** Resolved URL of the sample collection, or `null`. It is not fetched. */
   sampleCollection: string | null;
+  /** Resolved URL of the test file, or `null`. It is fetched only by `loadModTestCode`. */
+  testSource: string | null;
   config: YamlMapping;
   permissions: ModPermission[];
   theme: ModThemeSetting;
@@ -62,6 +64,7 @@ function buildModFile(source: string, modFormat: ModFormat): ModFile {
     entrypoint: resolveLocation(modFormat.entrypoint, source).href,
     typeSource: resolveModPath(modFormat.typePath, source),
     sampleCollection: resolveModPath(modFormat.sampleCollection, source),
+    testSource: resolveModPath(modFormat.testPath, source),
     config: modFormat.config,
     permissions: modFormat.permissions,
     theme: modFormat.theme,
@@ -71,8 +74,8 @@ function buildModFile(source: string, modFormat: ModFormat): ModFile {
 
 /**
  * Loads a mod file from a mod reference (a default mod name, a folder or the
- * file itself) without fetching its entrypoint, its tile type or its sample
- * collection. Raises `FileFetchError`, `YamlParseError` or `ModFormatError`.
+ * file itself) without fetching its entrypoint, its tile type, its sample
+ * collection or its test file. Raises `FileFetchError`, `YamlParseError` or `ModFormatError`.
  */
 export async function loadModFile(
   reference: string,
@@ -99,6 +102,22 @@ export async function loadModCode(
   const entrypointFile = await fetchFile(modFile.entrypoint, options);
   const loadedMod: LoadedMod = { ...modFile, code: entrypointFile.content };
   return loadedMod;
+}
+
+/**
+ * Fetches the test file of a mod and returns its text. Only a check's tests
+ * fetch it. Raises `FileFetchError`, whose source is the test file, and an
+ * `Error` when the mod declares no test file.
+ */
+export async function loadModTestCode(
+  modFile: ModFile,
+  options: ModLoadOptions = {},
+): Promise<string> {
+  if (modFile.testSource === null) {
+    throw new Error(`The mod "${modFile.source}" declares no test file`);
+  }
+  const testFile = await fetchFile(modFile.testSource, options);
+  return testFile.content;
 }
 
 /**

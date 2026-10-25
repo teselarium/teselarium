@@ -252,3 +252,32 @@ export function serveMismatchedSampleMod(
   );
   serveFourBooks();
 }
+
+/**
+ * A mod with `test_path: "./test.js"` and `open` for `"*"`, served by
+ * `fetchTestFile` once `serveTestedMod` ran. Unit tests play its frames, so
+ * its test file's text is never run.
+ */
+export const TESTED_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/tested/mod_conf.yaml`;
+export const TESTED_MOD_TEST_SOURCE = `${FIXTURES_BASE_URL}mods/tested/test.js`;
+export const TESTED_MOD_TEST_CODE =
+  'export default function registerTests(t) { t.test("lists books", function listsBooks() {}); }\n';
+
+/** Serves `TESTED_MOD_SOURCE`, with `testCode` as its test file, or no test file (`404 Not Found`) for `null`. */
+export function serveTestedMod(
+  testCode: string | null = TESTED_MOD_TEST_CODE,
+): void {
+  serveTestMod(TESTED_MOD_SOURCE, [
+    '  name: "tested"',
+    '  version: "0.1.0"',
+    '  entrypoint: "./main.js"',
+    '  test_path: "./test.js"',
+    "  permissions:",
+    "    open:",
+    '      - host: "*"',
+    '        reason: "Opens mods"',
+  ]);
+  if (testCode !== null) {
+    testTexts.set(TESTED_MOD_TEST_SOURCE, testCode);
+  }
+}

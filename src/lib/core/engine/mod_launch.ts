@@ -73,6 +73,8 @@ export interface ModLaunch {
   collectionSource: string | null;
   context: LaunchContext;
   contentHosts: string[];
+  /** The frame's Content-Security-Policy, which the frames of the mod's tests also get. */
+  policy: string;
   /** The frame's `srcdoc` HTML. */
   sandboxDocument: string;
   /** Whether the mod's `api` range matches `MOD_API_VERSION`, `null` without a range. */
@@ -264,12 +266,23 @@ export function buildModLaunch(
     collectionSource: modTiles === null ? null : modTiles.collectionSource,
     context: buildModContext(mod, link, modTiles, grants),
     contentHosts,
+    policy,
     sandboxDocument: buildSandboxDocument(policy, mod.theme),
     apiCompatible: matchModApiRange(mod.api),
     fileIssues: buildFileIssues(mod),
     issues: buildPermissionIssues(mod, grants),
   };
   return launch;
+}
+
+/**
+ * Builds the `srcdoc` HTML of a frame of the mod's tests: the policy and
+ * theme styles of the launch's frame, with the test runner after the loader.
+ */
+export function buildModTestDocument(launch: ModLaunch): string {
+  return buildSandboxDocument(launch.policy, launch.mod.theme, {
+    testRunner: true,
+  });
 }
 
 /**

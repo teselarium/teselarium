@@ -6,7 +6,7 @@ import {
   validateTileCollection,
 } from "../tile/index.ts";
 import type { TileCollection } from "../tile/index.ts";
-import { loadMod } from "./index.ts";
+import { loadMod, loadModTestCode } from "./index.ts";
 import type { LoadedMod } from "./index.ts";
 
 /** The `book_list` mod the app ships, read from `public/` like the built app serves it. */
@@ -74,5 +74,16 @@ describe("shipped sample mod", function describeShippedSampleMod(): void {
     });
 
     expect(sampleMod.api).toBe("^0.1.0");
+  });
+
+  it("declares its test file", async function declaresTestFile(): Promise<void> {
+    const sampleMod = await loadMod(SHIPPED_SAMPLE_MOD, {
+      fetch: fetchAppFile,
+    });
+
+    expect(sampleMod.testSource).toBe(`${SHIPPED_SAMPLE_MOD}test.js`);
+    const testCode = await loadModTestCode(sampleMod, { fetch: fetchAppFile });
+    expect(testCode).toContain('"lists the sample books"');
+    expect(testCode).toContain('"highlights the remembered book"');
   });
 });

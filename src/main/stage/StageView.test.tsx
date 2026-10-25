@@ -6,7 +6,7 @@ import {
   openStageLink,
   readStageSnapshot,
 } from "../../lib/core/stage/index.ts";
-import type { Stage } from "../../lib/core/stage/index.ts";
+import type { CheckSnapshot, Stage } from "../../lib/core/stage/index.ts";
 import {
   collectMessages,
   createFakeFrame,
@@ -84,11 +84,11 @@ async function openFromVisible(stage: Stage, openerId: string): Promise<void> {
 }
 
 /** Waits until the stage lists a check, after its bundle check. */
-async function waitForCheck(stage: Stage): Promise<string> {
+async function waitForCheck(stage: Stage): Promise<CheckSnapshot> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const entry = readStageSnapshot(stage).checks[0];
     if (entry !== undefined) {
-      return entry.id;
+      return entry;
     }
     await act(waitForMessages);
   }
@@ -318,6 +318,25 @@ function postNotification(
   port.postMessage({ jsonrpc: "2.0", method, params });
 }
 
+/** Publishes a snapshot whose only check runs the frame `key`, as the stage does when a check starts a frame. */
+function publishCheckFrame(stage: Stage, key: string): void {
+  const check: CheckSnapshot = Object.freeze({
+    id: "check-9",
+    key,
+    sandboxDocument: "<!doctype html>",
+    title: "Probe",
+  });
+  act(function publishSnapshot(): void {
+    stage.snapshot = Object.freeze({
+      ...stage.snapshot,
+      checks: Object.freeze([check]),
+    });
+    for (const listener of stage.listeners) {
+      listener();
+    }
+  });
+}
+
 describe("CheckFrame", function describeCheckFrame(): void {
   it("renders a hidden frame per check, outside the sandboxes, until the check ends", async function rendersCheckFrame(): Promise<void> {
     const stage = await startTestStage(
@@ -338,9 +357,9 @@ describe("CheckFrame", function describeCheckFrame(): void {
       method: "mods.check",
       params: { mod: SAMPLE_MOD_REFERENCE },
     });
-    const checkId = await waitForCheck(stage);
+    const check = await waitForCheck(stage);
     const checkFrame = container.querySelector<HTMLIFrameElement>(
-      `iframe[data-check-id="${checkId}"]`,
+      `iframe[data-check-id="${check.id}"]`,
     );
 
     expect(checkFrame).not.toBeNull();
@@ -354,7 +373,7 @@ describe("CheckFrame", function describeCheckFrame(): void {
     expect(checkFrame?.hidden).toBe(false);
 
     await act(async function endCheck(): Promise<void> {
-      checkFrameLoadedAgain(stage, checkId);
+      checkFrameLoadedAgain(stage, check.id, check.key);
       await waitForMessages();
     });
 
@@ -362,5 +381,21 @@ describe("CheckFrame", function describeCheckFrame(): void {
     expect(received).toMatchObject([
       { id: 1, result: { status: "fail", mountChecked: true } },
     ]);
+  });
+
+  it("renders a new iframe for a new frame of the same check", async function rendersNewFrame(): Promise<void> {
+    const stage = await startTestStage("");
+    const { container } = render(<StageView stage={stage} />);
+
+    publishCheckFrame(stage, "check-9-frame-1");
+    const firstFrame = container.querySelector("iframe[data-check-id]");
+    publishCheckFrame(stage, "check-9-frame-2");
+    const secondFrame = container.querySelector("iframe[data-check-id]");
+
+    expect(firstFrame).not.toBeNull();
+    expect(secondFrame).not.toBeNull();
+    expect(secondFrame).not.toBe(firstFrame);
+    expect(firstFrame?.isConnected).toBe(false);
+    expect(secondFrame?.getAttribute("data-check-id")).toBe("check-9");
   });
 });

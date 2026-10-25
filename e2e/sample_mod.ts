@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 
 /** `/samples/mods`: the folder of the shipped sample mods on the app's server. */
@@ -11,6 +12,15 @@ export const SAMPLE_MOD_FILE_PATH = `${SAMPLE_MOD_FOLDER_PATH}/mod_conf.yaml`;
 
 /** `/samples/mods/book_list/main.js`: the sample mod's entrypoint. */
 export const SAMPLE_ENTRYPOINT_PATH = `${SAMPLE_MOD_FOLDER_PATH}/main.js`;
+
+/** The text of the sample mod's entrypoint, to serve it in a test mod of another folder. */
+export const SAMPLE_ENTRYPOINT_CODE = readFileSync(
+  new URL(`../public${SAMPLE_ENTRYPOINT_PATH}`, import.meta.url),
+  "utf8",
+);
+
+/** `/samples/mods/book_list/test.js`: the sample mod's test file. */
+export const SAMPLE_TEST_PATH = `${SAMPLE_MOD_FOLDER_PATH}/test.js`;
 
 /** `/samples/mods/book_list/book_type.md`: the sample mod's tile type, `book`. */
 export const SAMPLE_TYPE_PATH = `${SAMPLE_MOD_FOLDER_PATH}/book_type.md`;

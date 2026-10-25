@@ -1,17 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Mock } from "vitest";
+import {
+  attachCheckingFrame,
+  closeCheckPorts,
+  finishMount,
+  finishPlayedCase,
+  listFindingMessages,
+  listRequestedUrls,
+  sendNotification,
+  sendRequest,
+  startCheck,
+  startCases,
+  startCheckStage,
+  trackCheckPort,
+  waitForCheckEntry,
+  waitForReceived,
+} from "../../../test/check_stages.ts";
+import type {
+  CheckStage,
+  PlayedCheckFrame,
+} from "../../../test/check_stages.ts";
 import {
   collectMessages,
   createFakeFrame,
   readModPort,
   waitForMessages,
 } from "../../../test/fake_frames.ts";
-import { FakeHistory } from "../../../test/fake_history.ts";
-import { createMemoryStorage } from "../../../test/memory_storage.ts";
-import type { MemoryStorage } from "../../../test/memory_storage.ts";
-import { APP_BASE_URL, FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
+import { FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
-  APP_ORIGIN,
   MISSING_TYPE_MOD_SOURCE,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_MOD_REFERENCE,
@@ -20,22 +35,16 @@ import {
   serveMissingTypeMod,
   serveTestMod,
   serveTwoBooks,
+  serveTestedMod,
   serveUntypedMod,
+  TESTED_MOD_SOURCE,
+  TESTED_MOD_TEST_SOURCE,
   TWO_BOOKS_REFERENCE,
   TWO_BOOKS_SOURCE,
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
-import {
-  fetchTestFile,
-  readRequestedUrl,
-  testTexts,
-} from "../../../test/test_files.ts";
-import { PAGE_HOME_ROUTING } from "../../../test/test_stages.ts";
-import type {
-  ModCheckReport,
-  ModCheckRequest,
-  ModContext,
-} from "../engine/index.ts";
+import { testTexts } from "../../../test/test_files.ts";
+import type { ModCheckReport, ModContext } from "../engine/index.ts";
 import { readModValue, writeModValue } from "../storage/index.ts";
 import {
   attachCheckFrame,
@@ -43,34 +52,13 @@ import {
   checkFrameLoadedAgain,
   checkStageMod,
   closeSandbox,
-  createStage,
-  followHistory,
   readStageSnapshot,
 } from "./stage_controller.ts";
-import type { CheckSnapshot, Stage } from "./stage_controller.ts";
+import type { Stage } from "./stage_controller.ts";
 import { CHECK_MOUNT_LIMIT_MS, CHECK_SETTLE_MS } from "./stage_checks.ts";
-
-/** The mod viewer, granted `open` for `"*"`: the visible mod that asks for checks. */
-const VIEWER_HASH = "#/run?mod=mod_viewer";
 
 /** A fixture mod on the app's origin with `open` for `"*"`, so its `mods.open` reaches the stage. */
 const OPENING_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/opening/mod_conf.yaml`;
-
-interface CheckStage {
-  stage: Stage;
-  history: FakeHistory;
-  storage: MemoryStorage;
-  fetchSpy: Mock<typeof fetch>;
-  requesterId: string;
-}
-
-interface CheckFrame {
-  modPort: MessagePort;
-  received: unknown[];
-  context: ModContext;
-}
-
-const openPorts: MessagePort[] = [];
 
 beforeEach(function useFakeTimers(): void {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -79,10 +67,7 @@ beforeEach(function useFakeTimers(): void {
 afterEach(function cleanUp(): void {
   vi.useRealTimers();
   testTexts.clear();
-  for (const port of openPorts) {
-    port.close();
-  }
-  openPorts.length = 0;
+  closeCheckPorts();
 });
 
 function serveOpeningMod(): void {
@@ -95,130 +80,6 @@ function serveOpeningMod(): void {
     '      - host: "*"',
     '        reason: "Opens mods"',
   ]);
-}
-
-/** A stage showing the mod viewer, whose launch settled. */
-async function startCheckStage(): Promise<CheckStage> {
-  const history = new FakeHistory(VIEWER_HASH);
-  const storage = createMemoryStorage();
-  const fetchSpy = vi.fn<typeof fetch>(fetchTestFile);
-  const stage = createStage({
-    history,
-    defaults: { folder: "./default_mods/", switchedOff: [] },
-    routing: PAGE_HOME_ROUTING,
-    appOrigin: APP_ORIGIN,
-    baseUrl: APP_BASE_URL,
-    storage,
-    fetch: fetchSpy,
-    colorScheme: "light",
-  });
-  followHistory(stage, history.hash, history.state);
-  for (const runtime of stage.runtimes.values()) {
-    await runtime.settled;
-  }
-  const requesterId = readStageSnapshot(stage).sandboxes[0].id;
-  const checkStage = { stage, history, storage, fetchSpy, requesterId };
-  return checkStage;
-}
-
-function listRequestedUrls(fetchSpy: Mock<typeof fetch>): string[] {
-  const requestedUrls: string[] = [];
-  for (const call of fetchSpy.mock.calls) {
-    requestedUrls.push(readRequestedUrl(call[0]));
-  }
-  return requestedUrls;
-}
-
-function startCheck(
-  checkStage: CheckStage,
-  request: ModCheckRequest,
-): Promise<ModCheckReport> {
-  const reporting = checkStageMod(
-    checkStage.stage,
-    checkStage.requesterId,
-    request,
-  );
-  if (reporting === null) {
-    throw new Error(`Expected the stage to check "${request.source}"`);
-  }
-  return reporting;
-}
-
-/** Waits until the stage's snapshot lists a check, after its bundle check. */
-async function waitForCheckEntry(stage: Stage): Promise<CheckSnapshot> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    const entry = readStageSnapshot(stage).checks[0];
-    if (entry !== undefined) {
-      return entry;
-    }
-    await waitForMessages();
-  }
-  throw new Error("Expected the stage to list a check");
-}
-
-/** Attaches a fake frame to the check, playing the frame loader through the mod's port. */
-async function attachCheckingFrame(
-  checkStage: CheckStage,
-): Promise<CheckFrame> {
-  const entry = await waitForCheckEntry(checkStage.stage);
-  const fakeFrame = createFakeFrame();
-  attachCheckFrame(checkStage.stage, entry.id, fakeFrame.target);
-  const modPort = readModPort(fakeFrame);
-  openPorts.push(modPort);
-  const connect = fakeFrame.posted[0].message as {
-    params: { context: ModContext };
-  };
-  const checkFrame: CheckFrame = {
-    modPort,
-    received: collectMessages(modPort),
-    context: connect.params.context,
-  };
-  return checkFrame;
-}
-
-function sendNotification(
-  checkFrame: CheckFrame,
-  method: string,
-  params: object,
-): void {
-  checkFrame.modPort.postMessage({ jsonrpc: "2.0", method, params });
-}
-
-function sendRequest(
-  checkFrame: CheckFrame,
-  id: number,
-  method: string,
-  params: object,
-): void {
-  checkFrame.modPort.postMessage({ jsonrpc: "2.0", id, method, params });
-}
-
-/** Waits until the mod side received `count` messages. */
-async function waitForReceived(
-  checkFrame: CheckFrame,
-  count: number,
-): Promise<void> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    if (checkFrame.received.length >= count) {
-      return;
-    }
-    await waitForMessages();
-  }
-}
-
-/** Plays a `mount` that resolves, then lets the settle time pass. */
-async function finishMount(checkFrame: CheckFrame): Promise<void> {
-  sendNotification(checkFrame, "sandbox.mounted", {});
-  await waitForMessages();
-  await vi.advanceTimersByTimeAsync(CHECK_SETTLE_MS);
-}
-
-function listFindingMessages(report: ModCheckReport): string[] {
-  const messages: string[] = [];
-  for (const finding of report.findings) {
-    messages.push(finding.message);
-  }
-  return messages;
 }
 
 function listTileSources(context: ModContext): string[] {
@@ -253,6 +114,8 @@ describe("Check a mod", function describeCheckMod(): void {
       source: SAMPLE_MOD_SOURCE,
       status: "pass",
       mountChecked: true,
+      testsChecked: false,
+      tests: [],
       findings: [],
     });
     expect(listTileSources(checkFrame.context)).toEqual(SAMPLE_TILE_SOURCES);
@@ -312,7 +175,7 @@ describe("Check a mod", function describeCheckMod(): void {
       requesterFrame.target,
     );
     const requesterPort = readModPort(requesterFrame);
-    openPorts.push(requesterPort);
+    trackCheckPort(requesterPort);
     const requesterReceived = collectMessages(requesterPort);
 
     requesterPort.postMessage({
@@ -333,6 +196,8 @@ describe("Check a mod", function describeCheckMod(): void {
           source: SAMPLE_MOD_SOURCE,
           status: "pass",
           mountChecked: true,
+          testsChecked: false,
+          tests: [],
           findings: [],
         },
       },
@@ -543,7 +408,7 @@ describe("What the mount check records", function describeMountRecords(): void {
     });
     await attachCheckingFrame(checkStage);
     const entry = readStageSnapshot(checkStage.stage).checks[0];
-    checkFrameLoadedAgain(checkStage.stage, entry.id);
+    checkFrameLoadedAgain(checkStage.stage, entry.id, entry.key);
     const report = await reporting;
 
     expect(report.status).toBe("fail");
@@ -557,6 +422,55 @@ describe("What the mount check records", function describeMountRecords(): void {
       },
     ]);
     expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+  });
+});
+
+describe("Check frame keys", function describeCheckFrameKeys(): void {
+  it("ignores a frame whose key is not the check's frame", async function ignoresStaleKey(): Promise<void> {
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: SAMPLE_MOD_SOURCE,
+      collection: null,
+    });
+    const entry = await waitForCheckEntry(checkStage.stage);
+    const staleFrame = createFakeFrame();
+    attachCheckFrame(
+      checkStage.stage,
+      entry.id,
+      `${entry.key}-replaced`,
+      staleFrame.target,
+    );
+    checkFrameLoadedAgain(checkStage.stage, entry.id, `${entry.key}-replaced`);
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(entry.key).toBe(checkFrame.key);
+    expect(staleFrame.posted).toEqual([]);
+    expect(report.status).toBe("pass");
+    expect(report.findings).toEqual([]);
+  });
+
+  it("ignores a second attach of the same frame", async function ignoresSecondAttach(): Promise<void> {
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: SAMPLE_MOD_SOURCE,
+      collection: null,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    const secondFrame = createFakeFrame();
+    attachCheckFrame(
+      checkStage.stage,
+      readStageSnapshot(checkStage.stage).checks[0].id,
+      checkFrame.key,
+      secondFrame.target,
+    );
+    await finishMount(checkFrame);
+    await reporting;
+
+    expect(secondFrame.posted).toEqual([]);
   });
 });
 
@@ -726,5 +640,343 @@ describe("A check leaves the stage unchanged", function describeStageUnchanged()
 
     expect(report.mountChecked).toBe(false);
     expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+  });
+});
+
+/** Checks the tested mod for the viewer. */
+function startTestedCheck(checkStage: CheckStage): Promise<ModCheckReport> {
+  return startCheck(checkStage, {
+    source: TESTED_MOD_SOURCE,
+    collection: null,
+  });
+}
+
+/** Plays the cases one after another, each ending with its message, `null` for a pass. */
+async function playCases(
+  checkStage: CheckStage,
+  firstFrame: PlayedCheckFrame,
+  messages: (string | null)[],
+): Promise<PlayedCheckFrame[]> {
+  const caseFrames: PlayedCheckFrame[] = [];
+  let caseFrame = firstFrame;
+  for (const message of messages) {
+    caseFrames.push(caseFrame);
+    await finishPlayedCase(caseFrame, message);
+    if (caseFrames.length < messages.length) {
+      caseFrame = await attachCheckingFrame(checkStage, caseFrame.key);
+    }
+  }
+  return caseFrames;
+}
+
+/** Plays the mount check of the tested mod and a list frame that fails with `message`. */
+async function failListing(
+  checkStage: CheckStage,
+  message: string,
+): Promise<ModCheckReport> {
+  const reporting = startTestedCheck(checkStage);
+  const mountFrame = await attachCheckingFrame(checkStage);
+  await finishMount(mountFrame);
+  const listFrame = await attachCheckingFrame(checkStage, mountFrame.key);
+  sendNotification(listFrame, "sandbox.testsFailed", { message });
+  const report = await reporting;
+  return report;
+}
+
+describe("Tests run in the check", function describeTestsInCheck(): void {
+  it("Mod without tests", async function checksModWithoutTests(): Promise<void> {
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: SAMPLE_MOD_SOURCE,
+      collection: null,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(report.testsChecked).toBe(false);
+    expect(report.tests).toEqual([]);
+    expect(report.findings).toEqual([]);
+    expect(checkFrame.test).toBeNull();
+  });
+
+  it("Mount error skips the tests", async function skipsTestsAfterMountError(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const checkFrame = await attachCheckingFrame(checkStage);
+    sendNotification(checkFrame, "sandbox.mountFailed", {
+      message: "map failed",
+    });
+    await waitForMessages();
+    await vi.advanceTimersByTimeAsync(CHECK_SETTLE_MS);
+    const report = await reporting;
+
+    expect(report.mountChecked).toBe(true);
+    expect(report.testsChecked).toBe(false);
+    expect(report.tests).toEqual([]);
+    expect(listRequestedUrls(checkStage.fetchSpy)).not.toContain(
+      TESTED_MOD_TEST_SOURCE,
+    );
+    expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+  });
+
+  it("fetches the test file only after the mount check", async function fetchesTestsAfterMount(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const mountFrame = await attachCheckingFrame(checkStage);
+    const requestedWhileMounting = listRequestedUrls(checkStage.fetchSpy);
+    await finishMount(mountFrame);
+    const listFrame = await attachCheckingFrame(checkStage, mountFrame.key);
+    sendNotification(listFrame, "sandbox.testsListed", { names: ["first"] });
+    const caseFrame = await attachCheckingFrame(checkStage, listFrame.key);
+    await finishPlayedCase(caseFrame, null);
+    await reporting;
+
+    expect(requestedWhileMounting).not.toContain(TESTED_MOD_TEST_SOURCE);
+    expect(listRequestedUrls(checkStage.fetchSpy)).toContain(
+      TESTED_MOD_TEST_SOURCE,
+    );
+  });
+
+  it("Missing test file", async function reportsMissingTestFile(): Promise<void> {
+    serveTestedMod(null);
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(report.mountChecked).toBe(true);
+    expect(report.testsChecked).toBe(false);
+    expect(report.status).toBe("fail");
+    expect(report.findings).toHaveLength(1);
+    expect(report.findings[0]).toMatchObject({
+      step: "test",
+      level: "error",
+      source: TESTED_MOD_TEST_SOURCE,
+    });
+    expect(report.findings[0].message).toContain("404");
+    expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+  });
+
+  it("closing the requester during the tests ends the check", async function endsTestsOfClosedRequester(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const caseFrame = await startCases(checkStage, ["first", "second"]);
+    closeSandbox(checkStage.stage, checkStage.requesterId);
+    const report = await reporting;
+    await waitForMessages();
+
+    expect(caseFrame.test?.caseName).toBe("first");
+    expect(report.tests).toEqual([]);
+    expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("Test file format", function describeTestFileFormat(): void {
+  it("Syntax error", async function reportsSyntaxError(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const report = await failListing(checkStage, "Unexpected token '}'");
+
+    expect(report.status).toBe("fail");
+    expect(report.testsChecked).toBe(false);
+    expect(report.findings).toEqual([
+      {
+        step: "test",
+        level: "error",
+        source: TESTED_MOD_TEST_SOURCE,
+        message: "The tests could not be listed: Unexpected token '}'",
+      },
+    ]);
+    expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+  });
+
+  it("Repeated name", async function reportsRepeatedName(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const report = await failListing(
+      checkStage,
+      'the test file registers the test "lists books" twice',
+    );
+
+    expect(report.tests).toEqual([]);
+    expect(listFindingMessages(report)[0]).toContain("lists books");
+    expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+  });
+
+  it("No case", async function reportsNoCase(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const report = await failListing(
+      checkStage,
+      "the test file registers no test",
+    );
+
+    expect(listFindingMessages(report)[0]).toContain(
+      "the test file registers no test",
+    );
+    expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+  });
+
+  it("treats an empty list of names as no case", async function reportsEmptyList(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const mountFrame = await attachCheckingFrame(checkStage);
+    await finishMount(mountFrame);
+    const listFrame = await attachCheckingFrame(checkStage, mountFrame.key);
+    sendNotification(listFrame, "sandbox.testsListed", { names: [] });
+    const report = await reporting;
+
+    expect(report.testsChecked).toBe(false);
+    expect(listFindingMessages(report)[0]).toContain(
+      "the test file registers no test",
+    );
+  });
+});
+
+describe("Case results", function describeCaseResults(): void {
+  it("One case fails", async function runsEveryCase(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const firstFrame = await startCases(checkStage, [
+      "first",
+      "second",
+      "third",
+    ]);
+    const caseFrames = await playCases(checkStage, firstFrame, [
+      null,
+      "no books",
+      null,
+    ]);
+    const report = await reporting;
+
+    expect(report.tests).toEqual([
+      { name: "first", status: "pass", message: null },
+      { name: "second", status: "fail", message: "no books" },
+      { name: "third", status: "pass", message: null },
+    ]);
+    const caseNames: (string | null)[] = [];
+    const frameKeys = new Set<string>();
+    for (const caseFrame of caseFrames) {
+      caseNames.push(caseFrame.test?.caseName ?? null);
+      frameKeys.add(caseFrame.key);
+    }
+    expect(caseNames).toEqual(["first", "second", "third"]);
+    expect(frameKeys.size).toBe(3);
+    expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("Failed case", async function failsReport(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const caseFrame = await startCases(checkStage, ["lists books"]);
+    await finishPlayedCase(caseFrame, "no books");
+    const report = await reporting;
+
+    expect(report.status).toBe("fail");
+    expect(report.testsChecked).toBe(true);
+    expect(report.tests).toEqual([
+      { name: "lists books", status: "fail", message: "no books" },
+    ]);
+  });
+
+  it("Failed case in the findings", async function recordsFailedCase(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const caseFrame = await startCases(checkStage, ["lists books"]);
+    await finishPlayedCase(caseFrame, "no books");
+    const report = await reporting;
+
+    expect(report.findings).toEqual([
+      {
+        step: "test",
+        level: "error",
+        source: TESTED_MOD_TEST_SOURCE,
+        message: 'The test "lists books" failed: no books',
+      },
+    ]);
+  });
+
+  it("Passing case", async function passesReport(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const caseFrame = await startCases(checkStage, ["lists books"]);
+    await finishPlayedCase(caseFrame, null);
+    const report = await reporting;
+
+    expect(report).toEqual({
+      source: TESTED_MOD_SOURCE,
+      status: "pass",
+      mountChecked: true,
+      testsChecked: true,
+      tests: [{ name: "lists books", status: "pass", message: null }],
+      findings: [],
+    });
+  });
+
+  it("fails a case whose name the test file no longer registers", async function failsMissingCase(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const caseFrame = await startCases(checkStage, ["random case"]);
+    await finishPlayedCase(
+      caseFrame,
+      'the test file no longer registers the test "random case"',
+    );
+    const report = await reporting;
+
+    expect(report.tests[0].status).toBe("fail");
+    expect(report.tests[0].message).toContain("no longer registers");
+  });
+});
+
+describe("Each case in a fresh frame", function describeFreshFrames(): void {
+  it("Cases do not share storage", async function isolatesStorage(): Promise<void> {
+    serveTestedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startTestedCheck(checkStage);
+    const firstFrame = await startCases(checkStage, ["stores", "reads"]);
+    sendRequest(firstFrame, 1, "storage.set", {
+      key: "selected",
+      value: "kallocain",
+    });
+    await waitForReceived(firstFrame, 1);
+    await finishPlayedCase(firstFrame, null);
+    const secondFrame = await attachCheckingFrame(checkStage, firstFrame.key);
+    sendRequest(secondFrame, 1, "storage.get", { key: "selected" });
+    await waitForReceived(secondFrame, 1);
+    await finishPlayedCase(secondFrame, null);
+    await reporting;
+
+    expect(secondFrame.received).toEqual([
+      { jsonrpc: "2.0", id: 1, result: null },
+    ]);
+    expect(checkStage.storage.items.size).toBe(0);
   });
 });

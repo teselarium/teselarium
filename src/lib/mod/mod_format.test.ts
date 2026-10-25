@@ -61,6 +61,7 @@ describe("readModFormat", function describeReadModFormat(): void {
       entrypoint: "./main.js",
       typePath: "../../types/book.md",
       sampleCollection: "../../tiles/books_collection.yaml",
+      testPath: null,
       config: { show_covers: true },
       permissions: [
         {
@@ -85,6 +86,7 @@ describe("readModFormat", function describeReadModFormat(): void {
       entrypoint: "./main.js",
       typePath: null,
       sampleCollection: null,
+      testPath: null,
       config: {},
       permissions: [],
       theme: "default",
@@ -172,6 +174,29 @@ describe("readModFormat", function describeReadModFormat(): void {
     expect(error.message).toContain(
       '"sample_collection" must be a non-empty string',
     );
+  });
+
+  it("Test file next to the mod file", function readsTestPath(): void {
+    const modFormat = readModFormat(
+      buildMinimalMod({ test_path: "./test.js" }),
+    );
+
+    expect(modFormat.testPath).toBe("./test.js");
+  });
+
+  it("Empty test path", function rejectsEmptyTestPath(): void {
+    const error = catchFormatError(buildMinimalMod({ test_path: "" }));
+
+    expect(error.source).toBe(MOD_SOURCE);
+    expect(error.message).toBe(
+      `Invalid mod "${MOD_SOURCE}": "test_path" must be a non-empty string`,
+    );
+  });
+
+  it("rejects a test path that is a number", function rejectsTestPathNumber(): void {
+    const error = catchFormatError(buildMinimalMod({ test_path: 3 }));
+
+    expect(error.message).toContain('"test_path" must be a non-empty string');
   });
 
   it("Config is not a mapping", function rejectsConfigList(): void {

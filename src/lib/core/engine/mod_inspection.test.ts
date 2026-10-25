@@ -24,6 +24,9 @@ import {
 import { FileFetchError } from "../../files/index.ts";
 import { inspectMod } from "./mod_inspection.ts";
 
+const CLOCK_MOD_SOURCE = "https://example.org/mods/clock/mod_conf.yaml";
+const CLOCK_TEST_SOURCE = "https://example.org/mods/clock/test.js";
+
 afterEach(function clearTestTexts(): void {
   testTexts.clear();
 });
@@ -60,10 +63,36 @@ describe("inspectMod", function describeInspectMod(): void {
       apiCompatible: true,
       typeSource: SAMPLE_TYPE_SOURCE,
       sampleCollection: SAMPLE_COLLECTION_SOURCE,
+      testSource: null,
       config: { show_covers: true },
       permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
     });
     expect(listRequestedUrls(testFetch)).not.toContain(SAMPLE_ENTRYPOINT);
+  });
+
+  it("Inspect a mod with tests", async function inspectsModWithTests(): Promise<void> {
+    testTexts.set(
+      CLOCK_MOD_SOURCE,
+      'mod:\n  name: "clock"\n  version: "1.0.0"\n  entrypoint: "./main.js"\n  test_path: "./test.js"',
+    );
+    const testFetch = createTestFetch();
+
+    const inspection = await inspectMod(CLOCK_MOD_SOURCE, APP_ORIGIN, {
+      fetch: testFetch,
+    });
+
+    expect(inspection.testSource).toBe(CLOCK_TEST_SOURCE);
+    expect(listRequestedUrls(testFetch)).toEqual([CLOCK_MOD_SOURCE]);
+  });
+
+  it("Inspect a mod without tests", async function inspectsModWithoutTests(): Promise<void> {
+    serveUntypedMod();
+
+    const inspection = await inspectMod(UNTYPED_MOD_SOURCE, APP_ORIGIN, {
+      fetch: fetchTestFile,
+    });
+
+    expect(inspection.testSource).toBeNull();
   });
 
   it("gives the permissions a foreign mod would get", async function inspectsForeignMod(): Promise<void> {

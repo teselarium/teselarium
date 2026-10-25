@@ -6,7 +6,7 @@ A mod is community JavaScript that OpenTesela runs in a sandbox (see [sandbox](.
 
 ### Mod file format
 
-A mod is a folder with a `mod_conf.yaml` file. By default, a mod bundles its tile type and its sample collection in that folder, so it can be copied or shared as one folder. The sample book list mod (`public/samples/mods/book_list/`) holds `mod_conf.yaml`, `main.js`, `book_type.md`, `book_collection.yaml` and the `books/` it lists. Its `mod_conf.yaml`:
+A mod is a folder with a `mod_conf.yaml` file. By default, a mod bundles its tile type, its sample collection and its test file in that folder, so it can be copied or shared as one folder, and its tests go with it. The sample book list mod (`public/samples/mods/book_list/`) holds `mod_conf.yaml`, `main.js`, `test.js` (its tests, see the [guide to writing mod tests](../../../mod_plugin_spec.md#mod-tests)), `book_type.md`, `book_collection.yaml` and the `books/` it lists. Its `mod_conf.yaml`:
 
 ```yaml
 mod:
@@ -18,6 +18,7 @@ mod:
   entrypoint: "./main.js"
   type_path: "./book_type.md"
   sample_collection: "./book_collection.yaml"
+  test_path: "./test.js"
   config:
     show_covers: true
   permissions:
@@ -38,11 +39,12 @@ Every key lives under a `mod` mapping:
 | `api` | no | The range of [mod API versions](../core/engine/README.md#mod-api-version) the mod was written for, in npm's semver range syntax, e.g. `"^0.1.0"`. The loaded mod keeps it as written, or `null` without the key. Anything that is not a non-empty string holding a valid range, such as `"latest"`, `""` or the number `0.1`, is rejected with `"api" must be a semver range, such as "^0.1.0"`. The library only checks the syntax: the [engine](../core/engine/README.md) matches the range against the app's mod API version. |
 | `type_path` | no | Path of the tile type file the mod's tiles must match. Without it, the mod receives every tile. |
 | `sample_collection` | no | Path of the sample tiles the mod comes with. It is not fetched when the mod is loaded. |
+| `test_path` | no | Path of the mod's JavaScript test file, which [`mods.check`](../core/engine/README.md#mod-check) runs (see the [guide to writing mod tests](../../../mod_plugin_spec.md#mod-tests)). It is fetched only by a check's tests, never when the mod is loaded, opened or inspected. Anything that is not a non-empty string is rejected with `"test_path" must be a non-empty string`. |
 | `config` | no | Mapping given to the mod as `context.config`, defaults to `{}`. |
 | `permissions` | no | The web hosts and mods the mod needs, see below. |
 | `theme` | no | `"default"` (the default) or `"none"`. With `"none"`, the mod's frame gets neither the theme tokens nor the base stylesheet; the mod still receives the theme in its mount context and the `theme.changed` event. Any other value is rejected. See the [theme module](../core/theme/README.md). |
 
-- `entrypoint`, `type_path` and `sample_collection` are resolved against the mod file's location.
+- `entrypoint`, `type_path`, `sample_collection` and `test_path` are resolved against the mod file's location.
 - Bundling the tile type and the sample collection is a convention, not a rule: `type_path` and `sample_collection` may still point outside the mod folder (`../../types/book.md`) or to another site (`https://types.example.net/book.md`), so several mods can share one tile type.
 - Other keys are ignored. An inline `schema` is rejected for now: use `type_path` with the path of a tile type file.
 - The file follows the same plain YAML rules as a collection file.
@@ -89,11 +91,12 @@ Implemented in `src/lib/mod/`. Other modules import only from the public entry p
 ### Mod loader
 
 - `resolveModReference(reference, options)`: resolves a mod reference to the URL of its mod file. `options` are `{ baseUrl?, defaultModsFolder? }`. Raises `FileFetchError` when it cannot, for example for a default mod name without a default mods folder.
-- `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `name`, `title`, `version`, `api`, `description`, `entrypoint`, `typeSource`, `sampleCollection`, `config`, `permissions`, `theme`). The entrypoint, the tile type and the sample collection are not fetched.
+- `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `name`, `title`, `version`, `api`, `description`, `entrypoint`, `typeSource`, `sampleCollection`, `testSource`, `config`, `permissions`, `theme`). `testSource` is the resolved address of the test file, or `null` without `test_path`. The entrypoint, the tile type, the sample collection and the test file are not fetched.
 - `loadModCode(modFile, options?)`: fetches the entrypoint of a `ModFile`. Returns a `LoadedMod`: the `ModFile` with `code`, the entrypoint text. An entrypoint that cannot be fetched raises `FileFetchError`, whose `source` is the entrypoint. The engine's mod check uses it to tell a failing entrypoint apart from a failing mod file.
+- `loadModTestCode(modFile, options?)`: fetches the test file of a `ModFile` and returns its text. Only the tests of a mod check call it. A test file that cannot be fetched raises `FileFetchError`, whose `source` is the test file, and a mod without `testSource` raises an `Error`.
 - `loadMod(reference, options?)`: `loadModFile`, then `loadModCode`. Returns the `LoadedMod`.
 - `ModLoadOptions`: the `FileFetchOptions` of the [files module](../files/README.md) plus `defaultModsFolder`. Relative references are resolved against `baseUrl`, by default the page's document base URL.
-- Errors: `ModFormatError` (the file does not follow the mod file format). It exposes the failing `source`. A mod file or entrypoint that cannot be fetched raises `FileFetchError`, and a mod file that is not plain YAML raises `YamlParseError`.
+- Errors: `ModFormatError` (the file does not follow the mod file format). It exposes the failing `source`. A mod file, entrypoint or test file that cannot be fetched raises `FileFetchError`, and a mod file that is not plain YAML raises `YamlParseError`.
 - Constants: `MOD_FILE_KEYS`, the keys of the `mod` mapping the loader reads, and `PERMISSION_CATEGORIES`, the permission categories in their order. The engine's mod API surface guard reads both.
 - Types: `ModFile`, `LoadedMod`, `ModLoadOptions`, `ModPermission` (`category`, `host`, `reason`), `PermissionCategory`, `ModThemeSetting` (`"default" | "none"`), `ModIssue` (`level`, `source`, `message`, the shape of a `TileIssue`).
 
@@ -110,6 +113,7 @@ const modFile = await loadModFile("./samples/mods/book_list", {
 // modFile.source === "https://example.org/samples/mods/book_list/mod_conf.yaml"
 // modFile.typeSource === "https://example.org/samples/mods/book_list/book_type.md"
 // modFile.sampleCollection === "https://example.org/samples/mods/book_list/book_collection.yaml"
+// modFile.testSource === "https://example.org/samples/mods/book_list/test.js", not fetched
 
 const sampleMod = await loadModCode(modFile);
 // sampleMod.code is the text of the sample's main.js

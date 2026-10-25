@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
 import {
   buildAnimationFrameFiles,
   buildCheckerFiles,
@@ -10,12 +9,15 @@ import {
   buildThrowingFiles,
   buildUndeclaredImageFiles,
   buildUnknownMethodFiles,
+  CHECK_FRAME_SELECTOR,
   CHECKER_HASH,
   CHECKER_TITLE,
+  checkFromChecker,
   findModFrame,
   issueList,
+  openChecker,
   readReportedValue,
-  requestFromProbe,
+  readTestModSource,
   routeCovers,
   serveAppOriginMod,
   serveSelectionReportingSample,
@@ -23,62 +25,12 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
-import type { ModFiles, ProbeAnswer } from "./mod_routes.ts";
 import {
   readSampleModSource,
   SAMPLE_COLLECTION_RUN_HASH,
   SAMPLE_ENTRYPOINT_GLOB,
   SAMPLE_MOD_REFERENCE,
 } from "./sample_mod.ts";
-
-interface CheckFinding {
-  step: string;
-  level: string;
-  source: string;
-  message: string;
-}
-
-interface CheckReport {
-  source: string;
-  status: string;
-  mountChecked: boolean;
-  findings: CheckFinding[];
-}
-
-/** Every frame of a running check: hidden frames outside the sandboxes. */
-const CHECK_FRAME_SELECTOR = "iframe[data-check-id]";
-
-/** Serves the checker and `files` on the app's origin, and opens the checker. Returns the URLs the route saw. */
-async function openChecker(page: Page, files: ModFiles): Promise<string[]> {
-  await routeCovers(page);
-  const seenUrls = await serveAppOriginMod(page, {
-    ...buildCheckerFiles(),
-    ...files,
-  });
-  await page.goto(`/${CHECKER_HASH}`);
-  await waitForProbe(await findModFrame(page, CHECKER_TITLE));
-  return seenUrls;
-}
-
-/** Sends `mods.check` from the checker and returns the report. */
-async function checkFromChecker(page: Page, mod: string): Promise<CheckReport> {
-  const checkerFrame = await findModFrame(page, CHECKER_TITLE);
-  const answer: ProbeAnswer = await checkerFrame.evaluate(requestFromProbe, [
-    "mods.check",
-    { mod },
-  ]);
-  if (answer.result === undefined) {
-    throw new Error(
-      `Expected a report for "${mod}", got error ${answer.code}: ${answer.message}`,
-    );
-  }
-  return answer.result as CheckReport;
-}
-
-function readTestModSource(page: Page, folder: string): string {
-  const source = new URL(`/test-mods/${folder}/mod_conf.yaml`, page.url()).href;
-  return source;
-}
 
 test.describe("Check a mod", function describeCheckMod(): void {
   test("Check the sample mod", async function checksSampleMod({
@@ -92,6 +44,15 @@ test.describe("Check a mod", function describeCheckMod(): void {
       source: readSampleModSource(page),
       status: "pass",
       mountChecked: true,
+      testsChecked: true,
+      tests: [
+        { name: "lists the sample books", status: "pass", message: null },
+        {
+          name: "highlights the remembered book",
+          status: "pass",
+          message: null,
+        },
+      ],
       findings: [],
     });
   });
