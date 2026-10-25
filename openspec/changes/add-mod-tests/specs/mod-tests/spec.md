@@ -5,7 +5,7 @@ Lets a mod ship JavaScript tests in its own folder, written by its author, that 
 ## ADDED Requirements
 
 ### Requirement: Tests run in the check
-When a mod declares `test_path`, `mods.check` SHALL run its tests after the mount check, only when the bundle and mount checks found no error. The app SHALL fetch the test file and hand its code to the frames, as for the entrypoint. The test file SHALL NOT be requested when the mod is opened or inspected.
+When a mod declares `test_path`, `mods.check` SHALL run its tests after the mount check, only when the bundle and mount checks found no error. Only then SHALL the app fetch the test file and hand its code to the case frames, as for the entrypoint. The test file SHALL NOT be requested when the mod is opened or inspected, or when its tests do not run. A test file that cannot be loaded SHALL be a `test` error whose source is the test file's address and whose message is the load error's message.
 
 #### Scenario: Sample mod tests pass
 - **WHEN** the visible mod viewer checks the sample book list mod
@@ -17,11 +17,11 @@ When a mod declares `test_path`, `mods.check` SHALL run its tests after the moun
 
 #### Scenario: Mount error skips the tests
 - **WHEN** a mod with `test_path` whose `mount` throws is checked
-- **THEN** the report has `testsChecked` `false`, an empty `tests` list, and the test file's code is not run
+- **THEN** the report has `testsChecked` `false`, an empty `tests` list, and the test file is not requested
 
 #### Scenario: Missing test file
-- **WHEN** a mod whose test file answers HTTP 404 is checked
-- **THEN** the report has a `bundle` error whose source is the test file's address and whose message names `404`, and `testsChecked` is `false`
+- **WHEN** a mod with a valid bundle that mounts, whose test file answers HTTP 404, is checked
+- **THEN** the report has `mountChecked` `true`, `testsChecked` `false`, and a `test` error whose source is the test file's address and whose message names `404`
 
 ### Requirement: Test file format
 The test file SHALL be an ES module whose default export is a function. The system SHALL call it with `t`, whose `test(name, fn)` registers a case with a non-empty name that no other case has, and an async or plain function `fn`. A test file that cannot be imported, has no default export function, throws while registering, registers a case with an empty or repeated name, or registers no case SHALL give a `test` error whose source is the test file's address, and no case SHALL run.
@@ -76,7 +76,7 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 - **THEN** `requests` lists `storage.get` with its result and then `storage.set` with key `selected` and the first tile's source
 
 ### Requirement: Scripted answers
-`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save` or `ui.confirm` with a boolean value, or `mods.open` with `null`. The request SHALL resolve with the queued value without any dialog. A `mods.open` answered this way SHALL NOT open anything. Requests without a queued answer SHALL be answered as in the mount check. In cases, these requests SHALL NOT be findings.
+`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save` or `ui.confirm` with a boolean value, or `mods.open` with `null`. The request SHALL resolve with the queued value without any dialog. A `mods.open` answered this way SHALL NOT open anything. Requests without a queued answer SHALL be answered as in the mount check. In cases, no request that needs the user SHALL be a finding, answered or not.
 
 #### Scenario: Confirm answered yes
 - **WHEN** a case calls `answer("ui.confirm", true)` and the mod then sends `ui.confirm`
@@ -89,6 +89,21 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 #### Scenario: Wrong answer type
 - **WHEN** a case calls `answer("ui.confirm", "yes")`
 - **THEN** the call throws an error that says the answer to `ui.confirm` must be a boolean
+
+### Requirement: What a case records
+While a case runs, the check SHALL record as `test` findings what the mount check records as `mount` findings, with the same level and source and a message that also names the case: blocked requests and blocked browser dialogs as warnings, and each request answered with `-32600`, `-32601` or `-32602` as an error. A mount that throws or rejects SHALL NOT be a finding, since it rejects the case's `mount` call.
+
+#### Scenario: Unknown method in a case
+- **WHEN** a case named `deletes a book` mounts a mod that then sends `tiles.delete`
+- **THEN** the report has a `test` error whose message names `deletes a book` and `tiles.delete` and says that the method is unknown
+
+#### Scenario: Blocked image in a case
+- **WHEN** a case named `shows covers` mounts a mod that then requests an image from an undeclared host
+- **THEN** the report has a `test` warning whose message names `shows covers`, the host and `permissions.show`
+
+#### Scenario: Expected mount failure
+- **WHEN** a case expects `mount()` to reject, and the mod's `mount` throws `new Error("map failed")`
+- **THEN** the case passes and the report has no finding whose message includes `map failed`
 
 ### Requirement: Expectations
 `expect(actual)` SHALL return matchers that throw an error naming the expected and the actual value when they fail: `toBe(expected)` by `Object.is`, `toEqual(expected)` by deep equality of plain data, `toContain(item)` for a string's substring or a list's element by `toEqual`, and `toBeTruthy()`. `expect(actual).not` SHALL have the same matchers with the opposite result.
