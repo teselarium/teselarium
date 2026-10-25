@@ -7,9 +7,11 @@ import {
   waitForMessages,
 } from "../../../test/fake_frames.ts";
 import { createMemoryStorage } from "../../../test/memory_storage.ts";
-import { APP_BASE_URL } from "../../../test/sample_files.ts";
+import { APP_BASE_URL, FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   TEST_DEFAULTS,
 } from "../../../test/sample_mods.ts";
@@ -52,8 +54,8 @@ function launchSampleMod(): Promise<ModLaunch> {
   return prepareModLaunch(
     {
       link: {
-        mod: "./fixtures/mods/book_list",
-        collection: "./fixtures/tiles/books_collection.yaml",
+        mod: SAMPLE_MOD_REFERENCE,
+        collection: SAMPLE_COLLECTION_REFERENCE,
         params: {},
       },
       appOrigin: APP_ORIGIN,
@@ -226,7 +228,7 @@ describe("connectModSession", function describeConnectModSession(): void {
   it("Store and read a value", async function storesValue(): Promise<void> {
     const played = await playSession();
     const value = {
-      source: "https://example.org/fixtures/tiles/books/kallocain.md",
+      source: `${FIXTURES_BASE_URL}tiles/books/kallocain.md`,
     };
 
     sendRequest(played, 1, "storage.set", { key: "selected", value });
@@ -483,7 +485,7 @@ describe("stopModSession", function describeStopModSession(): void {
     const played = await playSession();
 
     sendRequest(played, 1, "mods.inspect", {
-      mod: "./fixtures/mods/book_list",
+      mod: SAMPLE_MOD_REFERENCE,
     });
     stopModSession(played.session);
     sendRequest(played, 2, "storage.get", { key: "selected" });

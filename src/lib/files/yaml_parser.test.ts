@@ -1,11 +1,11 @@
 import { YAMLException } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
-import { readFixtureText } from "../../test/sample_files.ts";
+import { FIXTURES_BASE_URL, readFixtureText } from "../../test/sample_files.ts";
 import { YamlParseError } from "./file_errors.ts";
 import type { FetchedFile } from "./file_fetcher.ts";
 import { parseYaml } from "./yaml_parser.ts";
 
-const TEST_SOURCE = "https://example.org/fixtures/test.yaml";
+const TEST_SOURCE = `${FIXTURES_BASE_URL}test.yaml`;
 const COLLECTION_PATH = "tiles/books_collection.yaml";
 const CODE_RAN_MARKER = "openTeselaYamlCodeRan";
 

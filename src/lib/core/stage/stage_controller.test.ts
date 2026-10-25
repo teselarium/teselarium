@@ -9,7 +9,14 @@ import { FakeHistory } from "../../../test/fake_history.ts";
 import type { FakeNavigation } from "../../../test/fake_history.ts";
 import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
-import { APP_ORIGIN, SAMPLE_MOD_SOURCE } from "../../../test/sample_mods.ts";
+import {
+  APP_ORIGIN,
+  SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_COLLECTION_RUN_HASH,
+  SAMPLE_MOD_REFERENCE,
+  SAMPLE_MOD_SOURCE,
+  SAMPLE_RUN_HASH,
+} from "../../../test/sample_mods.ts";
 import { fetchTestFile } from "../../../test/test_files.ts";
 import {
   MOD_HOME_ROUTING,
@@ -35,13 +42,11 @@ import {
 } from "./stage_controller.ts";
 import type { SandboxSnapshot, Stage } from "./stage_controller.ts";
 
-const SAMPLE_HASH = "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list";
 /** The sample mod with its collection: no section has this link. */
-const COLLECTION_HASH =
-  "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&collection=.%2Ffixtures%2Ftiles%2Fbooks_collection.yaml";
+const COLLECTION_HASH = SAMPLE_COLLECTION_RUN_HASH;
 const VIEWER_LINK = {
-  mod: "./fixtures/mods/book_list",
-  collection: "./fixtures/tiles/books_collection.yaml",
+  mod: SAMPLE_MOD_REFERENCE,
+  collection: SAMPLE_COLLECTION_REFERENCE,
   params: { from: "explorer" },
 };
 
@@ -255,7 +260,7 @@ describe("followHistory", function describeFollowHistory(): void {
   });
 
   it("A page hides the mods", async function hidesModsForPage(): Promise<void> {
-    const history = new FakeHistory(SAMPLE_HASH);
+    const history = new FakeHistory(SAMPLE_RUN_HASH);
     const stage = await startPageStage(history);
     const runtime = stage.runtimes.get("sandbox-1");
 
@@ -293,7 +298,7 @@ describe("followHistory", function describeFollowHistory(): void {
   });
 
   it("Back from a page to a mod", async function goesBackFromPage(): Promise<void> {
-    const history = new FakeHistory(SAMPLE_HASH);
+    const history = new FakeHistory(SAMPLE_RUN_HASH);
     const stage = await startPageStage(history);
     const runtime = stage.runtimes.get("sandbox-1");
     await openSection(stage, "settings");
@@ -305,7 +310,7 @@ describe("followHistory", function describeFollowHistory(): void {
   });
 
   it("Forward to a page", async function goesForwardToPage(): Promise<void> {
-    const history = new FakeHistory(SAMPLE_HASH);
+    const history = new FakeHistory(SAMPLE_RUN_HASH);
     const stage = await startPageStage(history);
     await openSection(stage, "settings");
     await follow(stage, history.goBack());
@@ -320,7 +325,7 @@ describe("followHistory", function describeFollowHistory(): void {
   });
 
   it("Reload on a page", async function reloadsOnPage(): Promise<void> {
-    const history = new FakeHistory(SAMPLE_HASH);
+    const history = new FakeHistory(SAMPLE_RUN_HASH);
     const stage = await startPageStage(history);
     await openSection(stage, "about");
     const reloadedStage = buildStage(history, "light", PAGE_HOME_ROUTING);
@@ -332,7 +337,7 @@ describe("followHistory", function describeFollowHistory(): void {
     });
     await follow(reloadedStage, history.goBack());
 
-    expect(readVisible(reloadedStage).hash).toBe(SAMPLE_HASH);
+    expect(readVisible(reloadedStage).hash).toBe(SAMPLE_RUN_HASH);
     expect(readStageSnapshot(reloadedStage).sandboxes).toHaveLength(1);
   });
 
@@ -383,7 +388,7 @@ describe("followHistory", function describeFollowHistory(): void {
     const viewerRuntime = stage.runtimes.get("sandbox-2");
     await follow(stage, history.goBack());
 
-    await follow(stage, history.followLink(SAMPLE_HASH));
+    await follow(stage, history.followLink(SAMPLE_RUN_HASH));
 
     expect(viewerRuntime?.status).toBe("stopped");
     expect(stage.runtimes.has("sandbox-2")).toBe(false);
@@ -393,7 +398,7 @@ describe("followHistory", function describeFollowHistory(): void {
   it("New section after going back", async function dropsForwardPages(): Promise<void> {
     const history = new FakeHistory("");
     const stage = await startPageStage(history);
-    await follow(stage, history.followLink(SAMPLE_HASH));
+    await follow(stage, history.followLink(SAMPLE_RUN_HASH));
     const bookList = stage.runtimes.get("sandbox-1");
     await openSection(stage, "settings");
     await follow(stage, history.goBack());
@@ -576,7 +581,7 @@ describe("active section", function describeActiveSection(): void {
   });
 
   it("Link to another mod", async function belongsToNoSection(): Promise<void> {
-    const history = new FakeHistory("#/run?mod=./fixtures/mods/book_list");
+    const history = new FakeHistory(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
 
     const stage = await startPageStage(history);
 
@@ -603,7 +608,7 @@ describe("openStageLink", function describeOpenStageLink(): void {
       { state: stageState(0, "home"), hash: "#/" },
       {
         state: stageState(1, "home"),
-        hash: "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&collection=.%2Ffixtures%2Ftiles%2Fbooks_collection.yaml&from=explorer",
+        hash: `${SAMPLE_COLLECTION_RUN_HASH}&from=explorer`,
       },
     ]);
     expect(stage.state.sandboxes[1].openerId).toBe("sandbox-1");
@@ -625,7 +630,7 @@ describe("openStageLink", function describeOpenStageLink(): void {
   });
 
   it("refuses a mod hidden behind a page", async function refusesBehindPage(): Promise<void> {
-    const history = new FakeHistory(SAMPLE_HASH);
+    const history = new FakeHistory(SAMPLE_RUN_HASH);
     const stage = await startPageStage(history);
     await openSection(stage, "settings");
 
@@ -652,7 +657,7 @@ describe("closeSandbox", function describeCloseSandbox(): void {
   });
 
   it("Close a mod opened from a link", async function closesLinkedMod(): Promise<void> {
-    const history = new FakeHistory(SAMPLE_HASH);
+    const history = new FakeHistory(SAMPLE_RUN_HASH);
     const stage = await startPageStage(history);
 
     closeSandbox(stage, "sandbox-1");
@@ -891,7 +896,7 @@ describe("a mod that leaves gets no", function describeLeftActions(): void {
       buildConfirm("Home asks"),
     );
 
-    await follow(stage, history.followLink(SAMPLE_HASH));
+    await follow(stage, history.followLink(SAMPLE_RUN_HASH));
 
     await expect(answer).resolves.toBe(false);
     expect(readStageSnapshot(stage).action).toBeNull();

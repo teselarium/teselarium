@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SAMPLE_MOD_REFERENCE } from "../../test/sample_mods.ts";
 import {
   buildPageFileUrl,
   mapPageLink,
@@ -48,7 +49,7 @@ describe("mapPageLink", function describeMapPageLink(): void {
   });
 
   it("Run link", function keepsAppAddress(): void {
-    const href = "#/run?mod=./fixtures/mods/book_list";
+    const href = `#/run?mod=${SAMPLE_MOD_REFERENCE}`;
 
     expect(mapPageLink(href, GUIDES_INDEX)).toEqual({
       href,

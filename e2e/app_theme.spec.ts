@@ -14,6 +14,7 @@ import {
   startProbeRequests,
   waitForProbe,
 } from "./mod_routes.ts";
+import { SAMPLE_COLLECTION_RUN_HASH } from "./sample_mod.ts";
 import {
   buildThemeProbeFiles,
   canFrameScroll,
@@ -29,8 +30,6 @@ import {
   waitForFrameColorScheme,
 } from "./theme_probes.ts";
 
-const SAMPLE_RUN_LINK =
-  "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
 /** The bottom of the frame may sit this far above the viewport's bottom: the stage's padding and border. */
@@ -38,7 +37,7 @@ const BOTTOM_TOLERANCE = 24;
 
 async function openSample(page: Page): Promise<void> {
   await routeCovers(page);
-  await page.goto(SAMPLE_RUN_LINK);
+  await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
   const frame = await findModFrame(page, "Book List");
   await expect(frame.getByRole("button", { name: /Kallocain/ })).toBeVisible();
 }

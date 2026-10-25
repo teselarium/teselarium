@@ -10,6 +10,7 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
+import { SAMPLE_COLLECTION_RUN_HASH } from "./sample_mod.ts";
 import {
   addModHtml,
   addModStyle,
@@ -35,8 +36,6 @@ import {
 } from "./theme_probes.ts";
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
-const SAMPLE_RUN_LINK =
-  "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
 /** Opens the theme probe while the operating system prefers `colorScheme`, with the choice System. */
@@ -303,7 +302,7 @@ test.describe("Frame before it connects", function describeFirstPaint(): void {
   }): Promise<void> {
     await page.emulateMedia({ colorScheme: "dark" });
     await page.addInitScript(recordPaints);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frame = await findModFrame(page, "Book List");
     await expect(
       frame.getByRole("button", { name: /Kallocain/ }),
@@ -329,7 +328,7 @@ test.describe("Sample and default mods follow the theme", function describeShipp
   }): Promise<void> {
     await page.emulateMedia({ colorScheme: "dark" });
     await routeCovers(page);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frame = await findModFrame(page, "Book List");
     await expect(
       frame.getByRole("button", { name: /Kallocain/ }),
@@ -345,7 +344,7 @@ test.describe("Sample and default mods follow the theme", function describeShipp
   }): Promise<void> {
     await page.emulateMedia({ colorScheme: "light" });
     await routeCovers(page);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frame = await findModFrame(page, "Book List");
     const kallocain = frame.getByRole("button", { name: /Kallocain/ });
 

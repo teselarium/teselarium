@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SAMPLE_MOD_SOURCE } from "../../../test/sample_mods.ts";
 import type { ModPermission } from "../../mod/index.ts";
 import * as permissionsModule from "./index.ts";
 import {
@@ -10,7 +11,7 @@ import type { ModGrants } from "./index.ts";
 
 const APP_ORIGIN = "https://example.org";
 const SAMPLE_MOD = {
-  source: "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
+  source: SAMPLE_MOD_SOURCE,
   permissions: [
     {
       category: "show",

@@ -17,6 +17,7 @@ import {
   stageBar,
   waitForProbe,
 } from "./mod_routes.ts";
+import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
 import { themeControl } from "./theme_probes.ts";
 
 const SECTION_SWITCHES_KEY = "opentesela.sidebar-sections";
@@ -77,7 +78,7 @@ test.describe("Settings page", function describeSettingsPage(): void {
 
 test.describe("Switch a section off", function describeSwitchOff(): void {
   test("Hide Guides", async function hidesGuides({ page }): Promise<void> {
-    await page.goto("/#/run?mod=./samples/mods/book_list");
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     await expect(stageBar(page)).toContainText("Book List");
     const frame = await findModFrame(page, "Book List");
     await markFrame(frame);

@@ -14,6 +14,12 @@ import {
   stageBar,
   waitForProbe,
 } from "./mod_routes.ts";
+import {
+  MISSING_MOD_REFERENCE,
+  readSampleModSource,
+  SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_MOD_FILE_PATH,
+} from "./sample_mod.ts";
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const OPEN_ANY_SITE_LINES = [
@@ -106,7 +112,7 @@ test.describe("Engine API object in the frame", function describeEngineApi(): vo
     const frame = await openProbe(
       page,
       [],
-      `${PROBE_LINK}&collection=./samples/mods/book_list/book_collection.yaml`,
+      `${PROBE_LINK}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
     );
     await frame.evaluate(registerTwoTileHandlers);
 
@@ -131,7 +137,7 @@ function countItems(items: unknown[]): number {
 
 test.describe("Mount context", function describeMountContext(): void {
   test("Link parameters", async function readsParams({ page }): Promise<void> {
-    const target = "https://example.org/samples/mods/book_list/mod_conf.yaml";
+    const target = `https://example.org${SAMPLE_MOD_FILE_PATH}`;
     const frame = await openProbe(
       page,
       [],
@@ -172,8 +178,7 @@ test.describe("Open a mod in a new sandbox", function describeOpen(): void {
     page,
   }): Promise<void> {
     const frame = await openProbe(page, OPEN_ANY_SITE_LINES);
-    const target = new URL("/samples/mods/book_list/mod_conf.yaml", page.url())
-      .href;
+    const target = readSampleModSource(page);
 
     const answer = await frame.evaluate(requestFromProbe, [
       "mods.open",
@@ -195,7 +200,7 @@ test.describe("Open a mod in a new sandbox", function describeOpen(): void {
 
     const answer = await frame.evaluate(requestFromProbe, [
       "mods.open",
-      { mod: "./samples/mods/missing" },
+      { mod: MISSING_MOD_REFERENCE },
     ]);
 
     expect(answer).toEqual({ result: null });

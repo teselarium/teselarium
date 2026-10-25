@@ -274,7 +274,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
   describe("collection-level failures", function describeCollectionFailures(): void {
     it("Missing tiles list", async function rejectsMissingTiles(): Promise<void> {
       const testFetch = createTestFetch();
-      const noTilesUrl = "https://example.org/fixtures/no_tiles.yaml";
+      const noTilesUrl = `${FIXTURES_BASE_URL}no_tiles.yaml`;
 
       const error = await loadFailingCollection(
         noTilesUrl,

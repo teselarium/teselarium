@@ -6,8 +6,12 @@ import {
 } from "../../../test/method_contexts.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
+  MISSING_MOD_REFERENCE,
+  MISSING_MOD_SOURCE,
+  SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
+  SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
@@ -89,7 +93,7 @@ describe("mods.inspect", function describeModsInspect(): void {
     const { context } = buildSpiedContext(["https://example.org"]);
 
     const inspection = await inspect(context, {
-      mod: "./fixtures/mods/book_list",
+      mod: SAMPLE_MOD_REFERENCE,
     });
 
     expect(inspection).toMatchObject({
@@ -108,7 +112,7 @@ describe("mods.inspect", function describeModsInspect(): void {
     };
 
     const inspection = await inspect(context, {
-      mod: "./fixtures/mods/book_list",
+      mod: SAMPLE_MOD_REFERENCE,
     });
 
     expect(inspection).toMatchObject({ source: SAMPLE_MOD_SOURCE });
@@ -118,13 +122,11 @@ describe("mods.inspect", function describeModsInspect(): void {
     const { context } = buildSpiedContext(["https://example.org"]);
 
     const error = await catchMethodError(
-      inspect(context, { mod: "./fixtures/mods/missing" }),
+      inspect(context, { mod: MISSING_MOD_REFERENCE }),
     );
 
     expect(error.code).toBe(LOAD_FAILED);
-    expect(error.message).toContain(
-      "https://example.org/fixtures/mods/missing/mod_conf.yaml",
-    );
+    expect(error.message).toContain(MISSING_MOD_SOURCE);
     expect(error.message).toContain("404");
   });
 
@@ -161,7 +163,7 @@ describe("mods.inspect", function describeModsInspect(): void {
     context.grants = { granted: [], denied: [buildOpenPermission("*")] };
 
     const error = await catchMethodError(
-      inspect(context, { mod: "./fixtures/mods/book_list" }),
+      inspect(context, { mod: SAMPLE_MOD_REFERENCE }),
     );
 
     expect(error.code).toBe(PERMISSION_DENIED);
@@ -200,14 +202,14 @@ describe("mods.open", function describeModsOpen(): void {
 
     const result = await open(context, {
       mod: "mod_viewer",
-      collection: "./fixtures/tiles/books_collection.yaml",
+      collection: SAMPLE_COLLECTION_REFERENCE,
       params: { target: VIEWER_TARGET },
     });
 
     expect(result).toBeNull();
     expect(openLinkSpy).toHaveBeenCalledExactlyOnceWith({
       mod: "mod_viewer",
-      collection: "./fixtures/tiles/books_collection.yaml",
+      collection: SAMPLE_COLLECTION_REFERENCE,
       params: { target: VIEWER_TARGET },
     });
   });
@@ -215,10 +217,10 @@ describe("mods.open", function describeModsOpen(): void {
   it("defaults the collection to null and the params to {}", async function defaultsLink(): Promise<void> {
     const { context, openLinkSpy } = buildSpiedContext(["*"]);
 
-    await open(context, { mod: "./fixtures/mods/book_list" });
+    await open(context, { mod: SAMPLE_MOD_REFERENCE });
 
     expect(openLinkSpy).toHaveBeenCalledExactlyOnceWith({
-      mod: "./fixtures/mods/book_list",
+      mod: SAMPLE_MOD_REFERENCE,
       collection: null,
       params: {},
     });
@@ -235,7 +237,7 @@ describe("mods.open", function describeModsOpen(): void {
   it("makes no request", async function opensWithoutFetch(): Promise<void> {
     const { context, fetchSpy } = buildSpiedContext(["*"]);
 
-    await open(context, { mod: "./fixtures/mods/missing" });
+    await open(context, { mod: MISSING_MOD_REFERENCE });
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -244,7 +246,7 @@ describe("mods.open", function describeModsOpen(): void {
     const { context, openLinkSpy } = buildSpiedContext(["*"]);
 
     const error = await catchMethodError(
-      open(context, { collection: "./fixtures/tiles/books_collection.yaml" }),
+      open(context, { collection: SAMPLE_COLLECTION_REFERENCE }),
     );
 
     expect(error.code).toBe(INVALID_PARAMS);

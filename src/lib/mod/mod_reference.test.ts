@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
+import {
+  SAMPLE_MOD_REFERENCE,
+  SAMPLE_MOD_SOURCE,
+} from "../../test/sample_mods.ts";
 import { FileFetchError } from "../files/index.ts";
 import { resolveModReference } from "./mod_reference.ts";
 
 const APP_URL = "https://example.org/";
 const DEFAULT_MODS_FOLDER = "https://example.org/default_mods/";
-const SAMPLE_MOD_SOURCE =
-  "https://example.org/fixtures/mods/book_list/mod_conf.yaml";
 
 describe("resolveModReference", function describeResolveModReference(): void {
   it("Default mod name", function resolvesDefaultName(): void {
@@ -30,7 +32,7 @@ describe("resolveModReference", function describeResolveModReference(): void {
   });
 
   it("Folder without a trailing slash", function resolvesFolder(): void {
-    const source = resolveModReference("./fixtures/mods/book_list", {
+    const source = resolveModReference(SAMPLE_MOD_REFERENCE, {
       baseUrl: APP_URL,
     });
 
@@ -54,7 +56,7 @@ describe("resolveModReference", function describeResolveModReference(): void {
 
   it("keeps a .yaml mod file", function resolvesYamlFile(): void {
     const source = resolveModReference(
-      "./fixtures/mods/book_list/mod_conf.yaml",
+      `${SAMPLE_MOD_REFERENCE}/mod_conf.yaml`,
       { baseUrl: APP_URL },
     );
 
@@ -68,7 +70,7 @@ describe("resolveModReference", function describeResolveModReference(): void {
   });
 
   it("drops the query and fragment of a folder", function dropsQuery(): void {
-    const source = resolveModReference("./fixtures/mods/book_list?v=2#top", {
+    const source = resolveModReference(`${SAMPLE_MOD_REFERENCE}?v=2#top`, {
       baseUrl: APP_URL,
     });
 
@@ -77,7 +79,7 @@ describe("resolveModReference", function describeResolveModReference(): void {
 
   it("fails for a relative location without a base URL", function failsWithoutBase(): void {
     function resolveWithoutBase(): string {
-      return resolveModReference("./fixtures/mods/book_list", {});
+      return resolveModReference(SAMPLE_MOD_REFERENCE, {});
     }
 
     expect(resolveWithoutBase).toThrow(FileFetchError);
@@ -85,9 +87,9 @@ describe("resolveModReference", function describeResolveModReference(): void {
 
   it("One mod, one source", function givesOneSource(): void {
     const references = [
-      "./fixtures/mods/book_list",
-      "./fixtures/mods/book_list/",
-      "./fixtures/mods/book_list/mod_conf.yaml",
+      SAMPLE_MOD_REFERENCE,
+      `${SAMPLE_MOD_REFERENCE}/`,
+      `${SAMPLE_MOD_REFERENCE}/mod_conf.yaml`,
     ];
 
     const sources = new Set<string>();

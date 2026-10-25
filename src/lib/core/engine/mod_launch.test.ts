@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { APP_BASE_URL } from "../../../test/sample_files.ts";
+import {
+  APP_BASE_URL,
+  FIXTURES_BASE_URL,
+  FIXTURES_REFERENCE,
+} from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
   FOUR_BOOKS_SOURCE,
+  MISSING_MOD_REFERENCE,
   NO_COUNTRY_TILE_SOURCE,
   OTHER_APP_ORIGIN,
+  SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
+  SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TILE_SOURCES,
   serveFourBooks,
@@ -30,8 +37,8 @@ import { loadModTiles, prepareModLaunch } from "./mod_launch.ts";
 import type { ModLaunch, ModLaunchRequest, RunLink } from "./mod_launch.ts";
 
 const SAMPLE_LINK: RunLink = {
-  mod: "./fixtures/mods/book_list",
-  collection: "./fixtures/tiles/books_collection.yaml",
+  mod: SAMPLE_MOD_REFERENCE,
+  collection: SAMPLE_COLLECTION_REFERENCE,
   params: {},
 };
 
@@ -128,9 +135,7 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
   });
 
   it("Link parameters", async function copiesParams(): Promise<void> {
-    const params = {
-      target: "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
-    };
+    const params = { target: SAMPLE_MOD_SOURCE };
 
     const launch = await launchMod({ ...SAMPLE_LINK, params });
 
@@ -185,7 +190,7 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     const testFetch = createTestFetch();
     const defaults = resolveDefaultModSettings(
       {
-        folder: "./fixtures/mods/",
+        folder: `${FIXTURES_REFERENCE}mods/`,
         switchedOff: ["book_list"],
       },
       APP_BASE_URL,
@@ -247,28 +252,27 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
   it("propagates mod file errors with their classes", async function propagatesModErrors(): Promise<void> {
     testTexts.set(
-      "https://example.org/fixtures/mods/no_mod/mod_conf.yaml",
+      `${FIXTURES_BASE_URL}mods/no_mod/mod_conf.yaml`,
       'name: "no mod mapping"',
     );
     testTexts.set(
-      "https://example.org/fixtures/mods/bad_yaml/mod_conf.yaml",
+      `${FIXTURES_BASE_URL}mods/bad_yaml/mod_conf.yaml`,
       "mod: [unclosed",
     );
 
     await expect(
-      launchMod({ ...SAMPLE_LINK, mod: "./fixtures/mods/missing" }),
+      launchMod({ ...SAMPLE_LINK, mod: MISSING_MOD_REFERENCE }),
     ).rejects.toThrow(FileFetchError);
     await expect(
-      launchMod({ ...SAMPLE_LINK, mod: "./fixtures/mods/no_mod" }),
+      launchMod({ ...SAMPLE_LINK, mod: `${FIXTURES_REFERENCE}mods/no_mod` }),
     ).rejects.toThrow(ModFormatError);
     await expect(
-      launchMod({ ...SAMPLE_LINK, mod: "./fixtures/mods/bad_yaml" }),
+      launchMod({ ...SAMPLE_LINK, mod: `${FIXTURES_REFERENCE}mods/bad_yaml` }),
     ).rejects.toThrow(YamlParseError);
   });
 
   it("propagates type file errors with their classes", async function propagatesTypeErrors(): Promise<void> {
-    const brokenTypeSource =
-      "https://example.org/fixtures/mods/broken_type/mod_conf.yaml";
+    const brokenTypeSource = `${FIXTURES_BASE_URL}mods/broken_type/mod_conf.yaml`;
     serveTestMod(brokenTypeSource, [
       '  name: "broken_type"',
       '  version: "0.1.0"',
@@ -276,7 +280,7 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
       '  type_path: "./type.md"',
     ]);
     testTexts.set(
-      "https://example.org/fixtures/mods/broken_type/type.md",
+      `${FIXTURES_BASE_URL}mods/broken_type/type.md`,
       "---\ntitle: no schema\n---\n",
     );
 
@@ -287,22 +291,22 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
   it("propagates collection errors with their classes", async function propagatesCollectionErrors(): Promise<void> {
     testTexts.set(
-      "https://example.org/fixtures/tiles/not_a_collection.yaml",
+      `${FIXTURES_BASE_URL}tiles/not_a_collection.yaml`,
       'name: "no collection mapping"',
     );
 
     await expect(
       launchMod({
         ...SAMPLE_LINK,
-        collection: "./fixtures/tiles/missing.yaml",
+        collection: `${FIXTURES_REFERENCE}tiles/missing.yaml`,
       }),
     ).rejects.toThrow(
-      'Cannot load file "https://example.org/fixtures/tiles/missing.yaml": HTTP 404',
+      `Cannot load file "${FIXTURES_BASE_URL}tiles/missing.yaml": HTTP 404`,
     );
     await expect(
       launchMod({
         ...SAMPLE_LINK,
-        collection: "./fixtures/tiles/not_a_collection.yaml",
+        collection: `${FIXTURES_REFERENCE}tiles/not_a_collection.yaml`,
       }),
     ).rejects.toThrow(CollectionFormatError);
   });

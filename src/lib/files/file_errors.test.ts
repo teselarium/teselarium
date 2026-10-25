@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { FIXTURES_BASE_URL } from "../../test/sample_files.ts";
+import { SAMPLE_COLLECTION_SOURCE } from "../../test/sample_mods.ts";
 import {
   describeErrorCause,
   FileFetchError,
@@ -6,9 +8,7 @@ import {
   YamlParseError,
 } from "./file_errors.ts";
 
-const SOURCE = "https://example.org/fixtures/tiles/books/kallocain.md";
-const COLLECTION_SOURCE =
-  "https://example.org/fixtures/tiles/books_collection.yaml";
+const SOURCE = `${FIXTURES_BASE_URL}tiles/books/kallocain.md`;
 
 describe("describeErrorCause", function describeDescribeErrorCause(): void {
   it("uses the message of an Error", function usesErrorMessage(): void {
@@ -100,7 +100,10 @@ describe("MarkdownParseError", function describeMarkdownParseError(): void {
 
 describe("YamlParseError", function describeYamlParseError(): void {
   it("is an Error named after its class", function isNamedError(): void {
-    const error = new YamlParseError(COLLECTION_SOURCE, "unexpected end");
+    const error = new YamlParseError(
+      SAMPLE_COLLECTION_SOURCE,
+      "unexpected end",
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toBeInstanceOf(YamlParseError);
@@ -108,25 +111,35 @@ describe("YamlParseError", function describeYamlParseError(): void {
   });
 
   it("exposes the source", function exposesSource(): void {
-    const error = new YamlParseError(COLLECTION_SOURCE, "unexpected end");
+    const error = new YamlParseError(
+      SAMPLE_COLLECTION_SOURCE,
+      "unexpected end",
+    );
 
-    expect(error.source).toBe(COLLECTION_SOURCE);
+    expect(error.source).toBe(SAMPLE_COLLECTION_SOURCE);
   });
 
   it("builds the message from the source and the reason", function buildsMessage(): void {
-    const error = new YamlParseError(COLLECTION_SOURCE, "unexpected end");
+    const error = new YamlParseError(
+      SAMPLE_COLLECTION_SOURCE,
+      "unexpected end",
+    );
 
     expect(error.message).toBe(
-      `Cannot parse YAML "${COLLECTION_SOURCE}": unexpected end`,
+      `Cannot parse YAML "${SAMPLE_COLLECTION_SOURCE}": unexpected end`,
     );
   });
 
   it("keeps the cause when given", function keepsCause(): void {
     const yamlError = new Error("duplicated mapping key");
 
-    const error = new YamlParseError(COLLECTION_SOURCE, yamlError.message, {
-      cause: yamlError,
-    });
+    const error = new YamlParseError(
+      SAMPLE_COLLECTION_SOURCE,
+      yamlError.message,
+      {
+        cause: yamlError,
+      },
+    );
 
     expect(error.cause).toBe(yamlError);
   });

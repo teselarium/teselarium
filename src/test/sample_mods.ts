@@ -1,4 +1,8 @@
-import { APP_BASE_URL, FIXTURES_BASE_URL } from "./sample_files.ts";
+import {
+  APP_BASE_URL,
+  FIXTURES_BASE_URL,
+  FIXTURES_REFERENCE,
+} from "./sample_files.ts";
 import { buildTypeText, testTexts } from "./test_files.ts";
 
 /** The app's origin in tests. Mods under `APP_BASE_URL` are on it and get their permissions. */
@@ -16,6 +20,41 @@ export const SAMPLE_TILE_SOURCES = [
   `${FIXTURES_BASE_URL}tiles/books/kallocain.md`,
   `${FIXTURES_BASE_URL}tiles/books/fictions.md`,
 ];
+
+/** `./fixtures/mods/book_list`: the sample mod as a run link names it. It resolves to `SAMPLE_MOD_SOURCE`. */
+export const SAMPLE_MOD_REFERENCE = `${FIXTURES_REFERENCE}mods/book_list`;
+
+/** `./fixtures/tiles/books_collection.yaml`: the sample collection as a run link names it. It resolves to `SAMPLE_COLLECTION_SOURCE`. */
+export const SAMPLE_COLLECTION_REFERENCE = `${FIXTURES_REFERENCE}tiles/books_collection.yaml`;
+
+/** `./fixtures/mods/missing`: a mod folder that does not exist. It resolves to `MISSING_MOD_SOURCE`. */
+export const MISSING_MOD_REFERENCE = `${FIXTURES_REFERENCE}mods/missing`;
+
+/** `https://example.org/fixtures/mods/missing/mod_conf.yaml`: the mod file of `MISSING_MOD_REFERENCE`, which answers `404 Not Found`. */
+export const MISSING_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/missing/mod_conf.yaml`;
+
+/**
+ * `#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list`: the run link of the sample mod,
+ * as the stage writes it. Written by hand, so tests of the encoding compare
+ * against an independent value.
+ */
+export const SAMPLE_RUN_HASH = "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list";
+
+/**
+ * `#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&collection=.%2Ffixtures%2Ftiles%2Fbooks_collection.yaml`:
+ * the run link of the sample mod on the sample collection, as the stage writes it.
+ * Written by hand, like `SAMPLE_RUN_HASH`.
+ */
+export const SAMPLE_COLLECTION_RUN_HASH =
+  "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&collection=.%2Ffixtures%2Ftiles%2Fbooks_collection.yaml";
+
+/**
+ * `#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Ffixtures%2Fmods%2Fbook_list%2Fmod_conf.yaml`:
+ * the run link of the mod viewer on `SAMPLE_MOD_SOURCE`, as the stage writes it.
+ * Written by hand, like `SAMPLE_RUN_HASH`.
+ */
+export const SAMPLE_VIEWER_RUN_HASH =
+  "#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Ffixtures%2Fmods%2Fbook_list%2Fmod_conf.yaml";
 
 export const SAMPLE_COVERS_PERMISSION = {
   category: "show",

@@ -8,7 +8,13 @@ import {
   readModPort,
   waitForMessages,
 } from "../../test/fake_frames.ts";
-import { SAMPLE_MOD_SOURCE } from "../../test/sample_mods.ts";
+import {
+  MISSING_MOD_REFERENCE,
+  MISSING_MOD_SOURCE,
+  SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_MOD_REFERENCE,
+  SAMPLE_MOD_SOURCE,
+} from "../../test/sample_mods.ts";
 import { settleStage, startTestStage } from "../../test/test_stages.ts";
 import { StageView } from "./StageView.tsx";
 
@@ -22,8 +28,8 @@ afterEach(function closePorts(): void {
 });
 
 const SAMPLE_LINK = {
-  mod: "./fixtures/mods/book_list",
-  collection: "./fixtures/tiles/books_collection.yaml",
+  mod: SAMPLE_MOD_REFERENCE,
+  collection: SAMPLE_COLLECTION_REFERENCE,
   params: {},
 };
 
@@ -84,14 +90,14 @@ describe("StageView", function describeStageView(): void {
   });
 
   it("shows the close button for a mod opened from a link", async function showsClose(): Promise<void> {
-    const stage = await startTestStage("#/run?mod=./fixtures/mods/book_list");
+    const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
     render(<StageView stage={stage} />);
 
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
   it("No collection, no reload", async function hidesReload(): Promise<void> {
-    const stage = await startTestStage("#/run?mod=./fixtures/mods/book_list");
+    const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
     render(<StageView stage={stage} />);
 
     expect(screen.queryByRole("button", { name: "Reload tiles" })).toBeNull();
@@ -99,7 +105,7 @@ describe("StageView", function describeStageView(): void {
 
   it("shows Reload tiles for a mod opened with a collection", async function showsReload(): Promise<void> {
     const stage = await startTestStage(
-      "#/run?mod=./fixtures/mods/book_list&collection=./fixtures/tiles/books_collection.yaml",
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
     );
     render(<StageView stage={stage} />);
 
@@ -119,12 +125,10 @@ describe("StageView", function describeStageView(): void {
   });
 
   it("Missing mod file", async function showsLoadFailure(): Promise<void> {
-    const stage = await startTestStage("#/run?mod=./fixtures/mods/missing");
+    const stage = await startTestStage(`#/run?mod=${MISSING_MOD_REFERENCE}`);
     const { container } = render(<StageView stage={stage} />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "https://example.org/fixtures/mods/missing/mod_conf.yaml",
-    );
+    expect(screen.getByRole("alert")).toHaveTextContent(MISSING_MOD_SOURCE);
     expect(screen.getByRole("alert")).toHaveTextContent("404");
     expect(container.querySelector("iframe")).toBeNull();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();

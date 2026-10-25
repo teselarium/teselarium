@@ -8,6 +8,7 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
+import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
 import {
   addModHtml,
   buildThemeProbeFiles,
@@ -334,7 +335,7 @@ test.describe("Links in pages", function describeLinks(): void {
     await servePage(
       page,
       "home/index",
-      "# Home\n\n[Book list](#/run?mod=./samples/mods/book_list)\n",
+      `# Home\n\n[Book list](${SAMPLE_RUN_HASH})\n`,
     );
     await page.goto("/");
 

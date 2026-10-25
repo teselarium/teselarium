@@ -15,10 +15,12 @@ import {
   startProbeRequests,
   waitForProbe,
 } from "./mod_routes.ts";
+import {
+  readSampleModSource,
+  SAMPLE_COLLECTION_RUN_HASH,
+} from "./sample_mod.ts";
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
-const SAMPLE_RUN_LINK =
-  "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const OPEN_ANY_SITE_LINES = [
   "  permissions:",
   "    open:",
@@ -209,11 +211,10 @@ test.describe("The action dialog names the mod", function describeNaming(): void
   }): Promise<void> {
     await routeCovers(page);
     await exposeSampleEngine(page);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frame = await findModFrame(page, "Book List");
     await waitForProbe(frame);
-    const source = new URL("/samples/mods/book_list/mod_conf.yaml", page.url())
-      .href;
+    const source = readSampleModSource(page);
 
     await ask(frame, "ui.confirm", { message: "Delete this list?" });
 
@@ -230,7 +231,7 @@ test.describe("The action dialog names the mod", function describeNaming(): void
   }): Promise<void> {
     await routeCovers(page);
     await exposeSampleEngine(page);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frame = await findModFrame(page, "Book List");
     await waitForProbe(frame);
     const book = frame.getByRole("button", { name: /Kallocain/ });

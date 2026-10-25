@@ -1,32 +1,36 @@
 import { describe, expect, it } from "vitest";
+import {
+  SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_COLLECTION_RUN_HASH,
+  SAMPLE_MOD_REFERENCE,
+  SAMPLE_MOD_SOURCE,
+  SAMPLE_VIEWER_RUN_HASH,
+} from "../../../test/sample_mods.ts";
 import type { RunLink } from "../engine/index.ts";
 import { buildRunLink, readAppRoute } from "./run_links.ts";
-
-const SAMPLE_SOURCE =
-  "https://example.org/fixtures/mods/book_list/mod_conf.yaml";
 
 describe("readAppRoute", function describeReadAppRoute(): void {
   it("Link with a mod and a collection", function readsModAndCollection(): void {
     const route = readAppRoute(
-      "#/run?mod=./fixtures/mods/book_list&collection=./fixtures/tiles/books_collection.yaml",
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
     );
 
     expect(route).toEqual({
       page: "run",
       link: {
-        mod: "./fixtures/mods/book_list",
-        collection: "./fixtures/tiles/books_collection.yaml",
+        mod: SAMPLE_MOD_REFERENCE,
+        collection: SAMPLE_COLLECTION_REFERENCE,
         params: {},
       },
     });
   });
 
   it("Link without a collection", function readsModOnly(): void {
-    const route = readAppRoute("#/run?mod=./fixtures/mods/book_list");
+    const route = readAppRoute(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
 
     expect(route).toEqual({
       page: "run",
-      link: { mod: "./fixtures/mods/book_list", collection: null, params: {} },
+      link: { mod: SAMPLE_MOD_REFERENCE, collection: null, params: {} },
     });
   });
 
@@ -50,7 +54,7 @@ describe("readAppRoute", function describeReadAppRoute(): void {
 
   it("Encoded values", function readsEncodedValues(): void {
     const route = readAppRoute(
-      `#/run?mod=mod_viewer&target=${encodeURIComponent(SAMPLE_SOURCE)}`,
+      `#/run?mod=mod_viewer&target=${encodeURIComponent(SAMPLE_MOD_SOURCE)}`,
     );
 
     expect(route).toEqual({
@@ -58,7 +62,7 @@ describe("readAppRoute", function describeReadAppRoute(): void {
       link: {
         mod: "mod_viewer",
         collection: null,
-        params: { target: SAMPLE_SOURCE },
+        params: { target: SAMPLE_MOD_SOURCE },
       },
     });
   });
@@ -95,31 +99,27 @@ describe("buildRunLink", function describeBuildRunLink(): void {
     const runLink = buildRunLink({
       mod: "mod_viewer",
       collection: null,
-      params: { target: SAMPLE_SOURCE },
+      params: { target: SAMPLE_MOD_SOURCE },
     });
 
-    expect(runLink).toBe(
-      "#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Ffixtures%2Fmods%2Fbook_list%2Fmod_conf.yaml",
-    );
+    expect(runLink).toBe(SAMPLE_VIEWER_RUN_HASH);
   });
 
   it("writes the collection after the mod", function buildsCollection(): void {
     const runLink = buildRunLink({
-      mod: "./fixtures/mods/book_list",
-      collection: "./fixtures/tiles/books_collection.yaml",
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: SAMPLE_COLLECTION_REFERENCE,
       params: {},
     });
 
-    expect(runLink).toBe(
-      "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&collection=.%2Ffixtures%2Ftiles%2Fbooks_collection.yaml",
-    );
+    expect(runLink).toBe(SAMPLE_COLLECTION_RUN_HASH);
   });
 
   it("gives the link back when read", function roundTrips(): void {
     const links: RunLink[] = [
       { mod: "mod_viewer", collection: null, params: {} },
       {
-        mod: SAMPLE_SOURCE,
+        mod: SAMPLE_MOD_SOURCE,
         collection: "https://example.org/a b&c.yaml",
         params: { target: "x=y&z", "odd key": "é" },
       },

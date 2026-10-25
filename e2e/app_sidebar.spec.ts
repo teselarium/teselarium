@@ -27,9 +27,9 @@ import {
   stageBar,
   waitForProbe,
 } from "./mod_routes.ts";
+import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
 import { DARK_COLORS, LIGHT_COLORS } from "./theme_probes.ts";
 
-const SAMPLE_LINK = "/#/run?mod=./samples/mods/book_list";
 const EXPLORER_HASH = "#/run?mod=mod_explorer";
 const SIDEBAR_LAYOUT_KEY = "opentesela.sidebar";
 
@@ -49,7 +49,7 @@ async function readFrameBox(
 }
 
 async function openSample(page: Page): Promise<void> {
-  await page.goto(SAMPLE_LINK);
+  await page.goto(`/${SAMPLE_RUN_HASH}`);
   await expect(stageBar(page)).toContainText("Book List");
 }
 

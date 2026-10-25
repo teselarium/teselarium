@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { SAMPLE_MOD_SOURCE } from "../../test/sample_mods.ts";
 import { ModFormatError } from "./mod_errors.ts";
-
-const MOD_SOURCE = "https://example.org/fixtures/mods/book_list/mod_conf.yaml";
 
 describe("ModFormatError", function describeModFormatError(): void {
   it("is an Error named after its class", function isNamedError(): void {
-    const error = new ModFormatError(MOD_SOURCE, 'a "mod" mapping is required');
+    const error = new ModFormatError(
+      SAMPLE_MOD_SOURCE,
+      'a "mod" mapping is required',
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toBeInstanceOf(ModFormatError);
@@ -13,16 +15,22 @@ describe("ModFormatError", function describeModFormatError(): void {
   });
 
   it("exposes the source", function exposesSource(): void {
-    const error = new ModFormatError(MOD_SOURCE, 'a "mod" mapping is required');
+    const error = new ModFormatError(
+      SAMPLE_MOD_SOURCE,
+      'a "mod" mapping is required',
+    );
 
-    expect(error.source).toBe(MOD_SOURCE);
+    expect(error.source).toBe(SAMPLE_MOD_SOURCE);
   });
 
   it("builds the message from the source and the reason", function buildsMessage(): void {
-    const error = new ModFormatError(MOD_SOURCE, 'a "mod" mapping is required');
+    const error = new ModFormatError(
+      SAMPLE_MOD_SOURCE,
+      'a "mod" mapping is required',
+    );
 
     expect(error.message).toBe(
-      `Invalid mod "${MOD_SOURCE}": a "mod" mapping is required`,
+      `Invalid mod "${SAMPLE_MOD_SOURCE}": a "mod" mapping is required`,
     );
   });
 
@@ -30,7 +38,7 @@ describe("ModFormatError", function describeModFormatError(): void {
     const formatError = new Error("not a mapping");
 
     const error = new ModFormatError(
-      MOD_SOURCE,
+      SAMPLE_MOD_SOURCE,
       'a "mod" mapping is required',
       { cause: formatError },
     );

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { RenderResult } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "./App";
+import { SAMPLE_MOD_REFERENCE } from "./test/sample_mods.ts";
 import { startTestApp } from "./test/test_app.ts";
 import type { AppFixture } from "./test/test_app.ts";
 import { MOD_HOME_ROUTING } from "./test/test_stages.ts";
@@ -61,7 +62,7 @@ describe("App", function describeApp(): void {
 
   it("keeps the stage mounted and hidden while a page shows", async function hidesStage(): Promise<void> {
     const { container } = renderApp(
-      await startTestApp("#/run?mod=./fixtures/mods/book_list"),
+      await startTestApp(`#/run?mod=${SAMPLE_MOD_REFERENCE}`),
     );
     const frame = screen.getByTitle("Book List");
 

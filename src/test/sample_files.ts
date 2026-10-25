@@ -13,6 +13,12 @@ export const APP_BASE_URL = "https://example.org/";
  */
 export const FIXTURES_BASE_URL = `${APP_BASE_URL}fixtures/`;
 
+/**
+ * `./fixtures/`: the app-relative form of the fixtures root, as run links and
+ * mod references write it. It resolves to `FIXTURES_BASE_URL` against `APP_BASE_URL`.
+ */
+export const FIXTURES_REFERENCE = "./fixtures/";
+
 const PROJECT_DIRECTORY = join(
   dirname(fileURLToPath(import.meta.url)),
   "..",

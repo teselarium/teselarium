@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { createFullStorage } from "../../../test/memory_storage.ts";
 import { buildMethodContext } from "../../../test/method_contexts.ts";
+import { FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import { ModMethodError } from "./engine_errors.ts";
 import { INVALID_PARAMS, STORAGE_FAILED } from "./mod_messages.ts";
 import type { ModMethodContext } from "./mod_methods.ts";
 import { STORAGE_METHODS } from "./storage_methods.ts";
 
 const SELECTED_VALUE = {
-  source: "https://example.org/fixtures/tiles/books/kallocain.md",
+  source: `${FIXTURES_BASE_URL}tiles/books/kallocain.md`,
 };
 
 function getValue(context: ModMethodContext, params: object): Promise<unknown> {

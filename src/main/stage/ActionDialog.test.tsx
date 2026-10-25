@@ -2,11 +2,12 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import type { ActionSnapshot, AppAction } from "../../lib/core/stage/index.ts";
+import { SAMPLE_MOD_SOURCE } from "../../test/sample_mods.ts";
 import { ActionDialog } from "./ActionDialog.tsx";
 
 const MOD = {
   title: "Book List",
-  source: "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
+  source: SAMPLE_MOD_SOURCE,
 };
 
 let onAnswer: Mock<(id: number, accepted: boolean) => void>;

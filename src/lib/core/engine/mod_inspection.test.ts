@@ -3,11 +3,13 @@ import type { Mock } from "vitest";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  MISSING_MOD_SOURCE,
   OTHER_APP_ORIGIN,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
   SAMPLE_ENTRYPOINT,
   SAMPLE_MOD_SOURCE,
+  SAMPLE_TYPE_SOURCE,
 } from "../../../test/sample_mods.ts";
 import {
   fetchTestFile,
@@ -49,7 +51,7 @@ describe("inspectMod", function describeInspectMod(): void {
       title: "Book List",
       version: "1.0.0",
       description: "A very simple list of books with their covers.",
-      typeSource: "https://example.org/fixtures/types/book.md",
+      typeSource: SAMPLE_TYPE_SOURCE,
       sampleCollection: SAMPLE_COLLECTION_SOURCE,
       config: { show_covers: true },
       permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
@@ -69,10 +71,7 @@ describe("inspectMod", function describeInspectMod(): void {
   });
 
   it("Inspect a missing mod", async function inspectsMissingMod(): Promise<void> {
-    const missingSource =
-      "https://example.org/fixtures/mods/missing/mod_conf.yaml";
-
-    const inspecting = inspectMod(missingSource, APP_ORIGIN, {
+    const inspecting = inspectMod(MISSING_MOD_SOURCE, APP_ORIGIN, {
       fetch: fetchTestFile,
     });
 

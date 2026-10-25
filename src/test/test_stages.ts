@@ -4,7 +4,7 @@ import type { Stage, StageRouting } from "../lib/core/stage/index.ts";
 import { FakeHistory } from "./fake_history.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
-import { APP_ORIGIN } from "./sample_mods.ts";
+import { APP_ORIGIN, SAMPLE_MOD_REFERENCE } from "./sample_mods.ts";
 import { fetchTestFile } from "./test_files.ts";
 
 export const EXPLORER_LINK: RunLink = Object.freeze({
@@ -14,7 +14,7 @@ export const EXPLORER_LINK: RunLink = Object.freeze({
 });
 
 export const SAMPLE_LINK: RunLink = Object.freeze({
-  mod: "./fixtures/mods/book_list",
+  mod: SAMPLE_MOD_REFERENCE,
   collection: null,
   params: Object.freeze({}),
 });

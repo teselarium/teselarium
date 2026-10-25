@@ -1,20 +1,22 @@
 import { describe, expect, it } from "vitest";
+import { FIXTURES_BASE_URL } from "../../test/sample_files.ts";
+import {
+  SAMPLE_COLLECTION_SOURCE,
+  SAMPLE_TYPE_SOURCE,
+} from "../../test/sample_mods.ts";
 import {
   CollectionFormatError,
   TileTypeError,
   TileValidationError,
 } from "./tile_errors.ts";
 
-const SOURCE = "https://example.org/fixtures/tiles/books/kallocain.md";
-const COLLECTION_SOURCE =
-  "https://example.org/fixtures/tiles/books_collection.yaml";
-const TYPE_SOURCE = "https://example.org/fixtures/types/book.md";
-const MISMATCH_REASON = `"book" (${TYPE_SOURCE}): metadata must have property 'country'`;
+const SOURCE = `${FIXTURES_BASE_URL}tiles/books/kallocain.md`;
+const MISMATCH_REASON = `"book" (${SAMPLE_TYPE_SOURCE}): metadata must have property 'country'`;
 
 describe("CollectionFormatError", function describeCollectionFormatError(): void {
   it("is an Error named after its class", function isNamedError(): void {
     const error = new CollectionFormatError(
-      COLLECTION_SOURCE,
+      SAMPLE_COLLECTION_SOURCE,
       '"tiles" must be a list',
     );
 
@@ -25,21 +27,21 @@ describe("CollectionFormatError", function describeCollectionFormatError(): void
 
   it("exposes the source", function exposesSource(): void {
     const error = new CollectionFormatError(
-      COLLECTION_SOURCE,
+      SAMPLE_COLLECTION_SOURCE,
       '"tiles" must be a list',
     );
 
-    expect(error.source).toBe(COLLECTION_SOURCE);
+    expect(error.source).toBe(SAMPLE_COLLECTION_SOURCE);
   });
 
   it("builds the message from the source and the reason", function buildsMessage(): void {
     const error = new CollectionFormatError(
-      COLLECTION_SOURCE,
+      SAMPLE_COLLECTION_SOURCE,
       '"tiles" must be a list',
     );
 
     expect(error.message).toBe(
-      `Invalid tile collection "${COLLECTION_SOURCE}": "tiles" must be a list`,
+      `Invalid tile collection "${SAMPLE_COLLECTION_SOURCE}": "tiles" must be a list`,
     );
   });
 
@@ -47,7 +49,7 @@ describe("CollectionFormatError", function describeCollectionFormatError(): void
     const formatError = new Error("not a list");
 
     const error = new CollectionFormatError(
-      COLLECTION_SOURCE,
+      SAMPLE_COLLECTION_SOURCE,
       '"tiles" must be a list',
       { cause: formatError },
     );
@@ -58,7 +60,7 @@ describe("CollectionFormatError", function describeCollectionFormatError(): void
 
 describe("TileTypeError", function describeTileTypeError(): void {
   it("is an Error named after its class", function isNamedError(): void {
-    const error = new TileTypeError(TYPE_SOURCE, '"schema" is missing');
+    const error = new TileTypeError(SAMPLE_TYPE_SOURCE, '"schema" is missing');
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toBeInstanceOf(TileTypeError);
@@ -66,16 +68,16 @@ describe("TileTypeError", function describeTileTypeError(): void {
   });
 
   it("exposes the source", function exposesSource(): void {
-    const error = new TileTypeError(TYPE_SOURCE, '"schema" is missing');
+    const error = new TileTypeError(SAMPLE_TYPE_SOURCE, '"schema" is missing');
 
-    expect(error.source).toBe(TYPE_SOURCE);
+    expect(error.source).toBe(SAMPLE_TYPE_SOURCE);
   });
 
   it("builds the message from the source and the reason", function buildsMessage(): void {
-    const error = new TileTypeError(TYPE_SOURCE, '"schema" is missing');
+    const error = new TileTypeError(SAMPLE_TYPE_SOURCE, '"schema" is missing');
 
     expect(error.message).toBe(
-      `Invalid tile type "${TYPE_SOURCE}": "schema" is missing`,
+      `Invalid tile type "${SAMPLE_TYPE_SOURCE}": "schema" is missing`,
     );
   });
 
@@ -83,7 +85,7 @@ describe("TileTypeError", function describeTileTypeError(): void {
     const compileError = new Error("schema is invalid: data must be object");
 
     const error = new TileTypeError(
-      TYPE_SOURCE,
+      SAMPLE_TYPE_SOURCE,
       '"schema" is not valid JSON Type Definition',
       { cause: compileError },
     );
@@ -111,7 +113,7 @@ describe("TileValidationError", function describeTileValidationError(): void {
     const error = new TileValidationError(SOURCE, MISMATCH_REASON);
 
     expect(error.message).toBe(
-      `Tile "${SOURCE}" is not of tile type "book" (${TYPE_SOURCE}): metadata must have property 'country'`,
+      `Tile "${SOURCE}" is not of tile type "book" (${SAMPLE_TYPE_SOURCE}): metadata must have property 'country'`,
     );
   });
 

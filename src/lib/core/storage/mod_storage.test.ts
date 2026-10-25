@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createMemoryStorage } from "../../../test/memory_storage.ts";
+import { FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
+import { SAMPLE_MOD_SOURCE } from "../../../test/sample_mods.ts";
 import * as storageModule from "./index.ts";
 import { readModValue, writeModValue } from "./index.ts";
 
-const BOOK_LIST_SOURCE =
-  "https://example.org/fixtures/mods/book_list/mod_conf.yaml";
+const BOOK_LIST_SOURCE = SAMPLE_MOD_SOURCE;
 const OTHER_BOOK_LIST_SOURCE =
   "https://mods.example.net/book_list/mod_conf.yaml";
 
@@ -12,7 +13,7 @@ describe("mod storage slots", function describeModStorage(): void {
   it("Store and read a value", function storesValue(): void {
     const storage = createMemoryStorage();
     const value = {
-      source: "https://example.org/fixtures/tiles/books/kallocain.md",
+      source: `${FIXTURES_BASE_URL}tiles/books/kallocain.md`,
     };
 
     writeModValue(storage, BOOK_LIST_SOURCE, "selected", value);

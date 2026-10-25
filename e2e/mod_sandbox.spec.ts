@@ -31,9 +31,13 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
+import {
+  SAMPLE_COLLECTION_GLOB,
+  SAMPLE_COLLECTION_PATH,
+  SAMPLE_COLLECTION_RUN_HASH,
+  SAMPLE_ENTRYPOINT_PATH,
+} from "./sample_mod.ts";
 
-const SAMPLE_RUN_LINK =
-  "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 const APP_PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const FOREIGN_PROBE_LINK = `/#/run?mod=${encodeURIComponent(`${FOREIGN_HOST}/probe/`)}`;
@@ -94,7 +98,7 @@ test.describe("Each mod runs in its own sandboxed frame", function describeFrame
     page,
   }): Promise<void> {
     await routeCovers(page);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frameElement = page.locator('iframe[title="Book List"]');
 
     await expect(frameElement).toHaveAttribute("sandbox", "allow-scripts");
@@ -183,7 +187,7 @@ test.describe("The engine delivers the mod code", function describeDelivery(): v
     );
     await routeCovers(page);
 
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     await findModFrame(page, "Book List");
     await expect(
       page.frameLocator('iframe[title="Book List"]').getByText("Kallocain"),
@@ -195,7 +199,7 @@ test.describe("The engine delivers the mod code", function describeDelivery(): v
 });
 
 function recordEntrypointRequest(requests: Request[], request: Request): void {
-  if (request.url().endsWith("/samples/mods/book_list/main.js")) {
+  if (request.url().endsWith(SAMPLE_ENTRYPOINT_PATH)) {
     requests.push(request);
   }
 }
@@ -205,7 +209,7 @@ test.describe("The mod entrypoint is mounted", function describeMount(): void {
     page,
   }): Promise<void> {
     await routeCovers(page);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const sampleFrame = page.frameLocator('iframe[title="Book List"]');
 
     await expect(sampleFrame.getByText("Fahrenheit 451")).toBeVisible();
@@ -277,16 +281,13 @@ test.describe("Default content policy", function describeDefaultPolicy(): void {
   test("Connections are blocked", async function blocksConnections({
     page,
   }): Promise<void> {
-    const seenUrls = await recordHost(
-      page,
-      "**/samples/mods/book_list/book_collection.yaml",
-    );
+    const seenUrls = await recordHost(page, SAMPLE_COLLECTION_GLOB);
     const frame = await openAppProbe(page);
     const appOrigin = new URL(page.url()).origin;
 
     const outcome = await frame.evaluate(
       fetchFromFrame,
-      `${appOrigin}/samples/mods/book_list/book_collection.yaml`,
+      `${appOrigin}${SAMPLE_COLLECTION_PATH}`,
     );
 
     expect(outcome).not.toBe("sent");
@@ -315,7 +316,7 @@ test.describe("Content hosts", function describeContentHosts(): void {
     page,
   }): Promise<void> {
     await routeCovers(page);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const appOrigin = new URL(page.url()).origin;
 
     const sandboxDocument = await page
@@ -378,7 +379,7 @@ test.describe("Grant declared permissions to mods from the app's origin", functi
     page,
   }): Promise<void> {
     const coverUrls = await routeCovers(page);
-    await page.goto(SAMPLE_RUN_LINK);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frame = await findModFrame(page, "Book List");
     await expect(
       page.frameLocator('iframe[title="Book List"]').getByRole("img"),

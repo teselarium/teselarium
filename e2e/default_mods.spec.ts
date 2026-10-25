@@ -8,6 +8,12 @@ import {
   serveAppOriginMod,
   stageBar,
 } from "./mod_routes.ts";
+import {
+  MISSING_MOD_REFERENCE,
+  readSampleModSource,
+  SAMPLE_BOOKS_FOLDER_PATH,
+  SAMPLE_MOD_REFERENCE,
+} from "./sample_mod.ts";
 import { listOwnLookDeclarations, readTokenAs } from "./theme_probes.ts";
 import { openModsSection, pageBody } from "./app_layout.ts";
 
@@ -18,11 +24,7 @@ const EXPLORER_CODE = readFileSync(
   "utf8",
 );
 
-function readSampleSource(page: Page): string {
-  return new URL("/samples/mods/book_list/mod_conf.yaml", page.url()).href;
-}
-
-/** The explorer with `./samples/mods/missing` in its `mods` list, served on the app's origin. */
+/** The explorer with `MISSING_MOD_REFERENCE` in its `mods` list, served on the app's origin. */
 async function openBrokenExplorer(page: Page): Promise<Frame> {
   await serveAppOriginMod(page, {
     "explorer/mod_conf.yaml": [
@@ -34,7 +36,7 @@ async function openBrokenExplorer(page: Page): Promise<Frame> {
       "  config:",
       '    viewer: "mod_viewer"',
       "    mods:",
-      '      - "./samples/mods/missing"',
+      `      - "${MISSING_MOD_REFERENCE}"`,
       "  permissions:",
       "    open:",
       '      - host: "*"',
@@ -68,7 +70,7 @@ function coverPermissionRow(viewer: FrameLocator): Locator {
 }
 
 async function openViewerForSample(page: Page): Promise<void> {
-  await page.goto("/#/run?mod=mod_viewer&target=./samples/mods/book_list");
+  await page.goto(`/#/run?mod=mod_viewer&target=${SAMPLE_MOD_REFERENCE}`);
   await expect(
     page
       .frameLocator('iframe[title="Mod Viewer"]')
@@ -161,7 +163,7 @@ test.describe("Mod explorer", function describeExplorer(): void {
       }),
     ).toBeVisible();
     expect(new URL(page.url()).hash).toBe(
-      `#/run?mod=mod_viewer&target=${encodeURIComponent(readSampleSource(page))}`,
+      `#/run?mod=mod_viewer&target=${encodeURIComponent(readSampleModSource(page))}`,
     );
   });
 
@@ -170,7 +172,7 @@ test.describe("Mod explorer", function describeExplorer(): void {
   }): Promise<void> {
     const explorer = await openBrokenExplorer(page);
 
-    await expect(explorer.getByText("./samples/mods/missing")).toBeVisible();
+    await expect(explorer.getByText(MISSING_MOD_REFERENCE)).toBeVisible();
     await expect(explorer.getByRole("alert")).toContainText("404");
   });
 });
@@ -212,7 +214,7 @@ test.describe("Mod viewer", function describeViewer(): void {
   test("Missing target", async function showsTargetError({
     page,
   }): Promise<void> {
-    await page.goto("/#/run?mod=mod_viewer&target=./samples/mods/missing");
+    await page.goto(`/#/run?mod=mod_viewer&target=${MISSING_MOD_REFERENCE}`);
 
     await expect(
       page.frameLocator('iframe[title="Mod Viewer"]').getByRole("alert"),
@@ -254,8 +256,8 @@ test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
         "collection:",
         '  name: "Two books"',
         "  tiles:",
-        '    - path: "../samples/mods/book_list/books/kallocain.md"',
-        '    - path: "../samples/mods/book_list/books/fictions.md"',
+        `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/kallocain.md"`,
+        `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/fictions.md"`,
       ].join("\n"),
     });
     await openViewerForSample(page);
@@ -288,7 +290,7 @@ test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
         .getByText("There are no books to show."),
     ).toBeVisible();
     expect(new URL(page.url()).hash).toBe(
-      `#/run?mod=${encodeURIComponent(readSampleSource(page))}`,
+      `#/run?mod=${encodeURIComponent(readSampleModSource(page))}`,
     );
   });
 
@@ -381,7 +383,7 @@ test.describe("Default mods show how to get the app's look", function describeEx
     const explorer = await openBrokenExplorer(page);
 
     const alert = explorer.getByRole("alert");
-    await expect(alert).toContainText("./samples/mods/missing");
+    await expect(alert).toContainText(MISSING_MOD_REFERENCE);
     await expect(alert).toContainText("404");
     expect(await alert.evaluate(readBorderColor)).toBe(
       await readTokenColor(explorer, "--ot-destructive"),

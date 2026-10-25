@@ -19,12 +19,19 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
+import {
+  MISSING_COLLECTION_PATH,
+  MISSING_COLLECTION_REFERENCE,
+  MISSING_MOD_FILE_PATH,
+  MISSING_MOD_REFERENCE,
+  readSampleModSource,
+  SAMPLE_COLLECTION_GLOB,
+  SAMPLE_COLLECTION_RUN_HASH,
+  SAMPLE_RUN_HASH,
+} from "./sample_mod.ts";
 import { openModsSection, openSection, pageBody } from "./app_layout.ts";
 import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
 
-const SAMPLE_WITH_TILES =
-  "#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
-const SAMPLE_WITHOUT_TILES = "#/run?mod=./samples/mods/book_list";
 const VIEWER_LINK = "#/run?mod=mod_viewer";
 const EXPLORER_LINK = "#/run?mod=mod_explorer";
 const SAMPLE_TITLES = ["Fahrenheit 451", "Kallocain", "The Library of Babel"];
@@ -65,7 +72,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
   }): Promise<void> {
     await routeCovers(page);
 
-    await page.goto(`/${SAMPLE_WITH_TILES}`);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
 
     await expect(stageBar(page)).toContainText("Book List");
     await expect(stageBar(page)).toContainText("1.0.0");
@@ -77,7 +84,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
   }): Promise<void> {
     const requestedUrls = collectRequestedUrls(page);
 
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
 
     await expect(
       page
@@ -93,8 +100,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
     page,
   }): Promise<void> {
     await page.goto(`/${EXPLORER_LINK}`);
-    const source = new URL("/samples/mods/book_list/mod_conf.yaml", page.url())
-      .href;
+    const source = readSampleModSource(page);
 
     await followLink(page, `#/run?mod=${encodeURIComponent(source)}`);
 
@@ -142,7 +148,7 @@ test.describe("Several sandboxes, at most one visible", function describeSandbox
   test("Second link hides the first mod", async function hidesFirstMod({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     const firstFrame = await findSandboxFrame(page, "sandbox-1");
     await markFrame(firstFrame);
 
@@ -160,7 +166,7 @@ test.describe("Back and forward keep the sandbox state", function describeHistor
   test("Back to the previous mod", async function goesBack({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     const firstFrame = await findSandboxFrame(page, "sandbox-1");
     await firstFrame.evaluate(rememberValue);
     await markFrame(firstFrame);
@@ -176,7 +182,7 @@ test.describe("Back and forward keep the sandbox state", function describeHistor
   });
 
   test("Forward again", async function goesForward({ page }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     await followLink(page, EXPLORER_LINK);
     const secondFrame = await findSandboxFrame(page, "sandbox-2");
     await markFrame(secondFrame);
@@ -193,7 +199,7 @@ test.describe("Back and forward keep the sandbox state", function describeHistor
   test("Back after a page reload", async function reopensAfterReload({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     await followLink(page, EXPLORER_LINK);
     await expect(stageBar(page)).toContainText("Mods");
 
@@ -213,7 +219,7 @@ test.describe("Opening after going back drops the forward entries", function des
   test("New link after going back", async function dropsForwardSandbox({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     await followLink(page, VIEWER_LINK);
     await expect(stageBar(page)).toContainText("Mod Viewer");
     await page.goBack();
@@ -249,7 +255,7 @@ test.describe("Close a sandbox", function describeClose(): void {
   test("Close a mod opened from a link", async function closesLinkedMod({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     await expect(stageBar(page)).toContainText("Book List");
 
     await stageBar(page).getByRole("button", { name: "Close" }).click();
@@ -291,7 +297,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
   test("A page hides the mods", async function hidesModsForPage({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     const frame = await findSandboxFrame(page, "sandbox-1");
     await markFrame(frame);
 
@@ -308,7 +314,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
   test("Back from a page to a mod", async function goesBackToMod({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     const frame = await findSandboxFrame(page, "sandbox-1");
     await frame.evaluate(rememberValue);
     await openSection(page, "Settings");
@@ -325,7 +331,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
   test("Forward to a page", async function goesForwardToPage({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     await expect(stageBar(page)).toContainText("Book List");
     await openSection(page, "Settings");
     await page.goBack();
@@ -341,7 +347,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
   test("Reload on a page", async function reloadsOnPage({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     await expect(stageBar(page)).toContainText("Book List");
     await openSection(page, "About");
     await expect(
@@ -361,7 +367,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
     page,
   }): Promise<void> {
     await page.goto("/");
-    await followLink(page, SAMPLE_WITHOUT_TILES);
+    await followLink(page, SAMPLE_RUN_HASH);
     await expect(stageBar(page)).toContainText("Book List");
     await openSection(page, "Settings");
     await expect(
@@ -386,7 +392,7 @@ test.describe("Show the mod issues", function describeIssues(): void {
   }): Promise<void> {
     await routeCovers(page);
 
-    await page.goto(`/${SAMPLE_WITH_TILES}`);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
 
     await expect(stageBar(page)).toContainText("Book List");
     await expect(stageBar(page)).toContainText("No issues.");
@@ -440,7 +446,7 @@ test.describe("Show the mod issues", function describeIssues(): void {
     await frame.evaluate(showImage, "https://images.example.net/cover.jpg");
     await expect(issueList(page)).toContainText("https://images.example.net");
 
-    await followLink(page, SAMPLE_WITHOUT_TILES);
+    await followLink(page, SAMPLE_RUN_HASH);
     await expect(stageBar(page)).toContainText("Book List");
     await expect(stageBar(page)).toContainText("No issues.");
     await page.goBack();
@@ -454,11 +460,8 @@ test.describe("Show load failures", function describeLoadFailures(): void {
   test("Missing mod file", async function showsMissingMod({
     page,
   }): Promise<void> {
-    await page.goto("/#/run?mod=./samples/mods/missing");
-    const missingSource = new URL(
-      "/samples/mods/missing/mod_conf.yaml",
-      page.url(),
-    ).href;
+    await page.goto(`/#/run?mod=${MISSING_MOD_REFERENCE}`);
+    const missingSource = new URL(MISSING_MOD_FILE_PATH, page.url()).href;
 
     await expect(page.getByRole("alert")).toContainText(missingSource);
     await expect(page.getByRole("alert")).toContainText("404");
@@ -472,12 +475,9 @@ test.describe("Show load failures", function describeLoadFailures(): void {
     page,
   }): Promise<void> {
     await page.goto(
-      "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/missing.yaml",
+      `/${SAMPLE_RUN_HASH}&collection=${MISSING_COLLECTION_REFERENCE}`,
     );
-    const missingCollection = new URL(
-      "/samples/mods/book_list/missing.yaml",
-      page.url(),
-    ).href;
+    const missingCollection = new URL(MISSING_COLLECTION_PATH, page.url()).href;
 
     await expect(page.getByRole("alert")).toContainText(missingCollection);
     await expect(page.locator("iframe")).toHaveCount(0);
@@ -513,10 +513,10 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
     const twoBooks = { isOn: false };
     await routeCovers(page);
     await page.route(
-      "**/samples/mods/book_list/book_collection.yaml",
+      SAMPLE_COLLECTION_GLOB,
       answerCollection.bind(undefined, twoBooks),
     );
-    await page.goto(`/${SAMPLE_WITH_TILES}`);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     await expectSampleBooks(page, "sandbox-1");
     const frame = await findSandboxFrame(page, "sandbox-1");
     await markFrame(frame);
@@ -533,7 +533,7 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
   test("No collection, no reload", async function hidesReload({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_WITHOUT_TILES}`);
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
     await expect(stageBar(page)).toContainText("Book List");
 
     await expect(
@@ -547,7 +547,7 @@ test.describe("Sample book list mod", function describeSampleMod(): void {
     page,
   }): Promise<void> {
     await routeCovers(page);
-    await page.goto(`/${SAMPLE_WITH_TILES}`);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frameLocator = page.frameLocator('iframe[title="Book List"]');
     await expectSampleBooks(page, "sandbox-1");
     const frame = await findModFrame(page, "Book List");
@@ -569,7 +569,7 @@ test.describe("Sample book list mod", function describeSampleMod(): void {
     page,
   }): Promise<void> {
     await routeCovers(page);
-    await page.goto(`/${SAMPLE_WITH_TILES}`);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     const frameLocator = page.frameLocator('iframe[title="Book List"]');
     const kallocain = frameLocator.getByRole("button", { name: /Kallocain/ });
     await kallocain.click();

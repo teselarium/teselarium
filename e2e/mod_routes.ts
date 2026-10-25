@@ -1,4 +1,5 @@
 import type { Frame, Locator, Page, Route } from "@playwright/test";
+import { SAMPLE_ENTRYPOINT_GLOB } from "./sample_mod.ts";
 
 /** The host of the sample book covers. Tests answer it locally, so no test needs the network. */
 export const COVER_HOST = "https://upload.wikimedia.org";
@@ -442,7 +443,7 @@ async function answerExposedSample(route: Route): Promise<void> {
  * test can send requests as the sample mod.
  */
 export async function exposeSampleEngine(page: Page): Promise<void> {
-  await page.route("**/samples/mods/book_list/main.js", answerExposedSample);
+  await page.route(SAMPLE_ENTRYPOINT_GLOB, answerExposedSample);
 }
 
 /** The app's action dialog, while it is open. */
