@@ -14,6 +14,12 @@ export type {
   SwitchedOffMod,
 } from "./default_mod_settings.ts";
 export { ModMethodError, ModSwitchedOffError } from "./engine_errors.ts";
+export {
+  describeCancelledApiMismatch,
+  describeMissingApiRange,
+  matchModApiRange,
+  MOD_API_VERSION,
+} from "./mod_api_version.ts";
 export { inspectMod } from "./mod_inspection.ts";
 export type { ModInspection } from "./mod_inspection.ts";
 export { loadModTiles, prepareModLaunch } from "./mod_launch.ts";

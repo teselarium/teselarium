@@ -7,7 +7,7 @@ It is an ordinary sandboxed mod. It uses only the engine API: `mods.inspect` to 
 ## What it does
 
 - It reads the mod reference in its `target` link parameter. Without one, it says "No mod was given."
-- It sends `mods.inspect` for the target and shows the title with the version as a badge, then a card with the metadata: description, name, source, tile type, sample collection, the config as indented `key: value` lines, and a table of the declared permissions with each one's category, host, reason and a badge saying whether it would be granted ("granted" or "not granted"). When the mod cannot be inspected, it shows the error message as an alert.
+- It sends `mods.inspect` for the target and shows the title with the version as a badge, then a card with the metadata: description, name, source, the API range, tile type, sample collection, the config as indented `key: value` lines, and a table of the declared permissions with each one's category, host, reason and a badge saying whether it would be granted ("granted" or "not granted"). The API range is the mod's `api` from `inspection.api`, with a badge from `inspection.apiCompatible`: "matches" when it matches the app's mod API version, or "does not match" followed by the app's mod API version, read from `context.api.version`. A mod without `api` shows "The mod declares no API range." When the mod cannot be inspected, it shows the error message as an alert.
 - It offers three ways to run the mod, each a `mods.open` with the mod's source as `mod`:
   - "Run with sample tiles", only when the mod declares a `sample_collection`: with that collection. It is the page's primary action.
   - A collection address field with "Run with this collection" (or Enter): with the typed collection. An address that is not a full URL marks the field invalid and shows an alert instead.
@@ -20,7 +20,7 @@ The mod opens in a new sandbox, and the viewer stays open behind it, so back ret
 Its source, `public/default_mods/mod_viewer/main.js`, is a short example of how a mod gets the app's look from semantic HTML, with no classes and no styling library:
 
 - the metadata is an `<article>`, drawn as a card, and the permissions a plain `<table>`;
-- the version and the permission statuses are badges: `<span>`s with `data-ot-variant` (`secondary`, `success`, `outline`);
+- the version, the API range's match and the permission statuses are badges: `<span>`s with `data-ot-variant` (`secondary`, `success`, `warning`, `outline`);
 - "Run with sample tiles" is a `<button type="submit">`, drawn as the primary button, and "Run with this collection" a submit button with `data-ot-variant="outline"`, so the page has one primary action;
 - an invalid address sets `aria-invalid="true"` on the field, and errors and notices are `role="alert"` and `role="status"` elements.
 
@@ -35,6 +35,7 @@ mod:
   name: "mod_viewer"
   title: "Mod Viewer"
   version: "0.1.0"
+  api: "^0.1.0"
   description: "Shows a mod's metadata and runs it with or without tiles."
   entrypoint: "./main.js"
   permissions:

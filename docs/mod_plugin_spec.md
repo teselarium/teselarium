@@ -4,7 +4,7 @@ Mosaic Designs (or mods) are javascript plugins that allow to visualize and inte
 
 Mods are loaded inside an isolated iframe (sandbox) where it can display their UI. The Mod module inside `src/lib` is in charge of loading/unloading a mod.
 
-Mods can communicates with the main app via the core engine API, like requesting data and receiving data, storing and modifying data, redirecting to another mod. Once a mod is loaded, they can interact with the core engine and request data like the opentesela version, tiles, tile collections, mods, mosaics, settings, etc. Each mod can display the data in a customized way inside the sandbox. 
+Mods can communicates with the main app via the core engine API, like requesting data and receiving data, storing and modifying data, redirecting to another mod. Once a mod is loaded, they can interact with the core engine and request data like the mod API version, tiles, tile collections, mods, mosaics, settings, etc. Each mod can display the data in a customized way inside the sandbox. 
 
 A loaded mod doesn't have direct access to localStorage or indexedDB, it must use the core engine API for operations like requesting, writing or redirecting the user. Mods only have access to their own data and the common (shared) data from the main app via the core engine API. Data from each mod is stored in separated slots.
 
@@ -25,6 +25,7 @@ mod:
   name: "country_markers_map"
   title: "Country Markers Map"
   version: "1.0.0"
+  api: "^0.1.0"
   description: "An interactive world map that display tiles as markers organized by country."
   entrypoint: "./main.js"
   type_path: "./country_location.md"
@@ -41,6 +42,8 @@ mod:
       show_image: true
       show_body: false
 ```
+
+`api` is the range of mod API versions the mod was written for, in npm's semver range syntax. The mod API version is separate from the app's own version and covers what a mod relies on: the engine methods and events, the mount context and the mod file format. When the range does not match the app's mod API version, the app asks the user before starting the mod; a mod without `api` runs with a warning. A mod reads the version it runs on in its mount context, as `context.api.version`.
 
 The tile type is a markdown file whose frontmatter has a `schema` mapping, here `country_location.md` next to mod_conf.yaml:
 

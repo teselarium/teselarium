@@ -171,6 +171,46 @@ describe("loadMod", function describeLoadMod(): void {
     expect(mod).not.toHaveProperty("author");
   });
 
+  it("Caret range", async function loadsCaretRange(): Promise<void> {
+    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
+
+    expect(mod.api).toBe("^0.1.0");
+  });
+
+  it("No api key", async function loadsNoRange(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, MINIMAL_MOD_TEXT);
+
+    const mod = await loadModFile(BROKEN_MOD_SOURCE, { fetch: fetchTestFile });
+
+    expect(mod.api).toBeNull();
+  });
+
+  it("Not a range", async function rejectsNonRange(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, `${MINIMAL_MOD_TEXT}\n  api: "latest"`);
+
+    const error = await catchLoadError(
+      loadModFile(BROKEN_MOD_SOURCE, { fetch: fetchTestFile }),
+    );
+
+    expect(error).toBeInstanceOf(ModFormatError);
+    expect((error as ModFormatError).message).toContain(
+      '"api" must be a semver range',
+    );
+  });
+
+  it("Range written as a number", async function rejectsRangeNumber(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, `${MINIMAL_MOD_TEXT}\n  api: 0.1`);
+
+    const error = await catchLoadError(
+      loadModFile(BROKEN_MOD_SOURCE, { fetch: fetchTestFile }),
+    );
+
+    expect(error).toBeInstanceOf(ModFormatError);
+    expect((error as ModFormatError).message).toContain(
+      '"api" must be a semver range',
+    );
+  });
+
   it("Config is kept as plain data", async function keepsConfig(): Promise<void> {
     const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
@@ -273,7 +313,9 @@ describe("loadModFile", function describeLoadModFile(): void {
 describe("mod module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(modModule).sort()).toEqual([
+      "MOD_FILE_KEYS",
       "ModFormatError",
+      "PERMISSION_CATEGORIES",
       "loadMod",
       "loadModFile",
       "resolveModReference",

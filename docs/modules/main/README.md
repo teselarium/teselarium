@@ -95,6 +95,13 @@ A section whose target is a default mod that the instantiation switched off (`sw
 - **Change a section**: edit its fields. Changing an `id` changes its addresses and its folder, and resets its stored switch.
 - **Make a coming-soon section available**: set `comingSoon` to `false` and give it its real target.
 
+## Stage dialogs
+
+The stage view has two dialogs, drawn by the app outside every mod frame. Both are native `<dialog>` elements opened with `showModal()`, so the rest of the page, frames included, is inert while they are open. They share their mechanics through `StageDialog` (`stage/StageDialog.tsx`): Cancel has the focus, so a key pressed for the mod cannot accept, Escape answers as Cancel, and only the stage closes the dialog, which opens again if a browser closes it while something is still shown. The two are never open together: actions come only from a visible, running sandbox, and the question only from a visible, asking one.
+
+- **Action dialog** (`ActionDialog`): shows the action the visible mod asked for (`links.open`, `files.save`, `ui.confirm`), with the mod's title and source. Its accept button ("Open", "Save" or the confirmation's label) performs the action inside its own click.
+- **API mismatch dialog** (`ApiMismatchDialog`): asks before starting a mod whose `api` range does not match the app's mod API version. It shows the mod's title, source and version, the mod's range and the app's mod API version. "Run anyway" starts the mod; "Cancel" (or Escape) leaves the sandbox with an error naming both versions and no frame. While it asks, the sandbox shows "Waiting for your answer…" in place of the frame. Going back hides the sandbox and the dialog without answering. See the [stage module](../lib/core/stage/README.md#mods-written-for-another-api).
+
 ## What lives where
 
 | File | Owns |
@@ -105,6 +112,6 @@ A section whose target is a default mod that the instantiation switched off (`sw
 | `sidebar/` | The sidebar's layout state and its view. |
 | `pages/` | The page view: markdown pages and the Settings page (see [pages](homepage/README.md)). |
 | `settings/` | The Settings page. |
-| `stage/` | The stage view: the stage bar, the frames and the action dialog. |
+| `stage/` | The stage view: the stage bar, the frames, the action dialog and the API mismatch dialog. |
 | `theme/` | The app's theme and the Theme control. |
 | `default_mods.ts` | The default mod settings: the default mods folder and the switched-off mods. |

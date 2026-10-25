@@ -67,4 +67,12 @@ describe("shipped sample mod", function describeShippedSampleMod(): void {
     }
     expect(collection.issues).toEqual([]);
   });
+
+  it("declares the mod API range", async function declaresApiRange(): Promise<void> {
+    const sampleMod = await loadMod(SHIPPED_SAMPLE_MOD, {
+      fetch: fetchAppFile,
+    });
+
+    expect(sampleMod.api).toBe("^0.1.0");
+  });
 });

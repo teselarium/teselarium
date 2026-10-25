@@ -23,6 +23,7 @@ mod:
   name: "mod_explorer"
   title: "Mods"
   version: "0.1.0"
+  api: "^0.1.0"
   description: "Lists mods and opens them in the mod viewer."
   entrypoint: "./main.js"
   config:

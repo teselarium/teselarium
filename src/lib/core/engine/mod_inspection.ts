@@ -2,6 +2,7 @@ import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
 import { loadModFile } from "../../mod/index.ts";
 import { grantModPermissions } from "../permissions/index.ts";
 import type { ModGrants } from "../permissions/index.ts";
+import { matchModApiRange } from "./mod_api_version.ts";
 
 /** A mod's metadata, without running it. `permissions` are what it would get if it were opened. */
 export interface ModInspection {
@@ -10,6 +11,10 @@ export interface ModInspection {
   title: string;
   version: string;
   description: string;
+  /** The mod's `api` range, or `null` when it declares none. */
+  api: string | null;
+  /** Whether `api` matches the mod API version, `null` without a range. */
+  apiCompatible: boolean | null;
   typeSource: string | null;
   sampleCollection: string | null;
   config: YamlMapping;
@@ -32,6 +37,8 @@ export async function inspectMod(
     title: modFile.title,
     version: modFile.version,
     description: modFile.description,
+    api: modFile.api,
+    apiCompatible: matchModApiRange(modFile.api),
     typeSource: modFile.typeSource,
     sampleCollection: modFile.sampleCollection,
     config: structuredClone(modFile.config),

@@ -8,11 +8,16 @@ import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   MISSING_MOD_REFERENCE,
   MISSING_MOD_SOURCE,
+  OTHER_API_MOD_SOURCE,
+  OTHER_API_RANGE,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
+  serveOtherApiMod,
+  serveUntypedMod,
+  UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
@@ -101,7 +106,31 @@ describe("mods.inspect", function describeModsInspect(): void {
       title: "Book List",
       sampleCollection: SAMPLE_COLLECTION_SOURCE,
       permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
+      api: "^0.1.0",
+      apiCompatible: true,
     });
+  });
+
+  it("Inspect a mod for another API", async function inspectsOtherApiMod(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["https://example.org"]);
+    serveOtherApiMod();
+
+    const inspection = await inspect(context, { mod: OTHER_API_MOD_SOURCE });
+
+    expect(inspection).toMatchObject({
+      api: OTHER_API_RANGE,
+      apiCompatible: false,
+    });
+    expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+
+  it("Inspect a mod without a range", async function inspectsModWithoutRange(): Promise<void> {
+    const { context } = buildSpiedContext(["https://example.org"]);
+    serveUntypedMod(null);
+
+    const inspection = await inspect(context, { mod: UNTYPED_MOD_SOURCE });
+
+    expect(inspection).toMatchObject({ api: null, apiCompatible: null });
   });
 
   it("Same reference from two mods", async function resolvesAgainstApp(): Promise<void> {

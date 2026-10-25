@@ -1,9 +1,10 @@
 import type { FileFetchOptions } from "../../files/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
-import { resolveDefaultModSettings } from "../engine/index.ts";
+import { MOD_API_VERSION, resolveDefaultModSettings } from "../engine/index.ts";
 import type {
   AppAction,
   DefaultModSettings,
+  ModLaunch,
   ResolvedDefaultModSettings,
   RunLink,
 } from "../engine/index.ts";
@@ -36,6 +37,7 @@ import {
 } from "./stage_routes.ts";
 import type { StageRoute, StageRouting } from "./stage_routes.ts";
 import {
+  answerSandboxApiMismatch,
   attachSandboxFrame,
   launchSandbox,
   pushSandboxTheme,
@@ -102,6 +104,8 @@ export interface SandboxSnapshot {
   canReloadTiles: boolean;
   issues: readonly ModIssue[];
   errorMessage: string | null;
+  /** The mod's `api` range and the app's mod API version, only while the sandbox is `asking`. */
+  apiMismatch: { range: string; apiVersion: string } | null;
 }
 
 /** The action the page shows in its dialog. Frozen, except the bytes of a save. */
@@ -207,6 +211,17 @@ function freezeIssues(issues: ModIssue[]): readonly ModIssue[] {
   return Object.freeze(frozenIssues);
 }
 
+function buildApiMismatch(
+  status: SandboxStatus,
+  launch: ModLaunch | null,
+): SandboxSnapshot["apiMismatch"] {
+  if (status !== "asking" || launch === null || launch.mod.api === null) {
+    return null;
+  }
+  const mismatch = { range: launch.mod.api, apiVersion: MOD_API_VERSION };
+  return Object.freeze(mismatch);
+}
+
 function buildSandboxSnapshot(
   sandbox: StageSandbox,
   runtime: SandboxRuntime | undefined,
@@ -228,6 +243,7 @@ function buildSandboxSnapshot(
       runtime === undefined ? [] : readSandboxIssues(runtime),
     ),
     errorMessage: runtime?.errorMessage ?? null,
+    apiMismatch: buildApiMismatch(status, launch),
   };
   return Object.freeze(snapshot);
 }
@@ -608,6 +624,28 @@ export function answerStageAction(
     return;
   }
   publishStage(stage);
+}
+
+/**
+ * Answers the question of the visible sandbox, whose mod was written for
+ * another mod API: `runAnyway` starts the mod, otherwise the sandbox fails
+ * with an error naming both versions and keeps its entry and close button.
+ * Does nothing unless the sandbox is visible and still asking, so a late or
+ * repeated answer is ignored.
+ */
+export function answerApiMismatch(
+  stage: Stage,
+  sandboxId: string,
+  runAnyway: boolean,
+): void {
+  const runtime = stage.runtimes.get(sandboxId);
+  if (
+    runtime === undefined ||
+    readVisibleSandbox(stage.state)?.id !== sandboxId
+  ) {
+    return;
+  }
+  answerSandboxApiMismatch(runtime, buildSandboxServices(stage), runAnyway);
 }
 
 /** Connects a sandbox's frame, on the frame's first `load`. */

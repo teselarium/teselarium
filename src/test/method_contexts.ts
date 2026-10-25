@@ -6,7 +6,11 @@ import type { ModMethodContext } from "../lib/core/engine/mod_methods.ts";
 import type { LoadedMod, ModPermission } from "../lib/mod/index.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
-import { APP_ORIGIN, TEST_DEFAULTS } from "./sample_mods.ts";
+import {
+  APP_ORIGIN,
+  TEST_DEFAULTS,
+  TEST_MOD_API_RANGE,
+} from "./sample_mods.ts";
 import { fetchTestFile } from "./test_files.ts";
 
 /** Source of the mod that sends requests in handler tests. */
@@ -28,6 +32,7 @@ export function buildRequestingMod(permissions: ModPermission[]): LoadedMod {
     name: "mod_explorer",
     title: "Mods",
     version: "0.1.0",
+    api: TEST_MOD_API_RANGE,
     description: "",
     entrypoint: `${APP_BASE_URL}default_mods/mod_explorer/main.js`,
     typeSource: null,

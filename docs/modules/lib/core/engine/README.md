@@ -88,6 +88,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.0"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. |
@@ -115,7 +116,7 @@ Before any file is requested, the engine checks:
 
 Then:
 
-- `mods.inspect` loads the mod file, without its entrypoint, and answers `source`, `name`, `title`, `version`, `description`, `typeSource`, `sampleCollection`, `config` and `permissions` (the `granted` and `denied` lists that mod would get if it were opened). A load failure is `-32001` with the load error's message.
+- `mods.inspect` loads the mod file, without its entrypoint, and answers `source`, `name`, `title`, `version`, `description`, `api` (the mod's `api` range as written, or `null` when it declares none), `apiCompatible` (`true` when the range matches the mod API version, `false` when it does not, `null` without a range), `typeSource`, `sampleCollection`, `config` and `permissions` (the `granted` and `denied` lists that mod would get if it were opened). Inspecting a mod for another API asks the user nothing. A load failure is `-32001` with the load error's message.
 - `mods.open` asks the stage to open the link in a new sandbox, with the requesting sandbox as its opener, and answers `null`. Only the visible mod can open mods: a hidden one gets `-32002` with `mods.open: only the visible mod can open mods`. The new mod's load failures belong to its own sandbox, not to the response.
 
 Mods never build app addresses: they send what to run, and only the stage turns it into a run link and a history entry (see the [stage module](../stage/README.md)).
@@ -247,6 +248,24 @@ await engine.request("mods.open", {
 
 A mod that wants to pass a location in a parameter passes an absolute one, such as the `source` from `mods.inspect`.
 
+### Mod API version
+
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context and the mod file format (see the [mod module](../../mod/README.md)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.0` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#mods-written-for-another-api)).
+
+When it changes, while it is `0.x`:
+
+- A breaking change bumps the minor version (`0.1.0` → `0.2.0`): removing or renaming a method, an event, a mount context key or a mod file key, or changing what one means or accepts so that existing mods break. `^0.1.0` ranges stop matching, so their users are asked.
+- An addition or a fix bumps the patch version (`0.1.0` → `0.1.1`): a new method, event, context key or optional mod file key, or a fix that existing mods keep working with. `^0.1.0` ranges still match.
+
+From `1.0.0` on, semver's usual rule applies: major for a breaking change, minor for an addition, patch for a fix.
+
+Each bump also updates:
+
+- the surface guard, `mod_api_surface.test.ts`: it records, for each version, the API's surface by name (the method names, the event names, the mount context's keys and the keys of its `mod`, `api`, `permissions` and `theme` mappings, the mod file keys and the permission categories). It fails when the surface built from the code differs from the entry of `MOD_API_VERSION`, or when a recorded version is above it. A bump adds an entry for the new version; older entries are never edited, so the record shows how the API grew. The guard sees names, not params or results, so a change to those needs the bump without the guard's help;
+- the shipped mods' `api` ranges, and `TEST_MOD_API_RANGE` in `src/test/sample_mods.ts` and `e2e/mod_routes.ts`, on a breaking bump.
+
+An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `openspec/config.yaml` asks.
+
 ### Hosting note
 
 Mods run in `srcdoc` frames, which inherit the Content-Security-Policy of the page that embeds them. The app sends none on static hosts. A page that embeds OpenTesela with its own Content-Security-Policy must allow inline scripts in frames (`script-src 'unsafe-inline' blob:`), or no mod can start. The app also needs `unsafe-eval` to build tile validators (see the [tile module](../../tile/README.md)).
@@ -311,12 +330,24 @@ const inspection = await inspectMod(
   { baseUrl: "https://example.org/" },
 );
 // inspection.title === "Book List"
+// inspection.api === "^0.1.0" and inspection.apiCompatible === true
 // inspection.permissions.granted holds the show permission for https://upload.wikimedia.org
 ```
 
+### API version matching
+
+Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
+
+- `MOD_API_VERSION`: `"0.1.0"`, the app's mod API version.
+- `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.7` but not `0.2.0`.
+- `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
+- `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
+
+`prepareModLaunch`, `inspectMod` and the stage use these, so the version and its matching live in one place.
+
 ### Launch
 
-- `prepareModLaunch(request, options)`: prepares everything a mod's frame needs. `request` is a `ModLaunchRequest` (`link`, `appOrigin`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `params`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` before any request, loads the mod and its entrypoint, loads the collection when `link.collection` is not `null`, grants the permissions, collects the content hosts and builds the policy and the frame document. Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `sandboxDocument`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects, and `issues` holds one warning per denied permission. Every error propagates, and each names its source.
+- `prepareModLaunch(request, options)`: prepares everything a mod's frame needs. `request` is a `ModLaunchRequest` (`link`, `appOrigin`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `params`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` before any request, loads the mod and its entrypoint, loads the collection when `link.collection` is not `null`, grants the permissions, collects the content hosts and builds the policy and the frame document. Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. Every error propagates, and each names its source.
 - `loadModTiles(mod, collectionLocation, options?)`: loads and filters a collection for a mod. Returns `ModTiles` (`collectionSource`, `tiles`, `issues`). The stage's "Reload tiles" calls it again.
 
 ```ts
@@ -363,7 +394,7 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
 - `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `onIssue`, `onOpenLink`, `onRequestAction`, `theme`). Returns a `ModSession`.
 - `pushTilesChanged(session, tiles, issues)`: pushes `tiles.changed`.
 - `pushThemeChanged(session, theme)`: pushes `theme.changed` with the `Theme`.
-- `THEME_CHANGED_METHOD`: `"theme.changed"`, shared with the frame loader.
+- `THEME_CHANGED_METHOD`: `"theme.changed"`, shared with the frame loader. `TILES_CHANGED_METHOD`, `"tiles.changed"`, and `ENGINE_METHODS`, the merged handler table, are exported by `mod_session.ts` for the surface guard, not by `index.ts`.
 - `stopModSession(session)`: closes the channel. Later messages, pushes and answers to pending requests do nothing.
 
 Lifecycle:

@@ -21,6 +21,11 @@ import type { Theme } from "../theme/index.ts";
 import { findSwitchedOffMod } from "./default_mod_settings.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModSwitchedOffError } from "./engine_errors.ts";
+import {
+  describeMissingApiRange,
+  matchModApiRange,
+  MOD_API_VERSION,
+} from "./mod_api_version.ts";
 
 /** What to run: a mod reference, a collection location and the link parameters. Not an address. */
 export interface RunLink {
@@ -37,6 +42,10 @@ export interface ModContext {
     title: string;
     version: string;
     description: string;
+  };
+  /** The mod API the mod runs on. */
+  api: {
+    version: string;
   };
   config: YamlMapping;
   params: Record<string, string>;
@@ -61,6 +70,10 @@ export interface ModLaunch {
   contentHosts: string[];
   /** The frame's `srcdoc` HTML. */
   sandboxDocument: string;
+  /** Whether the mod's `api` range matches `MOD_API_VERSION`, `null` without a range. */
+  apiCompatible: boolean | null;
+  /** Issues of the mod file itself: the warning of a missing `api` range. */
+  fileIssues: ModIssue[];
   /** Permission issues found before the mod starts. */
   issues: ModIssue[];
 }
@@ -175,6 +188,18 @@ function buildPermissionIssues(mod: LoadedMod, grants: ModGrants): ModIssue[] {
   return issues;
 }
 
+function buildFileIssues(mod: LoadedMod): ModIssue[] {
+  const issues: ModIssue[] = [];
+  if (mod.api === null) {
+    issues.push({
+      level: "warning",
+      source: mod.source,
+      message: describeMissingApiRange(),
+    });
+  }
+  return issues;
+}
+
 function buildModContext(
   mod: LoadedMod,
   link: RunLink,
@@ -189,6 +214,7 @@ function buildModContext(
       version: mod.version,
       description: mod.description,
     },
+    api: { version: MOD_API_VERSION },
     config: structuredClone(mod.config),
     params: { ...link.params },
     tiles: modTiles === null ? [] : modTiles.tiles,
@@ -220,6 +246,8 @@ export async function prepareModLaunch(
     context: buildModContext(mod, request.link, modTiles, grants),
     contentHosts,
     sandboxDocument: buildSandboxDocument(policy, mod.theme),
+    apiCompatible: matchModApiRange(mod.api),
+    fileIssues: buildFileIssues(mod),
     issues: buildPermissionIssues(mod, grants),
   };
   return launch;

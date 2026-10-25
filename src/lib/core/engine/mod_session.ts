@@ -77,11 +77,14 @@ export interface ModSession {
 /** Engine to mod: the resolved color scheme changed. The frame loader sets its attribute first. */
 export const THEME_CHANGED_METHOD = "theme.changed";
 
+/** Engine to mod: "Reload tiles" reloaded the mod's collection. */
+export const TILES_CHANGED_METHOD = "tiles.changed";
+
 /** JSON-RPC's code for an error inside the engine. It only answers a bug. */
 const INTERNAL_ERROR = -32603;
 
 /** Every request the engine answers: one handler table per namespace. */
-const ENGINE_METHODS: ModMethodTable = {
+export const ENGINE_METHODS: ModMethodTable = {
   ...STORAGE_METHODS,
   ...MODS_METHODS,
   ...LINKS_METHODS,
@@ -277,7 +280,10 @@ export function pushTilesChanged(
   tiles: Tile[],
   issues: TileIssue[],
 ): void {
-  sendToMod(session, buildNotification("tiles.changed", { tiles, issues }));
+  sendToMod(
+    session,
+    buildNotification(TILES_CHANGED_METHOD, { tiles, issues }),
+  );
 }
 
 /** Pushes `theme.changed` with the new theme. */

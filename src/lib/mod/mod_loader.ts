@@ -12,6 +12,8 @@ export interface ModFile {
   name: string;
   title: string;
   version: string;
+  /** The mod API range the mod was written for, as written, or `null`. */
+  api: string | null;
   description: string;
   /** Resolved URL of the entrypoint. */
   entrypoint: string;
@@ -55,6 +57,7 @@ function buildModFile(source: string, modFormat: ModFormat): ModFile {
     name: modFormat.name,
     title: modFormat.title,
     version: modFormat.version,
+    api: modFormat.api,
     description: modFormat.description,
     entrypoint: resolveLocation(modFormat.entrypoint, source).href,
     typeSource: resolveModPath(modFormat.typePath, source),

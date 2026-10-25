@@ -18,6 +18,14 @@ schema: spec-driven
 #       - Always state what is out of scope
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - >-
+      When the change modifies the specs of the mod API (mod-engine-api,
+      mod-loading's mod file format, mod-api-version, mod-theme's mount context
+      and events, mod-app-actions), state the mod API version bump it needs
+      (none, patch or minor while the version is 0.x) and why, following the
+      "Mod API version" section of docs/modules/lib/core/engine/README.md
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.

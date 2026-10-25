@@ -2,6 +2,7 @@ mod:
   name: "book_list"
   title: "Book List"
   version: "1.0.0"
+  api: "^0.1.0"
   description: "A very simple list of books with their covers."
   entrypoint: "./main.js"
   type_path: "./book_type.md"

@@ -3,6 +3,7 @@ import type { ModIssue } from "../../mod/index.ts";
 import type { TileIssue } from "../../tile/index.ts";
 import {
   connectModSession,
+  describeCancelledApiMismatch,
   loadModTiles,
   prepareModLaunch,
   pushThemeChanged,
@@ -39,7 +40,9 @@ export interface SandboxServices {
   readTheme: () => Theme;
 }
 
-export type SandboxStatus = "loading" | "failed" | "running" | "stopped";
+/** `asking`: the mod is loaded, but written for another mod API, and waits for the user's answer. */
+export type SandboxStatus =
+  "loading" | "asking" | "failed" | "running" | "stopped";
 
 /** The runtime of one sandbox. Mutable, because it follows a launch and a session. */
 export interface SandboxRuntime {
@@ -47,6 +50,8 @@ export interface SandboxRuntime {
   status: SandboxStatus;
   launch: ModLaunch | null;
   session: ModSession | null;
+  /** The issues of the mod file itself, such as a missing `api` range. */
+  fileIssues: ModIssue[];
   /** The issues of the collection, replaced when the tiles are reloaded. */
   collectionIssues: TileIssue[];
   /** Permission issues, then the issues found while the mod runs, in order. */
@@ -74,6 +79,7 @@ function startRuntime(
   }
   runtime.status = "running";
   runtime.launch = launch;
+  runtime.fileIssues = [...launch.fileIssues];
   runtime.collectionIssues = launch.context.issues;
   runtime.issues = [...launch.issues];
   services.onChange();
@@ -92,7 +98,57 @@ function failRuntime(
   services.onChange();
 }
 
-/** Starts loading a sandbox's mod. The runtime is `loading`, then `running` or `failed`. */
+/** Keeps the launch of a mod written for another mod API, without starting it. */
+function askRuntime(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  launch: ModLaunch,
+): void {
+  if (runtime.status === "stopped") {
+    return;
+  }
+  runtime.status = "asking";
+  runtime.launch = launch;
+  services.onChange();
+}
+
+function settleLaunch(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  launch: ModLaunch,
+): void {
+  if (launch.apiCompatible === false) {
+    askRuntime(runtime, services, launch);
+    return;
+  }
+  startRuntime(runtime, services, launch);
+}
+
+/**
+ * Answers the question of an `asking` runtime: "Run anyway" starts its mod as
+ * a matching launch would, and "Cancel" fails it with an error naming the
+ * mod's range and the mod API version. Does nothing for any other runtime.
+ */
+export function answerSandboxApiMismatch(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  runAnyway: boolean,
+): void {
+  const launch = runtime.launch;
+  if (runtime.status !== "asking" || launch === null) {
+    return;
+  }
+  if (runAnyway) {
+    startRuntime(runtime, services, launch);
+    return;
+  }
+  failRuntime(runtime, services, describeCancelledApiMismatch(launch.mod.api));
+}
+
+/**
+ * Starts loading a sandbox's mod. The runtime is `loading`, then `running` or
+ * `failed`, or `asking` when the mod was written for another mod API.
+ */
 export function launchSandbox(
   sandbox: StageSandbox,
   services: SandboxServices,
@@ -102,6 +158,7 @@ export function launchSandbox(
     status: "loading",
     launch: null,
     session: null,
+    fileIssues: [],
     collectionIssues: [],
     issues: [],
     errorMessage: null,
@@ -115,15 +172,19 @@ export function launchSandbox(
     },
     services.fetchOptions,
   ).then(
-    startRuntime.bind(undefined, runtime, services),
+    settleLaunch.bind(undefined, runtime, services),
     failRuntime.bind(undefined, runtime, services),
   );
   return runtime;
 }
 
-/** Every issue of a sandbox, in the order they were found. */
+/** Every issue of a sandbox, in the order they were found: mod file, collection, then the others. */
 export function readSandboxIssues(runtime: SandboxRuntime): ModIssue[] {
-  const issues: ModIssue[] = [...runtime.collectionIssues, ...runtime.issues];
+  const issues: ModIssue[] = [
+    ...runtime.fileIssues,
+    ...runtime.collectionIssues,
+    ...runtime.issues,
+  ];
   return issues;
 }
 

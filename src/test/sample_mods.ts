@@ -78,25 +78,86 @@ export const NO_COUNTRY_TILE_SOURCE = `${FIXTURES_BASE_URL}tiles/books/no_countr
 /** A collection with two of the sample books. */
 export const TWO_BOOKS_SOURCE = `${FIXTURES_BASE_URL}tiles/two_books.yaml`;
 
+/**
+ * `^0.1.0`: the `api` range the test mods declare unless a test asks for
+ * another one, so they match the mod API version and get no missing-range
+ * warning. A breaking bump of the mod API updates it with the shipped mods.
+ */
+export const TEST_MOD_API_RANGE = "^0.1.0";
+
 const MOUNT_CODE = "export default function mount() {}\n";
 
-export function serveUntypedMod(): void {
+/** The text of a mod file with `modLines` under `mod`, after an `api` line unless `apiRange` is `null`. */
+function buildTestModText(modLines: string[], apiRange: string | null): string {
+  const lines = ["mod:"];
+  if (apiRange !== null) {
+    lines.push(`  api: "${apiRange}"`);
+  }
+  lines.push(...modLines);
+  const text = lines.join("\n");
+  return text;
+}
+
+/** Serves the mod at `UNTYPED_MOD_SOURCE`, declaring `apiRange` unless it is `null`. */
+export function serveUntypedMod(
+  apiRange: string | null = TEST_MOD_API_RANGE,
+): void {
   testTexts.set(
     UNTYPED_MOD_SOURCE,
-    [
-      "mod:",
-      '  name: "untyped"',
-      '  version: "0.1.0"',
-      '  entrypoint: "./main.js"',
-    ].join("\n"),
+    buildTestModText(
+      ['  name: "untyped"', '  version: "0.1.0"', '  entrypoint: "./main.js"'],
+      apiRange,
+    ),
   );
   testTexts.set(`${FIXTURES_BASE_URL}mods/untyped/main.js`, MOUNT_CODE);
 }
 
-/** Serves an inline mod file at `source`, with a `main.js` next to it. */
-export function serveTestMod(source: string, modLines: string[]): void {
-  testTexts.set(source, ["mod:", ...modLines].join("\n"));
+/**
+ * Serves an inline mod file at `source`, with a `main.js` next to it. The
+ * file declares `apiRange` as its first line under `mod`, unless it is `null`.
+ */
+export function serveTestMod(
+  source: string,
+  modLines: string[],
+  apiRange: string | null = TEST_MOD_API_RANGE,
+): void {
+  testTexts.set(source, buildTestModText(modLines, apiRange));
   testTexts.set(new URL("./main.js", source).href, MOUNT_CODE);
+}
+
+/** `^0.2.0`: an `api` range for a later mod API, which the mod API version does not match. */
+export const OTHER_API_RANGE = "^0.2.0";
+
+/** A mod written for `OTHER_API_RANGE`, served by `fetchTestFile` once `serveOtherApiMod` ran. */
+export const OTHER_API_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/other_api/mod_conf.yaml`;
+
+export function serveOtherApiMod(): void {
+  serveTestMod(
+    OTHER_API_MOD_SOURCE,
+    [
+      '  name: "other_api"',
+      '  title: "Other API"',
+      '  version: "2.0.0"',
+      '  entrypoint: "./main.js"',
+    ],
+    OTHER_API_RANGE,
+  );
+}
+
+/** A mod of the sample book type that declares no `api` range, served by `fetchTestFile` once `serveNoApiBookMod` ran. */
+export const NO_API_BOOK_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/no_api_books/mod_conf.yaml`;
+
+export function serveNoApiBookMod(): void {
+  serveTestMod(
+    NO_API_BOOK_MOD_SOURCE,
+    [
+      '  name: "no_api_books"',
+      '  version: "0.1.0"',
+      '  entrypoint: "./main.js"',
+      '  type_path: "../../types/book.md"',
+    ],
+    null,
+  );
 }
 
 export function serveFourBooks(): void {

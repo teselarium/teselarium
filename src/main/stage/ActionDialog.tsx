@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef } from "react";
-import type { ReactElement, SyntheticEvent } from "react";
+import { useId, useRef } from "react";
+import type { ReactElement } from "react";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
 import type { ActionSnapshot, AppAction } from "../../lib/core/stage/index.ts";
 import {
@@ -7,13 +7,7 @@ import {
   formatFileSize,
   openLinkInNewTab,
 } from "./action_effects.ts";
-
-/**
- * The dialog box: centered in the viewport (`m-auto` undoes Tailwind's
- * margin reset of the native `<dialog>`), in the popover colors.
- */
-const DIALOG_CLASSES =
-  "m-auto w-full max-w-[calc(100%-2rem)] rounded-lg border bg-popover p-6 text-popover-foreground shadow-lg backdrop:bg-black/50 sm:max-w-lg";
+import { StageDialog } from "./StageDialog.tsx";
 
 /** The box of the action's detail: the address, the file or the message. */
 const DETAIL_CLASSES = "m-0 rounded-md bg-muted p-2 [overflow-wrap:anywhere]";
@@ -84,43 +78,19 @@ function performAction(action: AppAction): void {
 }
 
 /**
- * The app's dialog for an action a mod asked for. It is a modal `<dialog>`
- * in the app's page, which a mod's frame cannot reach, and `showModal` makes
- * the rest of the page inert, frames included. It names the mod by its title
- * and source and shows the action as plain text. The accept button performs
- * the action inside its own click, because a browser only opens a tab or
- * starts a download from a click on the app's page, and then answers. Cancel
- * and Escape answer `false`. Cancel has the focus, so a key pressed for the
- * mod cannot accept.
+ * The app's dialog for an action a mod asked for, a `StageDialog`: modal,
+ * out of every frame's reach, with Cancel focused. It names the mod by its
+ * title and source and shows the action as plain text. The accept button
+ * performs the action inside its own click, because a browser only opens a
+ * tab or starts a download from a click on the app's page, and then answers.
+ * Cancel and Escape answer `false`.
  */
 export function ActionDialog({
   shown,
   onAnswer,
 }: ActionDialogProps): ReactElement {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
-  const shownId = shown?.id ?? null;
-
-  useEffect(
-    function showOrCloseDialog(): void {
-      const dialog = dialogRef.current;
-      if (dialog === null) {
-        return;
-      }
-      if (shownId === null) {
-        if (dialog.open) {
-          dialog.close();
-        }
-        return;
-      }
-      if (!dialog.open) {
-        dialog.showModal();
-      }
-      cancelRef.current?.focus();
-    },
-    [shownId],
-  );
 
   function handleAcceptClick(): void {
     if (shown === null) {
@@ -137,40 +107,22 @@ export function ActionDialog({
     onAnswer(shown.id, false);
   }
 
-  // Escape: the stage closes the dialog once the answer removed the action.
-  function handleDialogCancel(event: SyntheticEvent<HTMLDialogElement>): void {
-    event.preventDefault();
-    handleCancelClick();
-  }
-
-  // Only the stage closes the dialog. A browser can close it on a repeated
-  // Escape even though the cancel was prevented; the cancel already answered,
-  // so the dialog opens again for the action now shown.
-  function handleDialogClose(): void {
-    const dialog = dialogRef.current;
-    if (shown !== null && dialog !== null && !dialog.open) {
-      dialog.showModal();
-    }
-  }
-
   if (shown === null) {
     return (
-      <dialog
-        ref={dialogRef}
-        className={DIALOG_CLASSES}
-        onCancel={handleDialogCancel}
-        onClose={handleDialogClose}
+      <StageDialog
+        shownKey={null}
+        cancelRef={cancelRef}
+        onCancel={handleCancelClick}
       />
     );
   }
   const texts = describeAction(shown.action);
   return (
-    <dialog
-      ref={dialogRef}
-      className={DIALOG_CLASSES}
-      aria-labelledby={titleId}
-      onCancel={handleDialogCancel}
-      onClose={handleDialogClose}
+    <StageDialog
+      shownKey={shown.id}
+      labelledBy={titleId}
+      cancelRef={cancelRef}
+      onCancel={handleCancelClick}
     >
       <h2
         id={titleId}
@@ -197,6 +149,6 @@ export function ActionDialog({
           {texts.acceptLabel}
         </Button>
       </div>
-    </dialog>
+    </StageDialog>
   );
 }

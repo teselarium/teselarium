@@ -1,12 +1,16 @@
-import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import type { Frame, FrameLocator, Locator, Page } from "@playwright/test";
 import {
+  APP_MOD_API_VERSION,
+  buildProbeFiles,
+  EXPLORER_CODE,
   findModFrame,
+  OTHER_API_RANGE,
   readParentDocumentError,
   routeCovers,
   serveAppOriginMod,
   stageBar,
+  TEST_MOD_API_RANGE,
 } from "./mod_routes.ts";
 import {
   MISSING_MOD_REFERENCE,
@@ -19,16 +23,12 @@ import { openModsSection, pageBody } from "./app_layout.ts";
 
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
-const EXPLORER_CODE = readFileSync(
-  new URL("../public/default_mods/mod_explorer/main.js", import.meta.url),
-  "utf8",
-);
-
 /** The explorer with `MISSING_MOD_REFERENCE` in its `mods` list, served on the app's origin. */
 async function openBrokenExplorer(page: Page): Promise<Frame> {
   await serveAppOriginMod(page, {
     "explorer/mod_conf.yaml": [
       "mod:",
+      `  api: "${TEST_MOD_API_RANGE}"`,
       '  name: "mod_explorer"',
       '  title: "Broken explorer"',
       '  version: "0.1.0"',
@@ -67,6 +67,11 @@ function coverPermissionRow(viewer: FrameLocator): Locator {
   return viewer
     .getByRole("row")
     .filter({ hasText: "https://upload.wikimedia.org" });
+}
+
+/** The description of the "API range" term in the viewer's metadata list. */
+function apiRangeDefinition(viewer: FrameLocator): Locator {
+  return viewer.locator('dt:text-is("API range") + dd');
 }
 
 async function openViewerForSample(page: Page): Promise<void> {
@@ -199,6 +204,46 @@ test.describe("Mod viewer", function describeViewer(): void {
       "Shows the book covers",
       "granted",
     ]);
+    const apiRange = apiRangeDefinition(viewer);
+    await expect(apiRange).toContainText(TEST_MOD_API_RANGE);
+    await expect(apiRange).toContainText("matches");
+    await expect(apiRange).not.toContainText("does not match");
+  });
+
+  test("View a mod for another API", async function viewsOtherApiMod({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(
+      page,
+      buildProbeFiles("later", ['  title: "Later API"'], OTHER_API_RANGE),
+    );
+
+    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/later/");
+
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+    await expect(
+      viewer.getByRole("heading", { name: "Later API" }),
+    ).toBeVisible();
+    const apiRange = apiRangeDefinition(viewer);
+    await expect(apiRange).toContainText(OTHER_API_RANGE);
+    await expect(apiRange).toContainText("does not match");
+    await expect(apiRange).toContainText(
+      `This app has mod API ${APP_MOD_API_VERSION}.`,
+    );
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("View a mod without a range", async function viewsModWithoutRange({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(page, buildProbeFiles("bare", [], null));
+
+    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/bare/");
+
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+    await expect(apiRangeDefinition(viewer)).toHaveText(
+      "The mod declares no API range.",
+    );
   });
 
   test("No target", async function saysNoTarget({ page }): Promise<void> {

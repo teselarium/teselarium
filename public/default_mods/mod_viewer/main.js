@@ -189,6 +189,31 @@ function buildPermissionTable(permissions) {
   return table;
 }
 
+/**
+ * The mod's `api` range with a badge telling whether it matches the app's mod
+ * API version, which is shown too when it does not.
+ */
+function buildApiRangeDescription(inspection, apiVersion) {
+  const description = document.createElement("span");
+  if (inspection.api === null) {
+    description.textContent = "The mod declares no API range.";
+    return description;
+  }
+  const range = document.createElement("code");
+  range.textContent = inspection.api;
+  if (inspection.apiCompatible) {
+    description.append(range, " ", buildBadge("matches", "success"));
+    return description;
+  }
+  description.append(
+    range,
+    " ",
+    buildBadge("does not match", "warning"),
+    ` This app has mod API ${apiVersion}.`,
+  );
+  return description;
+}
+
 function addDefinition(list, term, description) {
   const termElement = document.createElement("dt");
   termElement.textContent = term;
@@ -197,12 +222,17 @@ function addDefinition(list, term, description) {
   list.append(termElement, descriptionElement);
 }
 
-function buildMetadataList(inspection) {
+function buildMetadataList(inspection, apiVersion) {
   const list = document.createElement("dl");
   addDefinition(list, "Title", inspection.title);
   addDefinition(list, "Description", inspection.description);
   addDefinition(list, "Name", inspection.name);
   addDefinition(list, "Source", inspection.source);
+  addDefinition(
+    list,
+    "API range",
+    buildApiRangeDescription(inspection, apiVersion),
+  );
   addDefinition(list, "Tile type", inspection.typeSource ?? "(none)");
   addDefinition(
     list,
@@ -214,12 +244,12 @@ function buildMetadataList(inspection) {
 }
 
 /** The mod's metadata and permissions as a card: an `<article>`. */
-function buildMetadataCard(inspection) {
+function buildMetadataCard(inspection, apiVersion) {
   const card = document.createElement("article");
   const permissionsHeading = document.createElement("h2");
   permissionsHeading.textContent = "Permissions";
   card.append(
-    buildMetadataList(inspection),
+    buildMetadataList(inspection, apiVersion),
     permissionsHeading,
     buildPermissionTable(inspection.permissions),
   );
@@ -294,7 +324,7 @@ function buildCollectionForm(view) {
 function renderInspection(view) {
   document.body.replaceChildren(
     buildHeader(view.inspection),
-    buildMetadataCard(view.inspection),
+    buildMetadataCard(view.inspection, view.apiVersion),
     buildRunChoices(view),
     buildCollectionForm(view),
     view.messages,
@@ -323,6 +353,7 @@ export default async function mount(engine, context) {
   }
   const view = {
     engine,
+    apiVersion: context.api.version,
     inspection: null,
     messages: document.createElement("div"),
   };

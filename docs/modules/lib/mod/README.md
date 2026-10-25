@@ -13,6 +13,7 @@ mod:
   name: "book_list"
   title: "Book List"
   version: "1.0.0"
+  api: "^0.1.0"
   description: "A very simple list of books with their covers."
   entrypoint: "./main.js"
   type_path: "./book_type.md"
@@ -34,6 +35,7 @@ Every key lives under a `mod` mapping:
 | `entrypoint` | yes | Path of the ES module that default-exports `mount(engine, context)`. |
 | `title` | no | String, defaults to `name`. |
 | `description` | no | String, defaults to `""`. |
+| `api` | no | The range of [mod API versions](../core/engine/README.md#mod-api-version) the mod was written for, in npm's semver range syntax, e.g. `"^0.1.0"`. The loaded mod keeps it as written, or `null` without the key. Anything that is not a non-empty string holding a valid range, such as `"latest"`, `""` or the number `0.1`, is rejected with `"api" must be a semver range, such as "^0.1.0"`. The library only checks the syntax: the [engine](../core/engine/README.md) matches the range against the app's mod API version. |
 | `type_path` | no | Path of the tile type file the mod's tiles must match. Without it, the mod receives every tile. |
 | `sample_collection` | no | Path of the sample tiles the mod comes with. It is not fetched when the mod is loaded. |
 | `config` | no | Mapping given to the mod as `context.config`, defaults to `{}`. |
@@ -87,10 +89,11 @@ Implemented in `src/lib/mod/`. Other modules import only from the public entry p
 ### Mod loader
 
 - `resolveModReference(reference, options)`: resolves a mod reference to the URL of its mod file. `options` are `{ baseUrl?, defaultModsFolder? }`. Raises `FileFetchError` when it cannot, for example for a default mod name without a default mods folder.
-- `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `name`, `title`, `version`, `description`, `entrypoint`, `typeSource`, `sampleCollection`, `config`, `permissions`, `theme`). The entrypoint, the tile type and the sample collection are not fetched.
+- `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `name`, `title`, `version`, `api`, `description`, `entrypoint`, `typeSource`, `sampleCollection`, `config`, `permissions`, `theme`). The entrypoint, the tile type and the sample collection are not fetched.
 - `loadMod(reference, options?)`: `loadModFile`, then fetches the entrypoint. Returns a `LoadedMod`: a `ModFile` with `code`, the entrypoint text.
 - `ModLoadOptions`: the `FileFetchOptions` of the [files module](../files/README.md) plus `defaultModsFolder`. Relative references are resolved against `baseUrl`, by default the page's document base URL.
 - Errors: `ModFormatError` (the file does not follow the mod file format). It exposes the failing `source`. A mod file or entrypoint that cannot be fetched raises `FileFetchError`, and a mod file that is not plain YAML raises `YamlParseError`.
+- Constants: `MOD_FILE_KEYS`, the keys of the `mod` mapping the loader reads, and `PERMISSION_CATEGORIES`, the permission categories in their order. The engine's mod API surface guard reads both.
 - Types: `ModFile`, `LoadedMod`, `ModLoadOptions`, `ModPermission` (`category`, `host`, `reason`), `PermissionCategory`, `ModThemeSetting` (`"default" | "none"`), `ModIssue` (`level`, `source`, `message`, the shape of a `TileIssue`).
 
 Loaded mods are plain data, and two loads of the same mod never share objects.

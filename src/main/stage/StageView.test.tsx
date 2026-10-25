@@ -11,16 +11,24 @@ import {
 import {
   MISSING_MOD_REFERENCE,
   MISSING_MOD_SOURCE,
+  OTHER_API_MOD_SOURCE,
+  OTHER_API_RANGE,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
+  serveOtherApiMod,
 } from "../../test/sample_mods.ts";
+import { testTexts } from "../../test/test_files.ts";
 import { settleStage, startTestStage } from "../../test/test_stages.ts";
+import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
 import { StageView } from "./StageView.tsx";
+
+const OTHER_API_HASH = `#/run?mod=${encodeURIComponent(OTHER_API_MOD_SOURCE)}`;
 
 const openPorts: MessagePort[] = [];
 
-afterEach(function closePorts(): void {
+afterEach(function cleanUp(): void {
+  testTexts.clear();
   for (const port of openPorts) {
     port.close();
   }
@@ -41,6 +49,22 @@ function listWrappers(container: HTMLElement): HTMLElement[] {
     wrappers.push(wrapper);
   }
   return wrappers;
+}
+
+/** Renders the stage opened at the mod written for another API, which asks. */
+async function renderAskingStage(): Promise<HTMLElement> {
+  serveOtherApiMod();
+  const stage = await startTestStage(OTHER_API_HASH);
+  const { container } = render(<StageView stage={stage} />);
+  return container;
+}
+
+async function answerQuestion(buttonName: string): Promise<void> {
+  const dialog = screen.getByRole("dialog", { name: "Other API" });
+  await act(async function answer(): Promise<void> {
+    fireEvent.click(within(dialog).getByRole("button", { name: buttonName }));
+    await Promise.resolve();
+  });
 }
 
 async function openFromVisible(stage: Stage, openerId: string): Promise<void> {
@@ -169,6 +193,69 @@ describe("StageView", function describeStageView(): void {
 
     expect(received).toEqual([{ jsonrpc: "2.0", id: 1, result: true }]);
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("No question for the sample mod", async function asksNothingForSample(): Promise<void> {
+    const stage = await startTestStage("");
+    render(<StageView stage={stage} />);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTitle("Book List").tagName).toBe("IFRAME");
+  });
+
+  it("asks before starting a mod for another API", async function showsQuestion(): Promise<void> {
+    const container = await renderAskingStage();
+
+    const dialog = screen.getByRole("dialog", { name: "Other API" });
+    expect(dialog).toHaveTextContent(OTHER_API_MOD_SOURCE);
+    expect(dialog).toHaveTextContent("2.0.0");
+    expect(dialog).toHaveTextContent(OTHER_API_RANGE);
+    expect(dialog).toHaveTextContent(MOD_API_VERSION);
+    expect(
+      within(dialog).getByRole("button", { name: "Run anyway" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    ).toHaveFocus();
+    expect(screen.getByText("Waiting for your answer…")).toBeInTheDocument();
+    expect(container.querySelector("iframe")).toBeNull();
+  });
+
+  it("Run anyway", async function runsAnyway(): Promise<void> {
+    await renderAskingStage();
+
+    await answerQuestion("Run anyway");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTitle("Other API").tagName).toBe("IFRAME");
+    expect(screen.queryByText("Waiting for your answer…")).toBeNull();
+  });
+
+  it("Cancel", async function cancels(): Promise<void> {
+    const container = await renderAskingStage();
+
+    await answerQuestion("Cancel");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent(OTHER_API_RANGE);
+    expect(screen.getByRole("alert")).toHaveTextContent(MOD_API_VERSION);
+    expect(container.querySelector("iframe")).toBeNull();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+  });
+
+  it("Escape", async function cancelsOnEscape(): Promise<void> {
+    await renderAskingStage();
+    const dialog = screen.getByRole("dialog", { name: "Other API" });
+
+    const cancelEvent = new Event("cancel", { cancelable: true });
+    await act(async function pressEscape(): Promise<void> {
+      fireEvent(dialog, cancelEvent);
+      await Promise.resolve();
+    });
+
+    expect(cancelEvent.defaultPrevented).toBe(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent(OTHER_API_RANGE);
   });
 
   it("lists the issues in order with level, source and message", async function listsIssues(): Promise<void> {

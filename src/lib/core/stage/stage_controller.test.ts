@@ -11,22 +11,32 @@ import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  OTHER_API_MOD_SOURCE,
+  OTHER_API_RANGE,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_RUN_HASH,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   SAMPLE_RUN_HASH,
+  serveOtherApiMod,
+  serveUntypedMod,
+  UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
-import { fetchTestFile } from "../../../test/test_files.ts";
+import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
 import {
   MOD_HOME_ROUTING,
   PAGE_HOME_ROUTING,
 } from "../../../test/test_stages.ts";
+import {
+  describeCancelledApiMismatch,
+  MOD_API_VERSION,
+} from "../engine/index.ts";
 import type { AppAction } from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme } from "../theme/index.ts";
 import type { StageRouting } from "./stage_routes.ts";
 import {
+  answerApiMismatch,
   answerStageAction,
   attachFrame,
   changeStageColorScheme,
@@ -50,9 +60,18 @@ const VIEWER_LINK = {
   params: { from: "explorer" },
 };
 
+/** The mod written for another API, opened as a link. */
+const OTHER_API_LINK = {
+  mod: OTHER_API_MOD_SOURCE,
+  collection: null,
+  params: {},
+};
+const OTHER_API_HASH = `#/run?mod=${encodeURIComponent(OTHER_API_MOD_SOURCE)}`;
+
 const openPorts: MessagePort[] = [];
 
-afterEach(function closePorts(): void {
+afterEach(function cleanUp(): void {
+  testTexts.clear();
   for (const port of openPorts) {
     port.close();
   }
@@ -169,6 +188,24 @@ async function openViewerFromMods(history: FakeHistory): Promise<Stage> {
   openStageLink(stage, VIEWER_LINK, "sandbox-1");
   await settleStage(stage);
   return stage;
+}
+
+/** Starts at the Home mod, then follows the link of the mod written for another API, in `sandbox-2`. */
+async function openOtherApiFromHome(history: FakeHistory): Promise<Stage> {
+  serveOtherApiMod();
+  const stage = buildStage(history);
+  await follow(stage, history.readNavigation());
+  await follow(stage, history.followLink(OTHER_API_HASH));
+  return stage;
+}
+
+function findSandboxSnapshot(stage: Stage, id: string): SandboxSnapshot {
+  for (const sandbox of readStageSnapshot(stage).sandboxes) {
+    if (sandbox.id === id) {
+      return sandbox;
+    }
+  }
+  throw new Error(`Expected a sandbox "${id}" in the snapshot`);
 }
 
 describe("followHistory", function describeFollowHistory(): void {
@@ -919,6 +956,160 @@ describe("a mod that leaves gets no", function describeLeftActions(): void {
 
     expect(readStageSnapshot(stage).action).toBeNull();
     expect(attached.received).toEqual([]);
+  });
+});
+
+describe("answerApiMismatch", function describeAnswerApiMismatch(): void {
+  it("Matching and range-less mods never ask", async function startsWithoutAsking(): Promise<void> {
+    serveUntypedMod(null);
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "running",
+      apiMismatch: null,
+    });
+    await follow(
+      stage,
+      history.followLink(`#/run?mod=${encodeURIComponent(UNTYPED_MOD_SOURCE)}`),
+    );
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "running",
+      apiMismatch: null,
+    });
+    expect(readVisible(stage).sandboxDocument).not.toBeNull();
+  });
+
+  it("asks before starting a mod for another API", async function asks(): Promise<void> {
+    const history = new FakeHistory("");
+
+    const stage = await openOtherApiFromHome(history);
+
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-2",
+      status: "asking",
+      mod: {
+        title: "Other API",
+        version: "2.0.0",
+        source: OTHER_API_MOD_SOURCE,
+      },
+      sandboxDocument: null,
+      canReloadTiles: false,
+      apiMismatch: { range: OTHER_API_RANGE, apiVersion: MOD_API_VERSION },
+      issues: [],
+    });
+  });
+
+  it("Run anyway", async function runsAnyway(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openOtherApiFromHome(history);
+
+    answerApiMismatch(stage, "sandbox-2", true);
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "running",
+      apiMismatch: null,
+    });
+    expect(readVisible(stage).sandboxDocument).toContain(
+      "Content-Security-Policy",
+    );
+  });
+
+  it("Cancel", async function cancels(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openOtherApiFromHome(history);
+
+    answerApiMismatch(stage, "sandbox-2", false);
+
+    const visible = readVisible(stage);
+    expect(visible).toMatchObject({
+      id: "sandbox-2",
+      status: "failed",
+      sandboxDocument: null,
+      canClose: true,
+      apiMismatch: null,
+      errorMessage: describeCancelledApiMismatch(OTHER_API_RANGE),
+    });
+    expect(visible.errorMessage).toContain(OTHER_API_RANGE);
+    expect(visible.errorMessage).toContain(MOD_API_VERSION);
+    expect(history.entries[history.index].hash).toBe(OTHER_API_HASH);
+  });
+
+  it("ignores a repeated answer", async function ignoresRepeatedAnswer(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openOtherApiFromHome(history);
+
+    answerApiMismatch(stage, "sandbox-2", true);
+    answerApiMismatch(stage, "sandbox-2", false);
+
+    expect(readVisible(stage).status).toBe("running");
+  });
+
+  it("Back while asking", async function hidesOnBack(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openOtherApiFromHome(history);
+
+    await follow(stage, history.goBack());
+    answerApiMismatch(stage, "sandbox-2", true);
+
+    expect(readVisible(stage).id).toBe("sandbox-1");
+    expect(findSandboxSnapshot(stage, "sandbox-2")).toMatchObject({
+      isVisible: false,
+      status: "asking",
+      sandboxDocument: null,
+    });
+    await follow(stage, history.goForward());
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-2",
+      status: "asking",
+      apiMismatch: { range: OTHER_API_RANGE, apiVersion: MOD_API_VERSION },
+    });
+  });
+
+  it("closing while asking stops the runtime, and a later answer does nothing", async function stopsOnClose(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openOtherApiFromHome(history);
+    const runtime = stage.runtimes.get("sandbox-2");
+
+    closeSandbox(stage, "sandbox-2");
+    answerApiMismatch(stage, "sandbox-2", true);
+
+    expect(runtime?.status).toBe("stopped");
+    expect(runtime?.session).toBeNull();
+    expect(stage.runtimes.has("sandbox-2")).toBe(false);
+    expect(listIds(stage)).not.toContain("sandbox-2");
+  });
+
+  it("Asked after a page reload", async function asksAfterReload(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openOtherApiFromHome(history);
+    answerApiMismatch(stage, "sandbox-2", true);
+    const reloadedStage = buildStage(history);
+
+    await follow(reloadedStage, history.readNavigation());
+
+    expect(readVisible(reloadedStage)).toMatchObject({
+      status: "asking",
+      apiMismatch: { range: OTHER_API_RANGE, apiVersion: MOD_API_VERSION },
+    });
+  });
+
+  it("Opened by another mod", async function asksForOpenedMod(): Promise<void> {
+    serveOtherApiMod();
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    openStageLink(stage, OTHER_API_LINK, "sandbox-1");
+    await settleStage(stage);
+
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-2",
+      status: "asking",
+      apiMismatch: { range: OTHER_API_RANGE, apiVersion: MOD_API_VERSION },
+    });
   });
 });
 

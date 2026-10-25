@@ -3,15 +3,33 @@ import type { ParsedYaml, YamlMapping, YamlValue } from "../files/index.ts";
 import { ModFormatError } from "./mod_errors.ts";
 import { readModPermissions } from "./mod_permissions.ts";
 import type { ModPermission } from "./mod_permissions.ts";
+import validRange from "semver/ranges/valid.js";
 
 /** Whether the mod's frame gets the theme styles (`"default"`) or none (`"none"`). */
 export type ModThemeSetting = "default" | "none";
+
+/** The keys of the `mod` mapping that `readModFormat` reads. Other keys are ignored. */
+export const MOD_FILE_KEYS: readonly string[] = [
+  "name",
+  "version",
+  "entrypoint",
+  "title",
+  "description",
+  "api",
+  "type_path",
+  "sample_collection",
+  "config",
+  "permissions",
+  "theme",
+];
 
 /** The checked content of a mod file. Paths are not resolved yet. */
 export interface ModFormat {
   name: string;
   title: string;
   version: string;
+  /** The mod API range the mod was written for, as written, or `null`. */
+  api: string | null;
   description: string;
   entrypoint: string;
   typePath: string | null;
@@ -99,6 +117,29 @@ function readModTheme(mod: YamlMapping, source: string): ModThemeSetting {
   return theme;
 }
 
+/**
+ * Reads `api`: missing gives `null`, and anything else must be a non-empty
+ * semver range in npm's syntax. `validRange` takes blank text as `*`, so blank
+ * text is refused first.
+ */
+function readModApiRange(mod: YamlMapping, source: string): string | null {
+  const api = mod.api;
+  if (api === undefined) {
+    return null;
+  }
+  if (
+    typeof api !== "string" ||
+    api.trim() === "" ||
+    validRange(api) === null
+  ) {
+    throw new ModFormatError(
+      source,
+      '"api" must be a semver range, such as "^0.1.0"',
+    );
+  }
+  return api;
+}
+
 function checkNoInlineSchema(mod: YamlMapping, source: string): void {
   if (Object.hasOwn(mod, "schema")) {
     throw new ModFormatError(
@@ -111,10 +152,12 @@ function checkNoInlineSchema(mod: YamlMapping, source: string): void {
 /**
  * Checks the structure of a parsed mod file: a `mod` mapping with non-empty
  * string `name`, `version` and `entrypoint`, optional string `title` (defaults
- * to `name`) and `description` (defaults to `""`), optional non-empty
- * `type_path` and `sample_collection`, an optional `config` mapping,
- * optional `permissions` and an optional `theme` (`"default"` or `"none"`). Other keys are ignored, and an inline `schema` is
- * rejected. Raises `ModFormatError` at the first failure.
+ * to `name`) and `description` (defaults to `""`), an optional `api` semver
+ * range, optional non-empty `type_path` and `sample_collection`, an optional
+ * `config` mapping, optional `permissions` and an optional `theme`
+ * (`"default"` or `"none"`). These keys are listed in `MOD_FILE_KEYS`. Other
+ * keys are ignored, and an inline `schema` is rejected. Raises
+ * `ModFormatError` at the first failure.
  */
 export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
   const source = parsedYaml.source;
@@ -124,6 +167,7 @@ export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
   const entrypoint = readRequiredText(mod, "entrypoint", source);
   const title = readOptionalText(mod, "title", name, source);
   const description = readOptionalText(mod, "description", "", source);
+  const api = readModApiRange(mod, source);
   const typePath = readOptionalPath(mod, "type_path", source);
   const sampleCollection = readOptionalPath(mod, "sample_collection", source);
   const config = readModConfig(mod, source);
@@ -132,6 +176,7 @@ export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
     name,
     title,
     version,
+    api,
     description,
     entrypoint,
     typePath,

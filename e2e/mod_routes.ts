@@ -1,5 +1,12 @@
+import { readFileSync } from "node:fs";
 import type { Frame, Locator, Page, Route } from "@playwright/test";
 import { SAMPLE_ENTRYPOINT_GLOB } from "./sample_mod.ts";
+
+/** The code of the default mod explorer, to serve a copy with another config. */
+export const EXPLORER_CODE = readFileSync(
+  new URL("../public/default_mods/mod_explorer/main.js", import.meta.url),
+  "utf8",
+);
 
 /** The host of the sample book covers. Tests answer it locally, so no test needs the network. */
 export const COVER_HOST = "https://upload.wikimedia.org";
@@ -113,25 +120,53 @@ export async function serveAppOriginMod(
   return seenUrls;
 }
 
-/** The text of a `mod_conf.yaml` with the given name and extra lines under `mod`. */
-export function buildModConf(name: string, extraLines: string[] = []): string {
-  const modConf = [
-    "mod:",
+/**
+ * `^0.1.0`: the `api` range the test mods declare unless a test asks for
+ * another one, so they match the mod API version and get no missing-range
+ * warning. A breaking bump of the mod API updates it with the shipped mods.
+ */
+export const TEST_MOD_API_RANGE = "^0.1.0";
+
+/** `0.1.0`: the app's mod API version, as mods read it in `context.api.version`. */
+export const APP_MOD_API_VERSION = "0.1.0";
+
+/** `^0.2.0`: an `api` range for a later mod API, which the app's version does not match. */
+export const OTHER_API_RANGE = "^0.2.0";
+
+/**
+ * The text of a `mod_conf.yaml` with the given name and extra lines under
+ * `mod`. Its first line under `mod` declares `apiRange`, unless it is `null`.
+ */
+export function buildModConf(
+  name: string,
+  extraLines: string[] = [],
+  apiRange: string | null = TEST_MOD_API_RANGE,
+): string {
+  const lines = ["mod:"];
+  if (apiRange !== null) {
+    lines.push(`  api: "${apiRange}"`);
+  }
+  lines.push(
     `  name: "${name}"`,
     '  version: "0.1.0"',
     '  entrypoint: "./main.js"',
     ...extraLines,
-  ].join("\n");
+  );
+  const modConf = lines.join("\n");
   return modConf;
 }
 
-/** The files of a probe mod named `name` in the folder `name/`, with the given extra mod lines. */
+/**
+ * The files of a probe mod named `name` in the folder `name/`, with the given
+ * extra mod lines, declaring `apiRange` unless it is `null`.
+ */
 export function buildProbeFiles(
   name: string,
   extraLines: string[] = [],
+  apiRange: string | null = TEST_MOD_API_RANGE,
 ): ModFiles {
   const files: ModFiles = {
-    [`${name}/mod_conf.yaml`]: buildModConf(name, extraLines),
+    [`${name}/mod_conf.yaml`]: buildModConf(name, extraLines, apiRange),
     [`${name}/main.js`]: PROBE_MOD_CODE,
   };
   return files;

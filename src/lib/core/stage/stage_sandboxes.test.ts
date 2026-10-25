@@ -13,15 +13,21 @@ import {
   FOUR_BOOKS_SOURCE,
   MISSING_MOD_REFERENCE,
   MISSING_MOD_SOURCE,
+  NO_API_BOOK_MOD_SOURCE,
+  NO_COUNTRY_TILE_SOURCE,
   OTHER_APP_ORIGIN,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   serveFourBooks,
+  serveNoApiBookMod,
   serveTestMod,
   TEST_DEFAULTS,
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
-import { resolveDefaultModSettings } from "../engine/index.ts";
+import {
+  describeMissingApiRange,
+  resolveDefaultModSettings,
+} from "../engine/index.ts";
 import type { AppAction, RunLink } from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
@@ -155,6 +161,43 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     expect(issues).toHaveLength(2);
     expect(issues[0].message).toContain("is not of tile type");
     expect(issues[1].message).toContain("Permission not granted");
+  });
+
+  it("Missing range comes first", async function listsMissingRangeFirst(): Promise<void> {
+    serveFourBooks();
+    serveNoApiBookMod();
+    const spied = buildServices();
+
+    const { runtime } = await startSandbox(
+      buildSandbox(NO_API_BOOK_MOD_SOURCE, FOUR_BOOKS_SOURCE),
+      spied,
+    );
+
+    const issues = readSandboxIssues(runtime);
+    expect(issues).toHaveLength(2);
+    expect(issues[0]).toEqual({
+      level: "warning",
+      source: NO_API_BOOK_MOD_SOURCE,
+      message: describeMissingApiRange(),
+    });
+    expect(issues[1].source).toBe(NO_COUNTRY_TILE_SOURCE);
+  });
+
+  it("keeps the missing-range warning after reloading the tiles", async function keepsMissingRange(): Promise<void> {
+    serveFourBooks();
+    serveNoApiBookMod();
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(NO_API_BOOK_MOD_SOURCE, FOUR_BOOKS_SOURCE),
+      spied,
+    );
+
+    await reloadSandboxTiles(runtime, spied.services);
+
+    const issues = readSandboxIssues(runtime);
+    expect(issues).toHaveLength(2);
+    expect(issues[0].message).toBe(describeMissingApiRange());
+    expect(issues[1].source).toBe(NO_COUNTRY_TILE_SOURCE);
   });
 
   it("Missing mod file", async function failsMissingMod(): Promise<void> {

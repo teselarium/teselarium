@@ -10,6 +10,7 @@ import {
   FOUR_BOOKS_SOURCE,
   MISSING_MOD_REFERENCE,
   NO_COUNTRY_TILE_SOURCE,
+  OTHER_API_MOD_SOURCE,
   OTHER_APP_ORIGIN,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_SOURCE,
@@ -18,6 +19,7 @@ import {
   SAMPLE_MOD_SOURCE,
   SAMPLE_TILE_SOURCES,
   serveFourBooks,
+  serveOtherApiMod,
   serveTestMod,
   serveUntypedMod,
   TEST_DEFAULTS,
@@ -33,6 +35,7 @@ import { ModFormatError } from "../../mod/index.ts";
 import { CollectionFormatError, TileTypeError } from "../../tile/index.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
 import { ModSwitchedOffError } from "./engine_errors.ts";
+import { MOD_API_VERSION } from "./mod_api_version.ts";
 import { loadModTiles, prepareModLaunch } from "./mod_launch.ts";
 import type { ModLaunch, ModLaunchRequest, RunLink } from "./mod_launch.ts";
 
@@ -248,6 +251,60 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
     expect(structuredClone(launch.context)).toEqual(launch.context);
     expect(structuredClone(launch)).toEqual(launch);
+  });
+
+  it("Sample mod reads the version", async function givesApiVersion(): Promise<void> {
+    const launch = await launchMod(SAMPLE_LINK);
+
+    expect(launch.context.api).toEqual({ version: MOD_API_VERSION });
+    expect(Object.keys(launch.context.api)).toEqual(["version"]);
+  });
+
+  it("Mod without a range reads the version", async function givesApiVersionWithoutRange(): Promise<void> {
+    serveUntypedMod(null);
+
+    const launch = await launchMod({ ...SAMPLE_LINK, mod: UNTYPED_MOD_SOURCE });
+
+    expect(launch.context.api.version).toBe(MOD_API_VERSION);
+  });
+
+  it("Plain data", async function clonesApi(): Promise<void> {
+    const launch = await launchMod(SAMPLE_LINK);
+
+    expect(structuredClone(launch.context.api)).toEqual(launch.context.api);
+  });
+
+  it("matches the sample mod's range with no file issue", async function matchesSampleRange(): Promise<void> {
+    const launch = await launchMod(SAMPLE_LINK);
+
+    expect(launch.apiCompatible).toBe(true);
+    expect(launch.fileIssues).toEqual([]);
+  });
+
+  it("Mod without a range", async function warnsWithoutRange(): Promise<void> {
+    serveUntypedMod(null);
+
+    const launch = await launchMod({ ...SAMPLE_LINK, mod: UNTYPED_MOD_SOURCE });
+
+    expect(launch.apiCompatible).toBeNull();
+    expect(launch.fileIssues).toHaveLength(1);
+    expect(launch.fileIssues[0].level).toBe("warning");
+    expect(launch.fileIssues[0].source).toBe(UNTYPED_MOD_SOURCE);
+    expect(launch.fileIssues[0].message).toContain('"api"');
+    expect(launch.fileIssues[0].message).toContain(MOD_API_VERSION);
+    expect(launch.issues).toEqual([]);
+  });
+
+  it("gives a mod for another API no file issue", async function refusesOtherApi(): Promise<void> {
+    serveOtherApiMod();
+
+    const launch = await launchMod({
+      ...SAMPLE_LINK,
+      mod: OTHER_API_MOD_SOURCE,
+    });
+
+    expect(launch.apiCompatible).toBe(false);
+    expect(launch.fileIssues).toEqual([]);
   });
 
   it("propagates mod file errors with their classes", async function propagatesModErrors(): Promise<void> {

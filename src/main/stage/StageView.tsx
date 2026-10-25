@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { ReactElement } from "react";
 import { Alert, AlertDescription } from "@/vendor/shadcn/ui/alert.tsx";
 import {
+  answerApiMismatch,
   answerStageAction,
   readStageSnapshot,
   subscribeStage,
@@ -13,6 +14,7 @@ import type {
 } from "../../lib/core/stage/index.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { ActionDialog } from "./ActionDialog.tsx";
+import { ApiMismatchDialog } from "./ApiMismatchDialog.tsx";
 import { SandboxFrame } from "./SandboxFrame.tsx";
 import { StageBar } from "./StageBar.tsx";
 import "./stage.css";
@@ -38,6 +40,9 @@ function renderSandboxContent(
   }
   if (sandbox.status === "loading") {
     return <p className="text-muted-foreground">Loading…</p>;
+  }
+  if (sandbox.status === "asking") {
+    return <p className="text-muted-foreground">Waiting for your answer…</p>;
   }
   if (sandbox.sandboxDocument === null) {
     return null;
@@ -90,14 +95,22 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
  * never moves in the DOM (moving an iframe reloads it). Only the visible one
  * is shown, under the stage bar. While a page is shown, the whole view is
  * hidden but stays mounted, so no frame reloads. The action dialog shows the action the
- * visible mod asked for, if any. When the visible sandbox changes, the page
- * leaves fullscreen.
+ * visible mod asked for, if any, and the API mismatch dialog asks about the
+ * visible sandbox while its mod waits for an answer. When the visible sandbox
+ * changes, the page leaves fullscreen.
  */
 export function StageView({ stage }: StageViewProps): ReactElement {
   const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
 
   function handleActionAnswer(id: number, accepted: boolean): void {
     answerStageAction(stage, id, accepted);
+  }
+
+  function handleApiMismatchAnswer(
+    sandboxId: string,
+    runAnyway: boolean,
+  ): void {
+    answerApiMismatch(stage, sandboxId, runAnyway);
   }
 
   const visibleSandbox = findVisibleSandbox(snapshot);
@@ -123,6 +136,12 @@ export function StageView({ stage }: StageViewProps): ReactElement {
       )}
       <div className="flex flex-1 flex-col">{sandboxes}</div>
       <ActionDialog shown={snapshot.action} onAnswer={handleActionAnswer} />
+      {visibleSandbox?.status === "asking" ? (
+        <ApiMismatchDialog
+          sandbox={visibleSandbox}
+          onAnswer={handleApiMismatchAnswer}
+        />
+      ) : null}
     </div>
   );
 }

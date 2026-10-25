@@ -4,12 +4,17 @@ import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
   MISSING_MOD_SOURCE,
+  OTHER_API_MOD_SOURCE,
+  OTHER_API_RANGE,
   OTHER_APP_ORIGIN,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
   SAMPLE_ENTRYPOINT,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TYPE_SOURCE,
+  serveOtherApiMod,
+  serveUntypedMod,
+  UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
 import {
   fetchTestFile,
@@ -51,6 +56,8 @@ describe("inspectMod", function describeInspectMod(): void {
       title: "Book List",
       version: "1.0.0",
       description: "A very simple list of books with their covers.",
+      api: "^0.1.0",
+      apiCompatible: true,
       typeSource: SAMPLE_TYPE_SOURCE,
       sampleCollection: SAMPLE_COLLECTION_SOURCE,
       config: { show_covers: true },
@@ -68,6 +75,28 @@ describe("inspectMod", function describeInspectMod(): void {
       granted: [],
       denied: [SAMPLE_COVERS_PERMISSION],
     });
+  });
+
+  it("Inspect a mod for another API", async function inspectsOtherApiMod(): Promise<void> {
+    serveOtherApiMod();
+
+    const inspection = await inspectMod(OTHER_API_MOD_SOURCE, APP_ORIGIN, {
+      fetch: fetchTestFile,
+    });
+
+    expect(inspection.api).toBe(OTHER_API_RANGE);
+    expect(inspection.apiCompatible).toBe(false);
+  });
+
+  it("Inspect a mod without a range", async function inspectsModWithoutRange(): Promise<void> {
+    serveUntypedMod(null);
+
+    const inspection = await inspectMod(UNTYPED_MOD_SOURCE, APP_ORIGIN, {
+      fetch: fetchTestFile,
+    });
+
+    expect(inspection.api).toBeNull();
+    expect(inspection.apiCompatible).toBeNull();
   });
 
   it("Inspect a missing mod", async function inspectsMissingMod(): Promise<void> {

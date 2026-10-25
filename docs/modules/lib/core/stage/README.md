@@ -87,9 +87,19 @@ The stage bar has × for the visible sandbox, except for the Home mod opened at 
 
 ### Issues and load failures
 
-The stage bar lists every issue of the visible sandbox, in the order they were found: tile collection issues, permission issues, blocked requests, mount failures and a stopped mod. Each sandbox keeps its own issues. When the mod file, its entrypoint, its tile type file or the collection cannot be loaded, or a link names a switched-off default mod, the sandbox shows the error and no frame, and keeps its history entry and its ×.
+The stage bar lists every issue of the visible sandbox, in the order they were found: mod file issues (the warning of a mod that declares no `api` range), tile collection issues, permission issues, blocked requests, mount failures and a stopped mod. Each sandbox keeps its own issues. When the mod file, its entrypoint, its tile type file or the collection cannot be loaded, or a link names a switched-off default mod, the sandbox shows the error and no frame, and keeps its history entry and its ×.
 
-"Reload tiles", for a sandbox opened with a collection, loads and validates the collection again, pushes `tiles.changed` to the running mod and replaces the collection issues.
+"Reload tiles", for a sandbox opened with a collection, loads and validates the collection again, pushes `tiles.changed` to the running mod and replaces the collection issues. The mod file issues stay.
+
+### Mods written for another API
+
+When a mod's `api` range does not match the app's mod API version (see the [engine module](../engine/README.md#mod-api-version)), its sandbox does not start the mod once the launch settles: the runtime becomes `asking`, with its launch kept, so the stage bar shows the mod's title, version and source, but the snapshot has no frame document. The snapshot's `apiMismatch` holds the mod's `range` and the app's `apiVersion` while the sandbox is asking, and the page shows its question dialog for the visible sandbox (see the [main module](../../../main/README.md)).
+
+- `answerApiMismatch(stage, sandboxId, runAnyway)` answers it. "Run anyway" starts the mod as a matching launch would. "Cancel" fails the sandbox with an error naming the range and the mod API version, and no frame; it keeps its history entry and its ×.
+- Only the visible sandbox, while it is still asking, can be answered, so a late or repeated answer does nothing.
+- The question is derived from the snapshot, not queued: going back hides the sandbox, and so the question, and the mod stays unstarted; going forward to the same entry asks again. Closing the sandbox stops its runtime, which ignores any answer.
+- Nothing remembers the answer: a reload of the page, the same link opened again or a `mods.open` creates a new sandbox, which asks again.
+- A mod that matches, or declares no range, never asks. A mod whose files cannot be loaded fails as before, without a question.
 
 ### Actions the user answers
 
@@ -141,10 +151,11 @@ The work behind the public API is split so each file has one reason to change:
 - `attachFrame(stage, id, frameTarget)`: on a frame's first `load`, connects its mod's session.
 - `frameLoadedAgain(stage, id)`: on any later `load` of a frame: its mod navigated, so it is stopped with the issue `The mod left its page and was stopped.` and its frame removed.
 - `answerStageAction(stage, id, accepted)`: answers the action the page shows, so the mod's request resolves with `accepted` and the next action is shown. Does nothing for an unknown id.
+- `answerApiMismatch(stage, sandboxId, runAnyway)`: answers the question of the visible `asking` sandbox: `true` starts the mod, `false` fails the sandbox with the cancel error. Does nothing for a sandbox that is not visible or not asking.
 - `requestStageAction(stage, sandboxId, action)`, not exported: queues an action and resolves with the user's answer, or returns `null` when the sandbox is not the visible one or not running. The sessions call it through their `onRequestAction`.
 - `changeStageColorScheme(stage, colorScheme)`: switches the stage's theme and pushes `theme.changed` to every running mod, visible or hidden. Does nothing when the color scheme is the current one. The stage's current `Theme` is `stage.theme`.
 - `readStageSnapshot(stage)` and `subscribeStage(stage, listener)`: a frozen `StageSnapshot` that is new after every change, for React's `useSyncExternalStore`. `subscribeStage` returns the function that unsubscribes.
-- Types: `Stage`, `StageOptions`, `StageRouting`, `StageHome`, `SectionLink`, `StageSnapshot` (`sandboxes`, `action`, `visible` and `activeSection`), `VisibleView` (`{ kind: "sandbox", id }`, `{ kind: "page", section, page }` with `page: null` for the index, or `null` before the first entry), `ActionSnapshot` (`id`, `mod` with `title` and `source`, and `action`), `ActionMod`, the engine's `AppAction`, `LinkAction`, `SaveFileAction` and `ConfirmAction` re-exported as types, so the page imports them from the stage, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, `sandboxDocument`, `canReloadTiles`, `issues`, `errorMessage`), `SandboxStatus` (`loading`, `failed`, `running` or `stopped`), `StageHistory`.
+- Types: `Stage`, `StageOptions`, `StageRouting`, `StageHome`, `SectionLink`, `StageSnapshot` (`sandboxes`, `action`, `visible` and `activeSection`), `VisibleView` (`{ kind: "sandbox", id }`, `{ kind: "page", section, page }` with `page: null` for the index, or `null` before the first entry), `ActionSnapshot` (`id`, `mod` with `title` and `source`, and `action`), `ActionMod`, the engine's `AppAction`, `LinkAction`, `SaveFileAction` and `ConfirmAction` re-exported as types, so the page imports them from the stage, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, `sandboxDocument`, `canReloadTiles`, `issues`, `errorMessage`, `apiMismatch` with `range` and `apiVersion` only while asking, otherwise `null`), `SandboxStatus` (`loading`, `asking`, `failed`, `running` or `stopped`), `StageHistory`.
 
 ### Routing options
 
@@ -185,7 +196,7 @@ window.addEventListener("popstate", function followPopState(): void {
 });
 ```
 
-Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. `App` then renders the page the snapshot's `visible` names, if any, and `StageView`, which stays mounted, reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`. Its `ActionDialog` shows the snapshot's `action`, performs it from the accept button's click and calls `answerStageAction`.
+Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. `App` then renders the page the snapshot's `visible` names, if any, and `StageView`, which stays mounted, reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`. Its `ActionDialog` shows the snapshot's `action`, performs it from the accept button's click and calls `answerStageAction`. Its `ApiMismatchDialog` shows the visible sandbox's `apiMismatch` while it is asking, and calls `answerApiMismatch`.
 
 ### Why no router library
 

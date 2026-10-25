@@ -56,6 +56,7 @@ describe("readModFormat", function describeReadModFormat(): void {
       name: "book_list",
       title: "Book List",
       version: "1.0.0",
+      api: "^0.1.0",
       description: "A very simple list of books with their covers.",
       entrypoint: "./main.js",
       typePath: "../../types/book.md",
@@ -79,6 +80,7 @@ describe("readModFormat", function describeReadModFormat(): void {
       name: "minimal",
       title: "minimal",
       version: "0.1.0",
+      api: null,
       description: "",
       entrypoint: "./main.js",
       typePath: null,
@@ -219,6 +221,53 @@ describe("readModFormat", function describeReadModFormat(): void {
     const error = catchFormatError(buildMinimalMod({ theme: 0 }));
 
     expect(error.message).toContain('"theme" must be "default" or "none"');
+  });
+
+  it("Caret range", function readsCaretRange(): void {
+    const modFormat = readModFormat(buildMinimalMod({ api: "^0.1.0" }));
+
+    expect(modFormat.api).toBe("^0.1.0");
+  });
+
+  it("keeps the range as written", function keepsRangeText(): void {
+    const modFormat = readModFormat(
+      buildMinimalMod({ api: ">=0.1.0 <1.0.0 || 2.x" }),
+    );
+
+    expect(modFormat.api).toBe(">=0.1.0 <1.0.0 || 2.x");
+  });
+
+  it("No api key", function readsNoRange(): void {
+    const modFormat = readModFormat(buildMinimalMod({}));
+
+    expect(modFormat.api).toBeNull();
+  });
+
+  it("Not a range", function rejectsNonRange(): void {
+    const error = catchFormatError(buildMinimalMod({ api: "latest" }));
+
+    expect(error.source).toBe(MOD_SOURCE);
+    expect(error.message).toBe(
+      `Invalid mod "${MOD_SOURCE}": "api" must be a semver range, such as "^0.1.0"`,
+    );
+  });
+
+  it("Range written as a number", function rejectsRangeNumber(): void {
+    const error = catchFormatError(buildMinimalMod({ api: 0.1 }));
+
+    expect(error.message).toContain('"api" must be a semver range');
+  });
+
+  it("rejects an empty range", function rejectsEmptyRange(): void {
+    const error = catchFormatError(buildMinimalMod({ api: "" }));
+
+    expect(error.message).toContain('"api" must be a semver range');
+  });
+
+  it("rejects a blank range", function rejectsBlankRange(): void {
+    const error = catchFormatError(buildMinimalMod({ api: "  " }));
+
+    expect(error.message).toContain('"api" must be a semver range');
   });
 
   it("reads the permissions with the mod file's source", function readsPermissions(): void {

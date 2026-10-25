@@ -12,6 +12,9 @@ export const SAMPLE_MOD_FILE_PATH = `${SAMPLE_MOD_FOLDER_PATH}/mod_conf.yaml`;
 /** `/samples/mods/book_list/main.js`: the sample mod's entrypoint. */
 export const SAMPLE_ENTRYPOINT_PATH = `${SAMPLE_MOD_FOLDER_PATH}/main.js`;
 
+/** `/samples/mods/book_list/book_type.md`: the sample mod's tile type, `book`. */
+export const SAMPLE_TYPE_PATH = `${SAMPLE_MOD_FOLDER_PATH}/book_type.md`;
+
 /** `/samples/mods/book_list/book_collection.yaml`: the sample collection of three books. */
 export const SAMPLE_COLLECTION_PATH = `${SAMPLE_MOD_FOLDER_PATH}/book_collection.yaml`;
 
