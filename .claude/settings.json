@@ -1,13 +1,14 @@
 {
-  "autoMemoryEnabled": false,
   "permissions": {
     "allow": [
-      "Bash(npx vitest *)",
-      "Bash(npm run *)",
-      "Bash(npx tsc *)",
       "Bash(npm ci *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
       "Bash(npx prettier *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
       "Bash(openspec validate *)"
     ]
-  }
+  },
+  "autoMemoryEnabled": false
 }
