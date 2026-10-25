@@ -7,11 +7,15 @@ Gives the mod API a version of its own and lets each mod declare the range it wa
 ## Requirements
 
 ### Requirement: Mod API version
-The app SHALL have one mod API version, a semver version that covers the engine methods and events, the mount context and the mod file format. It SHALL be separate from the app's own version. The mod API version SHALL be `0.1.0`.
+The app SHALL have one mod API version, a semver version that covers the engine methods and events, the mount context and the mod file format. It SHALL be separate from the app's own version. The mod API version SHALL be `0.1.1`.
 
 #### Scenario: Version of this API
 - **WHEN** any mod is mounted
-- **THEN** the API version it receives is `0.1.0`, whatever the app's own version is
+- **THEN** the API version it receives is `0.1.1`, whatever the app's own version is
+
+#### Scenario: Mods for 0.1.0 still match
+- **WHEN** a mod with `api: "^0.1.0"` is opened
+- **THEN** no dialog is shown and the mod runs with no issue about its API
 
 ### Requirement: API version in the mount context
 The mount context SHALL have `api` with `version`, the app's mod API version as a string.
