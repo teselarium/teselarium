@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readSampleText, SAMPLES_BASE_URL } from "../../test/sample_files.ts";
+import { readFixtureText, FIXTURES_BASE_URL } from "../../test/sample_files.ts";
 import { parseMarkdown } from "../files/index.ts";
 import type { Metadata, ParsedMarkdown, YamlMapping } from "../files/index.ts";
 import { TileTypeError } from "./tile_errors.ts";
@@ -8,7 +8,7 @@ import {
   readTileTypeSchema,
 } from "./tile_type_schema.ts";
 
-const BOOK_TYPE_URL = `${SAMPLES_BASE_URL}types/book.md`;
+const BOOK_TYPE_URL = `${FIXTURES_BASE_URL}types/book.md`;
 const TYPE_SOURCE = "https://example.org/types/test_type.md";
 
 const STRING_FIELD: YamlMapping = { type: "string" };
@@ -36,7 +36,7 @@ describe("readTileTypeSchema", function describeReadTileTypeSchema(): void {
   it("reads the sample book type", function readsBookType(): void {
     const parsedBookType = parseMarkdown({
       source: BOOK_TYPE_URL,
-      content: readSampleText("types/book.md"),
+      content: readFixtureText("types/book.md"),
     });
 
     const tileTypeSchema = readTileTypeSchema(parsedBookType);

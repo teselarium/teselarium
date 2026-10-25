@@ -49,7 +49,7 @@ describe("inspectMod", function describeInspectMod(): void {
       title: "Book List",
       version: "1.0.0",
       description: "A very simple list of books with their covers.",
-      typeSource: "https://example.org/samples/types/book.md",
+      typeSource: "https://example.org/fixtures/types/book.md",
       sampleCollection: SAMPLE_COLLECTION_SOURCE,
       config: { show_covers: true },
       permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
@@ -70,7 +70,7 @@ describe("inspectMod", function describeInspectMod(): void {
 
   it("Inspect a missing mod", async function inspectsMissingMod(): Promise<void> {
     const missingSource =
-      "https://example.org/samples/mods/missing/mod_conf.yaml";
+      "https://example.org/fixtures/mods/missing/mod_conf.yaml";
 
     const inspecting = inspectMod(missingSource, APP_ORIGIN, {
       fetch: fetchTestFile,

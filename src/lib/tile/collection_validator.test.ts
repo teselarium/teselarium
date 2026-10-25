@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { fetchSample, SAMPLES_BASE_URL } from "../../test/sample_files.ts";
+import { fetchFixture, FIXTURES_BASE_URL } from "../../test/sample_files.ts";
 import {
   buildBookMetadata,
   buildBookTileWithout,
@@ -16,8 +16,8 @@ import {
 } from "./index.ts";
 import type { Tile, TileCollection, TileValidator } from "./index.ts";
 
-const SAMPLE_COLLECTION_URL = `${SAMPLES_BASE_URL}tiles/books_collection.yaml`;
-const BOOK_TYPE_URL = `${SAMPLES_BASE_URL}types/book.md`;
+const SAMPLE_COLLECTION_URL = `${FIXTURES_BASE_URL}tiles/books_collection.yaml`;
+const BOOK_TYPE_URL = `${FIXTURES_BASE_URL}types/book.md`;
 const TYPES_URL = "https://example.org/types/";
 const TILES_URL = "https://example.org/tiles/";
 const TEST_COLLECTION_URL = `${TILES_URL}test_collection.yaml`;
@@ -40,7 +40,7 @@ function serveTestFile(url: string, text: string): void {
 }
 
 function buildBookValidator(): Promise<TileValidator> {
-  return buildTileValidator(BOOK_TYPE_URL, { fetch: fetchSample });
+  return buildTileValidator(BOOK_TYPE_URL, { fetch: fetchFixture });
 }
 
 /** Serves a type file at `<TYPES_URL><fileName>` and builds a validator from it. */
@@ -57,7 +57,7 @@ async function buildTestValidator(
 }
 
 function loadSampleCollection(): Promise<TileCollection> {
-  return loadTileCollection(SAMPLE_COLLECTION_URL, { fetch: fetchSample });
+  return loadTileCollection(SAMPLE_COLLECTION_URL, { fetch: fetchFixture });
 }
 
 function buildTestCollection(tiles: Tile[]): TileCollection {

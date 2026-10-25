@@ -17,7 +17,7 @@ A request from a mod has `jsonrpc: "2.0"`, a string or number `id`, a string `me
 Each request gets exactly one response with the same `id`, and either a `result`:
 
 ```json
-{ "jsonrpc": "2.0", "id": 7, "result": "https://example.org/samples/tiles/books/kallocain.md" }
+{ "jsonrpc": "2.0", "id": 7, "result": "https://example.org/samples/mods/book_list/books/kallocain.md" }
 ```
 
 or an `error` with a numeric `code` and a `message`:
@@ -232,7 +232,7 @@ A mod never builds an app address. It sends what to run, and the stage turns it 
 | Request | Run link it becomes |
 |---|---|
 | `engine.request("mods.open", { mod: "mod_viewer", params: { target: inspection.source } })` | `#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml` |
-| `engine.request("mods.open", { mod: inspection.source, collection: inspection.sampleCollection })` | `#/run?mod=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml&collection=https%3A%2F%2Fexample.org%2Fsamples%2Ftiles%2Fbooks_collection.yaml` |
+| `engine.request("mods.open", { mod: inspection.source, collection: inspection.sampleCollection })` | `#/run?mod=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml&collection=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fbook_collection.yaml` |
 | `engine.request("mods.open", { mod: "./samples/mods/book_list" })` | `#/run?mod=.%2Fsamples%2Fmods%2Fbook_list` |
 
 The mod explorer, for example, inspects each mod of its config and opens the viewer for the one the user picks:
@@ -326,7 +326,7 @@ const launch = await prepareModLaunch(
   {
     link: {
       mod: "./samples/mods/book_list",
-      collection: "./samples/tiles/books_collection.yaml",
+      collection: "./samples/mods/book_list/book_collection.yaml",
       params: {},
     },
     appOrigin: "https://example.org",

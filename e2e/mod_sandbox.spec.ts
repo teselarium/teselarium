@@ -33,7 +33,7 @@ import {
 } from "./mod_routes.ts";
 
 const SAMPLE_RUN_LINK =
-  "/#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
+  "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 const APP_PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const FOREIGN_PROBE_LINK = `/#/run?mod=${encodeURIComponent(`${FOREIGN_HOST}/probe/`)}`;
@@ -279,14 +279,14 @@ test.describe("Default content policy", function describeDefaultPolicy(): void {
   }): Promise<void> {
     const seenUrls = await recordHost(
       page,
-      "**/samples/tiles/books_collection.yaml",
+      "**/samples/mods/book_list/book_collection.yaml",
     );
     const frame = await openAppProbe(page);
     const appOrigin = new URL(page.url()).origin;
 
     const outcome = await frame.evaluate(
       fetchFromFrame,
-      `${appOrigin}/samples/tiles/books_collection.yaml`,
+      `${appOrigin}/samples/mods/book_list/book_collection.yaml`,
     );
 
     expect(outcome).not.toBe("sent");

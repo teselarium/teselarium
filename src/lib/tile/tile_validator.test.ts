@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import {
-  fetchSample,
-  readSampleText,
-  SAMPLES_BASE_URL,
+  fetchFixture,
+  readFixtureText,
+  FIXTURES_BASE_URL,
 } from "../../test/sample_files.ts";
 import {
   buildBookMetadata,
@@ -28,8 +28,8 @@ import {
 } from "./index.ts";
 import type { Tile, TileValidator } from "./index.ts";
 
-const BOOK_TYPE_URL = `${SAMPLES_BASE_URL}types/book.md`;
-const KALLOCAIN_URL = `${SAMPLES_BASE_URL}tiles/books/kallocain.md`;
+const BOOK_TYPE_URL = `${FIXTURES_BASE_URL}types/book.md`;
+const KALLOCAIN_URL = `${FIXTURES_BASE_URL}tiles/books/kallocain.md`;
 const TYPES_URL = "https://example.org/types/";
 const NO_COUNTRY_URL = "https://example.org/tiles/no_country.md";
 const NO_TITLE_URL = "https://example.org/tiles/no_title.md";
@@ -58,7 +58,7 @@ async function buildTestValidator(
 }
 
 function buildBookValidator(): Promise<TileValidator> {
-  return buildTileValidator(BOOK_TYPE_URL, { fetch: fetchSample });
+  return buildTileValidator(BOOK_TYPE_URL, { fetch: fetchFixture });
 }
 
 function catchBuildError(building: Promise<TileValidator>): Promise<unknown> {
@@ -180,7 +180,7 @@ describe("buildTileValidator", function describeBuildTileValidator(): void {
       const testFetch = createTestFetch();
 
       const tileValidator = await buildTileValidator("./types/book.md", {
-        baseUrl: SAMPLES_BASE_URL,
+        baseUrl: FIXTURES_BASE_URL,
         fetch: testFetch,
       });
 
@@ -193,7 +193,7 @@ describe("buildTileValidator", function describeBuildTileValidator(): void {
       const localFiles = indexLocalFiles([
         {
           path: "library/types/book.md",
-          content: new Blob([readSampleText("types/book.md")]),
+          content: new Blob([readFixtureText("types/book.md")]),
         },
       ]);
 
@@ -209,10 +209,10 @@ describe("buildTileValidator", function describeBuildTileValidator(): void {
 
   describe("type files that cannot be read", function describeUnreadableTypeFiles(): void {
     it("Type file HTTP 404", async function rejectsMissingTypeFile(): Promise<void> {
-      const missingUrl = `${SAMPLES_BASE_URL}types/missing.md`;
+      const missingUrl = `${FIXTURES_BASE_URL}types/missing.md`;
 
       const error = await catchBuildError(
-        buildTileValidator(missingUrl, { fetch: fetchSample }),
+        buildTileValidator(missingUrl, { fetch: fetchFixture }),
       );
 
       expect(error).toBeInstanceOf(FileFetchError);
@@ -462,7 +462,7 @@ describe("validateTile", function describeValidateTile(): void {
   describe("matching tiles", function describeMatchingTiles(): void {
     it("Matching sample tile", async function matchesKallocain(): Promise<void> {
       const tileValidator = await buildBookValidator();
-      const tile = await loadTile(KALLOCAIN_URL, { fetch: fetchSample });
+      const tile = await loadTile(KALLOCAIN_URL, { fetch: fetchFixture });
 
       expect(validateTile(tile, tileValidator)).toBe("book");
     });
@@ -561,7 +561,7 @@ describe("validateTile", function describeValidateTile(): void {
   describe("tile unchanged", function describeTileUnchanged(): void {
     it("Matching tile unchanged", async function keepsMatchingTile(): Promise<void> {
       const tileValidator = await buildBookValidator();
-      const tile = await loadTile(KALLOCAIN_URL, { fetch: fetchSample });
+      const tile = await loadTile(KALLOCAIN_URL, { fetch: fetchFixture });
       const tileBefore = structuredClone(tile);
 
       validateTile(tile, tileValidator);
@@ -586,7 +586,7 @@ describe("validateTile", function describeValidateTile(): void {
   describe("reused validator", function describeReusedValidator(): void {
     it("Matching tile after a tile that does not match", async function matchesAfterMismatch(): Promise<void> {
       const tileValidator = await buildBookValidator();
-      const kallocain = await loadTile(KALLOCAIN_URL, { fetch: fetchSample });
+      const kallocain = await loadTile(KALLOCAIN_URL, { fetch: fetchFixture });
 
       const error = catchValidationError(
         buildBookTileWithout(NO_COUNTRY_URL, "country"),

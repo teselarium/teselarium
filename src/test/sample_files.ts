@@ -3,29 +3,38 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Base URL under which `fetchSample` serves the files of `public/samples/`. */
-export const SAMPLES_BASE_URL = "https://example.org/samples/";
+/** Base URL under which `fetchAppFile` serves the files of `public/`: the app's address in tests. */
+export const APP_BASE_URL = "https://example.org/";
+
+/**
+ * Base URL under which `fetchFixture` and `fetchAppFile` serve the files of
+ * `src/test/fixtures/`. It is on the app's origin, so fixture mods get the
+ * permissions of mods from the app's origin.
+ */
+export const FIXTURES_BASE_URL = `${APP_BASE_URL}fixtures/`;
+
+const PROJECT_DIRECTORY = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+);
 
 /**
  * `public/` on disk. Built from a path rather than `new URL("…", import.meta.url)`,
  * which Vite rewrites into a served URL for files under `public/`.
  */
-const PUBLIC_DIRECTORY = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "public",
-);
+const PUBLIC_DIRECTORY = join(PROJECT_DIRECTORY, "public");
 
-const SAMPLES_DIRECTORY = join(PUBLIC_DIRECTORY, "samples");
+/** `src/test/fixtures/` on disk: the files unit tests read, apart from the shipped sample. */
+const FIXTURES_DIRECTORY = join(PROJECT_DIRECTORY, "src", "test", "fixtures");
 
-/** Reads a file under `public/samples/` from disk, e.g. `tiles/books/kallocain.md`. */
-export function readSampleText(relativePath: string): string {
-  const sampleText = readFileSync(
-    join(SAMPLES_DIRECTORY, relativePath),
+/** Reads a file under `src/test/fixtures/` from disk, e.g. `tiles/books/kallocain.md`. */
+export function readFixtureText(relativePath: string): string {
+  const fixtureText = readFileSync(
+    join(FIXTURES_DIRECTORY, relativePath),
     "utf8",
   );
-  return sampleText;
+  return fixtureText;
 }
 
 function readRequestedUrl(input: RequestInfo | URL): string {
@@ -57,34 +66,46 @@ async function readFileResponse(filePath: string): Promise<Response> {
   }
 }
 
-/**
- * Test-only fetch: serves the file under `public/samples/` for URLs below
- * `SAMPLES_BASE_URL`, and answers `404 Not Found` for anything else.
- */
-export async function fetchSample(input: RequestInfo | URL): Promise<Response> {
-  const requestedUrl = readRequestedUrl(input);
-  if (!requestedUrl.startsWith(SAMPLES_BASE_URL)) {
-    return buildNotFoundResponse();
-  }
-  const relativePath = requestedUrl.slice(SAMPLES_BASE_URL.length);
-  const sampleResponse = await readFileResponse(
-    join(SAMPLES_DIRECTORY, decodeURIComponent(relativePath)),
+/** Answers with the fixture file for a URL below `FIXTURES_BASE_URL`. */
+async function readFixtureResponse(requestedUrl: string): Promise<Response> {
+  const relativePath = requestedUrl.slice(FIXTURES_BASE_URL.length);
+  const fixtureResponse = await readFileResponse(
+    join(FIXTURES_DIRECTORY, decodeURIComponent(relativePath)),
   );
-  return sampleResponse;
+  return fixtureResponse;
 }
 
-/** Base URL under which `fetchAppFile` serves the files of `public/`: the app's address in tests. */
-export const APP_BASE_URL = "https://example.org/";
+/**
+ * Test-only fetch: serves the file under `src/test/fixtures/` for URLs below
+ * `FIXTURES_BASE_URL`, and answers `404 Not Found` for anything else.
+ */
+export async function fetchFixture(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const requestedUrl = readRequestedUrl(input);
+  if (!requestedUrl.startsWith(FIXTURES_BASE_URL)) {
+    return buildNotFoundResponse();
+  }
+  const fixtureResponse = await readFixtureResponse(requestedUrl);
+  return fixtureResponse;
+}
 
 /**
  * Test-only fetch: serves the file under `public/` for URLs below
  * `APP_BASE_URL`, like the built app does, and answers `404 Not Found` for
- * anything else. Samples are served at the same URLs as `fetchSample`.
+ * anything else. The one exception is the fixtures: URLs below
+ * `FIXTURES_BASE_URL` are served from `src/test/fixtures/`, at the same URLs
+ * as `fetchFixture`. `public/` has no `fixtures/` folder, so no file is hidden.
+ * Only the sample smoke test reads the shipped sample, at `${APP_BASE_URL}samples/`.
  */
 export async function fetchAppFile(
   input: RequestInfo | URL,
 ): Promise<Response> {
   const requestedUrl = new URL(readRequestedUrl(input));
+  if (requestedUrl.href.startsWith(FIXTURES_BASE_URL)) {
+    const fixtureResponse = await readFixtureResponse(requestedUrl.href);
+    return fixtureResponse;
+  }
   if (!requestedUrl.href.startsWith(APP_BASE_URL)) {
     return buildNotFoundResponse();
   }

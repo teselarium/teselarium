@@ -18,7 +18,7 @@ A same tile could be compatible with multiple mods if they have the required fie
 
 A Mod can use a generic tile type in order to be compatible with any tile, for example defining only optional parameter like title or name. Furthermore, a mod may not need any tile to work, for example a mod for an alternative visualization of the home or the settings page
 
-Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. For example for a mod called "country_markers_map" that shows input tiles organized by country in a map:
+Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. By default, a mod is a folder that bundles its mod_conf.yaml, its code, its tile type file and a sample collection, so it can be copied or shared as one folder. `type_path` and `sample_collection` are resolved against the mod_conf.yaml location, and they may also point outside the mod folder or to another site, for example to share one tile type between several mods. For example for a mod called "country_markers_map" that shows input tiles organized by country in a map:
 
 ```yaml
 mod:
@@ -27,21 +27,8 @@ mod:
   version: "1.0.0"
   description: "An interactive world map that display tiles as markers organized by country."
   entrypoint: "./main.js"
-  schema:
-    definitions:
-      country_location:
-        properties:
-          title:
-            type: string
-          country:
-            type: string
-        optionalProperties:
-          image:
-            type: string
-          date:
-            type: string
-        additionalProperties: true
-    ref: country_location
+  type_path: "./country_location.md"
+  sample_collection: "./sample_collection.yaml"
   config:
     map:
       center: [0, 0.0] # [latitude, longitude]
@@ -53,4 +40,30 @@ mod:
     popup:
       show_image: true
       show_body: false
+```
+
+The tile type is a markdown file whose frontmatter has a `schema` mapping, here `country_location.md` next to mod_conf.yaml:
+
+```markdown
+---
+schema:
+  definitions:
+    country_location:
+      properties:
+        title:
+          type: string
+        country:
+          type: string
+      optionalProperties:
+        image:
+          type: string
+        date:
+          type: string
+      additionalProperties: true
+  ref: country_location
+---
+
+# Country Location
+
+Tiles with a title and the country they are located in.
 ```

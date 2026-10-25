@@ -55,4 +55,4 @@ For an app at `https://example.org/`:
 | `https://example.org/#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml` | the same mod, by its source (what the explorer opens) |
 | `https://example.org/#/run?mod=mod_viewer` | "No mod was given." |
 
-"Run with sample tiles" on the sample mod opens `#/run?mod=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml&collection=https%3A%2F%2Fexample.org%2Fsamples%2Ftiles%2Fbooks_collection.yaml`.
+"Run with sample tiles" on the sample mod opens `#/run?mod=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml&collection=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fbook_collection.yaml`.

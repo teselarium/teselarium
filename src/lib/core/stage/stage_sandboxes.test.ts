@@ -122,7 +122,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     const spied = buildServices(OTHER_APP_ORIGIN);
 
     const runtime = launchSandbox(
-      buildSandbox("./samples/mods/book_list", null),
+      buildSandbox("./fixtures/mods/book_list", null),
       spied.services,
     );
 
@@ -143,7 +143,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     const spied = buildServices(OTHER_APP_ORIGIN);
 
     const runtime = launchSandbox(
-      buildSandbox("./samples/mods/book_list", FOUR_BOOKS_SOURCE),
+      buildSandbox("./fixtures/mods/book_list", FOUR_BOOKS_SOURCE),
       spied.services,
     );
     await runtime.settled;
@@ -158,7 +158,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     const spied = buildServices();
 
     const runtime = launchSandbox(
-      buildSandbox("./samples/mods/missing", null),
+      buildSandbox("./fixtures/mods/missing", null),
       spied.services,
     );
     await runtime.settled;
@@ -166,7 +166,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     expect(runtime.status).toBe("failed");
     expect(runtime.launch).toBeNull();
     expect(runtime.errorMessage).toContain(
-      "https://example.org/samples/mods/missing/mod_conf.yaml",
+      "https://example.org/fixtures/mods/missing/mod_conf.yaml",
     );
     expect(runtime.errorMessage).toContain("404");
     expect(spied.onChange).toHaveBeenCalledOnce();
@@ -202,7 +202,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     const spied = buildServices();
 
     const runtime = launchSandbox(
-      buildSandbox("./samples/mods/book_list", null),
+      buildSandbox("./fixtures/mods/book_list", null),
       spied.services,
     );
     stopSandbox(runtime, null);
@@ -218,7 +218,7 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
   it("connects a session and adds its issues to the runtime", async function connectsSession(): Promise<void> {
     const spied = buildServices();
     const { runtime, modPort } = await startSandbox(
-      buildSandbox("./samples/mods/book_list", null),
+      buildSandbox("./fixtures/mods/book_list", null),
       spied,
     );
     spied.onChange.mockClear();
@@ -244,7 +244,7 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
   it("passes ui.confirm to onRequestAction with the runtime's id", async function asksWithId(): Promise<void> {
     const spied = buildServices();
     const { modPort, received } = await startSandbox(
-      buildSandbox("./samples/mods/book_list", null),
+      buildSandbox("./fixtures/mods/book_list", null),
       spied,
     );
 
@@ -300,7 +300,7 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
   it("connects only once", async function connectsOnce(): Promise<void> {
     const spied = buildServices();
     const { runtime } = await startSandbox(
-      buildSandbox("./samples/mods/book_list", null),
+      buildSandbox("./fixtures/mods/book_list", null),
       spied,
     );
     const session = runtime.session;
@@ -317,7 +317,7 @@ describe("stopSandbox", function describeStopSandbox(): void {
   it("Mod navigates its frame", async function stopsWithIssue(): Promise<void> {
     const spied = buildServices();
     const { runtime } = await startSandbox(
-      buildSandbox("./samples/mods/book_list", null),
+      buildSandbox("./fixtures/mods/book_list", null),
       spied,
     );
 
@@ -341,7 +341,7 @@ describe("stopSandbox", function describeStopSandbox(): void {
   it("stops without an issue", async function stopsQuietly(): Promise<void> {
     const spied = buildServices();
     const { runtime } = await startSandbox(
-      buildSandbox("./samples/mods/book_list", null),
+      buildSandbox("./fixtures/mods/book_list", null),
       spied,
     );
 
@@ -357,7 +357,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     serveFourBooks();
     const spied = buildServices();
     const { runtime, received } = await startSandbox(
-      buildSandbox("./samples/mods/book_list", FOUR_BOOKS_SOURCE),
+      buildSandbox("./fixtures/mods/book_list", FOUR_BOOKS_SOURCE),
       spied,
     );
     expect(readSandboxIssues(runtime)).toHaveLength(1);
@@ -384,7 +384,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     serveFourBooks();
     const spied = buildServices();
     const { runtime } = await startSandbox(
-      buildSandbox("./samples/mods/book_list", FOUR_BOOKS_SOURCE),
+      buildSandbox("./fixtures/mods/book_list", FOUR_BOOKS_SOURCE),
       spied,
     );
     testTexts.delete(FOUR_BOOKS_SOURCE);
@@ -404,7 +404,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     const spied = buildServices();
     const fetchSpy = vi.fn<typeof fetch>(fetchTestFile);
     const { runtime } = await startSandbox(
-      buildSandbox("./samples/mods/book_list", null),
+      buildSandbox("./fixtures/mods/book_list", null),
       spied,
     );
     spied.services.fetchOptions = { baseUrl: APP_BASE_URL, fetch: fetchSpy };

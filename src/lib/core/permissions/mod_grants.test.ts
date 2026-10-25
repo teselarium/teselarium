@@ -10,7 +10,7 @@ import type { ModGrants } from "./index.ts";
 
 const APP_ORIGIN = "https://example.org";
 const SAMPLE_MOD = {
-  source: "https://example.org/samples/mods/book_list/mod_conf.yaml",
+  source: "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
   permissions: [
     {
       category: "show",

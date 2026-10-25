@@ -3,30 +3,30 @@ import type { RunLink } from "../engine/index.ts";
 import { buildRunLink, readAppRoute } from "./run_links.ts";
 
 const SAMPLE_SOURCE =
-  "https://example.org/samples/mods/book_list/mod_conf.yaml";
+  "https://example.org/fixtures/mods/book_list/mod_conf.yaml";
 
 describe("readAppRoute", function describeReadAppRoute(): void {
   it("Link with a mod and a collection", function readsModAndCollection(): void {
     const route = readAppRoute(
-      "#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml",
+      "#/run?mod=./fixtures/mods/book_list&collection=./fixtures/tiles/books_collection.yaml",
     );
 
     expect(route).toEqual({
       page: "run",
       link: {
-        mod: "./samples/mods/book_list",
-        collection: "./samples/tiles/books_collection.yaml",
+        mod: "./fixtures/mods/book_list",
+        collection: "./fixtures/tiles/books_collection.yaml",
         params: {},
       },
     });
   });
 
   it("Link without a collection", function readsModOnly(): void {
-    const route = readAppRoute("#/run?mod=./samples/mods/book_list");
+    const route = readAppRoute("#/run?mod=./fixtures/mods/book_list");
 
     expect(route).toEqual({
       page: "run",
-      link: { mod: "./samples/mods/book_list", collection: null, params: {} },
+      link: { mod: "./fixtures/mods/book_list", collection: null, params: {} },
     });
   });
 
@@ -99,19 +99,19 @@ describe("buildRunLink", function describeBuildRunLink(): void {
     });
 
     expect(runLink).toBe(
-      "#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml",
+      "#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Ffixtures%2Fmods%2Fbook_list%2Fmod_conf.yaml",
     );
   });
 
   it("writes the collection after the mod", function buildsCollection(): void {
     const runLink = buildRunLink({
-      mod: "./samples/mods/book_list",
-      collection: "./samples/tiles/books_collection.yaml",
+      mod: "./fixtures/mods/book_list",
+      collection: "./fixtures/tiles/books_collection.yaml",
       params: {},
     });
 
     expect(runLink).toBe(
-      "#/run?mod=.%2Fsamples%2Fmods%2Fbook_list&collection=.%2Fsamples%2Ftiles%2Fbooks_collection.yaml",
+      "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&collection=.%2Ffixtures%2Ftiles%2Fbooks_collection.yaml",
     );
   });
 

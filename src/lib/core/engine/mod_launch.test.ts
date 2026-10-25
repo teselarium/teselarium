@@ -30,8 +30,8 @@ import { loadModTiles, prepareModLaunch } from "./mod_launch.ts";
 import type { ModLaunch, ModLaunchRequest, RunLink } from "./mod_launch.ts";
 
 const SAMPLE_LINK: RunLink = {
-  mod: "./samples/mods/book_list",
-  collection: "./samples/tiles/books_collection.yaml",
+  mod: "./fixtures/mods/book_list",
+  collection: "./fixtures/tiles/books_collection.yaml",
   params: {},
 };
 
@@ -129,7 +129,7 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
   it("Link parameters", async function copiesParams(): Promise<void> {
     const params = {
-      target: "https://example.org/samples/mods/book_list/mod_conf.yaml",
+      target: "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
     };
 
     const launch = await launchMod({ ...SAMPLE_LINK, params });
@@ -185,7 +185,7 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     const testFetch = createTestFetch();
     const defaults = resolveDefaultModSettings(
       {
-        folder: "./samples/mods/",
+        folder: "./fixtures/mods/",
         switchedOff: ["book_list"],
       },
       APP_BASE_URL,
@@ -247,28 +247,28 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
   it("propagates mod file errors with their classes", async function propagatesModErrors(): Promise<void> {
     testTexts.set(
-      "https://example.org/samples/mods/no_mod/mod_conf.yaml",
+      "https://example.org/fixtures/mods/no_mod/mod_conf.yaml",
       'name: "no mod mapping"',
     );
     testTexts.set(
-      "https://example.org/samples/mods/bad_yaml/mod_conf.yaml",
+      "https://example.org/fixtures/mods/bad_yaml/mod_conf.yaml",
       "mod: [unclosed",
     );
 
     await expect(
-      launchMod({ ...SAMPLE_LINK, mod: "./samples/mods/missing" }),
+      launchMod({ ...SAMPLE_LINK, mod: "./fixtures/mods/missing" }),
     ).rejects.toThrow(FileFetchError);
     await expect(
-      launchMod({ ...SAMPLE_LINK, mod: "./samples/mods/no_mod" }),
+      launchMod({ ...SAMPLE_LINK, mod: "./fixtures/mods/no_mod" }),
     ).rejects.toThrow(ModFormatError);
     await expect(
-      launchMod({ ...SAMPLE_LINK, mod: "./samples/mods/bad_yaml" }),
+      launchMod({ ...SAMPLE_LINK, mod: "./fixtures/mods/bad_yaml" }),
     ).rejects.toThrow(YamlParseError);
   });
 
   it("propagates type file errors with their classes", async function propagatesTypeErrors(): Promise<void> {
     const brokenTypeSource =
-      "https://example.org/samples/mods/broken_type/mod_conf.yaml";
+      "https://example.org/fixtures/mods/broken_type/mod_conf.yaml";
     serveTestMod(brokenTypeSource, [
       '  name: "broken_type"',
       '  version: "0.1.0"',
@@ -276,7 +276,7 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
       '  type_path: "./type.md"',
     ]);
     testTexts.set(
-      "https://example.org/samples/mods/broken_type/type.md",
+      "https://example.org/fixtures/mods/broken_type/type.md",
       "---\ntitle: no schema\n---\n",
     );
 
@@ -287,19 +287,22 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
   it("propagates collection errors with their classes", async function propagatesCollectionErrors(): Promise<void> {
     testTexts.set(
-      "https://example.org/samples/tiles/not_a_collection.yaml",
+      "https://example.org/fixtures/tiles/not_a_collection.yaml",
       'name: "no collection mapping"',
     );
 
     await expect(
-      launchMod({ ...SAMPLE_LINK, collection: "./samples/tiles/missing.yaml" }),
+      launchMod({
+        ...SAMPLE_LINK,
+        collection: "./fixtures/tiles/missing.yaml",
+      }),
     ).rejects.toThrow(
-      'Cannot load file "https://example.org/samples/tiles/missing.yaml": HTTP 404',
+      'Cannot load file "https://example.org/fixtures/tiles/missing.yaml": HTTP 404',
     );
     await expect(
       launchMod({
         ...SAMPLE_LINK,
-        collection: "./samples/tiles/not_a_collection.yaml",
+        collection: "./fixtures/tiles/not_a_collection.yaml",
       }),
     ).rejects.toThrow(CollectionFormatError);
   });

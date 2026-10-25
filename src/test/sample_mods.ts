@@ -1,4 +1,4 @@
-import { APP_BASE_URL, SAMPLES_BASE_URL } from "./sample_files.ts";
+import { APP_BASE_URL, FIXTURES_BASE_URL } from "./sample_files.ts";
 import { buildTypeText, testTexts } from "./test_files.ts";
 
 /** The app's origin in tests. Mods under `APP_BASE_URL` are on it and get their permissions. */
@@ -7,14 +7,14 @@ export const APP_ORIGIN = "https://example.org";
 /** An origin that is not the app's, so the sample mod counts as a foreign mod. */
 export const OTHER_APP_ORIGIN = "https://other.example";
 
-export const SAMPLE_MOD_SOURCE = `${SAMPLES_BASE_URL}mods/book_list/mod_conf.yaml`;
-export const SAMPLE_ENTRYPOINT = `${SAMPLES_BASE_URL}mods/book_list/main.js`;
-export const SAMPLE_TYPE_SOURCE = `${SAMPLES_BASE_URL}types/book.md`;
-export const SAMPLE_COLLECTION_SOURCE = `${SAMPLES_BASE_URL}tiles/books_collection.yaml`;
+export const SAMPLE_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/book_list/mod_conf.yaml`;
+export const SAMPLE_ENTRYPOINT = `${FIXTURES_BASE_URL}mods/book_list/main.js`;
+export const SAMPLE_TYPE_SOURCE = `${FIXTURES_BASE_URL}types/book.md`;
+export const SAMPLE_COLLECTION_SOURCE = `${FIXTURES_BASE_URL}tiles/books_collection.yaml`;
 export const SAMPLE_TILE_SOURCES = [
-  `${SAMPLES_BASE_URL}tiles/books/farenheit_451.md`,
-  `${SAMPLES_BASE_URL}tiles/books/kallocain.md`,
-  `${SAMPLES_BASE_URL}tiles/books/fictions.md`,
+  `${FIXTURES_BASE_URL}tiles/books/farenheit_451.md`,
+  `${FIXTURES_BASE_URL}tiles/books/kallocain.md`,
+  `${FIXTURES_BASE_URL}tiles/books/fictions.md`,
 ];
 
 export const SAMPLE_COVERS_PERMISSION = {
@@ -30,14 +30,14 @@ export const TEST_DEFAULTS = {
 };
 
 /** A mod without `type_path`, served by `fetchTestFile` once `serveUntypedMod` ran. */
-export const UNTYPED_MOD_SOURCE = `${SAMPLES_BASE_URL}mods/untyped/mod_conf.yaml`;
+export const UNTYPED_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/untyped/mod_conf.yaml`;
 
 /** A collection with the three sample books and a fourth tile without `country`. */
-export const FOUR_BOOKS_SOURCE = `${SAMPLES_BASE_URL}tiles/four_books.yaml`;
-export const NO_COUNTRY_TILE_SOURCE = `${SAMPLES_BASE_URL}tiles/books/no_country.md`;
+export const FOUR_BOOKS_SOURCE = `${FIXTURES_BASE_URL}tiles/four_books.yaml`;
+export const NO_COUNTRY_TILE_SOURCE = `${FIXTURES_BASE_URL}tiles/books/no_country.md`;
 
 /** A collection with two of the sample books. */
-export const TWO_BOOKS_SOURCE = `${SAMPLES_BASE_URL}tiles/two_books.yaml`;
+export const TWO_BOOKS_SOURCE = `${FIXTURES_BASE_URL}tiles/two_books.yaml`;
 
 const MOUNT_CODE = "export default function mount() {}\n";
 
@@ -51,7 +51,7 @@ export function serveUntypedMod(): void {
       '  entrypoint: "./main.js"',
     ].join("\n"),
   );
-  testTexts.set(`${SAMPLES_BASE_URL}mods/untyped/main.js`, MOUNT_CODE);
+  testTexts.set(`${FIXTURES_BASE_URL}mods/untyped/main.js`, MOUNT_CODE);
 }
 
 /** Serves an inline mod file at `source`, with a `main.js` next to it. */

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import {
-  fetchSample,
-  readSampleText,
-  SAMPLES_BASE_URL,
+  fetchFixture,
+  readFixtureText,
+  FIXTURES_BASE_URL,
 } from "../../test/sample_files.ts";
 import {
   FileFetchError,
@@ -15,10 +15,10 @@ import { loadTile } from "./index.ts";
 import type { Tile } from "./index.ts";
 
 const KALLOCAIN_PATH = "tiles/books/kallocain.md";
-const KALLOCAIN_URL = `${SAMPLES_BASE_URL}${KALLOCAIN_PATH}`;
+const KALLOCAIN_URL = `${FIXTURES_BASE_URL}${KALLOCAIN_PATH}`;
 
 function createSampleFetch(): Mock<typeof fetch> {
-  const sampleFetch = vi.fn<typeof fetch>(fetchSample);
+  const sampleFetch = vi.fn<typeof fetch>(fetchFixture);
   return sampleFetch;
 }
 
@@ -36,7 +36,7 @@ function returnLoadError(error: unknown): unknown {
 
 describe("loadTile", function describeLoadTile(): void {
   it("Load a sample tile", async function loadsSampleTile(): Promise<void> {
-    const tile = await loadTile(KALLOCAIN_URL, { fetch: fetchSample });
+    const tile = await loadTile(KALLOCAIN_URL, { fetch: fetchFixture });
 
     expect(Object.keys(tile).sort()).toEqual([
       "body",
@@ -55,7 +55,7 @@ describe("loadTile", function describeLoadTile(): void {
     const sampleFetch = createSampleFetch();
 
     const tile = await loadTile("./tiles/books/kallocain.md", {
-      baseUrl: SAMPLES_BASE_URL,
+      baseUrl: FIXTURES_BASE_URL,
       fetch: sampleFetch,
     });
 
@@ -68,7 +68,7 @@ describe("loadTile", function describeLoadTile(): void {
     const localFiles = indexLocalFiles([
       {
         path: "library/books/kallocain.md",
-        content: new Blob([readSampleText(KALLOCAIN_PATH)]),
+        content: new Blob([readFixtureText(KALLOCAIN_PATH)]),
       },
     ]);
 
@@ -83,14 +83,14 @@ describe("loadTile", function describeLoadTile(): void {
   });
 
   it("Caller tells the failures apart", async function distinguishesFailures(): Promise<void> {
-    const missingUrl = `${SAMPLES_BASE_URL}tiles/missing.md`;
+    const missingUrl = `${FIXTURES_BASE_URL}tiles/missing.md`;
     const badUrl = "https://example.org/bad.md";
     const badFetch = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response('---\ntitle: "unterminated\n---\n'));
 
     const missingError = await catchLoadError(
-      loadTile(missingUrl, { fetch: fetchSample }),
+      loadTile(missingUrl, { fetch: fetchFixture }),
     );
     const badError = await catchLoadError(
       loadTile(badUrl, { fetch: badFetch }),
@@ -105,7 +105,7 @@ describe("loadTile", function describeLoadTile(): void {
   });
 
   it("Structured clone of a tile", async function clonesTile(): Promise<void> {
-    const tile = await loadTile(KALLOCAIN_URL, { fetch: fetchSample });
+    const tile = await loadTile(KALLOCAIN_URL, { fetch: fetchFixture });
 
     const clonedTile = structuredClone(tile);
 
@@ -113,8 +113,8 @@ describe("loadTile", function describeLoadTile(): void {
   });
 
   it("Same file loaded twice", async function loadsIndependentTiles(): Promise<void> {
-    const firstTile = await loadTile(KALLOCAIN_URL, { fetch: fetchSample });
-    const secondTile = await loadTile(KALLOCAIN_URL, { fetch: fetchSample });
+    const firstTile = await loadTile(KALLOCAIN_URL, { fetch: fetchFixture });
+    const secondTile = await loadTile(KALLOCAIN_URL, { fetch: fetchFixture });
 
     firstTile.metadata.title = "Changed";
 

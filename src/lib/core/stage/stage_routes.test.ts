@@ -39,13 +39,13 @@ const HOME_PAGE_ROUTE = {
 
 describe("readStageRoute", function describeReadStageRoute(): void {
   it("keeps the hash and the link of a run link", function readsRunLink(): void {
-    const hash = "#/run?mod=.%2Fsamples%2Fmods%2Fbook_list&extra=1";
+    const hash = "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&extra=1";
 
     expect(readStageRoute(hash, PAGE_ROUTING)).toEqual({
       kind: "sandbox",
       hash,
       link: {
-        mod: "./samples/mods/book_list",
+        mod: "./fixtures/mods/book_list",
         collection: null,
         params: { extra: "1" },
       },
@@ -157,7 +157,7 @@ describe("findLinkSection", function describeFindLinkSection(): void {
 
   it("Link to another mod", function findsNone(): void {
     const otherLinks: RunLink[] = [
-      { mod: "./samples/mods/book_list", collection: null, params: {} },
+      { mod: "./fixtures/mods/book_list", collection: null, params: {} },
       { mod: "mod_explorer", collection: "./c.yaml", params: {} },
       { mod: "mod_explorer", collection: null, params: { from: "home" } },
     ];
@@ -174,13 +174,13 @@ describe("routeForLink", function describeRouteForLink(): void {
       mod: "mod_viewer",
       collection: null,
       params: {
-        target: "https://example.org/samples/mods/book_list/mod_conf.yaml",
+        target: "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
       },
     };
 
     expect(routeForLink(link)).toEqual({
       kind: "sandbox",
-      hash: "#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml",
+      hash: "#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Ffixtures%2Fmods%2Fbook_list%2Fmod_conf.yaml",
       link,
       isHomeMod: false,
     });

@@ -1,6 +1,6 @@
 import { YAMLException } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
-import { readSampleText } from "../../test/sample_files.ts";
+import { readFixtureText } from "../../test/sample_files.ts";
 import { MarkdownParseError } from "./file_errors.ts";
 import type { FetchedFile } from "./file_fetcher.ts";
 import { parseMarkdown } from "./markdown_parser.ts";
@@ -45,7 +45,7 @@ describe("parseMarkdown", function describeParseMarkdown(): void {
   describe("frontmatter", function describeFrontmatter(): void {
     it("Sample frontmatter", function parsesSampleFrontmatter(): void {
       const parsed = parseMarkdown(
-        buildFetchedFile(readSampleText(FAHRENHEIT_PATH)),
+        buildFetchedFile(readFixtureText(FAHRENHEIT_PATH)),
       );
 
       expect(parsed.metadata.title).toBe("Fahrenheit 451");
@@ -105,7 +105,7 @@ describe("parseMarkdown", function describeParseMarkdown(): void {
 
   describe("body", function describeBody(): void {
     it("Sample body", function keepsSampleBody(): void {
-      const sampleText = readSampleText(FAHRENHEIT_PATH);
+      const sampleText = readFixtureText(FAHRENHEIT_PATH);
 
       const parsed = parseMarkdown(buildFetchedFile(sampleText));
 
@@ -261,7 +261,7 @@ describe("parseMarkdown", function describeParseMarkdown(): void {
 
   describe("independent results", function describeIndependentResults(): void {
     it("gives independent metadata for the same content", function parsesIndependently(): void {
-      const fetchedFile = buildFetchedFile(readSampleText(FAHRENHEIT_PATH));
+      const fetchedFile = buildFetchedFile(readFixtureText(FAHRENHEIT_PATH));
 
       const firstParsed = parseMarkdown(fetchedFile);
       const secondParsed = parseMarkdown(fetchedFile);

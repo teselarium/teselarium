@@ -23,7 +23,7 @@ import { openModsSection, openSection, pageBody } from "./app_layout.ts";
 import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
 
 const SAMPLE_WITH_TILES =
-  "#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
+  "#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const SAMPLE_WITHOUT_TILES = "#/run?mod=./samples/mods/book_list";
 const VIEWER_LINK = "#/run?mod=mod_viewer";
 const EXPLORER_LINK = "#/run?mod=mod_explorer";
@@ -85,7 +85,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
         .getByText("There are no books to show."),
     ).toBeVisible();
     for (const url of requestedUrls) {
-      expect(url).not.toContain("books_collection.yaml");
+      expect(url).not.toContain("book_collection.yaml");
     }
   });
 
@@ -472,10 +472,12 @@ test.describe("Show load failures", function describeLoadFailures(): void {
     page,
   }): Promise<void> {
     await page.goto(
-      "/#/run?mod=./samples/mods/book_list&collection=./samples/tiles/missing.yaml",
+      "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/missing.yaml",
     );
-    const missingCollection = new URL("/samples/tiles/missing.yaml", page.url())
-      .href;
+    const missingCollection = new URL(
+      "/samples/mods/book_list/missing.yaml",
+      page.url(),
+    ).href;
 
     await expect(page.getByRole("alert")).toContainText(missingCollection);
     await expect(page.locator("iframe")).toHaveCount(0);
@@ -511,7 +513,7 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
     const twoBooks = { isOn: false };
     await routeCovers(page);
     await page.route(
-      "**/samples/tiles/books_collection.yaml",
+      "**/samples/mods/book_list/book_collection.yaml",
       answerCollection.bind(undefined, twoBooks),
     );
     await page.goto(`/${SAMPLE_WITH_TILES}`);

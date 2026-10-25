@@ -12,7 +12,7 @@ export function readRequestedUrl(input: RequestInfo | URL): string {
   return String(input);
 }
 
-/** Serves the test texts, and falls back to the files under `public/` (see `fetchAppFile`). */
+/** Serves the test texts, and falls back to the fixtures and the files under `public/` (see `fetchAppFile`). */
 export async function fetchTestFile(
   input: RequestInfo | URL,
 ): Promise<Response> {

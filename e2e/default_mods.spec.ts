@@ -254,8 +254,8 @@ test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
         "collection:",
         '  name: "Two books"',
         "  tiles:",
-        '    - path: "../samples/tiles/books/kallocain.md"',
-        '    - path: "../samples/tiles/books/fictions.md"',
+        '    - path: "../samples/mods/book_list/books/kallocain.md"',
+        '    - path: "../samples/mods/book_list/books/fictions.md"',
       ].join("\n"),
     });
     await openViewerForSample(page);

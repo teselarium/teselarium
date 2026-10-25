@@ -36,7 +36,7 @@ Examples, for an app at `https://example.org/`:
 | `#/` | Home (the Home page in the vanilla app) |
 | `#/guides/first_steps` | the page `first_steps` of the Guides section |
 | `#/run?mod=mod_explorer` | the mod explorer |
-| `#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml` | the sample mod with the sample books |
+| `#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml` | the sample mod with the sample books |
 | `#/run?mod=./samples/mods/book_list` | the sample mod without tiles |
 | `#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml` | the mod viewer, showing the sample mod |
 

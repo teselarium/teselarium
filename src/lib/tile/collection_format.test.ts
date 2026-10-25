@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { readSampleText } from "../../test/sample_files.ts";
+import { readFixtureText } from "../../test/sample_files.ts";
 import { parseYaml } from "../files/index.ts";
 import type { ParsedYaml } from "../files/index.ts";
 import { readCollectionFormat, readTileEntry } from "./collection_format.ts";
 import { CollectionFormatError } from "./tile_errors.ts";
 
-const TEST_SOURCE = "https://example.org/samples/test_collection.yaml";
+const TEST_SOURCE = "https://example.org/fixtures/test_collection.yaml";
 const COLLECTION_PATH = "tiles/books_collection.yaml";
 
 function parseCollectionText(content: string): ParsedYaml {
@@ -31,7 +31,7 @@ describe("readCollectionFormat", function describeReadCollectionFormat(): void {
   describe("valid collections", function describeValidCollections(): void {
     it("reads the sample collection", function readsSampleCollection(): void {
       const collectionFormat = readCollectionFormat(
-        parseCollectionText(readSampleText(COLLECTION_PATH)),
+        parseCollectionText(readFixtureText(COLLECTION_PATH)),
       );
 
       expect(collectionFormat.name).toBe("Science fiction books");

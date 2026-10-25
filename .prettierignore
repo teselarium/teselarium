@@ -4,7 +4,7 @@ coverage/
 package-lock.json
 docs/
 openspec/
-public/samples/tiles/
-public/samples/types/
+public/samples/mods/book_list/books/
+src/test/fixtures/
 .claude/
 src/vendor/

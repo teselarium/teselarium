@@ -30,7 +30,7 @@ import {
 } from "./theme_probes.ts";
 
 const SAMPLE_RUN_LINK =
-  "/#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
+  "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
 /** The bottom of the frame may sit this far above the viewport's bottom: the stage's padding and border. */

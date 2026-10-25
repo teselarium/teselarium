@@ -61,7 +61,7 @@ describe("App", function describeApp(): void {
 
   it("keeps the stage mounted and hidden while a page shows", async function hidesStage(): Promise<void> {
     const { container } = renderApp(
-      await startTestApp("#/run?mod=./samples/mods/book_list"),
+      await startTestApp("#/run?mod=./fixtures/mods/book_list"),
     );
     const frame = screen.getByTitle("Book List");
 

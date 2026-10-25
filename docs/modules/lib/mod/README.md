@@ -6,7 +6,7 @@ A mod is community JavaScript that OpenTesela runs in a sandbox (see [sandbox](.
 
 ### Mod file format
 
-A mod is a folder with a `mod_conf.yaml` file. The sample book list mod (`public/samples/mods/book_list/mod_conf.yaml`):
+A mod is a folder with a `mod_conf.yaml` file. By default, a mod bundles its tile type and its sample collection in that folder, so it can be copied or shared as one folder. The sample book list mod (`public/samples/mods/book_list/`) holds `mod_conf.yaml`, `main.js`, `book_type.md`, `book_collection.yaml` and the `books/` it lists. Its `mod_conf.yaml`:
 
 ```yaml
 mod:
@@ -15,8 +15,8 @@ mod:
   version: "1.0.0"
   description: "A very simple list of books with their covers."
   entrypoint: "./main.js"
-  type_path: "../../types/book.md"
-  sample_collection: "../../tiles/books_collection.yaml"
+  type_path: "./book_type.md"
+  sample_collection: "./book_collection.yaml"
   config:
     show_covers: true
   permissions:
@@ -40,7 +40,8 @@ Every key lives under a `mod` mapping:
 | `permissions` | no | The web hosts and mods the mod needs, see below. |
 | `theme` | no | `"default"` (the default) or `"none"`. With `"none"`, the mod's frame gets neither the theme tokens nor the base stylesheet; the mod still receives the theme in its mount context and the `theme.changed` event. Any other value is rejected. See the [theme module](../core/theme/README.md). |
 
-- `entrypoint`, `type_path` and `sample_collection` are resolved against the mod file's location, so they can leave the mod folder (`../../types/book.md`).
+- `entrypoint`, `type_path` and `sample_collection` are resolved against the mod file's location.
+- Bundling the tile type and the sample collection is a convention, not a rule: `type_path` and `sample_collection` may still point outside the mod folder (`../../types/book.md`) or to another site (`https://types.example.net/book.md`), so several mods can share one tile type.
 - Other keys are ignored. An inline `schema` is rejected for now: use `type_path` with the path of a tile type file.
 - The file follows the same plain YAML rules as a collection file.
 
@@ -103,8 +104,8 @@ const modFile = await loadModFile("./samples/mods/book_list", {
   baseUrl: "https://example.org/",
 });
 // modFile.source === "https://example.org/samples/mods/book_list/mod_conf.yaml"
-// modFile.typeSource === "https://example.org/samples/types/book.md"
-// modFile.sampleCollection === "https://example.org/samples/tiles/books_collection.yaml"
+// modFile.typeSource === "https://example.org/samples/mods/book_list/book_type.md"
+// modFile.sampleCollection === "https://example.org/samples/mods/book_list/book_collection.yaml"
 
 const mod = await loadMod("mod_viewer", {
   baseUrl: "https://example.org/",

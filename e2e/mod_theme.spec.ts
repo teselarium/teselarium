@@ -36,7 +36,7 @@ import {
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const SAMPLE_RUN_LINK =
-  "/#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
+  "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
 /** Opens the theme probe while the operating system prefers `colorScheme`, with the choice System. */

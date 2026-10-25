@@ -36,7 +36,7 @@ describe("default mods", function describeDefaultMods(): void {
       name: "mod_explorer",
       title: "Mods",
       typeSource: null,
-      config: { viewer: "mod_viewer", mods: ["./samples/mods/book_list"] },
+      config: { viewer: "mod_viewer" },
     });
     expect(explorer.permissions).toEqual([
       expect.objectContaining(OPEN_ANY_SITE),

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import {
-  fetchSample,
-  readSampleText,
-  SAMPLES_BASE_URL,
+  fetchFixture,
+  readFixtureText,
+  FIXTURES_BASE_URL,
 } from "../../test/sample_files.ts";
 import {
   fetchTestFile,
@@ -20,8 +20,8 @@ import { CollectionFormatError, loadTileCollection } from "./index.ts";
 import type { TileCollection } from "./index.ts";
 
 const SAMPLE_COLLECTION_PATH = "tiles/books_collection.yaml";
-const SAMPLE_COLLECTION_URL = `${SAMPLES_BASE_URL}${SAMPLE_COLLECTION_PATH}`;
-const BOOKS_URL = `${SAMPLES_BASE_URL}tiles/books/`;
+const SAMPLE_COLLECTION_URL = `${FIXTURES_BASE_URL}${SAMPLE_COLLECTION_PATH}`;
+const BOOKS_URL = `${FIXTURES_BASE_URL}tiles/books/`;
 const KALLOCAIN_URL = `${BOOKS_URL}kallocain.md`;
 const LOCAL_COLLECTION_URL = "file:///library/books_collection.yaml";
 const CODE_RAN_MARKER = "openTeselaCollectionCodeRan";
@@ -127,7 +127,7 @@ function buildPickedBooks(): { path: string; content: Blob }[] {
   for (const bookFile of SAMPLE_BOOK_FILES) {
     pickedBooks.push({
       path: `library/books/${bookFile}`,
-      content: new Blob([readSampleText(`tiles/books/${bookFile}`)]),
+      content: new Blob([readFixtureText(`tiles/books/${bookFile}`)]),
     });
   }
   return pickedBooks;
@@ -173,7 +173,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
   describe("loaded collection", function describeLoadedCollection(): void {
     it("Load the sample collection", async function loadsSampleCollection(): Promise<void> {
       const collection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
-        fetch: fetchSample,
+        fetch: fetchFixture,
       });
 
       expect(Object.keys(collection).sort()).toEqual([
@@ -219,7 +219,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
     it("Relative collection path with a base URL", async function loadsRelativePath(): Promise<void> {
       const collection = await loadTileCollection(
         "./tiles/books_collection.yaml",
-        { baseUrl: SAMPLES_BASE_URL, fetch: fetchSample },
+        { baseUrl: FIXTURES_BASE_URL, fetch: fetchFixture },
       );
 
       expect(collection.source).toBe(SAMPLE_COLLECTION_URL);
@@ -274,7 +274,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
   describe("collection-level failures", function describeCollectionFailures(): void {
     it("Missing tiles list", async function rejectsMissingTiles(): Promise<void> {
       const testFetch = createTestFetch();
-      const noTilesUrl = "https://example.org/samples/no_tiles.yaml";
+      const noTilesUrl = "https://example.org/fixtures/no_tiles.yaml";
 
       const error = await loadFailingCollection(
         noTilesUrl,
@@ -408,7 +408,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
     it("Collection HTTP 404", async function rejectsMissingCollectionFile(): Promise<void> {
       const testFetch = createTestFetch();
-      const missingUrl = `${SAMPLES_BASE_URL}missing.yaml`;
+      const missingUrl = `${FIXTURES_BASE_URL}missing.yaml`;
 
       const error = await catchLoadError(
         loadTileCollection(missingUrl, { fetch: testFetch }),
@@ -422,9 +422,9 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
     it("Caller tells the collection failures apart", async function distinguishesFailures(): Promise<void> {
       const testFetch = createTestFetch();
-      const missingUrl = `${SAMPLES_BASE_URL}missing.yaml`;
+      const missingUrl = `${FIXTURES_BASE_URL}missing.yaml`;
       const badUrl = "https://example.org/bad.yaml";
-      const noTilesUrl = `${SAMPLES_BASE_URL}no_tiles.yaml`;
+      const noTilesUrl = `${FIXTURES_BASE_URL}no_tiles.yaml`;
 
       const missingError = await catchLoadError(
         loadTileCollection(missingUrl, { fetch: testFetch }),
@@ -473,12 +473,12 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
     it("Parent folder path", async function resolvesParentPath(): Promise<void> {
       const testFetch = createTestFetch();
-      const otherUrl = `${SAMPLES_BASE_URL}other/kallocain.md`;
+      const otherUrl = `${FIXTURES_BASE_URL}other/kallocain.md`;
       serveTestFile(
         SAMPLE_COLLECTION_URL,
         buildCollectionText(['- path: "../other/kallocain.md"']),
       );
-      serveTestFile(otherUrl, readSampleText("tiles/books/kallocain.md"));
+      serveTestFile(otherUrl, readFixtureText("tiles/books/kallocain.md"));
 
       const collection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
         fetch: testFetch,
@@ -495,7 +495,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
         SAMPLE_COLLECTION_URL,
         buildCollectionText([`- url: "${otherUrl}"`]),
       );
-      serveTestFile(otherUrl, readSampleText("tiles/books/kallocain.md"));
+      serveTestFile(otherUrl, readFixtureText("tiles/books/kallocain.md"));
 
       const collection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
         fetch: testFetch,
@@ -543,7 +543,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       });
 
       expect(testFetch).not.toHaveBeenCalledWith(
-        `${SAMPLES_BASE_URL}tiles/a.md`,
+        `${FIXTURES_BASE_URL}tiles/a.md`,
       );
       expect(testFetch).not.toHaveBeenCalledWith("https://example.org/a.md");
       expect(readTitles(collection)).toEqual([
@@ -732,7 +732,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
     });
 
     it("Collection larger than the limit", async function limitsParallelLoads(): Promise<void> {
-      const collectionUrl = `${SAMPLES_BASE_URL}numbered_collection.yaml`;
+      const collectionUrl = `${FIXTURES_BASE_URL}numbered_collection.yaml`;
       serveNumberedCollection(collectionUrl, 10);
       const loading = loadTileCollection(collectionUrl, {
         fetch: fetchPending,
@@ -745,19 +745,19 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
       expect(readPendingUrls()).toEqual([
         collectionUrl,
-        `${SAMPLES_BASE_URL}tile_1.md`,
-        `${SAMPLES_BASE_URL}tile_2.md`,
-        `${SAMPLES_BASE_URL}tile_3.md`,
-        `${SAMPLES_BASE_URL}tile_4.md`,
-        `${SAMPLES_BASE_URL}tile_5.md`,
-        `${SAMPLES_BASE_URL}tile_6.md`,
+        `${FIXTURES_BASE_URL}tile_1.md`,
+        `${FIXTURES_BASE_URL}tile_2.md`,
+        `${FIXTURES_BASE_URL}tile_3.md`,
+        `${FIXTURES_BASE_URL}tile_4.md`,
+        `${FIXTURES_BASE_URL}tile_5.md`,
+        `${FIXTURES_BASE_URL}tile_6.md`,
       ]);
 
       await answerPendingFetch(pendingFetches[3]);
       await waitForPendingFetches(8);
 
       expect(pendingFetches).toHaveLength(8);
-      expect(pendingFetches[7].url).toBe(`${SAMPLES_BASE_URL}tile_7.md`);
+      expect(pendingFetches[7].url).toBe(`${FIXTURES_BASE_URL}tile_7.md`);
 
       await answerPendingFetchesInOrder(11);
       await loading;
@@ -765,7 +765,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
     it("Every tile still loads", async function loadsEveryTile(): Promise<void> {
       const testFetch = createTestFetch();
-      const collectionUrl = `${SAMPLES_BASE_URL}numbered_collection.yaml`;
+      const collectionUrl = `${FIXTURES_BASE_URL}numbered_collection.yaml`;
       serveNumberedCollection(collectionUrl, 10);
 
       const collection = await loadTileCollection(collectionUrl, {
@@ -821,7 +821,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       const testFetch = createTestFetch();
       const localTileUrl = "file:///library/books/kallocain.md";
       const pickedContent = new Blob([
-        readSampleText("tiles/books/kallocain.md"),
+        readFixtureText("tiles/books/kallocain.md"),
       ]);
       const readPickedText = vi.spyOn(pickedContent, "text");
       const localFiles = indexLocalFiles([
@@ -852,7 +852,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       const localFiles = indexLocalFiles([
         {
           path: "library/books_collection.yaml",
-          content: new Blob([readSampleText(SAMPLE_COLLECTION_PATH)]),
+          content: new Blob([readFixtureText(SAMPLE_COLLECTION_PATH)]),
         },
         ...buildPickedBooks(),
       ]);
@@ -895,7 +895,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
   describe("plain data", function describePlainData(): void {
     it("Structured clone of a collection", async function clonesCollection(): Promise<void> {
       const collection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
-        fetch: fetchSample,
+        fetch: fetchFixture,
       });
 
       const clonedCollection = structuredClone(collection);
@@ -905,10 +905,10 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
     it("Same collection loaded twice", async function loadsIndependentCollections(): Promise<void> {
       const firstCollection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
-        fetch: fetchSample,
+        fetch: fetchFixture,
       });
       const secondCollection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
-        fetch: fetchSample,
+        fetch: fetchFixture,
       });
 
       firstCollection.tiles[0].metadata.title = "Changed";

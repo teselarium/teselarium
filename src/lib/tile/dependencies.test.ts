@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
 import matter from "@11ty/gray-matter";
 import Ajv from "ajv/dist/jtd";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
+import { readFixtureText } from "../../test/sample_files.ts";
 
 interface CollectionFile {
   collection: {
@@ -11,18 +11,9 @@ interface CollectionFile {
   };
 }
 
-function readSample(relativePath: string): string {
-  const sampleUrl = new URL(
-    `../../../public/samples/${relativePath}`,
-    import.meta.url,
-  );
-  const sampleText = readFileSync(sampleUrl, "utf8");
-  return sampleText;
-}
-
 describe("tile module dependencies", function describeDependencies(): void {
   it("gray-matter parses a tile into metadata and body", function parsesTile(): void {
-    const tile = matter(readSample("tiles/books/kallocain.md"));
+    const tile = matter(readFixtureText("tiles/books/kallocain.md"));
 
     expect(tile.data.title).toBe("Kallocain");
     expect(tile.content.trimStart()).toMatch(/^Kallocain is a 1940/);
@@ -30,7 +21,7 @@ describe("tile module dependencies", function describeDependencies(): void {
 
   it("js-yaml parses a collection file", function parsesCollection(): void {
     const collectionFile = load(
-      readSample("tiles/books_collection.yaml"),
+      readFixtureText("tiles/books_collection.yaml"),
     ) as CollectionFile;
 
     expect(collectionFile.collection.name).toBe("Science fiction books");
@@ -38,8 +29,8 @@ describe("tile module dependencies", function describeDependencies(): void {
   });
 
   it("Ajv JTD compiles a type schema and accepts tile metadata", function validatesTile(): void {
-    const bookType = matter(readSample("types/book.md"));
-    const tile = matter(readSample("tiles/books/kallocain.md"));
+    const bookType = matter(readFixtureText("types/book.md"));
+    const tile = matter(readFixtureText("tiles/books/kallocain.md"));
     const ajv = new Ajv();
 
     const validateBook = ajv.compile(bookType.data.schema);

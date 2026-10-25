@@ -6,7 +6,7 @@ import { ActionDialog } from "./ActionDialog.tsx";
 
 const MOD = {
   title: "Book List",
-  source: "https://example.org/samples/mods/book_list/mod_conf.yaml",
+  source: "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
 };
 
 let onAnswer: Mock<(id: number, accepted: boolean) => void>;

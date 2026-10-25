@@ -22,8 +22,8 @@ afterEach(function closePorts(): void {
 });
 
 const SAMPLE_LINK = {
-  mod: "./samples/mods/book_list",
-  collection: "./samples/tiles/books_collection.yaml",
+  mod: "./fixtures/mods/book_list",
+  collection: "./fixtures/tiles/books_collection.yaml",
   params: {},
 };
 
@@ -84,14 +84,14 @@ describe("StageView", function describeStageView(): void {
   });
 
   it("shows the close button for a mod opened from a link", async function showsClose(): Promise<void> {
-    const stage = await startTestStage("#/run?mod=./samples/mods/book_list");
+    const stage = await startTestStage("#/run?mod=./fixtures/mods/book_list");
     render(<StageView stage={stage} />);
 
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
   it("No collection, no reload", async function hidesReload(): Promise<void> {
-    const stage = await startTestStage("#/run?mod=./samples/mods/book_list");
+    const stage = await startTestStage("#/run?mod=./fixtures/mods/book_list");
     render(<StageView stage={stage} />);
 
     expect(screen.queryByRole("button", { name: "Reload tiles" })).toBeNull();
@@ -99,7 +99,7 @@ describe("StageView", function describeStageView(): void {
 
   it("shows Reload tiles for a mod opened with a collection", async function showsReload(): Promise<void> {
     const stage = await startTestStage(
-      "#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml",
+      "#/run?mod=./fixtures/mods/book_list&collection=./fixtures/tiles/books_collection.yaml",
     );
     render(<StageView stage={stage} />);
 
@@ -119,11 +119,11 @@ describe("StageView", function describeStageView(): void {
   });
 
   it("Missing mod file", async function showsLoadFailure(): Promise<void> {
-    const stage = await startTestStage("#/run?mod=./samples/mods/missing");
+    const stage = await startTestStage("#/run?mod=./fixtures/mods/missing");
     const { container } = render(<StageView stage={stage} />);
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "https://example.org/samples/mods/missing/mod_conf.yaml",
+      "https://example.org/fixtures/mods/missing/mod_conf.yaml",
     );
     expect(screen.getByRole("alert")).toHaveTextContent("404");
     expect(container.querySelector("iframe")).toBeNull();

@@ -48,7 +48,7 @@ describe("mapPageLink", function describeMapPageLink(): void {
   });
 
   it("Run link", function keepsAppAddress(): void {
-    const href = "#/run?mod=./samples/mods/book_list";
+    const href = "#/run?mod=./fixtures/mods/book_list";
 
     expect(mapPageLink(href, GUIDES_INDEX)).toEqual({
       href,

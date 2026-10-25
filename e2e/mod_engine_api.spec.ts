@@ -106,7 +106,7 @@ test.describe("Engine API object in the frame", function describeEngineApi(): vo
     const frame = await openProbe(
       page,
       [],
-      `${PROBE_LINK}&collection=./samples/tiles/books_collection.yaml`,
+      `${PROBE_LINK}&collection=./samples/mods/book_list/book_collection.yaml`,
     );
     await frame.evaluate(registerTwoTileHandlers);
 

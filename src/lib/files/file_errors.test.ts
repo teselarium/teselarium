@@ -6,9 +6,9 @@ import {
   YamlParseError,
 } from "./file_errors.ts";
 
-const SOURCE = "https://example.org/samples/tiles/books/kallocain.md";
+const SOURCE = "https://example.org/fixtures/tiles/books/kallocain.md";
 const COLLECTION_SOURCE =
-  "https://example.org/samples/tiles/books_collection.yaml";
+  "https://example.org/fixtures/tiles/books_collection.yaml";
 
 describe("describeErrorCause", function describeDescribeErrorCause(): void {
   it("uses the message of an Error", function usesErrorMessage(): void {

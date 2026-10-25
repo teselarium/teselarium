@@ -52,8 +52,8 @@ function launchSampleMod(): Promise<ModLaunch> {
   return prepareModLaunch(
     {
       link: {
-        mod: "./samples/mods/book_list",
-        collection: "./samples/tiles/books_collection.yaml",
+        mod: "./fixtures/mods/book_list",
+        collection: "./fixtures/tiles/books_collection.yaml",
         params: {},
       },
       appOrigin: APP_ORIGIN,
@@ -226,7 +226,7 @@ describe("connectModSession", function describeConnectModSession(): void {
   it("Store and read a value", async function storesValue(): Promise<void> {
     const played = await playSession();
     const value = {
-      source: "https://example.org/samples/tiles/books/kallocain.md",
+      source: "https://example.org/fixtures/tiles/books/kallocain.md",
     };
 
     sendRequest(played, 1, "storage.set", { key: "selected", value });
@@ -482,7 +482,9 @@ describe("stopModSession", function describeStopModSession(): void {
   it("answers nothing and pushes nothing after a stop", async function stopsSession(): Promise<void> {
     const played = await playSession();
 
-    sendRequest(played, 1, "mods.inspect", { mod: "./samples/mods/book_list" });
+    sendRequest(played, 1, "mods.inspect", {
+      mod: "./fixtures/mods/book_list",
+    });
     stopModSession(played.session);
     sendRequest(played, 2, "storage.get", { key: "selected" });
     pushTilesChanged(played.session, [], []);

@@ -5,10 +5,10 @@ import {
   TileValidationError,
 } from "./tile_errors.ts";
 
-const SOURCE = "https://example.org/samples/tiles/books/kallocain.md";
+const SOURCE = "https://example.org/fixtures/tiles/books/kallocain.md";
 const COLLECTION_SOURCE =
-  "https://example.org/samples/tiles/books_collection.yaml";
-const TYPE_SOURCE = "https://example.org/samples/types/book.md";
+  "https://example.org/fixtures/tiles/books_collection.yaml";
+const TYPE_SOURCE = "https://example.org/fixtures/types/book.md";
 const MISMATCH_REASON = `"book" (${TYPE_SOURCE}): metadata must have property 'country'`;
 
 describe("CollectionFormatError", function describeCollectionFormatError(): void {

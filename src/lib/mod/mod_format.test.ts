@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readSampleText } from "../../test/sample_files.ts";
+import { readFixtureText } from "../../test/sample_files.ts";
 import { parseYaml } from "../files/index.ts";
 import type { ParsedYaml, YamlMapping } from "../files/index.ts";
 import { ModFormatError } from "./mod_errors.ts";
@@ -45,8 +45,8 @@ function catchFormatError(parsedYaml: ParsedYaml): ModFormatError {
 describe("readModFormat", function describeReadModFormat(): void {
   it("reads the sample book list mod", function readsSampleMod(): void {
     const parsedYaml = parseYaml({
-      source: "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      content: readSampleText("mods/book_list/mod_conf.yaml"),
+      source: "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
+      content: readFixtureText("mods/book_list/mod_conf.yaml"),
     });
 
     const modFormat = readModFormat(parsedYaml);

@@ -14,7 +14,7 @@ export const EXPLORER_LINK: RunLink = Object.freeze({
 });
 
 export const SAMPLE_LINK: RunLink = Object.freeze({
-  mod: "./samples/mods/book_list",
+  mod: "./fixtures/mods/book_list",
   collection: null,
   params: Object.freeze({}),
 });

@@ -1,11 +1,11 @@
 import { YAMLException } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
-import { readSampleText } from "../../test/sample_files.ts";
+import { readFixtureText } from "../../test/sample_files.ts";
 import { YamlParseError } from "./file_errors.ts";
 import type { FetchedFile } from "./file_fetcher.ts";
 import { parseYaml } from "./yaml_parser.ts";
 
-const TEST_SOURCE = "https://example.org/samples/test.yaml";
+const TEST_SOURCE = "https://example.org/fixtures/test.yaml";
 const COLLECTION_PATH = "tiles/books_collection.yaml";
 const CODE_RAN_MARKER = "openTeselaYamlCodeRan";
 
@@ -38,7 +38,7 @@ describe("parseYaml", function describeParseYaml(): void {
   describe("valid YAML", function describeValidYaml(): void {
     it("parses the sample collection", function parsesSampleCollection(): void {
       const parsed = parseYaml(
-        buildFetchedFile(readSampleText(COLLECTION_PATH)),
+        buildFetchedFile(readFixtureText(COLLECTION_PATH)),
       );
 
       expect(parsed.source).toBe(TEST_SOURCE);
@@ -134,7 +134,7 @@ describe("parseYaml", function describeParseYaml(): void {
 
   describe("independent results", function describeIndependentResults(): void {
     it("gives independent content for the same file", function parsesIndependently(): void {
-      const fetchedFile = buildFetchedFile(readSampleText(COLLECTION_PATH));
+      const fetchedFile = buildFetchedFile(readFixtureText(COLLECTION_PATH));
 
       const firstParsed = parseYaml(fetchedFile);
       const secondParsed = parseYaml(fetchedFile);

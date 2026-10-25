@@ -200,7 +200,7 @@ import { buildSandboxPolicy, collectContentHosts } from "./lib/core/sandbox/inde
 
 const contentHosts = collectContentHosts([
   "https://example.org/samples/mods/book_list/mod_conf.yaml",
-  "https://example.org/samples/tiles/books/kallocain.md",
+  "https://example.org/samples/mods/book_list/books/kallocain.md",
 ]);
 // contentHosts is ["https://example.org"]
 

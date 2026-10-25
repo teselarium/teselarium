@@ -18,7 +18,7 @@ import {
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const SAMPLE_RUN_LINK =
-  "/#/run?mod=./samples/mods/book_list&collection=./samples/tiles/books_collection.yaml";
+  "/#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml";
 const OPEN_ANY_SITE_LINES = [
   "  permissions:",
   "    open:",

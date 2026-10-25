@@ -83,9 +83,9 @@ Example:
 import { loadTile } from "./lib/tile/index.ts";
 
 const tile = await loadTile("./books/kallocain.md", {
-  baseUrl: "https://example.org/samples/",
+  baseUrl: "https://example.org/samples/mods/book_list/",
 });
-// tile.source === "https://example.org/samples/books/kallocain.md"
+// tile.source === "https://example.org/samples/mods/book_list/books/kallocain.md"
 // tile.metadata.title === "Kallocain"
 // tile.types is []
 ```
@@ -105,12 +105,12 @@ Example:
 ```ts
 import { loadTileCollection } from "./lib/tile/index.ts";
 
-const collection = await loadTileCollection("./tiles/books_collection.yaml", {
-  baseUrl: "https://example.org/samples/",
+const collection = await loadTileCollection("./book_collection.yaml", {
+  baseUrl: "https://example.org/samples/mods/book_list/",
 });
-// collection.source === "https://example.org/samples/tiles/books_collection.yaml"
+// collection.source === "https://example.org/samples/mods/book_list/book_collection.yaml"
 // collection.name === "Science fiction books"
-// collection.tiles[1].source === "https://example.org/samples/tiles/books/kallocain.md"
+// collection.tiles[1].source === "https://example.org/samples/mods/book_list/books/kallocain.md"
 // collection.issues is []
 ```
 
@@ -128,12 +128,12 @@ Example:
 ```ts
 import { buildTileValidator, loadTile, validateTile } from "./lib/tile/index.ts";
 
-const options = { baseUrl: "https://example.org/samples/" };
-const bookValidator = await buildTileValidator("./types/book.md", options);
-// bookValidator.source === "https://example.org/samples/types/book.md"
+const options = { baseUrl: "https://example.org/samples/mods/book_list/" };
+const bookValidator = await buildTileValidator("./book_type.md", options);
+// bookValidator.source === "https://example.org/samples/mods/book_list/book_type.md"
 // bookValidator.typeName === "book"
 
-const tile = await loadTile("./tiles/books/kallocain.md", options);
+const tile = await loadTile("./books/kallocain.md", options);
 const tileType = validateTile(tile, bookValidator);
 // tileType === "book"
 // tile.types is still []
@@ -156,10 +156,10 @@ import {
   validateTileCollection,
 } from "./lib/tile/index.ts";
 
-const options = { baseUrl: "https://example.org/samples/" };
-const bookValidator = await buildTileValidator("./types/book.md", options);
+const options = { baseUrl: "https://example.org/samples/mods/book_list/" };
+const bookValidator = await buildTileValidator("./book_type.md", options);
 const collection = await loadTileCollection(
-  "./tiles/books_collection.yaml",
+  "./book_collection.yaml",
   options,
 );
 

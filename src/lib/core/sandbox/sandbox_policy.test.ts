@@ -3,13 +3,13 @@ import type { ModPermission, PermissionCategory } from "../../mod/index.ts";
 import { buildSandboxPolicy, collectContentHosts } from "./index.ts";
 
 const SAMPLE_SOURCES = [
-  "https://example.org/samples/mods/book_list/mod_conf.yaml",
-  "https://example.org/samples/mods/book_list/main.js",
-  "https://example.org/samples/types/book.md",
-  "https://example.org/samples/tiles/books_collection.yaml",
-  "https://example.org/samples/tiles/books/farenheit_451.md",
-  "https://example.org/samples/tiles/books/kallocain.md",
-  "https://example.org/samples/tiles/books/fictions.md",
+  "https://example.org/fixtures/mods/book_list/mod_conf.yaml",
+  "https://example.org/fixtures/mods/book_list/main.js",
+  "https://example.org/fixtures/types/book.md",
+  "https://example.org/fixtures/tiles/books_collection.yaml",
+  "https://example.org/fixtures/tiles/books/farenheit_451.md",
+  "https://example.org/fixtures/tiles/books/kallocain.md",
+  "https://example.org/fixtures/tiles/books/fictions.md",
 ];
 
 const DEFAULT_POLICY = [
@@ -56,7 +56,7 @@ describe("collectContentHosts", function describeCollectContentHosts(): void {
     const contentHosts = collectContentHosts([
       "file:///library/books/kallocain.md",
       "data:text/plain,hello",
-      "http://localhost:5173/samples/mods/book_list/mod_conf.yaml",
+      "http://localhost:5173/fixtures/mods/book_list/mod_conf.yaml",
     ]);
 
     expect(contentHosts).toEqual(["http://localhost:5173"]);

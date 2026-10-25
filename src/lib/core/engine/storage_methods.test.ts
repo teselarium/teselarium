@@ -7,7 +7,7 @@ import type { ModMethodContext } from "./mod_methods.ts";
 import { STORAGE_METHODS } from "./storage_methods.ts";
 
 const SELECTED_VALUE = {
-  source: "https://example.org/samples/tiles/books/kallocain.md",
+  source: "https://example.org/fixtures/tiles/books/kallocain.md",
 };
 
 function getValue(context: ModMethodContext, params: object): Promise<unknown> {

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import {
-  fetchSample,
-  readSampleText,
-  SAMPLES_BASE_URL,
+  fetchFixture,
+  readFixtureText,
+  FIXTURES_BASE_URL,
 } from "../../test/sample_files.ts";
 import { FileFetchError } from "./file_errors.ts";
 import { fetchFile, resolveLocation } from "./file_fetcher.ts";
@@ -11,10 +11,10 @@ import { indexLocalFiles } from "./local_files.ts";
 import type { LocalFiles } from "./local_files.ts";
 
 const KALLOCAIN_PATH = "tiles/books/kallocain.md";
-const KALLOCAIN_URL = `${SAMPLES_BASE_URL}${KALLOCAIN_PATH}`;
+const KALLOCAIN_URL = `${FIXTURES_BASE_URL}${KALLOCAIN_PATH}`;
 
 function createSampleFetch(): Mock<typeof fetch> {
-  const sampleFetch = vi.fn<typeof fetch>(fetchSample);
+  const sampleFetch = vi.fn<typeof fetch>(fetchFixture);
   return sampleFetch;
 }
 
@@ -24,7 +24,7 @@ function createTextFetch(text: string): Mock<typeof fetch> {
 }
 
 function pickLibraryFolder(): LocalFiles {
-  const kallocainContent = new Blob([readSampleText(KALLOCAIN_PATH)]);
+  const kallocainContent = new Blob([readFixtureText(KALLOCAIN_PATH)]);
   const localFiles = indexLocalFiles([
     { path: "library/books/kallocain.md", content: kallocainContent },
     { path: "library/my books/kallocain.md", content: kallocainContent },
@@ -34,7 +34,10 @@ function pickLibraryFolder(): LocalFiles {
 
 describe("resolveLocation", function describeResolveLocation(): void {
   it("Relative path with a base URL", function resolvesRelativePath(): void {
-    const url = resolveLocation("./tiles/books/kallocain.md", SAMPLES_BASE_URL);
+    const url = resolveLocation(
+      "./tiles/books/kallocain.md",
+      FIXTURES_BASE_URL,
+    );
 
     expect(url.href).toBe(KALLOCAIN_URL);
   });
@@ -42,7 +45,7 @@ describe("resolveLocation", function describeResolveLocation(): void {
   it("Path with dot segments", function removesDotSegments(): void {
     const url = resolveLocation(
       "./tiles/../tiles/books/kallocain.md",
-      SAMPLES_BASE_URL,
+      FIXTURES_BASE_URL,
     );
 
     expect(url.href).toBe(KALLOCAIN_URL);
@@ -51,7 +54,7 @@ describe("resolveLocation", function describeResolveLocation(): void {
   it("Absolute URL ignores the base URL", function keepsAbsoluteUrl(): void {
     const url = resolveLocation(
       "https://other.example/books/kallocain.md",
-      SAMPLES_BASE_URL,
+      FIXTURES_BASE_URL,
     );
 
     expect(url.href).toBe("https://other.example/books/kallocain.md");
@@ -68,10 +71,10 @@ describe("resolveLocation", function describeResolveLocation(): void {
 
   it("Invalid URL", function rejectsInvalidUrl(): void {
     expect(function resolveInvalidUrl(): URL {
-      return resolveLocation("https://[bad/kallocain.md", SAMPLES_BASE_URL);
+      return resolveLocation("https://[bad/kallocain.md", FIXTURES_BASE_URL);
     }).toThrowError(FileFetchError);
     expect(function resolveInvalidUrl(): URL {
-      return resolveLocation("https://[bad/kallocain.md", SAMPLES_BASE_URL);
+      return resolveLocation("https://[bad/kallocain.md", FIXTURES_BASE_URL);
     }).toThrowError("https://[bad/kallocain.md");
   });
 });
@@ -88,7 +91,7 @@ describe("fetchFile", function describeFetchFile(): void {
 
     expect(fetchedFile).toEqual({
       source: KALLOCAIN_URL,
-      content: readSampleText(KALLOCAIN_PATH),
+      content: readFixtureText(KALLOCAIN_PATH),
     });
   });
 
@@ -104,7 +107,7 @@ describe("fetchFile", function describeFetchFile(): void {
     const sampleFetch = createSampleFetch();
 
     const fetchedFile = await fetchFile("./tiles/books/kallocain.md", {
-      baseUrl: SAMPLES_BASE_URL,
+      baseUrl: FIXTURES_BASE_URL,
       fetch: sampleFetch,
     });
 
@@ -116,7 +119,7 @@ describe("fetchFile", function describeFetchFile(): void {
     const sampleFetch = createSampleFetch();
 
     const fetchedFile = await fetchFile("./tiles/../tiles/books/kallocain.md", {
-      baseUrl: SAMPLES_BASE_URL,
+      baseUrl: FIXTURES_BASE_URL,
       fetch: sampleFetch,
     });
 
@@ -128,7 +131,7 @@ describe("fetchFile", function describeFetchFile(): void {
 
     const fetchedFile = await fetchFile(
       "https://other.example/books/kallocain.md",
-      { baseUrl: SAMPLES_BASE_URL, fetch: textFetch },
+      { baseUrl: FIXTURES_BASE_URL, fetch: textFetch },
     );
 
     expect(textFetch).toHaveBeenCalledExactlyOnceWith(
@@ -178,9 +181,9 @@ describe("fetchFile", function describeFetchFile(): void {
   });
 
   it("HTTP 404", async function rejectsHttpError(): Promise<void> {
-    const missingUrl = `${SAMPLES_BASE_URL}tiles/missing.md`;
+    const missingUrl = `${FIXTURES_BASE_URL}tiles/missing.md`;
 
-    const fetching = fetchFile(missingUrl, { fetch: fetchSample });
+    const fetching = fetchFile(missingUrl, { fetch: fetchFixture });
 
     await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
     await expect(fetching).rejects.toMatchObject({
@@ -236,7 +239,7 @@ describe("fetchFile", function describeFetchFile(): void {
 
     expect(fetchedFile).toEqual({
       source: "file:///library/books/kallocain.md",
-      content: readSampleText(KALLOCAIN_PATH),
+      content: readFixtureText(KALLOCAIN_PATH),
     });
     expect(sampleFetch).not.toHaveBeenCalled();
   });
@@ -264,7 +267,7 @@ describe("fetchFile", function describeFetchFile(): void {
     });
 
     expect(fetchedFile.source).toBe("file:///library/my%20books/kallocain.md");
-    expect(fetchedFile.content).toBe(readSampleText(KALLOCAIN_PATH));
+    expect(fetchedFile.content).toBe(readFixtureText(KALLOCAIN_PATH));
     expect(sampleFetch).not.toHaveBeenCalled();
   });
 

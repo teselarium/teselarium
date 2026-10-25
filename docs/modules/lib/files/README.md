@@ -5,7 +5,7 @@
 This library fetches and parses any file, for tiles, mods and later mosaics. It does not know what a tile or a mod is. It implements the following components, moved from the [tile module](../tile/README.md):
 
 - A file fetcher. It will load in memory any file (path or URL). Relative paths are resolved against a base URL (by default the page's document base URL in a browser). Output object properties:
-  - Source: the resolved absolute URL of the input file as a string (e.g. `./books/kallocain.md` with base `https://example.org/samples/` gives `https://example.org/samples/books/kallocain.md`). The same file always has the same source.
+  - Source: the resolved absolute URL of the input file as a string (e.g. `./books/kallocain.md` with base `https://example.org/samples/mods/book_list/` gives `https://example.org/samples/mods/book_list/books/kallocain.md`). The same file always has the same source.
   - Content of the file
   - Local files: a page served over http(s) cannot fetch `file:///` paths, so files or folders picked by the user are read directly. Each picked file gets a virtual `file:///<path inside the picked folder>` URL as source (e.g. `file:///library/books/kallocain.md`), so relative paths resolve inside the picked folder in the same way as for remote files.
 - A md parser. It takes as input the output of the file fetcher. It will read a markdown with frontmatter and transform it in an object with properties. Output object properties:
@@ -37,10 +37,10 @@ Example:
 ```ts
 import { fetchFile } from "./lib/files/index.ts";
 
-const file = await fetchFile("./tiles/books_collection.yaml", {
-  baseUrl: "https://example.org/samples/",
+const file = await fetchFile("./book_collection.yaml", {
+  baseUrl: "https://example.org/samples/mods/book_list/",
 });
-// file.source === "https://example.org/samples/tiles/books_collection.yaml"
+// file.source === "https://example.org/samples/mods/book_list/book_collection.yaml"
 // file.content starts with "collection:"
 ```
 
@@ -57,8 +57,8 @@ Example:
 ```ts
 import { fetchFile, parseMarkdown } from "./lib/files/index.ts";
 
-const file = await fetchFile("./tiles/books/kallocain.md", {
-  baseUrl: "https://example.org/samples/",
+const file = await fetchFile("./books/kallocain.md", {
+  baseUrl: "https://example.org/samples/mods/book_list/",
 });
 const parsedMarkdown = parseMarkdown(file);
 // parsedMarkdown.metadata.title === "Kallocain"
@@ -77,8 +77,8 @@ Example:
 ```ts
 import { fetchFile, parseYaml } from "./lib/files/index.ts";
 
-const file = await fetchFile("./tiles/books_collection.yaml", {
-  baseUrl: "https://example.org/samples/",
+const file = await fetchFile("./book_collection.yaml", {
+  baseUrl: "https://example.org/samples/mods/book_list/",
 });
 const parsedYaml = parseYaml(file);
 // parsedYaml.content.collection is a mapping

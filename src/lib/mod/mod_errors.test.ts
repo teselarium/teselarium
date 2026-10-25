@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ModFormatError } from "./mod_errors.ts";
 
-const MOD_SOURCE = "https://example.org/samples/mods/book_list/mod_conf.yaml";
+const MOD_SOURCE = "https://example.org/fixtures/mods/book_list/mod_conf.yaml";
 
 describe("ModFormatError", function describeModFormatError(): void {
   it("is an Error named after its class", function isNamedError(): void {

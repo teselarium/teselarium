@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import {
-  fetchSample,
-  readSampleText,
-  SAMPLES_BASE_URL,
+  fetchFixture,
+  readFixtureText,
+  FIXTURES_BASE_URL,
 } from "../../test/sample_files.ts";
 import {
   fetchTestFile,
@@ -15,9 +15,9 @@ import * as modModule from "./index.ts";
 import { loadMod, loadModFile, ModFormatError } from "./index.ts";
 import type { LoadedMod, ModFile } from "./index.ts";
 
-const SAMPLE_MOD_SOURCE = `${SAMPLES_BASE_URL}mods/book_list/mod_conf.yaml`;
-const SAMPLE_ENTRYPOINT = `${SAMPLES_BASE_URL}mods/book_list/main.js`;
-const SAMPLE_COLLECTION = `${SAMPLES_BASE_URL}tiles/books_collection.yaml`;
+const SAMPLE_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/book_list/mod_conf.yaml`;
+const SAMPLE_ENTRYPOINT = `${FIXTURES_BASE_URL}mods/book_list/main.js`;
+const SAMPLE_COLLECTION = `${FIXTURES_BASE_URL}tiles/books_collection.yaml`;
 const BROKEN_MOD_SOURCE = "https://example.org/mods/broken/mod_conf.yaml";
 const BROKEN_ENTRYPOINT = "https://example.org/mods/broken/main.js";
 const MISSING_MOD_SOURCE = "https://example.org/mods/missing/mod_conf.yaml";
@@ -63,7 +63,7 @@ function returnLoadError(error: unknown): unknown {
 
 describe("loadMod", function describeLoadMod(): void {
   it("Load the sample book list mod", async function loadsSampleMod(): Promise<void> {
-    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchSample });
+    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
     expect(mod.source).toBe(SAMPLE_MOD_SOURCE);
     expect(mod.name).toBe("book_list");
@@ -72,14 +72,14 @@ describe("loadMod", function describeLoadMod(): void {
     expect(mod.description).toBe(
       "A very simple list of books with their covers.",
     );
-    expect(mod.code).toBe(readSampleText("mods/book_list/main.js"));
+    expect(mod.code).toBe(readFixtureText("mods/book_list/main.js"));
   });
 
   it("Relative mod path with a base URL", async function loadsRelativePath(): Promise<void> {
     const testFetch = createTestFetch();
 
     const mod = await loadMod("./mods/book_list/mod_conf.yaml", {
-      baseUrl: SAMPLES_BASE_URL,
+      baseUrl: FIXTURES_BASE_URL,
       fetch: testFetch,
     });
 
@@ -89,8 +89,8 @@ describe("loadMod", function describeLoadMod(): void {
 
   it("loads a default mod name from the default mods folder", async function loadsDefaultName(): Promise<void> {
     const mod = await loadModFile("book_list", {
-      defaultModsFolder: `${SAMPLES_BASE_URL}mods/`,
-      fetch: fetchSample,
+      defaultModsFolder: `${FIXTURES_BASE_URL}mods/`,
+      fetch: fetchFixture,
     });
 
     expect(mod.source).toBe(SAMPLE_MOD_SOURCE);
@@ -109,9 +109,9 @@ describe("loadMod", function describeLoadMod(): void {
   });
 
   it("Tile type outside the mod folder", async function resolvesTypePath(): Promise<void> {
-    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchSample });
+    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
-    expect(mod.typeSource).toBe(`${SAMPLES_BASE_URL}types/book.md`);
+    expect(mod.typeSource).toBe(`${FIXTURES_BASE_URL}types/book.md`);
   });
 
   it("Sample collection outside the mod folder", async function resolvesSampleCollection(): Promise<void> {
@@ -172,13 +172,13 @@ describe("loadMod", function describeLoadMod(): void {
   });
 
   it("Config is kept as plain data", async function keepsConfig(): Promise<void> {
-    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchSample });
+    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
     expect(mod.config).toEqual({ show_covers: true });
   });
 
   it("Sample show permission", async function readsSamplePermission(): Promise<void> {
-    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchSample });
+    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
     expect(mod.permissions).toEqual([
       {
@@ -243,14 +243,14 @@ describe("loadMod", function describeLoadMod(): void {
   });
 
   it("Structured clone of a loaded mod", async function clonesLoadedMod(): Promise<void> {
-    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchSample });
+    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
     expect(structuredClone(mod)).toEqual(mod);
   });
 
   it("Independent loads", async function loadsIndependently(): Promise<void> {
-    const firstMod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchSample });
-    const secondMod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchSample });
+    const firstMod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
+    const secondMod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
     firstMod.config.show_covers = false;
 

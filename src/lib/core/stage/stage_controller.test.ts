@@ -35,13 +35,13 @@ import {
 } from "./stage_controller.ts";
 import type { SandboxSnapshot, Stage } from "./stage_controller.ts";
 
-const SAMPLE_HASH = "#/run?mod=.%2Fsamples%2Fmods%2Fbook_list";
+const SAMPLE_HASH = "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list";
 /** The sample mod with its collection: no section has this link. */
 const COLLECTION_HASH =
-  "#/run?mod=.%2Fsamples%2Fmods%2Fbook_list&collection=.%2Fsamples%2Ftiles%2Fbooks_collection.yaml";
+  "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&collection=.%2Ffixtures%2Ftiles%2Fbooks_collection.yaml";
 const VIEWER_LINK = {
-  mod: "./samples/mods/book_list",
-  collection: "./samples/tiles/books_collection.yaml",
+  mod: "./fixtures/mods/book_list",
+  collection: "./fixtures/tiles/books_collection.yaml",
   params: { from: "explorer" },
 };
 
@@ -576,7 +576,7 @@ describe("active section", function describeActiveSection(): void {
   });
 
   it("Link to another mod", async function belongsToNoSection(): Promise<void> {
-    const history = new FakeHistory("#/run?mod=./samples/mods/book_list");
+    const history = new FakeHistory("#/run?mod=./fixtures/mods/book_list");
 
     const stage = await startPageStage(history);
 
@@ -603,7 +603,7 @@ describe("openStageLink", function describeOpenStageLink(): void {
       { state: stageState(0, "home"), hash: "#/" },
       {
         state: stageState(1, "home"),
-        hash: "#/run?mod=.%2Fsamples%2Fmods%2Fbook_list&collection=.%2Fsamples%2Ftiles%2Fbooks_collection.yaml&from=explorer",
+        hash: "#/run?mod=.%2Ffixtures%2Fmods%2Fbook_list&collection=.%2Ffixtures%2Ftiles%2Fbooks_collection.yaml&from=explorer",
       },
     ]);
     expect(stage.state.sandboxes[1].openerId).toBe("sandbox-1");

@@ -4,7 +4,7 @@ import * as storageModule from "./index.ts";
 import { readModValue, writeModValue } from "./index.ts";
 
 const BOOK_LIST_SOURCE =
-  "https://example.org/samples/mods/book_list/mod_conf.yaml";
+  "https://example.org/fixtures/mods/book_list/mod_conf.yaml";
 const OTHER_BOOK_LIST_SOURCE =
   "https://mods.example.net/book_list/mod_conf.yaml";
 
@@ -12,7 +12,7 @@ describe("mod storage slots", function describeModStorage(): void {
   it("Store and read a value", function storesValue(): void {
     const storage = createMemoryStorage();
     const value = {
-      source: "https://example.org/samples/tiles/books/kallocain.md",
+      source: "https://example.org/fixtures/tiles/books/kallocain.md",
     };
 
     writeModValue(storage, BOOK_LIST_SOURCE, "selected", value);
