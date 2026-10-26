@@ -1,0 +1,34 @@
+# Proposal
+
+## Why
+
+Some sites serve their files from many subdomains that change from file to file. Open Library's covers (`https://covers.openlibrary.org/b/id/…-L.jpg`) redirect to Internet Archive storage servers such as `https://ia800100.us.archive.org`, and the content policy checks every redirect. A mod can only declare exact origins today, so it cannot list them all, and the covers are blocked even though `https://covers.openlibrary.org` is granted. The browser's content policy already understands wildcard subdomains (`https://*.us.archive.org`). Only the mod file format forbids them.
+
+## What Changes
+
+- **Wildcard hosts**: in `show`, `connect`, `embed` and `code`, a permission `host` can be a wildcard host: an `http:` or `https:` scheme, `*.` as the whole leftmost label, a host name of at least two labels, and an optional port, such as `https://*.us.archive.org` or `http://*.example.test:8080`. It covers every subdomain of that host name, at any depth, with the same scheme and port. It does not cover the host name itself: `https://*.us.archive.org` does not cover `https://us.archive.org`, as in the browser's content policy.
+- **Still rejected**: `*` anywhere else (`https://cdn*.example.org`, `https://a.*.example.org`), a wildcard over a single label (`https://*.org`), a wildcard host in `open`, and everything rejected today (paths, queries, fragments, user info, other schemes). The error names the host as today.
+- **Content policy**: a granted wildcard host goes into the frame's policy as written, in the directives of its category. The policy's directives and order do not change.
+- **Blocked request reports**: a blocked origin counts as declared, or as declared but not granted, when a wildcard host of the category covers it, as it does for an exact host today.
+- **`open` unchanged**: it keeps exact origins and `"*"`. A mod opens mods from a few known sites, and `"*"` already means any site.
+
+## Capabilities
+
+### New Capabilities
+
+None.
+
+### Modified Capabilities
+
+- `mod-loading`: the requirement "Permission hosts are origins" allows wildcard hosts in `show`, `connect`, `embed` and `code`, and the "Wildcard host" scenario, which rejects `https://*.example.org`, is replaced by scenarios that accept it and reject the wildcards that stay invalid.
+- `mod-sandbox`: a new requirement says which origins a wildcard host covers, for granting its category's requests and for reporting blocked ones.
+- `mod-api-version`: the mod API version becomes `0.1.3`.
+
+## Impact
+
+- **Code**: `src/lib/mod/mod_permissions.ts` (validation, and a shared function that tells whether a permission host covers an origin, exported from the mod module), `src/lib/core/sandbox/sandbox_reports.ts` (uses that function). `src/lib/core/sandbox/sandbox_policy.ts` and `src/lib/core/permissions/mod_grants.ts` need no change.
+- **Tests**: unit tests for the validation, the covering function and the reports; a policy test with a wildcard host; an e2e test that an image from a subdomain of a granted wildcard host loads.
+- **Docs**: host rules in `docs/modules/lib/mod/README.md`, and the policy and report sections of `docs/modules/lib/core/sandbox/README.md`.
+- **Mod API version**: patch bump, `0.1.2` → `0.1.3`. The change touches `mod-loading`'s mod file format, and it is an addition: `host` accepts values it rejected before, and every mod file that loaded before loads the same way, so `^0.1.0` ranges keep matching. The surface guard gets a `0.1.3` entry equal to `0.1.2`, since no name changes.
+- **App version**: patch bump, following the mod API's patch bump.
+- **Out of scope**: wildcards in `open`; a check against the public suffix list (so `https://*.co.uk` is accepted, and the two-label rule only stops the plainest overreach); the message for a request blocked after a redirect from a granted host, which still reads "Blocked by the sandbox policy (img-src)."; changing the sample book list mod or the Nobel laureates sample tiles.
