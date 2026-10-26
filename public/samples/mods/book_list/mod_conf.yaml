@@ -14,3 +14,7 @@ mod:
     show:
       - host: "https://upload.wikimedia.org"
         reason: "Shows the book covers"
+      - host: "https://covers.openlibrary.org"
+        reason: "Shows the book covers"
+      - host: "https://*.archive.org"
+        reason: "Shows the book covers"
