@@ -2,7 +2,7 @@
 
 ## 1. Setup
 
-- [ ] 1.1 Record the current test counts: run `npm test` and `npm run test:e2e` and note the number of passing tests of each, for the check in 5.1
+- [ ] 1.1 Record the current test results: run `npm test` and `npm run test:e2e` and note the number of passing and failing tests of each, and the names of the failing ones, for the check in 5.1. Expect the failures design.md describes (3 unit tests in `src/lib/mod/sample_mod.test.ts` and, in each browser, the e2e tests that load the sample book list mod), all with the error `host "https://*.archive.org" must be an origin`. A failure with another cause is not this change's to fix: note it apart
 
 ## 2. Wildcard hosts in the mod file
 
@@ -15,7 +15,8 @@
 - [ ] 3.1 Write the failing test first in `src/lib/core/sandbox/sandbox_reports.test.ts`: a blocked image from `https://ia800100.us.archive.org` with `show` for `https://*.us.archive.org` granted gives the generic message, with it denied gives the "declared but not granted" message, and a blocked image from `https://us.archive.org` with it granted gives the "Add it to permissions.show" message. Then make `declaresHost` use `permissionHostCovers`. Verify `npx vitest run src/lib/core/sandbox` passes
 - [ ] 3.2 Add a test to `src/lib/core/sandbox/sandbox_policy.test.ts` that pins the policy of a mod granted `show` for `https://*.us.archive.org` and `https://upload.wikimedia.org`, with both hosts in `style-src`, `img-src`, `media-src` and `font-src` in sorted order and `connect-src 'none'`. Verify `npx vitest run src/lib/core/sandbox` passes with no change to `sandbox_policy.ts`
 - [ ] 3.3 In `e2e/mod_sandbox.spec.ts`, add a "Wildcard hosts cover subdomains" group with the scenarios of the `mod-sandbox` delta, serving the hosts with `page.route` as design.md says ("Image from a subdomain of a granted wildcard host", "Deeper subdomain", "The wildcard's own host name is not covered", "Other scheme is not covered", "Wildcard host declared but not granted"). Use example hosts under `example.net` instead of `archive.org`, so no test reads like it needs the real site. Verify `npm run test:e2e -- e2e/mod_sandbox.spec.ts` passes in all three browsers
-- [ ] 3.4 Update `docs/modules/lib/core/sandbox/README.md`: the policy table says granted hosts can be wildcard hosts and go in as written, and the reports section says a wildcard host that covers the blocked origin counts as declared, with an example. Verify the examples match the tests of 3.1 and 3.2
+- [ ] 3.4 Update `docs/modules/lib/core/sandbox/README.md`: the policy table says granted hosts can be wildcard hosts and go in as written, and the reports section says a wildcard host that covers the blocked origin counts as declared, with an example. The example of the sample book list mod's policy says its three `show` hosts, `https://*.archive.org`, `https://covers.openlibrary.org` and `https://upload.wikimedia.org`, are added after `https://example.org` in `style-src`, `img-src`, `media-src` and `font-src`. Verify the examples match the tests of 3.1, 3.2 and 3.5
+- [ ] 3.5 In `e2e/mod_sandbox.spec.ts`, update "Sample content hosts" so it expects the sample's `img-src` with its three `show` hosts, as design.md gives it. Verify `npm run test:e2e -- e2e/mod_sandbox.spec.ts` passes in all three browsers
 
 ## 4. Mod API version
 
@@ -24,7 +25,7 @@
 
 ## 5. Integration check
 
-- [ ] 5.1 Run `npm run lint`, `npm run format:check`, `npm test`, `npm run build` and `npm run test:e2e`, and verify all pass, with the counts of 1.1 plus only the tests this change added. Run `openspec validate allow-wildcard-permission-hosts --strict` and verify it reports the change as valid
+- [ ] 5.1 Run `npm run lint`, `npm run format:check`, `npm test`, `npm run build` and `npm run test:e2e`, and verify all pass, with the counts of 1.1 plus only the tests this change added, and with each test that 1.1 found failing because of the sample book list mod now passing in all three browsers. Run `openspec validate allow-wildcard-permission-hosts --strict` and verify it reports the change as valid
 - [ ] 5.2 Add `.changeset/allow-wildcard-permission-hosts.md` with a `patch` bump, following the "Bump rule" section of `docs/releasing.md`: the mod API's patch bump (an addition) means an app patch bump. Summary: "Mods can declare wildcard hosts such as `https://*.example.org` in the `show`, `connect`, `embed` and `code` permissions." Verify `npx changeset status` lists the change as a patch
 
 ## Workflow follow-up
