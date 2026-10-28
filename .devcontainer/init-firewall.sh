@@ -67,6 +67,7 @@ done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git)[]' | aggregate -q)
 for domain in \
     "wikimedia.org" \
     "wikimedia.org" \
+    "youtube.com" \
     "ui.shadcn.com" \
     "registry.npmjs.org" \
     "api.anthropic.com" \
