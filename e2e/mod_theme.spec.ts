@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Frame, Page } from "@playwright/test";
 import {
+  coverPermissionRow,
   findModFrame,
   findSandboxFrame,
   isFrameMarked,
@@ -265,7 +266,7 @@ test.describe("Theme changed event", function describeThemeChanged(): void {
     const explorer = await findModFrame(page, "Mods");
     await explorer.getByRole("button", { name: /Book List/ }).click();
     const viewer = await findModFrame(page, "Mod Viewer");
-    await expect(viewer.getByText("Shows the book covers")).toBeVisible();
+    await expect(coverPermissionRow(viewer)).toBeVisible();
     await expect(visibleSandbox(page)).toHaveAttribute(
       "data-sandbox-id",
       "sandbox-2",
@@ -365,7 +366,7 @@ test.describe("Sample and default mods follow the theme", function describeShipp
     const explorerColors = await explorer.evaluate(readBodyColors);
     await explorer.getByRole("button", { name: /Book List/ }).click();
     const viewer = await findModFrame(page, "Mod Viewer");
-    await expect(viewer.getByText("Shows the book covers")).toBeVisible();
+    await expect(coverPermissionRow(viewer)).toBeVisible();
 
     expect(explorerColors.background).toBe(DARK_COLORS.background.computed);
     expect((await viewer.evaluate(readBodyColors)).background).toBe(

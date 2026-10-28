@@ -64,8 +64,10 @@ Every key lives under a `mod` mapping:
 Host rules:
 
 - A host is an origin: `http:` or `https:`, a host name and an optional port, e.g. `https://upload.wikimedia.org` or `http://localhost:8080`.
-- Paths (`https://example.org/images`), trailing slashes, queries, fragments, user info, wildcards (`https://*.example.org`) and other schemes (`wss://example.org`) are rejected.
-- In `open` only, the host can be `"*"`, meaning any site.
+- In `show`, `connect`, `embed` and `code`, the host can also be a wildcard host: an origin whose host name starts with `*.` as its whole leftmost label, followed by at least two labels, e.g. `https://*.us.archive.org` or `http://*.example.test:8080`. It covers every subdomain of that host name, at any depth, with the same scheme and port: `https://*.us.archive.org` covers `https://ia800100.us.archive.org` and `https://a.b.us.archive.org`. It does not cover the host name itself (`https://us.archive.org`), a host name that only ends the same (`https://evil-us.archive.org`), another scheme (`http://ia800100.us.archive.org`) or another port (`https://ia800100.us.archive.org:8443`).
+- Paths (`https://example.org/images`, `https://*.example.org/images`), trailing slashes, queries, fragments, user info and other schemes (`wss://example.org`, `wss://*.example.org`) are rejected.
+- A `*` anywhere else is rejected: inside a label (`https://cdn*.example.org`), after the first label (`https://a.*.example.org`), or over a single label (`https://*.org`). A wildcard over an IP address (`https://*.1.2.3.4`) is rejected too.
+- In `open` only, the host can be `"*"`, meaning any site. Wildcard hosts are rejected in `open`.
 - The loaded permissions are listed in the order `show`, `connect`, `embed`, `code`, `open`, whatever the order in the file, then in entry order.
 
 ### Mod references
@@ -97,6 +99,7 @@ Implemented in `src/lib/mod/`. Other modules import only from the public entry p
 - `loadMod(reference, options?)`: `loadModFile`, then `loadModCode`. Returns the `LoadedMod`.
 - `ModLoadOptions`: the `FileFetchOptions` of the [files module](../files/README.md) plus `defaultModsFolder`. Relative references are resolved against `baseUrl`, by default the page's document base URL.
 - Errors: `ModFormatError` (the file does not follow the mod file format). It exposes the failing `source`. A mod file, entrypoint or test file that cannot be fetched raises `FileFetchError`, and a mod file that is not plain YAML raises `YamlParseError`.
+- `permissionHostCovers(host, origin)`: tells whether a permission host covers an origin, following the host rules above. An exact host covers only the origin equal to it, and `"*"` covers nothing, since it is the `open` category's own rule. The sandbox's blocked request reports use it.
 - Constants: `MOD_FILE_KEYS`, the keys of the `mod` mapping the loader reads, and `PERMISSION_CATEGORIES`, the permission categories in their order. The engine's mod API surface guard reads both.
 - Types: `ModFile`, `LoadedMod`, `ModLoadOptions`, `ModPermission` (`category`, `host`, `reason`), `PermissionCategory`, `ModThemeSetting` (`"default" | "none"`), `ModIssue` (`level`, `source`, `message`, the shape of a `TileIssue`).
 

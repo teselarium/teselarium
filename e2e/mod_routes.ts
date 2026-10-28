@@ -1,5 +1,12 @@
 import { readFileSync } from "node:fs";
-import type { Frame, Locator, Page, Route } from "@playwright/test";
+import { expect } from "@playwright/test";
+import type {
+  Frame,
+  FrameLocator,
+  Locator,
+  Page,
+  Route,
+} from "@playwright/test";
 import {
   SAMPLE_COLLECTION_PATH,
   SAMPLE_ENTRYPOINT_CODE,
@@ -53,7 +60,7 @@ function readContentType(path: string): string {
   return "text/yaml";
 }
 
-async function answerCover(seenUrls: string[], route: Route): Promise<void> {
+async function answerImage(seenUrls: string[], route: Route): Promise<void> {
   seenUrls.push(route.request().url());
   await route.fulfill({
     status: 200,
@@ -62,10 +69,19 @@ async function answerCover(seenUrls: string[], route: Route): Promise<void> {
   });
 }
 
+/** Answers every request under `pattern` with a 1×1 PNG. Returns the list of URLs the route saw. */
+export async function routeImages(
+  page: Page,
+  pattern: string,
+): Promise<string[]> {
+  const seenUrls: string[] = [];
+  await page.route(pattern, answerImage.bind(undefined, seenUrls));
+  return seenUrls;
+}
+
 /** Answers every cover request with a 1×1 PNG. Returns the list of URLs the route saw. */
 export async function routeCovers(page: Page): Promise<string[]> {
-  const seenUrls: string[] = [];
-  await page.route(`${COVER_HOST}/**`, answerCover.bind(undefined, seenUrls));
+  const seenUrls = await routeImages(page, `${COVER_HOST}/**`);
   return seenUrls;
 }
 
@@ -132,8 +148,8 @@ export async function serveAppOriginMod(
  */
 export const TEST_MOD_API_RANGE = "^0.1.0";
 
-/** `0.1.2`: the app's mod API version, as mods read it in `context.api.version`. */
-export const APP_MOD_API_VERSION = "0.1.2";
+/** `0.1.3`: the app's mod API version, as mods read it in `context.api.version`. */
+export const APP_MOD_API_VERSION = "0.1.3";
 
 /** `^0.2.0`: an `api` range for a later mod API, which the app's version does not match. */
 export const OTHER_API_RANGE = "^0.2.0";
@@ -226,6 +242,15 @@ export function stageBar(page: Page): Locator {
 
 export function issueList(page: Page): Locator {
   return stageBar(page).getByRole("list", { name: "Issues" });
+}
+
+/**
+ * The row of the sample mod's `show` permission for `COVER_HOST` in the mod
+ * viewer's permission table. The sample's `show` permissions share one reason,
+ * so the row is found by its host.
+ */
+export function coverPermissionRow(viewer: Frame | FrameLocator): Locator {
+  return viewer.getByRole("row").filter({ hasText: COVER_HOST });
 }
 
 /** The frame of the sandbox with this id. */
@@ -696,9 +721,10 @@ export function buildThrowingFiles(): ModFiles {
   return buildCheckedModFiles("throwing", ['  throw new Error("map failed");']);
 }
 
-/** A mod whose `mount` returns a promise that never settles. */
+/** A mod whose `mount` reports `started`, then returns a promise that never settles. */
 export function buildNeverMountedFiles(): ModFiles {
   return buildCheckedModFiles("never_mounted", [
+    `  reportToTest(context, "${STARTED_REPORT_NAME}", true);`,
     "  return new Promise(function waitForever() {});",
   ]);
 }
@@ -836,7 +862,49 @@ export async function checkFromChecker(
   return answer.result as CheckReport;
 }
 
-/** The source of the test mod in `folder/`, served by `serveAppOriginMod` on the page's origin. */
+/** The time limit of a check's mount and of each test case (`CHECK_MOUNT_LIMIT_MS`, `CHECK_CASE_LIMIT_MS`). */
+export const CHECK_LIMIT_MS = 10000;
+
+/** The name a checked mount or test case reports with `started` once it runs, which is after its limit timer started. */
+export const STARTED_REPORT_NAME = "started";
+
+/** A report of `checkPastLimit`, and how much time the page's clock saw pass. */
+export interface CheckPastLimit {
+  report: CheckReport;
+  elapsedMs: number;
+}
+
+function readPageTime(): number {
+  return Date.now();
+}
+
+/**
+ * Sends `mods.check` like `checkFromChecker` for a mod that never finishes
+ * its mount or a test case, waits until it reported `started`, then moves the
+ * page's clock past the limit, so the test does not wait the real 10 seconds.
+ * The page must have been opened after `page.clock.install()`. `seenUrls` are
+ * the URLs `openChecker` returned.
+ */
+export async function checkPastLimit(
+  page: Page,
+  mod: string,
+  seenUrls: string[],
+): Promise<CheckPastLimit> {
+  const startedAt = await page.evaluate(readPageTime);
+  const reportPromise = checkFromChecker(page, mod);
+  await expect
+    .poll(readReportedValue.bind(undefined, seenUrls, STARTED_REPORT_NAME))
+    .toBe(true);
+  await page.clock.fastForward(CHECK_LIMIT_MS);
+  const report = await reportPromise;
+  const pastLimit: CheckPastLimit = {
+    report,
+    elapsedMs: (await page.evaluate(readPageTime)) - startedAt,
+  };
+  return pastLimit;
+}
+
+/** The source of the test mod in `folder/`,served by `serveAppOriginMod` on the page's origin. */
 export function readTestModSource(page: Page, folder: string): string {
   const source = new URL(
     `${APP_ORIGIN_MOD_PATH}${folder}/mod_conf.yaml`,
@@ -964,10 +1032,17 @@ export const FAILING_CASE_TEST_CODE = buildTestCode(
   [["lists books", "listsBooks"]],
 );
 
-/** A case that awaits a promise that never settles. */
+/**
+ * A case that reports `started`, then awaits a promise that never settles. A
+ * case context has no mod source, so the beacon's address is relative: a
+ * case frame resolves it against the app page.
+ */
 export const ENDLESS_TEST_CODE = buildTestCode(
   [
     "function waitForever() {",
+    '  const image = document.createElement("img");',
+    `  image.src = "${APP_ORIGIN_MOD_PATH}${CHECK_BEACON_NAME}?${STARTED_REPORT_NAME}=true";`,
+    "  document.body.append(image);",
     "  return new Promise(function neverSettle() {});",
     "}",
   ],

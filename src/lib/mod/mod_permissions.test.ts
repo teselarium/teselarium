@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { YamlValue } from "../files/index.ts";
 import { ModFormatError } from "./mod_errors.ts";
-import { readModPermissions } from "./mod_permissions.ts";
+import { permissionHostCovers, readModPermissions } from "./mod_permissions.ts";
 import type { ModPermission } from "./mod_permissions.ts";
 
 const MOD_SOURCE = "https://example.org/mods/probe/mod_conf.yaml";
@@ -147,12 +147,82 @@ describe("readModPermissions", function describeReadModPermissions(): void {
     );
   });
 
-  it("Wildcard host", function rejectsWildcard(): void {
+  it("Wildcard host", function acceptsWildcard(): void {
+    const permissions = readModPermissions(
+      { show: [buildEntry("https://*.us.archive.org")] },
+      MOD_SOURCE,
+    );
+
+    expect(permissions[0].host).toBe("https://*.us.archive.org");
+  });
+
+  it("Wildcard host with a port", function acceptsWildcardWithPort(): void {
+    const permissions = readModPermissions(
+      { connect: [buildEntry("http://*.example.test:8080")] },
+      MOD_SOURCE,
+    );
+
+    expect(permissions[0].host).toBe("http://*.example.test:8080");
+  });
+
+  it("Wildcard inside a label", function rejectsWildcardInsideLabel(): void {
     const error = catchPermissionsError({
-      show: [buildEntry("https://*.example.org")],
+      show: [buildEntry("https://cdn*.example.org")],
     });
 
-    expect(error.message).toContain('host "https://*.example.org"');
+    expect(error.message).toContain(
+      '"permissions.show" entry 1: host "https://cdn*.example.org" must be an origin such as "https://example.org", or a wildcard host such as "https://*.example.org"',
+    );
+  });
+
+  it("Wildcard after the first label", function rejectsWildcardAfterFirstLabel(): void {
+    const error = catchPermissionsError({
+      show: [buildEntry("https://a.*.example.org")],
+    });
+
+    expect(error.message).toContain('host "https://a.*.example.org"');
+  });
+
+  it("Wildcard over a single label", function rejectsWildcardOverSingleLabel(): void {
+    const error = catchPermissionsError({
+      code: [buildEntry("https://*.org")],
+    });
+
+    expect(error.message).toContain('host "https://*.org"');
+  });
+
+  it("rejects a wildcard over an IP address", function rejectsWildcardOverIp(): void {
+    const error = catchPermissionsError({
+      show: [buildEntry("https://*.1.2.3.4")],
+    });
+
+    expect(error.message).toContain('host "https://*.1.2.3.4"');
+  });
+
+  it("Wildcard host in open", function rejectsWildcardInOpen(): void {
+    const error = catchPermissionsError({
+      open: [buildEntry("https://*.example.org")],
+    });
+
+    expect(error.message).toContain(
+      '"permissions.open" entry 1: host "https://*.example.org": wildcard hosts are not allowed in permissions.open',
+    );
+  });
+
+  it("rejects a wildcard host with a path", function rejectsWildcardWithPath(): void {
+    const error = catchPermissionsError({
+      show: [buildEntry("https://*.example.org/images")],
+    });
+
+    expect(error.message).toContain('host "https://*.example.org/images"');
+  });
+
+  it("rejects a wildcard host with another scheme", function rejectsWildcardOtherScheme(): void {
+    const error = catchPermissionsError({
+      connect: [buildEntry("wss://*.example.org")],
+    });
+
+    expect(error.message).toContain('host "wss://*.example.org"');
   });
 
   it("Other scheme", function rejectsOtherScheme(): void {
@@ -202,5 +272,88 @@ describe("readModPermissions", function describeReadModPermissions(): void {
     expect(error.message).toContain(
       '"permissions.show" entry 1: host "*" is only allowed in permissions.open',
     );
+  });
+});
+
+describe("permissionHostCovers", function describePermissionHostCovers(): void {
+  it("an exact host covers only itself", function coversExactHost(): void {
+    expect(
+      permissionHostCovers(
+        "https://upload.wikimedia.org",
+        "https://upload.wikimedia.org",
+      ),
+    ).toBe(true);
+    expect(
+      permissionHostCovers(
+        "https://upload.wikimedia.org",
+        "https://a.upload.wikimedia.org",
+      ),
+    ).toBe(false);
+  });
+
+  it("a wildcard host covers its subdomains at any depth", function coversSubdomains(): void {
+    expect(
+      permissionHostCovers(
+        "https://*.us.archive.org",
+        "https://ia800100.us.archive.org",
+      ),
+    ).toBe(true);
+    expect(
+      permissionHostCovers(
+        "https://*.us.archive.org",
+        "https://a.b.us.archive.org",
+      ),
+    ).toBe(true);
+  });
+
+  it("a wildcard host does not cover its own host name", function skipsOwnHostName(): void {
+    expect(
+      permissionHostCovers(
+        "https://*.us.archive.org",
+        "https://us.archive.org",
+      ),
+    ).toBe(false);
+  });
+
+  it("a wildcard host does not cover a host name that only ends the same", function skipsSameEnding(): void {
+    expect(
+      permissionHostCovers(
+        "https://*.us.archive.org",
+        "https://evil-us.archive.org",
+      ),
+    ).toBe(false);
+  });
+
+  it("a wildcard host does not cover another scheme", function skipsOtherScheme(): void {
+    expect(
+      permissionHostCovers(
+        "https://*.us.archive.org",
+        "http://ia800100.us.archive.org",
+      ),
+    ).toBe(false);
+  });
+
+  it("a wildcard host does not cover another port", function skipsOtherPort(): void {
+    expect(
+      permissionHostCovers(
+        "https://*.us.archive.org",
+        "https://ia800100.us.archive.org:8443",
+      ),
+    ).toBe(false);
+  });
+
+  it("a wildcard host with a port covers only that port", function coversOwnPort(): void {
+    expect(
+      permissionHostCovers(
+        "http://*.example.test:8080",
+        "http://a.example.test:8080",
+      ),
+    ).toBe(true);
+    expect(
+      permissionHostCovers(
+        "http://*.example.test:8080",
+        "http://a.example.test",
+      ),
+    ).toBe(false);
   });
 });

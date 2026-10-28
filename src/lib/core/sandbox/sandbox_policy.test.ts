@@ -139,6 +139,31 @@ describe("buildSandboxPolicy", function describeBuildSandboxPolicy(): void {
     );
   });
 
+  it("adds a granted wildcard host as written", function addsWildcardHost(): void {
+    const policy = buildSandboxPolicy(
+      ["https://example.org"],
+      [
+        buildPermission("show", "https://upload.wikimedia.org"),
+        buildPermission("show", "https://*.us.archive.org"),
+      ],
+    );
+
+    expect(policy).toBe(
+      [
+        "default-src 'none'",
+        "script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:",
+        "style-src 'unsafe-inline' data: blob: https://*.us.archive.org https://example.org https://upload.wikimedia.org",
+        "img-src data: blob: https://*.us.archive.org https://example.org https://upload.wikimedia.org",
+        "media-src data: blob: https://*.us.archive.org https://example.org https://upload.wikimedia.org",
+        "font-src data: blob: https://*.us.archive.org https://example.org https://upload.wikimedia.org",
+        "connect-src 'none'",
+        "frame-src 'none'",
+        "base-uri 'none'",
+        "form-action 'none'",
+      ].join("; "),
+    );
+  });
+
   it("follows the directive order", function followsDirectiveOrder(): void {
     const policy = buildSandboxPolicy([], []);
 

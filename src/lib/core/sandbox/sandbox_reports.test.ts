@@ -12,6 +12,11 @@ const COVERS_PERMISSION: ModPermission = {
   host: "https://upload.wikimedia.org",
   reason: "Shows the book covers",
 };
+const ARCHIVE_PERMISSION: ModPermission = {
+  category: "show",
+  host: "https://*.us.archive.org",
+  reason: "Shows the covers stored by the Internet Archive",
+};
 
 function describeBlock(
   blockedUrl: string,
@@ -137,6 +142,40 @@ describe("describeBlockedRequest", function describeDescribeBlocked(): void {
     );
 
     expect(message).toContain("to https://images.example.net:8443.");
+  });
+
+  it("gives the policy text for a subdomain of a granted wildcard host", function describesGrantedWildcard(): void {
+    const message = describeBlock(
+      "https://ia800100.us.archive.org/cover.jpg",
+      "img-src",
+      { granted: [ARCHIVE_PERMISSION], denied: [] },
+    );
+
+    expect(message).toBe("Blocked by the sandbox policy (img-src).");
+  });
+
+  it("Wildcard host declared but not granted", function describesDeniedWildcard(): void {
+    const message = describeBlock(
+      "https://ia800100.us.archive.org/cover.jpg",
+      "img-src",
+      { granted: [], denied: [ARCHIVE_PERMISSION] },
+    );
+
+    expect(message).toBe(
+      "Blocked image request to https://ia800100.us.archive.org: the mod declares it in permissions.show, but the permission was not granted.",
+    );
+  });
+
+  it("The wildcard's own host name is not covered", function describesWildcardOwnHost(): void {
+    const message = describeBlock(
+      "https://us.archive.org/cover.jpg",
+      "img-src",
+      { granted: [ARCHIVE_PERMISSION], denied: [] },
+    );
+
+    expect(message).toBe(
+      "Blocked image request to https://us.archive.org. Add it to permissions.show in mod_conf.yaml.",
+    );
   });
 });
 

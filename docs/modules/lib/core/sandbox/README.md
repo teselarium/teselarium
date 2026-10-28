@@ -50,6 +50,7 @@ The frame document carries a Content-Security-Policy. Directives come in this or
 - Workers fall back to `script-src`, so `blob:` workers are allowed and remote workers need `code`.
 - `object-src` and every other directive fall back to `default-src 'none'`.
 - `open` permissions are not in the policy: the engine enforces them.
+- Granted hosts go in as written, including wildcard hosts such as `https://*.us.archive.org`. The browser's policy matches a leading `*.` against one or more subdomain labels, never against the bare host name, which is what the [mod module's host rules](../../mod/README.md) say a wildcard host covers. `*` sorts before letters and digits, so `https://*.us.archive.org` lists before `https://example.org`.
 
 The default policy of the sample book list mod, without grants:
 
@@ -57,7 +58,11 @@ The default policy of the sample book list mod, without grants:
 default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; style-src 'unsafe-inline' data: blob: https://example.org; img-src data: blob: https://example.org; media-src data: blob: https://example.org; font-src data: blob: https://example.org; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'
 ```
 
-With its `show` permission granted, `https://upload.wikimedia.org` is added after `https://example.org` in `style-src`, `img-src`, `media-src` and `font-src`.
+With its `show` permissions granted, its three `show` hosts, `https://*.archive.org`, `https://covers.openlibrary.org` and `https://upload.wikimedia.org`, are added to `style-src`, `img-src`, `media-src` and `font-src`, sorted with `https://example.org`:
+
+```
+img-src data: blob: https://*.archive.org https://covers.openlibrary.org https://example.org https://upload.wikimedia.org
+```
 
 ### Blocked request reports
 
@@ -79,6 +84,12 @@ The blocked URL is reduced to its origin, since browsers sometimes report only t
 - Not declared: `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.`
 - Declared but not granted: `Blocked image request to https://upload.wikimedia.org: the mod declares it in permissions.show, but the permission was not granted.`
 - Any other directive, or a blocked URL that is not a web URL (such as `inline` or `eval`): `Blocked by the sandbox policy (object-src).`
+
+A blocked origin counts as declared when a host of the category covers it, as the mod module's `permissionHostCovers` decides: an exact host equal to it, or a wildcard host one of whose subdomains it is. With `show` for `https://*.us.archive.org`:
+
+- A blocked image from `https://ia800100.us.archive.org`, with the permission denied: `Blocked image request to https://ia800100.us.archive.org: the mod declares it in permissions.show, but the permission was not granted.`
+- A blocked image from `https://ia800100.us.archive.org`, with the permission granted (the policy did not allow it for another reason): `Blocked by the sandbox policy (img-src).`
+- A blocked image from `https://us.archive.org`, which the wildcard does not cover: `Blocked image request to https://us.archive.org. Add it to permissions.show in mod_conf.yaml.`
 
 Each message is reported once per mod, because a page of images could otherwise produce hundreds of equal issues.
 

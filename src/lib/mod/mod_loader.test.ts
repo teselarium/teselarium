@@ -446,6 +446,7 @@ describe("mod module entry point", function describeEntryPoint(): void {
       "loadModCode",
       "loadModFile",
       "loadModTestCode",
+      "permissionHostCovers",
       "resolveModReference",
     ]);
   });

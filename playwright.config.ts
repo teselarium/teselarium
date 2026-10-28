@@ -22,6 +22,9 @@ function buildInstantiationServer(
 
 export default defineConfig({
   testDir: "e2e",
+  // Each test opens its own page, so the tests of one file can run in
+  // different workers, which spreads the long files over the run.
+  fullyParallel: true,
   use: { baseURL: PREVIEW_URL },
   // Mods rely on frame behavior that differs between engines (design.md of
   // add-mod-ui-capabilities, Browser differences), so every test runs in all three.

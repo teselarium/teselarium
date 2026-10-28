@@ -23,6 +23,7 @@ import {
   readStorageError,
   requestFromProbe,
   routeCovers,
+  routeImages,
   serveAppOriginMod,
   serveForeignMod,
   showAssetNextToMod,
@@ -49,6 +50,24 @@ const SHOW_COVERS_LINES = [
   `      - host: "${COVER_HOST}"`,
   '        reason: "Shows the book covers"',
 ];
+const WILDCARD_COVERS_HOST = "https://*.covers.example.net";
+const WILDCARD_COVERS_OWN_HOST = "https://covers.example.net";
+const WILDCARD_COVERS_SUBDOMAIN = "https://a.covers.example.net";
+const SHOW_WILDCARD_COVERS_LINES = buildPermissionLines(
+  "show",
+  WILDCARD_COVERS_HOST,
+);
+
+/** The `permissions` lines of a probe's mod file that declare one host in one category. */
+function buildPermissionLines(category: string, host: string): string[] {
+  const lines = [
+    "  permissions:",
+    `    ${category}:`,
+    `      - host: "${host}"`,
+    '        reason: "Test reason"',
+  ];
+  return lines;
+}
 
 /** Records every URL a route under `pattern` sees, answering with a 1×1 response and CORS. */
 async function recordHost(page: Page, pattern: string): Promise<string[]> {
@@ -324,7 +343,7 @@ test.describe("Content hosts", function describeContentHosts(): void {
       .getAttribute("srcdoc");
 
     expect(sandboxDocument).toContain(
-      `img-src data: blob: ${appOrigin} ${COVER_HOST};`,
+      `img-src data: blob: ${appOrigin} https://*.archive.org https://covers.openlibrary.org ${COVER_HOST};`,
     );
     expect(sandboxDocument).toContain("connect-src 'none'");
   });
@@ -506,6 +525,77 @@ test.describe("Report blocked requests with the fix", function describeReports()
     await expect(issueList(page)).toContainText(IMAGES_HOST);
 
     await expect(issueList(page).getByRole("listitem")).toHaveCount(1);
+  });
+});
+
+test.describe("Wildcard hosts cover subdomains", function describeWildcardHosts(): void {
+  test("Image from a subdomain of a granted wildcard host", async function showsWildcardImage({
+    page,
+  }): Promise<void> {
+    const seenUrls = await routeImages(page, `${WILDCARD_COVERS_SUBDOMAIN}/**`);
+    const frame = await openAppProbe(page, SHOW_WILDCARD_COVERS_LINES);
+
+    expect(
+      await frame.evaluate(showImage, `${WILDCARD_COVERS_SUBDOMAIN}/cover.jpg`),
+    ).toBe(true);
+    expect(seenUrls).toEqual([`${WILDCARD_COVERS_SUBDOMAIN}/cover.jpg`]);
+  });
+
+  test("Deeper subdomain", async function sendsDeeperConnection({
+    page,
+  }): Promise<void> {
+    const deeperHost = "https://a.b.example.net";
+    const seenUrls = await recordHost(page, `${deeperHost}/**`);
+    const frame = await openAppProbe(
+      page,
+      buildPermissionLines("connect", "https://*.example.net"),
+    );
+
+    expect(await frame.evaluate(fetchFromFrame, `${deeperHost}/data`)).toBe(
+      "sent",
+    );
+    expect(seenUrls).toEqual([`${deeperHost}/data`]);
+  });
+
+  test("The wildcard's own host name is not covered", async function blocksWildcardOwnHost({
+    page,
+  }): Promise<void> {
+    const seenUrls = await recordHost(page, `${WILDCARD_COVERS_OWN_HOST}/**`);
+    const frame = await openAppProbe(page, SHOW_WILDCARD_COVERS_LINES);
+
+    expect(
+      await frame.evaluate(showImage, `${WILDCARD_COVERS_OWN_HOST}/cover.jpg`),
+    ).toBe(false);
+    await expect(issueList(page)).toContainText(
+      `Blocked image request to ${WILDCARD_COVERS_OWN_HOST}. Add it to permissions.show in mod_conf.yaml.`,
+    );
+    expect(seenUrls).toEqual([]);
+  });
+
+  test("Other scheme is not covered", async function blocksWildcardOtherScheme({
+    page,
+  }): Promise<void> {
+    const httpSubdomain = "http://a.covers.example.net";
+    const seenUrls = await recordHost(page, `${httpSubdomain}/**`);
+    const frame = await openAppProbe(page, SHOW_WILDCARD_COVERS_LINES);
+
+    expect(await frame.evaluate(showImage, `${httpSubdomain}/cover.jpg`)).toBe(
+      false,
+    );
+    expect(seenUrls).toEqual([]);
+  });
+
+  test("Wildcard host declared but not granted", async function reportsDeniedWildcard({
+    page,
+  }): Promise<void> {
+    await routeImages(page, `${WILDCARD_COVERS_SUBDOMAIN}/**`);
+    const { frame } = await openForeignProbe(page, SHOW_WILDCARD_COVERS_LINES);
+
+    await frame.evaluate(showImage, `${WILDCARD_COVERS_SUBDOMAIN}/cover.jpg`);
+
+    await expect(issueList(page)).toContainText(
+      `Blocked image request to ${WILDCARD_COVERS_SUBDOMAIN}: the mod declares it in permissions.show, but the permission was not granted.`,
+    );
   });
 });
 

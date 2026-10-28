@@ -10,9 +10,11 @@ import {
   buildUndeclaredImageFiles,
   buildUnknownMethodFiles,
   CHECK_FRAME_SELECTOR,
+  CHECK_LIMIT_MS,
   CHECKER_HASH,
   CHECKER_TITLE,
   checkFromChecker,
+  checkPastLimit,
   findModFrame,
   issueList,
   openChecker,
@@ -177,16 +179,16 @@ test.describe("What the mount check records", function describeMountRecords(): v
   test("Mount never finishes", async function failsSlowMount({
     page,
   }): Promise<void> {
-    test.setTimeout(30000);
-    await openChecker(page, buildNeverMountedFiles());
-    const startedAt = Date.now();
+    await page.clock.install();
+    const seenUrls = await openChecker(page, buildNeverMountedFiles());
 
-    const report = await checkFromChecker(
+    const { report, elapsedMs } = await checkPastLimit(
       page,
       buildTestModReference("never_mounted"),
+      seenUrls,
     );
 
-    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(10000);
+    expect(elapsedMs).toBeGreaterThanOrEqual(CHECK_LIMIT_MS);
     expect(report.status).toBe("fail");
     expect(report.findings).toEqual([
       {

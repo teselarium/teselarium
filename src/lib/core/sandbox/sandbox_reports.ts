@@ -4,6 +4,7 @@ import type {
   ModPermission,
   PermissionCategory,
 } from "../../mod/index.ts";
+import { permissionHostCovers } from "../../mod/index.ts";
 import type { ModGrants } from "../permissions/index.ts";
 
 /** A request the frame's policy blocked, as the frame loader reports it. */
@@ -74,7 +75,10 @@ function declaresHost(
   origin: string,
 ): boolean {
   for (const permission of permissions) {
-    if (permission.category === category && permission.host === origin) {
+    if (
+      permission.category === category &&
+      permissionHostCovers(permission.host, origin)
+    ) {
       return true;
     }
   }

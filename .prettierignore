@@ -5,6 +5,7 @@ package-lock.json
 docs/
 openspec/
 public/samples/mods/book_list/books/
+public/samples/tiles/**/*.md
 src/test/fixtures/
 .claude/
 src/vendor/

@@ -4,7 +4,7 @@
 
 See proposal.md - Why. The current state that shapes the approach:
 
-- `src/lib/mod/mod_permissions.ts` validates hosts with `isOriginHost`: the text must parse as an `http:` or `https:` URL whose `origin` is the text itself, and the host name must not contain `*`. The WHATWG URL parser accepts `*` in a domain, so `new URL("https://*.example.org").origin` is `"https://*.example.org"`; the explicit `*` check is what rejects wildcards today. A host name whose last label is numeric goes through the IPv4 parser, so `https://*.1.2.3` does not parse at all.
+- `src/lib/mod/mod_permissions.ts` validates hosts with `isOriginHost`: the text must parse as an `http:` or `https:` URL whose `origin` is the text itself, and the host name must not contain `*`. Engines disagree on `*` in a host name: Node, Firefox and WebKit keep it (`new URL("https://*.example.org").origin` is `"https://*.example.org"`), while Chromium encodes it (`"https://%2A.example.org"`). So a wildcard host cannot be validated or matched by parsing it as written, since the app runs the validation in the browser.
 - `src/lib/core/sandbox/sandbox_policy.ts` copies granted hosts into the directives of their category as written. CSP host sources already accept a leading `*.`, which matches one or more subdomain labels and never the bare host name.
 - `src/lib/core/sandbox/sandbox_reports.ts` decides between "add it to permissions", "declared but not granted" and the generic message with `declaresHost`, an exact comparison of the permission's host with the blocked origin.
 - `src/lib/core/permissions/mod_grants.ts` grants whole permission lists by the mod's origin and never looks inside a `show`, `connect`, `embed` or `code` host. Its `open` matching (`"*"` or exact origin) stays as it is, since `open` gets no wildcards.
@@ -26,9 +26,11 @@ See proposal.md - Why. The current state that shapes the approach:
 
 `isWildcardHost(host)` accepts a host when:
 
-1. the text parses as an `http:` or `https:` URL whose `origin` is the text itself (same rule as `isOriginHost`, so paths, queries, fragments, user info, trailing slashes and other schemes are rejected the same way);
-2. its host name starts with `*.`;
-3. the rest of the host name has no `*` and at least two labels.
+1. the text starts with `http://*.` or `https://*.`;
+2. the text without that `*.`, its base (`https://us.archive.org` for `https://*.us.archive.org`), passes `isOriginHost`, so paths, queries, fragments, user info, trailing slashes, other schemes and any other `*` are rejected the same way;
+3. the base's host name is a domain of at least two labels (not an IPv4 address, whose last label is numeric).
+
+The `*` is never given to the URL parser, so validation gives the same answer in every engine (see Context).
 
 `checkPermissionHost` keeps its order: `"*"` first, then `isOriginHost`, then, outside `open`, `isWildcardHost`. A wildcard host in `open` gets its own message (`… host "https://*.example.org": wildcard hosts are not allowed in permissions.open`), like `"*"` outside `open` does today. In the four categories, the message for an invalid host names both forms: `must be an origin such as "https://example.org", or a wildcard host such as "https://*.example.org"`. In `open`, it stays as it is.
 
@@ -41,7 +43,7 @@ The loaded permission keeps the host as written; `ModPermission` does not change
 `permissionHostCovers(host: string, origin: string): boolean`, next to the validation in `mod_permissions.ts` and exported from `src/lib/mod/index.ts`:
 
 - an exact host covers the origin equal to it;
-- a wildcard host covers an origin with the same protocol and the same port (`URL.port`, which is `""` for the default port) whose host name ends with `.` + the wildcard's host name without `*.`. The leading dot is what excludes the bare host name and `https://evil-us.archive.org`.
+- a wildcard host covers an origin with the same protocol and the same port (`URL.port`, which is `""` for the default port) as its parsed base, whose host name ends with `.` + the base's host name. The leading dot is what excludes the bare host name and `https://evil-us.archive.org`.
 
 `declaresHost` in `sandbox_reports.ts` calls it instead of `===`. `mod_grants.ts` does not: `"*"` in `open` is a different rule, and moving it into the shared function would make `permissionHostCovers` accept `"*"` for every category.
 

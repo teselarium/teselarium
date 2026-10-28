@@ -6,6 +6,7 @@ import {
   buildProbeFiles,
   buildSlowMountFiles,
   buildTestedProbeFiles,
+  coverPermissionRow,
   EXPLORER_CODE,
   FAILING_CASE_TEST_CODE,
   findModFrame,
@@ -67,13 +68,6 @@ async function readTokenColor(frame: Frame, token: string): Promise<string> {
   return frame.evaluate(readTokenAs, [token, "color"]);
 }
 
-/** The row of the sample mod's `show` permission in the viewer's permission table. */
-function coverPermissionRow(viewer: FrameLocator): Locator {
-  return viewer
-    .getByRole("row")
-    .filter({ hasText: "https://upload.wikimedia.org" });
-}
-
 /** The description of the "API range" term in the viewer's metadata list. */
 function apiRangeDefinition(viewer: FrameLocator): Locator {
   return viewer.locator('dt:text-is("API range") + dd');
@@ -82,9 +76,7 @@ function apiRangeDefinition(viewer: FrameLocator): Locator {
 async function openViewerForSample(page: Page): Promise<void> {
   await page.goto(`/#/run?mod=mod_viewer&target=${SAMPLE_MOD_REFERENCE}`);
   await expect(
-    page
-      .frameLocator('iframe[title="Mod Viewer"]')
-      .getByText("Shows the book covers"),
+    coverPermissionRow(page.frameLocator('iframe[title="Mod Viewer"]')),
   ).toBeVisible();
 }
 

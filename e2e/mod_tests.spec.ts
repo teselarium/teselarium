@@ -9,8 +9,10 @@ import {
   buildUndeclaredImageCaseFiles,
   buildUnknownMethodCaseFiles,
   CHECK_FRAME_SELECTOR,
+  CHECK_LIMIT_MS,
   CHECKER_TITLE,
   checkFromChecker,
+  checkPastLimit,
   ENDLESS_TEST_CODE,
   EXPECTATION_TEST_CODE,
   findModFrame,
@@ -452,19 +454,19 @@ test.describe("Case results", function describeCaseResults(): void {
   });
 
   test("Case too long", async function failsLongCase({ page }): Promise<void> {
-    test.setTimeout(30000);
-    await openChecker(
+    await page.clock.install();
+    const seenUrls = await openChecker(
       page,
       buildTestedProbeFiles("endless", ENDLESS_TEST_CODE),
     );
-    const startedAt = Date.now();
 
-    const report = await checkFromChecker(
+    const { report, elapsedMs } = await checkPastLimit(
       page,
       buildTestModReference("endless"),
+      seenUrls,
     );
 
-    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(10000);
+    expect(elapsedMs).toBeGreaterThanOrEqual(CHECK_LIMIT_MS);
     expect(report.tests).toEqual([
       {
         name: "waits forever",
