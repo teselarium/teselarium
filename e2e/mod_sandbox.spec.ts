@@ -343,7 +343,7 @@ test.describe("Content hosts", function describeContentHosts(): void {
       .getAttribute("srcdoc");
 
     expect(sandboxDocument).toContain(
-      `img-src data: blob: ${appOrigin} https://*.archive.org https://covers.openlibrary.org ${COVER_HOST};`,
+      `img-src data: blob: ${appOrigin} https://*.archive.org https://archive.org https://covers.openlibrary.org ${COVER_HOST};`,
     );
     expect(sandboxDocument).toContain("connect-src 'none'");
   });

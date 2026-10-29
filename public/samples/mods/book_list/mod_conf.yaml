@@ -18,3 +18,5 @@ mod:
         reason: "Shows the book covers"
       - host: "https://*.archive.org"
         reason: "Shows the book covers"
+      - host: "https://archive.org"
+        reason: "Shows the book covers"

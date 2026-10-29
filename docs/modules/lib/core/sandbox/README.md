@@ -58,10 +58,10 @@ The default policy of the sample book list mod, without grants:
 default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; style-src 'unsafe-inline' data: blob: https://example.org; img-src data: blob: https://example.org; media-src data: blob: https://example.org; font-src data: blob: https://example.org; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'
 ```
 
-With its `show` permissions granted, its three `show` hosts, `https://*.archive.org`, `https://covers.openlibrary.org` and `https://upload.wikimedia.org`, are added to `style-src`, `img-src`, `media-src` and `font-src`, sorted with `https://example.org`:
+With its `show` permissions granted, its four `show` hosts, `https://*.archive.org`, `https://archive.org`, `https://covers.openlibrary.org` and `https://upload.wikimedia.org`, are added to `style-src`, `img-src`, `media-src` and `font-src`, sorted with `https://example.org`. The Open Library covers redirect from `https://covers.openlibrary.org` to `https://archive.org` and then to a subdomain such as `https://ia800100.us.archive.org`, so the sample declares both `https://archive.org` and `https://*.archive.org`:
 
 ```
-img-src data: blob: https://*.archive.org https://covers.openlibrary.org https://example.org https://upload.wikimedia.org
+img-src data: blob: https://*.archive.org https://archive.org https://covers.openlibrary.org https://example.org https://upload.wikimedia.org
 ```
 
 ### Blocked request reports
