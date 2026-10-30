@@ -91,6 +91,8 @@ Fahrenheit 451 is a 1953 dystopian novel by American writer Ray Bradbury. It pre
 Source: https://en.wikipedia.org/wiki/Fahrenheit_451
 ```
 
+Metadata strings starting with `./` or `../` are paths next to the tile: mods receive `./fahrenheit_451.jpg` as an absolute URL, resolved against the tile's location, so the image can sit beside the tile.
+
 Tiles are organized in collections inside a yaml file. They are used as indexes of paths or urls, for example a collection of tiles named `science_fictions_books.yaml`:
 ```yaml
 collection:

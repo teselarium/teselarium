@@ -89,10 +89,10 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.3"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.4"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
-| `tiles` | The tiles of the link's collection that match the mod's tile type. |
+| `tiles` | The tiles of the link's collection that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
 | `issues` | The issues from loading and validating the collection. |
 | `permissions` | `granted` and `denied` lists of `{ category, host, reason }`. |
 | `theme` | `colorScheme` (`"light"` or `"dark"`) and `tokens`, a mapping from each theme token name to its value for that color scheme (see the [theme module](../theme/README.md)). It is the theme current when the frame connects, not when the mod started loading, so a mod opened while the user switches still mounts with the right one. |
@@ -104,6 +104,7 @@ A collection is optional. Without one, `tiles` and `issues` are empty and no col
 - When the mod has a `type_path`, the engine builds the tile validator, validates the collection and keeps only the tiles whose `types` include the type name. Tiles that do not match are left out of `tiles` and appear as warnings in `issues`.
 - Without a `type_path`, the mod receives every tile, each with `types` `[]`.
 - The validator is built again on each load, so "Reload tiles" picks up a changed type file too.
+- Each metadata string that starts with `./` or `../`, also inside lists and nested mappings, arrives as the absolute URL it names, resolved against the tile's `source`: `image: "./cover.jpg"` in `https://example.org/books/kallocain.md` arrives as `"https://example.org/books/cover.jpg"`. Only that prefix counts: strings such as `/r/books`, `cover.jpg` or absolute URLs, other values and mapping keys arrive as written. The tiles of `tiles.changed` and of a checked mod are resolved the same way; tiles a test passes to `mount(options)` are used as given. The loaded tile, which the collection is validated against, and the tile's `body` stay as written. A mod that shows such a string as text shows the absolute URL.
 
 ### Inspecting and opening mods
 
@@ -138,7 +139,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.3"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.4"
     }
   ]
 }
@@ -277,7 +278,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.3` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#mods-written-for-another-api)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.4` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#mods-written-for-another-api)).
 
 When it changes, while it is `0.x`:
 
@@ -367,7 +368,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.3"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.4"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.7` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -382,7 +383,7 @@ Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `a
 - `buildModLaunch(mod, link, modTiles, appOrigin)`: builds the `ModLaunch` of a loaded mod and its `ModTiles` (or `null`), without requesting anything: grants the permissions, collects the content hosts, builds the policy, the frame document, the mount context and the issues. Opening a mod and checking it both call it, so a checked mod gets the frame it would get if it were opened.
 - `buildModTestDocument(launch)`: the `srcdoc` HTML of a frame of the mod's tests: the launch's `policy` (the frame's Content-Security-Policy) and the mod's theme setting, as in `sandboxDocument`, with the assertions and the test runner after the frame loader (see the [sandbox module](../sandbox/README.md#frames-of-a-checks-tests)). So a case runs the mod with the content policy it gets when it is opened.
 - `loadModTiles(mod, collectionLocation, options?)`: loads a collection for a mod and selects its tiles with `selectModTiles`. Returns `ModTiles` (`collectionSource`, `tiles`, `issues`). The stage's "Reload tiles" calls it again.
-- `selectModTiles(collection, tileValidator)`: the `ModTiles` of a loaded collection. With a validator, the collection is validated and only the tiles of its type are kept, the others appearing as warnings in `issues`. With `null`, every tile is kept.
+- `selectModTiles(collection, tileValidator)`: the `ModTiles` of a loaded collection. With a validator, the collection is validated and only the tiles of its type are kept, the others appearing as warnings in `issues`. With `null`, every tile is kept. The kept tiles are new tiles whose metadata strings starting with `./` or `../` are resolved against the tile's `source` (`resolveTilePaths` in `tile_paths.ts`, not exported by `index.ts`), so opening, "Reload tiles" and checks all get resolved tiles. The collection's tiles stay as written and are validated as written.
 
 ```ts
 import { prepareModLaunch } from "./lib/core/engine/index.ts";

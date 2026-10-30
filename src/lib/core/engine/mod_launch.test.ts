@@ -7,6 +7,8 @@ import {
 } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  COVER_BOOK_COLLECTION_SOURCE,
+  COVER_BOOK_IMAGE_URL,
   FOUR_BOOKS_SOURCE,
   MISSING_MOD_REFERENCE,
   NO_COUNTRY_TILE_SOURCE,
@@ -18,6 +20,8 @@ import {
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TILE_SOURCES,
+  SAMPLE_TYPE_SOURCE,
+  serveCoverBook,
   serveFourBooks,
   serveOtherApiMod,
   serveTestMod,
@@ -32,7 +36,12 @@ import {
 } from "../../../test/test_files.ts";
 import { FileFetchError, YamlParseError } from "../../files/index.ts";
 import { ModFormatError } from "../../mod/index.ts";
-import { CollectionFormatError, TileTypeError } from "../../tile/index.ts";
+import {
+  buildTileValidator,
+  CollectionFormatError,
+  loadTileCollection,
+  TileTypeError,
+} from "../../tile/index.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
 import { ModSwitchedOffError } from "./engine_errors.ts";
 import { MOD_API_VERSION } from "./mod_api_version.ts";
@@ -44,6 +53,7 @@ import {
   buildModTestDocument,
   loadModTiles,
   prepareModLaunch,
+  selectModTiles,
 } from "./mod_launch.ts";
 import type { ModLaunch, ModLaunchRequest, RunLink } from "./mod_launch.ts";
 
@@ -195,6 +205,18 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     const launch = await launchMod({ ...SAMPLE_LINK, mod: UNTYPED_MOD_SOURCE });
 
     expect(listTileTypes(launch)).toEqual([[], [], []]);
+  });
+
+  it("Image next to the tile", async function resolvesTilePaths(): Promise<void> {
+    serveCoverBook();
+
+    const launch = await launchMod({
+      ...SAMPLE_LINK,
+      collection: COVER_BOOK_COLLECTION_SOURCE,
+    });
+
+    expect(launch.context.tiles).toHaveLength(1);
+    expect(launch.context.tiles[0].metadata.image).toBe(COVER_BOOK_IMAGE_URL);
   });
 
   it("refuses a switched-off mod before any request", async function refusesSwitchedOff(): Promise<void> {
@@ -432,5 +454,22 @@ describe("loadModTiles", function describeLoadModTiles(): void {
     expect(firstTiles.collectionSource).toBe(SAMPLE_COLLECTION_SOURCE);
     expect(firstTiles.tiles).toEqual(launch.context.tiles);
     expect(firstTiles.issues).toEqual([]);
+  });
+});
+
+describe("selectModTiles", function describeSelectModTiles(): void {
+  it("Loaded tile keeps the path as written", async function keepsLoadedTile(): Promise<void> {
+    serveCoverBook();
+    const options = { baseUrl: APP_BASE_URL, fetch: fetchTestFile };
+    const collection = await loadTileCollection(
+      COVER_BOOK_COLLECTION_SOURCE,
+      options,
+    );
+    const tileValidator = await buildTileValidator(SAMPLE_TYPE_SOURCE, options);
+
+    const modTiles = selectModTiles(collection, tileValidator);
+
+    expect(modTiles.tiles[0].metadata.image).toBe(COVER_BOOK_IMAGE_URL);
+    expect(collection.tiles[0].metadata.image).toBe("./cover.jpg");
   });
 });

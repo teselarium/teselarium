@@ -31,6 +31,7 @@ import {
   matchModApiRange,
   MOD_API_VERSION,
 } from "./mod_api_version.ts";
+import { resolveTilePaths } from "./tile_paths.ts";
 
 /** What to run: a mod reference, a collection location and the link parameters. Not an address. */
 export interface RunLink {
@@ -108,10 +109,18 @@ function keepTilesOfType(tiles: Tile[], typeName: string): Tile[] {
   return typedTiles;
 }
 
+function resolveEveryTilePaths(tiles: Tile[]): Tile[] {
+  const resolvedTiles: Tile[] = [];
+  for (const tile of tiles) {
+    resolvedTiles.push(resolveTilePaths(tile));
+  }
+  return resolvedTiles;
+}
+
 function buildModTiles(collection: TileCollection, tiles: Tile[]): ModTiles {
   const modTiles: ModTiles = {
     collectionSource: collection.source,
-    tiles,
+    tiles: resolveEveryTilePaths(tiles),
     issues: collection.issues,
   };
   return modTiles;
@@ -121,7 +130,10 @@ function buildModTiles(collection: TileCollection, tiles: Tile[]): ModTiles {
  * Selects the tiles a mod receives from a loaded collection. With a tile
  * validator, the collection is validated with it and only the tiles of its
  * type are kept; the others appear as warnings in the issues. Without one,
- * every tile is kept.
+ * every tile is kept. The kept tiles are new tiles whose metadata strings
+ * starting with `./` or `../` are resolved against the tile's `source`
+ * (`resolveTilePaths`); the collection's tiles stay as written, and are
+ * validated as written.
  */
 export function selectModTiles(
   collection: TileCollection,

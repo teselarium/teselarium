@@ -10,6 +10,8 @@ import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  COVER_BOOK_COLLECTION_SOURCE,
+  COVER_BOOK_IMAGE_URL,
   FOUR_BOOKS_SOURCE,
   MISSING_MOD_REFERENCE,
   MISSING_MOD_SOURCE,
@@ -18,6 +20,7 @@ import {
   OTHER_APP_ORIGIN,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
+  serveCoverBook,
   serveFourBooks,
   serveNoApiBookMod,
   serveTestMod,
@@ -436,6 +439,24 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     });
     const params = (received[0] as { params: { tiles: unknown[] } }).params;
     expect(params.tiles).toHaveLength(2);
+  });
+
+  it("Reloaded tiles have their relative paths resolved", async function resolvesReloadedTiles(): Promise<void> {
+    serveCoverBook();
+    const spied = buildServices();
+    const { runtime, received } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, COVER_BOOK_COLLECTION_SOURCE),
+      spied,
+    );
+
+    await reloadSandboxTiles(runtime, spied.services);
+    await waitForMessages();
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      method: "tiles.changed",
+      params: { tiles: [{ metadata: { image: COVER_BOOK_IMAGE_URL } }] },
+    });
   });
 
   it("lists a collection that cannot be reloaded as an error", async function reportsReloadFailure(): Promise<void> {

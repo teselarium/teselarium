@@ -202,6 +202,39 @@ export function serveTwoBooks(): void {
   );
 }
 
+/** A collection with one book tile whose `image` is `./cover.jpg`, a path next to the tile. */
+export const COVER_BOOK_COLLECTION_SOURCE = `${FIXTURES_BASE_URL}tiles/cover_book.yaml`;
+export const COVER_BOOK_TILE_SOURCE = `${FIXTURES_BASE_URL}tiles/books/cover_book.md`;
+
+/** `./cover.jpg` of the tile at `COVER_BOOK_TILE_SOURCE`, resolved against it. Written by hand. */
+export const COVER_BOOK_IMAGE_URL =
+  "https://example.org/fixtures/tiles/books/cover.jpg";
+
+export function serveCoverBook(): void {
+  testTexts.set(
+    COVER_BOOK_COLLECTION_SOURCE,
+    [
+      "collection:",
+      '  name: "Cover book"',
+      "  tiles:",
+      '    - path: "./books/cover_book.md"',
+    ].join("\n"),
+  );
+  testTexts.set(
+    COVER_BOOK_TILE_SOURCE,
+    buildTypeText([
+      'title: "Cover book"',
+      'date: "2001-01-01"',
+      "authors:",
+      '  - "Anonymous"',
+      'country: "Sweden"',
+      "genres:",
+      '  - "Mystery"',
+      'image: "./cover.jpg"',
+    ]),
+  );
+}
+
 /** A mod whose entrypoint answers `404 Not Found`, served by `fetchTestFile` once `serveMissingEntrypointMod` ran. */
 export const MISSING_ENTRYPOINT_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/missing_entrypoint/mod_conf.yaml`;
 export const MISSING_ENTRYPOINT_SOURCE = `${FIXTURES_BASE_URL}mods/missing_entrypoint/missing.js`;

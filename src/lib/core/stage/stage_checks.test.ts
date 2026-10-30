@@ -27,11 +27,14 @@ import {
 } from "../../../test/fake_frames.ts";
 import { FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
+  COVER_BOOK_COLLECTION_SOURCE,
+  COVER_BOOK_IMAGE_URL,
   MISSING_TYPE_MOD_SOURCE,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TILE_SOURCES,
+  serveCoverBook,
   serveMissingTypeMod,
   serveTestMod,
   serveTwoBooks,
@@ -234,6 +237,24 @@ describe("Mount check", function describeMountCheck(): void {
     expect(report.status).toBe("fail");
     expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
     expect(checkCounts).not.toContain(1);
+  });
+
+  it("Mount check gets the resolved tiles", async function givesResolvedTiles(): Promise<void> {
+    serveCoverBook();
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: SAMPLE_MOD_SOURCE,
+      collection: COVER_BOOK_COLLECTION_SOURCE,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    await reporting;
+
+    expect(checkFrame.context.tiles).toHaveLength(1);
+    expect(checkFrame.context.tiles[0].metadata.image).toBe(
+      COVER_BOOK_IMAGE_URL,
+    );
   });
 
   it("Frame removed after the check", async function removesCheckEntry(): Promise<void> {

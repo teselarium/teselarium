@@ -28,6 +28,16 @@ export default function mount(engine, context) {
 
 For a mod at `https://mods.example.net/probe/mod_conf.yaml`, the image loads from `https://mods.example.net/probe/icon.svg`. Scripts are different: loading code from the mod's folder still needs a granted `code` permission, because a mod is bundled into its one entrypoint, which the engine delivers over the channel.
 
+### Images next to tiles
+
+Each tile's origin is a content host too, and the engine resolves metadata strings starting with `./` or `../` against the tile's source before the mod gets them (see [Tiles](../engine/README.md#tiles)). So a mod can set `img.src` from the metadata as is:
+
+```js
+cover.src = tile.metadata.image;
+```
+
+For a tile at `https://example.org/books/kallocain.md` with `image: "./cover.jpg"`, the image loads from `https://example.org/books/cover.jpg`. A tile picked from the user's computer resolves to a `file:` URL, which is not a content host, so an image next to it does not load.
+
 ### Content policy
 
 The frame document carries a Content-Security-Policy. Directives come in this order, and the hosts of each directive are sorted and without duplicates, so the policy is the same for the same mod:

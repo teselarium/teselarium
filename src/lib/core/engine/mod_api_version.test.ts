@@ -10,7 +10,7 @@ import {
 
 describe("MOD_API_VERSION", function describeModApiVersion(): void {
   it("Version of this API", function isCurrentVersion(): void {
-    expect(MOD_API_VERSION).toBe("0.1.3");
+    expect(MOD_API_VERSION).toBe("0.1.4");
   });
 });
 

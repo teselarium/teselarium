@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
+  COVER_BOOK_COLLECTION_SOURCE,
+  COVER_BOOK_IMAGE_URL,
   MISMATCHED_SAMPLE_MOD_SOURCE,
   MISSING_ENTRYPOINT_MOD_SOURCE,
   MISSING_ENTRYPOINT_SOURCE,
@@ -16,6 +18,7 @@ import {
   SAMPLE_ENTRYPOINT,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TILE_SOURCES,
+  serveCoverBook,
   serveMismatchedSampleMod,
   serveMissingEntrypointMod,
   serveMissingTypeMod,
@@ -79,6 +82,22 @@ describe("Check a mod", function describeCheckMod(): void {
     ]);
     expect(listRequestedUrls(testFetch)).not.toContain(
       SAMPLE_COLLECTION_SOURCE,
+    );
+  });
+
+  it("Mount check gets the resolved tiles", async function resolvesCheckedTiles(): Promise<void> {
+    serveCoverBook();
+
+    const bundleCheck = await checkModBundle(
+      SAMPLE_MOD_SOURCE,
+      COVER_BOOK_COLLECTION_SOURCE,
+      { fetch: fetchTestFile },
+    );
+
+    expect(bundleCheck.findings).toEqual([]);
+    expect(bundleCheck.modTiles?.tiles).toHaveLength(1);
+    expect(bundleCheck.modTiles?.tiles[0].metadata.image).toBe(
+      COVER_BOOK_IMAGE_URL,
     );
   });
 

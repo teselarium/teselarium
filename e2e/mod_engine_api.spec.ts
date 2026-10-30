@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
 import type { Frame, Page } from "@playwright/test";
 import {
+  buildModConf,
   buildProbeFiles,
   findModFrame,
+  ICON_SVG,
   postRequestToParent,
+  readLoadedCovers,
   readProbeCalls,
   readProbeContext,
   readWindowMessages,
@@ -14,10 +17,12 @@ import {
   stageBar,
   waitForProbe,
 } from "./mod_routes.ts";
+import type { ModFiles } from "./mod_routes.ts";
 import {
   MISSING_MOD_REFERENCE,
   readSampleModSource,
   SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_ENTRYPOINT_CODE,
   SAMPLE_MOD_FILE_PATH,
 } from "./sample_mod.ts";
 
@@ -147,6 +152,54 @@ test.describe("Mount context", function describeMountContext(): void {
     const context = await frame.evaluate(readProbeContext);
 
     expect(context.params).toEqual({ target });
+  });
+});
+
+/** `/test-mods/covers/books/cover.svg`: the image next to the tile of `buildRelativeCoverFiles`. */
+const RELATIVE_COVER_PATH = "/test-mods/covers/books/cover.svg";
+
+/**
+ * The files of a mod running the sample entrypoint with `show_covers: true`
+ * and no tile type, and of a collection whose one tile has
+ * `image: "./cover.svg"`, served next to it.
+ */
+function buildRelativeCoverFiles(): ModFiles {
+  const files: ModFiles = {
+    "covers/mod_conf.yaml": buildModConf("covers", [
+      '  title: "Covers"',
+      "  config:",
+      "    show_covers: true",
+    ]),
+    "covers/main.js": SAMPLE_ENTRYPOINT_CODE,
+    "covers/tiles.yaml": [
+      "collection:",
+      '  name: "Covers"',
+      "  tiles:",
+      '    - path: "./books/kallocain.md"',
+    ].join("\n"),
+    "covers/books/kallocain.md":
+      '---\ntitle: "Kallocain"\nimage: "./cover.svg"\n---\n\nA tile with a cover next to it.\n',
+    "covers/books/cover.svg": ICON_SVG,
+  };
+  return files;
+}
+
+test.describe("Relative paths in tiles are resolved", function describeRelativeTilePaths(): void {
+  test("Image next to the tile", async function showsCoverNextToTile({
+    page,
+  }): Promise<void> {
+    const seenUrls = await serveAppOriginMod(page, buildRelativeCoverFiles());
+    await page.goto(
+      "/#/run?mod=./test-mods/covers/&collection=./test-mods/covers/tiles.yaml",
+    );
+    const frame = await findModFrame(page, "Covers");
+
+    await expect
+      .poll(function listCovers(): Promise<string[]> {
+        return frame.evaluate(readLoadedCovers);
+      })
+      .toEqual(["Cover of Kallocain"]);
+    expect(seenUrls).toContain(new URL(RELATIVE_COVER_PATH, page.url()).href);
   });
 });
 
