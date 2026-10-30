@@ -1,0 +1,41 @@
+# Domains the dev container may reach, each with all its subdomains.
+# One domain per line; "#" starts a comment.
+#
+# The image holds a copy owned by root (Dockerfile), so changes apply after
+# rebuilding the container. Run `firewall-status` to see the names looked up
+# outside this list.
+
+# GitHub: git and gh
+github.com
+
+# npm
+registry.npmjs.org
+
+# Claude Code
+api.anthropic.com
+mcp-proxy.anthropic.com
+statsig.com
+sentry.io
+
+# VS Code server and extensions
+marketplace.visualstudio.com
+vscode.blob.core.windows.net
+update.code.visualstudio.com
+vsassets.io
+vscode-cdn.net
+
+# shadcn/ui CLI
+ui.shadcn.com
+
+# Content used while developing
+wikimedia.org
+
+# Temporary: embed spike of the add-site-consent-dialog change
+youtube.com
+youtube-nocookie.com
+ytimg.com
+googlevideo.com
+vimeo.com
+vimeocdn.com
+soundcloud.com
+sndcdn.com

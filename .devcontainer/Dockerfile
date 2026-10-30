@@ -19,9 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   gh \
   iptables \
   ipset \
+  dnsmasq-base \
   iproute2 \
   dnsutils \
-  aggregate \
   jq \
   nano \
   vim \
@@ -99,10 +99,19 @@ RUN npx -y playwright@${PLAYWRIGHT_VERSION} install firefox
 RUN npx -y playwright@${PLAYWRIGHT_VERSION} install webkit
 
 
-# Copy and set up firewall script
+# Copy and set up the firewall (see init-firewall.sh). Its script, allowed
+# domains and DNS mode are owned by root, so changing them takes a rebuild.
+# learn: every name resolves; enforce: names outside the allowed domains do not.
+ARG FIREWALL_DNS_MODE=enforce
 COPY init-firewall.sh /usr/local/bin/
+COPY firewall-status.sh /usr/local/bin/firewall-status
+COPY allowed-domains.txt /etc/devcontainer-firewall/
 USER root
-RUN chmod +x /usr/local/bin/init-firewall.sh && \
+RUN chmod 0755 /usr/local/bin/init-firewall.sh /usr/local/bin/firewall-status && \
+  chmod 0755 /etc/devcontainer-firewall && \
+  chmod 0644 /etc/devcontainer-firewall/allowed-domains.txt && \
+  echo "$FIREWALL_DNS_MODE" > /etc/devcontainer-firewall/dns-mode && \
+  (id -u dnsmasq >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin dnsmasq) && \
   echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
   chmod 0440 /etc/sudoers.d/node-firewall
 

@@ -8,6 +8,11 @@
       "Bash(npx tsc *)",
       "Bash(npx vitest *)",
       "Bash(openspec validate *)"
+    ],
+    "deny": [
+      "Edit(.devcontainer/**)",
+      "Edit(.claude/settings.json)",
+      "Edit(.claude/settings.local.json)"
     ]
   },
   "autoMemoryEnabled": false
