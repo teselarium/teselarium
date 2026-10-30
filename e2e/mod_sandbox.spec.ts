@@ -21,6 +21,7 @@ import {
   readParentDocumentError,
   readProbeContext,
   readStorageError,
+  recordHost,
   requestFromProbe,
   routeCovers,
   routeImages,
@@ -67,22 +68,6 @@ function buildPermissionLines(category: string, host: string): string[] {
     '        reason: "Test reason"',
   ];
   return lines;
-}
-
-/** Records every URL a route under `pattern` sees, answering with a 1×1 response and CORS. */
-async function recordHost(page: Page, pattern: string): Promise<string[]> {
-  const seenUrls: string[] = [];
-  await page.route(pattern, answerRecorded.bind(undefined, seenUrls));
-  return seenUrls;
-}
-
-async function answerRecorded(seenUrls: string[], route: Route): Promise<void> {
-  seenUrls.push(route.request().url());
-  await route.fulfill({
-    status: 200,
-    headers: { "Access-Control-Allow-Origin": "*" },
-    body: "{}",
-  });
 }
 
 async function openAppProbe(

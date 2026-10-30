@@ -5,10 +5,9 @@
  * It is also an example of getting the app's look without classes: the
  * theme's base stylesheet styles semantic HTML like the app's components (a
  * submit button is the primary button, an `<article>` a card, `role="alert"`
- * an alert, `aria-invalid` an invalid field), `data-ot-variant` picks the
- * variants that have no semantic HTML (badges, an outline submit button), and
- * this mod's own CSS sets layout only. See "Write HTML, get the app's look"
- * in docs/modules/lib/core/theme/README.md.
+ * an alert), `data-ot-variant` picks the variants that have no semantic HTML
+ * (badges, an outline submit button), and this mod's own CSS sets layout only.
+ * See "Write HTML, get the app's look" in docs/modules/lib/core/theme/README.md.
  */
 
 // Layout only: the colors, borders and fonts come from the theme.
@@ -20,7 +19,7 @@ const VIEWER_STYLE = `
   pre { margin: 0; }
   td { overflow-wrap: anywhere; }
   form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); margin-top: var(--ot-space-4); }
-  input[type="url"] { flex: 1; min-width: 16rem; }
+  input[type="text"] { flex: 1; min-width: 16rem; }
 `;
 
 const COLLECTION_FIELD_ID = "collection-address";
@@ -86,31 +85,26 @@ function runWithoutTiles(view) {
   openMod(view, null);
 }
 
-/** An address that is not a full URL marks the field invalid instead of running. */
-function runWithTypedCollection(view, input, event) {
-  event.preventDefault();
-  const collection = input.value.trim();
-  if (collection === "") {
-    return;
-  }
-  if (!URL.canParse(collection)) {
-    input.setAttribute("aria-invalid", "true");
-    view.messages.replaceChildren(
-      buildErrorAlert(`"${collection}" is not a full address.`),
-    );
-    return;
-  }
-  input.removeAttribute("aria-invalid");
-  openMod(view, collection);
-}
-
-/** The collection field's value when it holds a full address, the rule of "Run with this collection", or `null`. */
-function readCheckCollection(view) {
+/**
+ * The collection field's value without surrounding spaces, or `null` when it
+ * is empty. It is sent as typed: the engine resolves a relative path against
+ * the app's address, as in a run link's `collection`.
+ */
+function readTypedCollection(view) {
   const collection = view.collectionInput?.value.trim() ?? "";
-  if (collection === "" || !URL.canParse(collection)) {
+  if (collection === "") {
     return null;
   }
   return collection;
+}
+
+function runWithTypedCollection(view, event) {
+  event.preventDefault();
+  const collection = readTypedCollection(view);
+  if (collection === null) {
+    return;
+  }
+  openMod(view, collection);
 }
 
 /** A finding: its level as a badge, its step and message, and its source. */
@@ -205,7 +199,7 @@ function checkMod(view, event) {
     buildStatusMessage(`Checking ${view.inspection.title}…`),
   );
   const params = { mod: view.inspection.source };
-  const collection = readCheckCollection(view);
+  const collection = readTypedCollection(view);
   if (collection !== null) {
     params.collection = collection;
   }
@@ -215,10 +209,6 @@ function checkMod(view, event) {
       showCheckReport.bind(undefined, view, button),
       showCheckError.bind(undefined, view, button),
     );
-}
-
-function clearInvalidField(input) {
-  input.removeAttribute("aria-invalid");
 }
 
 function formatScalar(value) {
@@ -437,9 +427,10 @@ function buildCollectionForm(view) {
   label.textContent = "Collection address";
   const input = document.createElement("input");
   input.id = COLLECTION_FIELD_ID;
-  input.type = "url";
-  input.placeholder = "https://example.org/collection.yaml";
-  input.addEventListener("input", clearInvalidField.bind(undefined, input));
+  input.type = "text";
+  input.inputMode = "url";
+  input.placeholder =
+    "./collection.yaml or https://example.org/collection.yaml";
   view.collectionInput = input;
   const runButton = document.createElement("button");
   runButton.type = "submit";
@@ -447,7 +438,7 @@ function buildCollectionForm(view) {
   runButton.textContent = "Run with this collection";
   runButton.addEventListener(
     "click",
-    runWithTypedCollection.bind(undefined, view, input),
+    runWithTypedCollection.bind(undefined, view),
   );
   form.append(label, input, runButton);
   return form;

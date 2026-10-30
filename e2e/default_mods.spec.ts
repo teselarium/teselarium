@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Frame, FrameLocator, Locator, Page } from "@playwright/test";
+import type { ModFiles } from "./mod_routes.ts";
 import {
   APP_MOD_API_VERSION,
   buildMissingEntrypointFiles,
@@ -12,6 +13,7 @@ import {
   findModFrame,
   OTHER_API_RANGE,
   readParentDocumentError,
+  recordHost,
   routeCovers,
   serveAppOriginMod,
   stageBar,
@@ -22,6 +24,7 @@ import {
   MISSING_MOD_REFERENCE,
   readSampleModSource,
   SAMPLE_BOOKS_FOLDER_PATH,
+  SAMPLE_COLLECTION_GLOB,
   SAMPLE_MOD_REFERENCE,
 } from "./sample_mod.ts";
 import { listOwnLookDeclarations, readTokenAs } from "./theme_probes.ts";
@@ -292,6 +295,50 @@ test.describe("Mod viewer reports a missing or failing target", function describ
   });
 });
 
+/** `two_books.yaml`: a collection of two sample books, served under `/test-mods/`. */
+function buildTwoBooksFiles(): ModFiles {
+  const files = {
+    "two_books.yaml": [
+      "collection:",
+      '  name: "Two books"',
+      "  tiles:",
+      `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/kallocain.md"`,
+      `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/fictions.md"`,
+    ].join("\n"),
+  };
+  return files;
+}
+
+function collectionField(viewer: FrameLocator): Locator {
+  return viewer.getByRole("textbox", { name: "Collection address" });
+}
+
+/** Types `address` in the viewer's collection field and presses "Run with this collection". */
+async function runWithTypedCollection(
+  viewer: FrameLocator,
+  address: string,
+): Promise<void> {
+  await collectionField(viewer).fill(address);
+  await viewer
+    .getByRole("button", { name: "Run with this collection" })
+    .click();
+}
+
+/** Expects the sample book list mod to list the two books of `two_books.yaml`. */
+async function expectTwoBooks(page: Page): Promise<void> {
+  const sample = page.frameLocator('iframe[title="Book List"]');
+  await expect(sample.getByRole("listitem")).toHaveCount(2);
+  await expect(sample.getByText("The Library of Babel")).toBeVisible();
+}
+
+/** A parameter of the run link in the page's address, e.g. `collection`. */
+function readRunLinkParam(page: Page, name: string): string | null {
+  const hash = new URL(page.url()).hash;
+  const query = hash.slice(hash.indexOf("?") + 1);
+  const value = new URLSearchParams(query).get(name);
+  return value;
+}
+
 test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
   test("Run with the sample tiles", async function runsWithSampleTiles({
     page,
@@ -321,28 +368,48 @@ test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
     page,
   }): Promise<void> {
     await routeCovers(page);
-    await serveAppOriginMod(page, {
-      "two_books.yaml": [
-        "collection:",
-        '  name: "Two books"',
-        "  tiles:",
-        `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/kallocain.md"`,
-        `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/fictions.md"`,
-      ].join("\n"),
-    });
+    await serveAppOriginMod(page, buildTwoBooksFiles());
     await openViewerForSample(page);
     const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
 
-    await viewer
-      .getByRole("textbox", { name: "Collection address" })
-      .fill(new URL("/test-mods/two_books.yaml", page.url()).href);
-    await viewer
-      .getByRole("button", { name: "Run with this collection" })
-      .click();
+    await runWithTypedCollection(
+      viewer,
+      new URL("/test-mods/two_books.yaml", page.url()).href,
+    );
 
-    const sample = page.frameLocator('iframe[title="Book List"]');
-    await expect(sample.getByRole("listitem")).toHaveCount(2);
-    await expect(sample.getByText("The Library of Babel")).toBeVisible();
+    await expectTwoBooks(page);
+  });
+
+  test("Run with a relative collection address", async function runsWithRelativeCollection({
+    page,
+  }): Promise<void> {
+    await routeCovers(page);
+    await serveAppOriginMod(page, buildTwoBooksFiles());
+    await openViewerForSample(page);
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+
+    await runWithTypedCollection(viewer, "./test-mods/two_books.yaml");
+
+    await expect(
+      viewer.getByRole("alert", { includeHidden: true }),
+    ).toHaveCount(0);
+    await expectTwoBooks(page);
+    expect(readRunLinkParam(page, "collection")).toBe(
+      "./test-mods/two_books.yaml",
+    );
+  });
+
+  test("Run with a bare relative path", async function runsWithBareRelativePath({
+    page,
+  }): Promise<void> {
+    await routeCovers(page);
+    await serveAppOriginMod(page, buildTwoBooksFiles());
+    await openViewerForSample(page);
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+
+    await runWithTypedCollection(viewer, "test-mods/two_books.yaml");
+
+    await expectTwoBooks(page);
   });
 
   test("Run without tiles", async function runsWithoutTiles({
@@ -414,6 +481,28 @@ test.describe("Mod viewer checks the mod", function describeViewerChecks(): void
     await expect(viewer.getByRole("button", { name: "Check mod" })).toHaveCount(
       0,
     );
+  });
+
+  test("Check with a relative collection address", async function checksWithRelativeCollection({
+    page,
+  }): Promise<void> {
+    // Every file under `/test-mods/` answers `404 Not Found`.
+    await serveAppOriginMod(page, {});
+    await openViewerForSample(page);
+    const sampleCollectionUrls = await recordHost(page, SAMPLE_COLLECTION_GLOB);
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+    const missingCollection = new URL("/test-mods/missing.yaml", page.url())
+      .href;
+
+    await collectionField(viewer).fill("./test-mods/missing.yaml");
+    await viewer.getByRole("button", { name: "Check mod" }).click();
+
+    const finding = checkReport(viewer)
+      .getByRole("listitem")
+      .filter({ hasText: missingCollection });
+    await expect(finding).toContainText("error");
+    await expect(finding).toContainText("404");
+    expect(sampleCollectionUrls).toEqual([]);
   });
 });
 

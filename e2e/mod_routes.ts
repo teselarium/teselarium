@@ -128,6 +128,25 @@ export async function serveForeignMod(
   return seenUrls;
 }
 
+/** Records every URL a route under `pattern` sees, answering with a 1×1 response and CORS. */
+export async function recordHost(
+  page: Page,
+  pattern: string,
+): Promise<string[]> {
+  const seenUrls: string[] = [];
+  await page.route(pattern, answerRecorded.bind(undefined, seenUrls));
+  return seenUrls;
+}
+
+async function answerRecorded(seenUrls: string[], route: Route): Promise<void> {
+  seenUrls.push(route.request().url());
+  await route.fulfill({
+    status: 200,
+    headers: { "Access-Control-Allow-Origin": "*" },
+    body: "{}",
+  });
+}
+
 /** Serves inline mod files under `/test-mods/` on the preview origin. Returns the URLs the route saw. */
 export async function serveAppOriginMod(
   page: Page,
