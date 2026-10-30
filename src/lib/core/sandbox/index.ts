@@ -26,5 +26,8 @@ export { buildSandboxPolicy, collectContentHosts } from "./sandbox_policy.ts";
 export {
   describeBlockedDialog,
   describeBlockedRequest,
+  describeNewTileLinks,
 } from "./sandbox_reports.ts";
 export type { BlockedDialogName, BlockedRequest } from "./sandbox_reports.ts";
+export { collectTileLinks } from "./tile_links.ts";
+export type { TileLinks } from "./tile_links.ts";

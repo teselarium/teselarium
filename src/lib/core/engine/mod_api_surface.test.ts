@@ -297,6 +297,7 @@ async function readSampleMountContext(): Promise<Record<string, object>> {
       },
       appOrigin: APP_ORIGIN,
       defaults: TEST_DEFAULTS,
+      loadsTileLinkedMedia: true,
     },
     { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
   );

@@ -160,6 +160,65 @@ export async function serveAppOriginMod(
   return seenUrls;
 }
 
+/** The host that serves the linked collection of `serveLinkedTiles`. */
+export const TILES_HOST = "https://tiles.example.net";
+
+/** The host of the media the linked tiles link. */
+export const MEDIA_HOST = "https://media.example.net";
+
+export const LINKED_COLLECTION_URL = `${TILES_HOST}/linked.yaml`;
+export const LINKED_TILE_URL = `${TILES_HOST}/books/kallocain.md`;
+export const LINKED_COVER_URL = `${MEDIA_HOST}/covers/kallocain.jpg`;
+
+/** The `collection` parameter of a run link that opens the linked collection. */
+export const LINKED_COLLECTION_PARAM = `&collection=${encodeURIComponent(LINKED_COLLECTION_URL)}`;
+
+/** The run link of the probe on the app's origin, opened with the linked collection. */
+export const LINKED_APP_PROBE_LINK = `/#/run?mod=.${APP_ORIGIN_MOD_PATH}probe/${LINKED_COLLECTION_PARAM}`;
+
+/** The tile the linked collection serves. Tests change its metadata before "Reload tiles". */
+export interface LinkedTile {
+  metadataLines: string[];
+}
+
+async function answerLinkedTiles(
+  linkedTile: LinkedTile,
+  route: Route,
+): Promise<void> {
+  const url = route.request().url();
+  const body =
+    url === LINKED_COLLECTION_URL
+      ? [
+          "collection:",
+          '  name: "Linked tiles"',
+          "  tiles:",
+          `    - url: "${LINKED_TILE_URL}"`,
+        ].join("\n")
+      : `---\ntitle: "Kallocain"\n${linkedTile.metadataLines.join("\n")}\n---\n\nA linked tile.\n`;
+  await route.fulfill({
+    status: 200,
+    headers: { "Access-Control-Allow-Origin": "*" },
+    body,
+  });
+}
+
+/**
+ * Serves a collection at `LINKED_COLLECTION_URL` whose one tile, at
+ * `LINKED_TILE_URL`, has the given metadata lines. Returns the tile, whose
+ * lines a test can change before "Reload tiles".
+ */
+export async function serveLinkedTiles(
+  page: Page,
+  metadataLines: string[],
+): Promise<LinkedTile> {
+  const linkedTile: LinkedTile = { metadataLines };
+  await page.route(
+    `${TILES_HOST}/**`,
+    answerLinkedTiles.bind(undefined, linkedTile),
+  );
+  return linkedTile;
+}
+
 /**
  * `^0.1.0`: the `api` range the test mods declare unless a test asks for
  * another one, so they match the mod API version and get no missing-range

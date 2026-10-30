@@ -110,6 +110,8 @@ export interface ModSession {
   onErrorResponse:
     ((method: string | null, error: ResponseError) => void) | null;
   onTestReport: ((report: SandboxTestReport) => void) | null;
+  /** Whether blocked image and media reports get the redirect hint: tile links were on as the mod started. */
+  hintsTileLinks: boolean;
   stopped: boolean;
 }
 
@@ -220,7 +222,12 @@ function reportBlockedRequest(session: ModSession, params: unknown): void {
   const context = session.methodContext;
   reportIssue(
     session,
-    describeBlockedRequest(blocked, context.mod, context.grants),
+    describeBlockedRequest(
+      blocked,
+      context.mod,
+      context.grants,
+      session.hintsTileLinks,
+    ),
   );
 }
 
@@ -373,6 +380,7 @@ export function connectModSession(
     onMounted: options.onMounted ?? null,
     onErrorResponse: options.onErrorResponse ?? null,
     onTestReport: options.onTestReport ?? null,
+    hintsTileLinks: launch.tileLinks !== null,
     stopped: false,
   };
   port.onmessage = handleModPortMessage.bind(undefined, session);

@@ -87,9 +87,16 @@ The stage bar has × for the visible sandbox, except for the Home mod opened at 
 
 ### Issues and load failures
 
-The stage bar lists every issue of the visible sandbox, in the order they were found: mod file issues (the warning of a mod that declares no `api` range), tile collection issues, permission issues, blocked requests, mount failures and a stopped mod. Each sandbox keeps its own issues. When the mod file, its entrypoint, its tile type file or the collection cannot be loaded, or a link names a switched-off default mod, the sandbox shows the error and no frame, and keeps its history entry and its ×.
+The stage bar lists every issue of the visible sandbox, in the order they were found: mod file issues (the warning of a mod that declares no `api` range), tile collection issues, tile link issues (the links left out of the policy, see [Media linked by tiles](../sandbox/README.md#media-linked-by-tiles)), permission issues, blocked requests, mount failures and a stopped mod. Each sandbox keeps its own issues. When the mod file, its entrypoint, its tile type file or the collection cannot be loaded, or a link names a switched-off default mod, the sandbox shows the error and no frame, and keeps its history entry and its ×.
 
 "Reload tiles", for a sandbox opened with a collection, loads and validates the collection again, pushes `tiles.changed` to the running mod and replaces the collection issues. The mod file issues stay.
+
+The files the tiles link are fixed in the frame's policy when the mod starts. When "Load media linked by tiles" was on as the mod started, a reload also replaces the tile link issues: it collects the links of the reloaded tiles against the launch's content hosts and granted permissions, and lists, in order:
+
+1. when the reloaded tiles link files the launch's policy does not allow, one warning whose source is the collection: `The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.`, or `The reloaded tiles link 3 files that this mod does not allow yet. Open the mod again to show them.`;
+2. the left-out links of the reloaded tiles, so a link no longer in the tiles stops being reported.
+
+Each reload compares against the launch, not the previous reload, since the frame keeps the launch's policy. When the collection cannot be loaded, the tile link issues stay as they were. Opening the mod again builds a new policy with the new links.
 
 ### Mods written for another API
 
@@ -142,6 +149,8 @@ The case logic lives in `stage_check_cases.ts`:
 
 The stage keeps the app's current theme, built from the resolved color scheme (see the [theme module](../theme/README.md)). It does not know where the color scheme comes from: the app tells it with `changeStageColorScheme`.
 
+The stage learns "Load media linked by tiles" the same way: `StageOptions.loadsTileLinkedMedia` is the start value, and the app calls `changeStageTileLinkedMedia` when the user switches it. Each sandbox launch and each mod check reads the current value, so a change applies to mods opened or checked after it. Running sandboxes keep their launch and their frame, and the stage publishes nothing, since the snapshot does not change.
+
 - A mod's session connects, on the frame's first `load`, with the theme current at that moment, so a mod opened while the color scheme changes mounts with the new one.
 - When the color scheme changes, every running mod, visible or hidden, gets `theme.changed` once. A mod still loading gets nothing: it connects with the new theme. A change to the current color scheme pushes nothing.
 
@@ -172,7 +181,7 @@ The work behind the public API is split so each file has one reason to change:
 
 ### Public API
 
-- `createStage(options)`: builds a stage. `StageOptions` are `history` (the `state`, `pushState` and `replaceState` of `History`), `defaults` (`DefaultModSettings`), `routing` (below), `appOrigin`, `baseUrl` (the app's address), `storage` (`localStorage`), an optional `fetch` and `colorScheme`, the color scheme the app starts with.
+- `createStage(options)`: builds a stage. `StageOptions` are `history` (the `state`, `pushState` and `replaceState` of `History`), `defaults` (`DefaultModSettings`), `routing` (below), `appOrigin`, `baseUrl` (the app's address), `storage` (`localStorage`), an optional `fetch`, `colorScheme`, the color scheme the app starts with, and `loadsTileLinkedMedia`, whether "Load media linked by tiles" is on as the app starts.
 - `followHistory(stage, hash, historyState)`: follows the current entry, on start and on each `popstate`.
 - `openStageSection(stage, section)`: activates a section, as the sidebar does. Returns `false`, and does nothing, for an id that is neither a page section nor a mod section.
 - `openStageLink(stage, link, openerId)`: opens a `RunLink` a mod asked for. Returns `false` when the opener is not the visible sandbox. The sessions call it through their `onOpenLink`.
@@ -187,6 +196,7 @@ The work behind the public API is split so each file has one reason to change:
 - `answerApiMismatch(stage, sandboxId, runAnyway)`: answers the question of the visible `asking` sandbox: `true` starts the mod, `false` fails the sandbox with the cancel error. Does nothing for a sandbox that is not visible or not asking.
 - `requestStageAction(stage, sandboxId, action)`, not exported: queues an action and resolves with the user's answer, or returns `null` when the sandbox is not the visible one or not running. The sessions call it through their `onRequestAction`.
 - `changeStageColorScheme(stage, colorScheme)`: switches the stage's theme and pushes `theme.changed` to every running mod, visible or hidden. Does nothing when the color scheme is the current one. The stage's current `Theme` is `stage.theme`.
+- `changeStageTileLinkedMedia(stage, isOn)`: switches "Load media linked by tiles" for the mods launched and checked from now on (`stage.loadsTileLinkedMedia`). Running sandboxes keep their launch, and nothing is published.
 - `readStageSnapshot(stage)` and `subscribeStage(stage, listener)`: a frozen `StageSnapshot` that is new after every change, for React's `useSyncExternalStore`. `subscribeStage` returns the function that unsubscribes.
 - Types: `Stage`, `StageOptions`, `StageRouting`, `StageHome`, `SectionLink`, `StageSnapshot` (`sandboxes`, `checks`, `action`, `visible` and `activeSection`), `CheckSnapshot` (`id`, `key`, `sandboxDocument`, `title`), `VisibleView` (`{ kind: "sandbox", id }`, `{ kind: "page", section, page }` with `page: null` for the index, or `null` before the first entry), `ActionSnapshot` (`id`, `mod` with `title` and `source`, and `action`), `ActionMod`, the engine's `AppAction`, `LinkAction`, `SaveFileAction` and `ConfirmAction` re-exported as types, so the page imports them from the stage, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, `sandboxDocument`, `canReloadTiles`, `issues`, `errorMessage`, `apiMismatch` with `range` and `apiVersion` only while asking, otherwise `null`), `SandboxStatus` (`loading`, `asking`, `failed`, `running` or `stopped`), `StageHistory`.
 
@@ -222,6 +232,7 @@ const stage = createStage({
   baseUrl: document.baseURI,
   storage: localStorage,
   colorScheme: "light",
+  loadsTileLinkedMedia: true,
 });
 followHistory(stage, location.hash, history.state);
 window.addEventListener("popstate", function followPopState(): void {
@@ -229,7 +240,7 @@ window.addEventListener("popstate", function followPopState(): void {
 });
 ```
 
-Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. `App` then renders the page the snapshot's `visible` names, if any, and `StageView`, which stays mounted, reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`. Apart from them, it renders a hidden `CheckFrame` per entry of the snapshot's `checks`, which calls `attachCheckFrame` and `checkFrameLoadedAgain`. Its `ActionDialog` shows the snapshot's `action`, performs it from the accept button's click and calls `answerStageAction`. Its `ApiMismatchDialog` shows the visible sandbox's `apiMismatch` while it is asking, and calls `answerApiMismatch`.
+Fragment navigations fire `popstate` too, so `hashchange` is not needed. The app's theme (`src/main/theme/app_theme.ts`) passes the resolved color scheme as `colorScheme` and calls `changeStageColorScheme` when it changes. The tile media setting (`src/main/settings/tile_media_setting.ts`) passes its start value as `loadsTileLinkedMedia` and calls `changeStageTileLinkedMedia` when it is switched. `App` then renders the page the snapshot's `visible` names, if any, and `StageView`, which stays mounted, reads the snapshot with `useSyncExternalStore`, renders every sandbox in creation order (hidden unless visible), and calls `attachFrame`, `frameLoadedAgain`, `closeSandbox` and `reloadTiles`. Apart from them, it renders a hidden `CheckFrame` per entry of the snapshot's `checks`, which calls `attachCheckFrame` and `checkFrameLoadedAgain`. Its `ActionDialog` shows the snapshot's `action`, performs it from the accept button's click and calls `answerStageAction`. Its `ApiMismatchDialog` shows the visible sandbox's `apiMismatch` while it is asking, and calls `answerApiMismatch`.
 
 ### Why no router library
 

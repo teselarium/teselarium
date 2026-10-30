@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import type { Dialog, Frame, Page, Request, Route } from "@playwright/test";
+import type {
+  Dialog,
+  Frame,
+  Locator,
+  Page,
+  Request,
+  Route,
+} from "@playwright/test";
 import {
   addFullscreenButton,
   buildProbeFiles,
@@ -13,6 +20,12 @@ import {
   isPageFullscreen,
   isPopupBlocked,
   issueList,
+  LINKED_APP_PROBE_LINK,
+  LINKED_COLLECTION_PARAM,
+  LINKED_COLLECTION_URL,
+  LINKED_COVER_URL,
+  LINKED_TILE_URL,
+  MEDIA_HOST,
   navigateFrame,
   navigateTop,
   readFrameOrigin,
@@ -27,6 +40,7 @@ import {
   routeImages,
   serveAppOriginMod,
   serveForeignMod,
+  serveLinkedTiles,
   showAssetNextToMod,
   showImage,
   stageBar,
@@ -510,6 +524,178 @@ test.describe("Report blocked requests with the fix", function describeReports()
     await expect(issueList(page)).toContainText(IMAGES_HOST);
 
     await expect(issueList(page).getByRole("listitem")).toHaveCount(1);
+  });
+});
+
+const ROUTER_LOGO_URL = "http://192.168.1.1/logo.png";
+const REDIRECT_HINT =
+  "If a tile links this file, link its final address: links that redirect to another site are blocked.";
+
+/** Opens the app's probe with the linked collection. */
+async function openLinkedAppProbe(page: Page): Promise<Frame> {
+  const frame = await openAppProbe(page, [], LINKED_APP_PROBE_LINK);
+  return frame;
+}
+
+/** Runs in a mod frame: starts loading `url` in an `<audio>` element. */
+function loadAudio(url: string): void {
+  const audio = document.createElement("audio");
+  audio.preload = "auto";
+  audio.src = url;
+  document.body.append(audio);
+  audio.load();
+}
+
+async function answerRedirect(location: string, route: Route): Promise<void> {
+  await route.fulfill({ status: 302, headers: { Location: location } });
+}
+
+function reloadTilesButton(page: Page): Locator {
+  return stageBar(page).getByRole("button", { name: "Reload tiles" });
+}
+
+test.describe("Media linked by tiles", function describeLinkedMedia(): void {
+  test("Image linked by a tile", async function loadsLinkedImage({
+    page,
+  }): Promise<void> {
+    await serveLinkedTiles(page, [`image: "${LINKED_COVER_URL}"`]);
+    const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+    const frame = await openLinkedAppProbe(page);
+
+    expect(await frame.evaluate(showImage, LINKED_COVER_URL)).toBe(true);
+    expect(seenUrls).toEqual([LINKED_COVER_URL]);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("Audio linked by a tile", async function sendsLinkedAudio({
+    page,
+  }): Promise<void> {
+    const audioUrl = `${MEDIA_HOST}/sound/theme.mp3`;
+    await serveLinkedTiles(page, [`audio: "${audioUrl}"`]);
+    const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+    const frame = await openLinkedAppProbe(page);
+
+    await frame.evaluate(loadAudio, audioUrl);
+
+    await expect
+      .poll(function readSeenUrls(): string[] {
+        return seenUrls;
+      })
+      .toContain(audioUrl);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("Mod from another origin", async function loadsLinkForForeignMod({
+    page,
+  }): Promise<void> {
+    const coverUrl = `${MEDIA_HOST}/cover.jpg`;
+    await serveLinkedTiles(page, [`image: "${coverUrl}"`]);
+    await routeImages(page, `${MEDIA_HOST}/**`);
+    await serveForeignMod(page, buildProbeFiles("probe"));
+    await page.goto(`${FOREIGN_PROBE_LINK}${LINKED_COLLECTION_PARAM}`);
+    const frame = await findModFrame(page, "probe");
+    await waitForProbe(frame);
+
+    expect(await frame.evaluate(showImage, coverUrl)).toBe(true);
+  });
+});
+
+test.describe("A tile link allows only the linked file", function describeOnlyLinkedFile(): void {
+  test("Other file of the same host", async function blocksOtherFile({
+    page,
+  }): Promise<void> {
+    const otherUrl = `${MEDIA_HOST}/covers/other.jpg`;
+    await serveLinkedTiles(page, [`image: "${LINKED_COVER_URL}"`]);
+    const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+    const frame = await openLinkedAppProbe(page);
+
+    expect(await frame.evaluate(showImage, otherUrl)).toBe(false);
+    expect(seenUrls).toEqual([]);
+    await expect(issueList(page)).toContainText(MEDIA_HOST);
+  });
+});
+
+test.describe("Tile links allow only images, video and audio", function describeOnlyMedia(): void {
+  test("Linked file fetched", async function blocksLinkedFetch({
+    page,
+  }): Promise<void> {
+    await serveLinkedTiles(page, [`image: "${LINKED_COVER_URL}"`]);
+    const seenUrls = await recordHost(page, `${MEDIA_HOST}/**`);
+    const frame = await openLinkedAppProbe(page);
+
+    const outcome = await frame.evaluate(fetchFromFrame, LINKED_COVER_URL);
+
+    expect(outcome).not.toBe("sent");
+    expect(seenUrls).toEqual([]);
+  });
+});
+
+test.describe("Private network guard", function describePrivateNetworkGuard(): void {
+  test("Router address in a tile from the web", async function leavesOutRouter({
+    page,
+  }): Promise<void> {
+    await serveLinkedTiles(page, [`logo: "${ROUTER_LOGO_URL}"`]);
+    const seenUrls = await recordHost(page, "http://192.168.1.1/**");
+    const frame = await openLinkedAppProbe(page);
+
+    expect(await frame.evaluate(showImage, ROUTER_LOGO_URL)).toBe(false);
+    await expect(issueList(page)).toContainText(
+      `Not loading ${ROUTER_LOGO_URL}: tiles from other sites cannot link addresses on your computer or network.`,
+    );
+    await expect(issueList(page)).toContainText(LINKED_TILE_URL);
+    expect(seenUrls).toEqual([]);
+  });
+});
+
+test.describe("Redirect hint for tile authors", function describeRedirectHint(): void {
+  test("Tile link that redirects", async function hintsRedirect({
+    page,
+    browserName,
+  }): Promise<void> {
+    // Playwright's WebKit cannot fulfill a route with a redirect status. The
+    // hint does not depend on the browser: sandbox_reports.test.ts covers it.
+    test.skip(
+      browserName === "webkit",
+      "Playwright cannot fulfill a route with a 302 in WebKit",
+    );
+    const coverUrl = `${MEDIA_HOST}/cover.jpg`;
+    await serveLinkedTiles(page, [`image: "${coverUrl}"`]);
+    await page.route(
+      `${MEDIA_HOST}/**`,
+      answerRedirect.bind(undefined, "https://cdn.example.org/cover.jpg"),
+    );
+    const seenUrls = await routeImages(page, "https://cdn.example.org/**");
+    const frame = await openLinkedAppProbe(page);
+
+    expect(await frame.evaluate(showImage, coverUrl)).toBe(false);
+    await expect(issueList(page)).toContainText(
+      "Add it to permissions.show in mod_conf.yaml.",
+    );
+    await expect(issueList(page)).toContainText(REDIRECT_HINT);
+    expect(seenUrls).toEqual([]);
+  });
+});
+
+test.describe("Tile links are fixed when the mod starts", function describeFixedTileLinks(): void {
+  test("New link after reloading the tiles", async function reportsNewLink({
+    page,
+  }): Promise<void> {
+    const newUrl = `${MEDIA_HOST}/new.jpg`;
+    const linkedTile = await serveLinkedTiles(page, [
+      `image: "${LINKED_COVER_URL}"`,
+    ]);
+    const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+    const frame = await openLinkedAppProbe(page);
+    linkedTile.metadataLines = [`image: "${newUrl}"`];
+
+    await reloadTilesButton(page).click();
+
+    await expect(issueList(page)).toContainText(
+      "The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.",
+    );
+    await expect(issueList(page)).toContainText(LINKED_COLLECTION_URL);
+    expect(await frame.evaluate(showImage, newUrl)).toBe(false);
+    expect(seenUrls).toEqual([]);
   });
 });
 

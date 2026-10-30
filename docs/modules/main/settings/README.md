@@ -6,6 +6,7 @@ The Settings section is always shown at the bottom of the sidebar. Its page, at 
 
 - **Appearance**: the Theme control, with System, Light and Dark. Changing it applies the choice to the app, to the pages and to every running mod at once, visible or hidden, without reloading the page or any mod's frame. System follows the operating system's preference. (The Theme control used to sit in the header.)
 - **Sidebar**: every section of the app, in the sidebar's order. Home, Settings and About say "Always shown". Each optional section, coming-soon ones included, has a switch labeled with its name, and a coming-soon section also says "Coming soon". A section whose mod the instantiation switched off is not listed (see the [section registry](../README.md#sections-of-switched-off-mods)).
+- **Privacy**: the "Load media linked by tiles" switch, on by default. On, mods can show the images, audio and video their tiles link to, from any public site, without a permission (see [Media linked by tiles](../../lib/core/sandbox/README.md#media-linked-by-tiles)); the group says that the linked sites can see that the user viewed the tile. Off, mods show only media from where their files and tiles were loaded and from the hosts of their granted `show` permissions. A change applies to mods opened after it: running mods keep what they were started with, and no frame reloads. The store (`src/main/settings/tile_media_setting.ts`) gives the stage its start value (`readStartTileLinkedMedia`) and tells it of each change (`changeStageTileLinkedMedia`).
 - **Version**: the app's version, labeled `OpenTesela`, and the app's mod API version, labeled `Mod API`. The app's version is the one in `package.json` when the app was built (`src/main/app_version.ts`, see the [release guide](../../../releasing.md)), and the mod API version is `MOD_API_VERSION` (see [the engine](../../lib/core/engine/README.md#mod-api-version)). Both are plain text, so the user can select them and copy them into a problem report.
 
 ## Stored keys
@@ -16,6 +17,7 @@ The app keeps the user's choices in `localStorage`, under keys that start with `
 |---|---|
 | `opentesela.theme-choice` | `system`, `light` or `dark`. A missing or unknown value is System. |
 | `opentesela.sidebar-sections` | The section switches, `{ "<section id>": false }` for a section switched off. A section with no stored switch is on, so a section an instantiation adds starts shown. A switch of a section the registry no longer has is dropped on the next start. |
+| `opentesela.tile-linked-media` | "Load media linked by tiles": `true` or `false`, as JSON. A missing or other value is on. |
 | `opentesela.sidebar` | The sidebar's layout on viewports at least 768px wide: `{ state, from, width }`, the state (`expanded`, `collapsed` or `hidden`), the state a hidden sidebar comes back to, and the expanded width. An invalid value gives an expanded sidebar of 240px. Nothing done on a narrow viewport is stored. |
 
 When the storage cannot be read or written (a private window, a full or blocked storage), the choices still apply until the page is closed, and no error is shown.

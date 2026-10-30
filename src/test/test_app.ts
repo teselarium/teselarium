@@ -5,6 +5,8 @@ import type { SectionDefinition } from "../main/sections/section_registry.ts";
 import { createSectionSwitches } from "../main/sections/section_switches.ts";
 import type { SectionSwitches } from "../main/sections/section_switches.ts";
 import { VANILLA_SECTIONS } from "../main/sections/vanilla_sections.ts";
+import { createTileMediaSetting } from "../main/settings/tile_media_setting.ts";
+import type { TileMediaSetting } from "../main/settings/tile_media_setting.ts";
 import { createSidebarLayout } from "../main/sidebar/sidebar_layout.ts";
 import type { SidebarLayoutStore } from "../main/sidebar/sidebar_layout.ts";
 import { createAppTheme } from "../main/theme/app_theme.ts";
@@ -23,6 +25,7 @@ export interface AppFixture {
   appTheme: AppTheme;
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
+  tileMedia: TileMediaSetting;
   layout: SidebarLayoutStore;
   storage: MemoryStorage;
   narrowQuery: FakeColorSchemeQuery;
@@ -74,6 +77,7 @@ export async function startTestApp(
       storage,
       optionalIds: listOptionalIds(sections),
     }),
+    tileMedia: createTileMediaSetting({ storage, stage }),
     layout: createSidebarLayout({
       storage,
       narrowQuery,

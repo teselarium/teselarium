@@ -10,6 +10,7 @@ describe("stage module entry point", function describeEntryPoint(): void {
       "attachFrame",
       "buildSectionHash",
       "changeStageColorScheme",
+      "changeStageTileLinkedMedia",
       "checkFrameLoadedAgain",
       "closeSandbox",
       "createStage",

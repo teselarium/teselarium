@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ModFile, ModPermission } from "../../mod/index.ts";
 import type { ModGrants } from "../permissions/index.ts";
-import { describeBlockedDialog, describeBlockedRequest } from "./index.ts";
+import {
+  describeBlockedDialog,
+  describeBlockedRequest,
+  describeNewTileLinks,
+} from "./index.ts";
 import type { BlockedRequest } from "./index.ts";
 
 const MOD_SOURCE = "https://mods.example.net/probe/mod_conf.yaml";
@@ -12,6 +16,9 @@ const COVERS_PERMISSION: ModPermission = {
   host: "https://upload.wikimedia.org",
   reason: "Shows the book covers",
 };
+const COLLECTION_SOURCE = "https://tiles.example.net/books/collection.yaml";
+const REDIRECT_HINT =
+  "If a tile links this file, link its final address: links that redirect to another site are blocked.";
 const ARCHIVE_PERMISSION: ModPermission = {
   category: "show",
   host: "https://*.us.archive.org",
@@ -22,9 +29,10 @@ function describeBlock(
   blockedUrl: string,
   directive: string,
   grants: ModGrants,
+  hintsTileLinks = false,
 ): string {
   const blocked: BlockedRequest = { blockedUrl, directive };
-  const issue = describeBlockedRequest(blocked, MOD, grants);
+  const issue = describeBlockedRequest(blocked, MOD, grants, hintsTileLinks);
   return issue.message;
 }
 
@@ -37,6 +45,7 @@ describe("describeBlockedRequest", function describeDescribeBlocked(): void {
       },
       MOD,
       NO_GRANTS,
+      false,
     );
 
     expect(issue).toEqual({
@@ -175,6 +184,101 @@ describe("describeBlockedRequest", function describeDescribeBlocked(): void {
 
     expect(message).toBe(
       "Blocked image request to https://us.archive.org. Add it to permissions.show in mod_conf.yaml.",
+    );
+  });
+});
+
+describe("Redirect hint for tile authors", function describeRedirectHint(): void {
+  it("Tile link that redirects", function hintsImageRedirect(): void {
+    const message = describeBlock(
+      "https://cdn.example.org/cover.jpg",
+      "img-src",
+      NO_GRANTS,
+      true,
+    );
+
+    expect(message).toBe(
+      `Blocked image request to https://cdn.example.org. Add it to permissions.show in mod_conf.yaml. ${REDIRECT_HINT}`,
+    );
+  });
+
+  it("hints a blocked media request", function hintsMediaRedirect(): void {
+    const message = describeBlock(
+      "https://cdn.example.org/theme.mp3",
+      "media-src",
+      NO_GRANTS,
+      true,
+    );
+
+    expect(message).toBe(
+      `Blocked media request to https://cdn.example.org. Add it to permissions.show in mod_conf.yaml. ${REDIRECT_HINT}`,
+    );
+  });
+
+  it("No hint for other categories", function omitsHintForOtherDirectives(): void {
+    const directives = [
+      "connect-src",
+      "font-src",
+      "style-src",
+      "frame-src",
+      "script-src",
+    ];
+
+    const hintedDirectives: string[] = [];
+    for (const directive of directives) {
+      const message = describeBlock(
+        "https://api.example.net/data",
+        directive,
+        NO_GRANTS,
+        true,
+      );
+      if (message.includes(REDIRECT_HINT)) {
+        hintedDirectives.push(directive);
+      }
+    }
+    expect(hintedDirectives).toEqual([]);
+  });
+
+  it("No hint with the setting off", function omitsHintWithSettingOff(): void {
+    const message = describeBlock(
+      "https://images.example.net/cover.jpg",
+      "img-src",
+      NO_GRANTS,
+      false,
+    );
+
+    expect(message).toBe(
+      "Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.",
+    );
+  });
+
+  it("gives no hint for a declared permission that was not granted", function omitsHintForDenied(): void {
+    const message = describeBlock(
+      "https://upload.wikimedia.org/cover.jpg",
+      "img-src",
+      { granted: [], denied: [COVERS_PERMISSION] },
+      true,
+    );
+
+    expect(message).toBe(
+      "Blocked image request to https://upload.wikimedia.org: the mod declares it in permissions.show, but the permission was not granted.",
+    );
+  });
+});
+
+describe("describeNewTileLinks", function describeDescribeNewTileLinks(): void {
+  it("names one file", function describesOneFile(): void {
+    expect(describeNewTileLinks(1, COLLECTION_SOURCE)).toEqual({
+      level: "warning",
+      source: COLLECTION_SOURCE,
+      message:
+        "The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.",
+    });
+  });
+
+  it("counts several files", function describesSeveralFiles(): void {
+    expect(describeNewTileLinks(3, COLLECTION_SOURCE).message).toBe(
+      "The reloaded tiles link 3 files that this mod does not allow yet. Open the mod again to show them.",
     );
   });
 });

@@ -80,6 +80,7 @@ export async function startCheckStage(): Promise<CheckStage> {
     storage,
     fetch: fetchSpy,
     colorScheme: "light",
+    loadsTileLinkedMedia: true,
   });
   followHistory(stage, history.hash, history.state);
   for (const runtime of stage.runtimes.values()) {

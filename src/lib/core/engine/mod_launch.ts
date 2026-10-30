@@ -21,7 +21,9 @@ import {
   buildSandboxDocument,
   buildSandboxPolicy,
   collectContentHosts,
+  collectTileLinks,
 } from "../sandbox/index.ts";
+import type { TileLinks } from "../sandbox/index.ts";
 import type { Theme } from "../theme/index.ts";
 import { findSwitchedOffMod } from "./default_mod_settings.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
@@ -74,6 +76,12 @@ export interface ModLaunch {
   collectionSource: string | null;
   context: LaunchContext;
   contentHosts: string[];
+  /**
+   * The files the tiles link, which the policy allows as images, video and
+   * audio, and the links left out. `null` when "Load media linked by tiles"
+   * was off as the mod started.
+   */
+  tileLinks: TileLinks | null;
   /** The frame's Content-Security-Policy, which the frames of the mod's tests also get. */
   policy: string;
   /** The frame's `srcdoc` HTML. */
@@ -90,6 +98,8 @@ export interface ModLaunchRequest {
   link: RunLink;
   appOrigin: string;
   defaults: ResolvedDefaultModSettings;
+  /** Whether "Load media linked by tiles" is on as the mod starts. */
+  loadsTileLinkedMedia: boolean;
 }
 
 /** The tiles a mod receives from a collection, and the collection's issues. */
@@ -259,25 +269,53 @@ function buildModContext(
   return context;
 }
 
+function collectLaunchTileLinks(
+  modTiles: ModTiles | null,
+  contentHosts: string[],
+  grants: ModGrants,
+  loadsTileLinkedMedia: boolean,
+): TileLinks | null {
+  if (!loadsTileLinkedMedia) {
+    return null;
+  }
+  const tiles = modTiles === null ? [] : modTiles.tiles;
+  const tileLinks = collectTileLinks(tiles, contentHosts, grants.granted);
+  return tileLinks;
+}
+
 /**
  * Builds everything a loaded mod's frame needs from its tiles: grants its
  * permissions and builds its policy, its frame document, its mount context
- * and its issues. Requests nothing.
+ * and its issues. With `loadsTileLinkedMedia`, the policy also allows the
+ * files the tiles link (`collectTileLinks`); the mount context does not list
+ * them. Requests nothing.
  */
 export function buildModLaunch(
   mod: LoadedMod,
   link: RunLink,
   modTiles: ModTiles | null,
   appOrigin: string,
+  loadsTileLinkedMedia: boolean,
 ): ModLaunch {
   const grants = grantModPermissions(mod, appOrigin);
   const contentHosts = collectContentHosts(listContentSources(mod, modTiles));
-  const policy = buildSandboxPolicy(contentHosts, grants.granted);
+  const tileLinks = collectLaunchTileLinks(
+    modTiles,
+    contentHosts,
+    grants,
+    loadsTileLinkedMedia,
+  );
+  const policy = buildSandboxPolicy(
+    contentHosts,
+    grants.granted,
+    tileLinks === null ? [] : tileLinks.sources,
+  );
   const launch: ModLaunch = {
     mod,
     collectionSource: modTiles === null ? null : modTiles.collectionSource,
     context: buildModContext(mod, link, modTiles, grants),
     contentHosts,
+    tileLinks,
     policy,
     sandboxDocument: buildSandboxDocument(policy, mod.theme),
     apiCompatible: matchModApiRange(mod.api),
@@ -310,6 +348,12 @@ export async function prepareModLaunch(
   const source = resolveLaunchSource(request, options);
   const mod = await loadMod(source, options);
   const modTiles = await loadLinkTiles(mod, request.link, options);
-  const launch = buildModLaunch(mod, request.link, modTiles, request.appOrigin);
+  const launch = buildModLaunch(
+    mod,
+    request.link,
+    modTiles,
+    request.appOrigin,
+    request.loadsTileLinkedMedia,
+  );
   return launch;
 }

@@ -5,9 +5,9 @@ const CONTENT_PROTOCOLS = new Set(["http:", "https:"]);
 const NONE = "'none'";
 
 /** Sorted and without duplicates, so the policy is the same for the same input. */
-function sortHosts(hosts: Iterable<string>): string[] {
-  const sortedHosts = [...new Set(hosts)].sort();
-  return sortedHosts;
+export function sortSources(sources: Iterable<string>): string[] {
+  const sortedSources = [...new Set(sources)].sort();
+  return sortedSources;
 }
 
 function readContentOrigin(source: string): string | null {
@@ -33,10 +33,11 @@ export function collectContentHosts(sources: Iterable<string>): string[] {
       origins.push(origin);
     }
   }
-  return sortHosts(origins);
+  return sortSources(origins);
 }
 
-function listCategoryHosts(
+/** The hosts of the granted permissions of one category, as declared. */
+export function listCategoryHosts(
   granted: ModPermission[],
   category: PermissionCategory,
 ): string[] {
@@ -59,24 +60,27 @@ function buildHostDirective(name: string, hosts: string[]): string {
   if (hosts.length === 0) {
     return buildDirective(name, [NONE]);
   }
-  return buildDirective(name, sortHosts(hosts));
+  return buildDirective(name, sortSources(hosts));
 }
 
 /**
  * Builds the Content-Security-Policy of a mod's frame. Content hosts and
  * granted `show` hosts can be shown, granted `connect`, `embed` and `code`
  * hosts can be reached for their requests, and everything else is blocked.
- * `open` permissions are enforced by the engine, not by the policy.
+ * The tile link sources, already sorted, allow their exact files as images,
+ * video and audio only. `open` permissions are enforced by the engine, not by
+ * the policy.
  */
 export function buildSandboxPolicy(
   contentHosts: string[],
   granted: ModPermission[],
+  tileLinkSources: string[],
 ): string {
-  const showHosts = sortHosts([
+  const showHosts = sortSources([
     ...contentHosts,
     ...listCategoryHosts(granted, "show"),
   ]);
-  const codeHosts = sortHosts(listCategoryHosts(granted, "code"));
+  const codeHosts = sortSources(listCategoryHosts(granted, "code"));
   const directives = [
     buildDirective("default-src", [NONE]),
     buildDirective("script-src", [
@@ -92,8 +96,18 @@ export function buildSandboxPolicy(
       "blob:",
       ...showHosts,
     ]),
-    buildDirective("img-src", ["data:", "blob:", ...showHosts]),
-    buildDirective("media-src", ["data:", "blob:", ...showHosts]),
+    buildDirective("img-src", [
+      "data:",
+      "blob:",
+      ...showHosts,
+      ...tileLinkSources,
+    ]),
+    buildDirective("media-src", [
+      "data:",
+      "blob:",
+      ...showHosts,
+      ...tileLinkSources,
+    ]),
     buildDirective("font-src", ["data:", "blob:", ...showHosts]),
     buildHostDirective("connect-src", listCategoryHosts(granted, "connect")),
     buildHostDirective("frame-src", listCategoryHosts(granted, "embed")),

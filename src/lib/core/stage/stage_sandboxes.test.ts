@@ -7,7 +7,7 @@ import {
   waitForMessages,
 } from "../../../test/fake_frames.ts";
 import { createMemoryStorage } from "../../../test/memory_storage.ts";
-import { APP_BASE_URL } from "../../../test/sample_files.ts";
+import { APP_BASE_URL, FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
   COVER_BOOK_COLLECTION_SOURCE,
@@ -24,13 +24,20 @@ import {
   serveFourBooks,
   serveNoApiBookMod,
   serveTestMod,
+  serveUntypedMod,
   TEST_DEFAULTS,
+  UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
-import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
+import {
+  buildTypeText,
+  fetchTestFile,
+  testTexts,
+} from "../../../test/test_files.ts";
 import {
   describeMissingApiRange,
   resolveDefaultModSettings,
 } from "../engine/index.ts";
+import type { ModIssue } from "../../mod/index.ts";
 import type {
   AppAction,
   ModCheckReport,
@@ -50,6 +57,36 @@ import {
 import type { SandboxRuntime, SandboxServices } from "./stage_sandboxes.ts";
 
 const OPENER_MOD_SOURCE = `${APP_BASE_URL}test-mods/opener/mod_conf.yaml`;
+
+const LINKED_COLLECTION_SOURCE = `${FIXTURES_BASE_URL}tiles/linked.yaml`;
+const LINKED_TILE_SOURCE = `${FIXTURES_BASE_URL}tiles/linked/one.md`;
+const MISSING_LINKED_TILE_SOURCE = `${FIXTURES_BASE_URL}tiles/linked/missing.md`;
+const ROUTER_LOGO_URL = "http://192.168.1.1/logo.png";
+
+/** Serves a collection whose one tile has the given metadata lines, and optionally a missing tile. */
+function serveLinkedTile(
+  metadataLines: string[],
+  withMissingTile = false,
+): void {
+  const tileLines = ['    - path: "./linked/one.md"'];
+  if (withMissingTile) {
+    tileLines.push('    - path: "./linked/missing.md"');
+  }
+  testTexts.set(
+    LINKED_COLLECTION_SOURCE,
+    ["collection:", '  name: "Linked"', "  tiles:", ...tileLines].join("\n"),
+  );
+  testTexts.set(LINKED_TILE_SOURCE, buildTypeText(metadataLines));
+}
+
+function buildRouterIssue(): ModIssue {
+  const issue: ModIssue = {
+    level: "warning",
+    source: LINKED_TILE_SOURCE,
+    message: `Not loading ${ROUTER_LOGO_URL}: tiles from other sites cannot link addresses on your computer or network.`,
+  };
+  return issue;
+}
 
 const openPorts: MessagePort[] = [];
 
@@ -99,6 +136,7 @@ function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
     onRequestAction,
     onCheckMod,
     readTheme: readLightTheme,
+    loadsTileLinkedMedia: true,
   };
   const spiedServices: SpiedServices = {
     services,
@@ -492,5 +530,164 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(runtime.launch?.collectionSource).toBeNull();
+  });
+});
+
+describe("Tile link issues", function describeTileLinkIssues(): void {
+  it("lists the tile link issues after the collection issues", async function ordersTileLinkIssues(): Promise<void> {
+    serveUntypedMod(null);
+    serveLinkedTile([`logo: "${ROUTER_LOGO_URL}"`], true);
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
+      spied,
+    );
+    const stopIssue: ModIssue = {
+      level: "warning",
+      source: UNTYPED_MOD_SOURCE,
+      message: "The mod left its page and was stopped.",
+    };
+    stopSandbox(runtime, stopIssue);
+
+    const sources: string[] = [];
+    for (const issue of readSandboxIssues(runtime)) {
+      sources.push(issue.source);
+    }
+    expect(sources).toEqual([
+      UNTYPED_MOD_SOURCE,
+      MISSING_LINKED_TILE_SOURCE,
+      LINKED_TILE_SOURCE,
+      UNTYPED_MOD_SOURCE,
+    ]);
+    expect(readSandboxIssues(runtime)[2]).toEqual(buildRouterIssue());
+    expect(readSandboxIssues(runtime)[3]).toEqual(stopIssue);
+  });
+
+  it("New link after reloading the tiles", async function reportsNewLink(): Promise<void> {
+    serveUntypedMod();
+    serveLinkedTile(['image: "https://media.example.net/old.jpg"']);
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
+      spied,
+    );
+    const policy = runtime.launch?.policy;
+    serveLinkedTile([
+      'image: "https://media.example.net/old.jpg"',
+      'thumbnail: "https://media.example.net/new.jpg"',
+      `logo: "${ROUTER_LOGO_URL}"`,
+    ]);
+
+    await reloadSandboxTiles(runtime, spied.services);
+
+    expect(readSandboxIssues(runtime)).toEqual([
+      {
+        level: "warning",
+        source: LINKED_COLLECTION_SOURCE,
+        message:
+          "The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.",
+      },
+      buildRouterIssue(),
+    ]);
+    expect(runtime.launch?.policy).toBe(policy);
+    expect(runtime.launch?.tileLinks?.sources).toEqual([
+      "https://media.example.net/old.jpg",
+    ]);
+  });
+
+  it("compares a second reload against the launch", async function comparesAgainstLaunch(): Promise<void> {
+    serveUntypedMod();
+    serveLinkedTile(['image: "https://media.example.net/old.jpg"']);
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
+      spied,
+    );
+    serveLinkedTile([
+      'image: "https://media.example.net/a.jpg"',
+      'thumbnail: "https://media.example.net/b.jpg"',
+    ]);
+
+    await reloadSandboxTiles(runtime, spied.services);
+    await reloadSandboxTiles(runtime, spied.services);
+
+    expect(readSandboxIssues(runtime)).toEqual([
+      {
+        level: "warning",
+        source: LINKED_COLLECTION_SOURCE,
+        message:
+          "The reloaded tiles link 2 files that this mod does not allow yet. Open the mod again to show them.",
+      },
+    ]);
+  });
+
+  it("Nothing new", async function reportsNothingNew(): Promise<void> {
+    serveUntypedMod();
+    serveLinkedTile(['image: "https://media.example.net/old.jpg"']);
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
+      spied,
+    );
+
+    await reloadSandboxTiles(runtime, spied.services);
+
+    expect(readSandboxIssues(runtime)).toEqual([]);
+  });
+
+  it("Left-out link removed", async function removesLeftOutLink(): Promise<void> {
+    serveUntypedMod();
+    serveLinkedTile([`logo: "${ROUTER_LOGO_URL}"`]);
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
+      spied,
+    );
+    expect(readSandboxIssues(runtime)).toEqual([buildRouterIssue()]);
+    serveLinkedTile(['title: "No logo"']);
+
+    await reloadSandboxTiles(runtime, spied.services);
+
+    expect(readSandboxIssues(runtime)).toEqual([]);
+  });
+
+  it("keeps the tile link issues when the reload fails", async function keepsIssuesOnFailure(): Promise<void> {
+    serveUntypedMod();
+    serveLinkedTile([`logo: "${ROUTER_LOGO_URL}"`]);
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
+      spied,
+    );
+    testTexts.delete(LINKED_COLLECTION_SOURCE);
+
+    await reloadSandboxTiles(runtime, spied.services);
+
+    expect(readSandboxIssues(runtime)).toEqual([
+      {
+        level: "error",
+        source: LINKED_COLLECTION_SOURCE,
+        message: `Cannot load file "${LINKED_COLLECTION_SOURCE}": HTTP 404 Not Found`,
+      },
+      buildRouterIssue(),
+    ]);
+  });
+
+  it("reports nothing with the setting off", async function reportsNothingWhenOff(): Promise<void> {
+    serveUntypedMod();
+    serveLinkedTile([`logo: "${ROUTER_LOGO_URL}"`]);
+    const spied = buildServices();
+    spied.services.loadsTileLinkedMedia = false;
+    const { runtime } = await startSandbox(
+      buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
+      spied,
+    );
+    expect(readSandboxIssues(runtime)).toEqual([]);
+    serveLinkedTile(['image: "https://media.example.net/new.jpg"']);
+
+    await reloadSandboxTiles(runtime, spied.services);
+
+    expect(runtime.launch?.tileLinks).toBeNull();
+    expect(readSandboxIssues(runtime)).toEqual([]);
   });
 });

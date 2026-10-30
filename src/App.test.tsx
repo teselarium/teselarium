@@ -14,6 +14,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       appTheme={fixture.appTheme}
       sections={fixture.sections}
       switches={fixture.switches}
+      tileMedia={fixture.tileMedia}
       layout={fixture.layout}
     />,
   );

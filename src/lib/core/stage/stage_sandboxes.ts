@@ -1,5 +1,6 @@
 import type { FileFetchOptions } from "../../files/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
+import { collectTileLinks, describeNewTileLinks } from "../sandbox/index.ts";
 import type { TileIssue } from "../../tile/index.ts";
 import {
   connectModSession,
@@ -16,6 +17,7 @@ import type {
   ModCheckRequest,
   ModLaunch,
   ModSession,
+  ModTiles,
   ResolvedDefaultModSettings,
   RunLink,
 } from "../engine/index.ts";
@@ -45,6 +47,8 @@ export interface SandboxServices {
   ) => Promise<ModCheckReport> | null;
   /** The stage's current theme, read when a session connects. */
   readTheme: () => Theme;
+  /** Whether "Load media linked by tiles" is on, read when a sandbox is launched. */
+  loadsTileLinkedMedia: boolean;
 }
 
 /** `asking`: the mod is loaded, but written for another mod API, and waits for the user's answer. */
@@ -61,6 +65,11 @@ export interface SandboxRuntime {
   fileIssues: ModIssue[];
   /** The issues of the collection, replaced when the tiles are reloaded. */
   collectionIssues: TileIssue[];
+  /**
+   * The tile links left out of the policy and, after "Reload tiles", the
+   * notice of links the frame does not allow yet. Replaced when the tiles are reloaded.
+   */
+  tileLinkIssues: ModIssue[];
   /** Permission issues, then the issues found while the mod runs, in order. */
   issues: ModIssue[];
   /** The load error's message of a `failed` runtime. */
@@ -88,6 +97,8 @@ function startRuntime(
   runtime.launch = launch;
   runtime.fileIssues = [...launch.fileIssues];
   runtime.collectionIssues = launch.context.issues;
+  runtime.tileLinkIssues =
+    launch.tileLinks === null ? [] : [...launch.tileLinks.issues];
   runtime.issues = [...launch.issues];
   services.onChange();
 }
@@ -167,6 +178,7 @@ export function launchSandbox(
     session: null,
     fileIssues: [],
     collectionIssues: [],
+    tileLinkIssues: [],
     issues: [],
     errorMessage: null,
     settled: Promise.resolve(),
@@ -176,6 +188,7 @@ export function launchSandbox(
       link: sandbox.link,
       appOrigin: services.appOrigin,
       defaults: services.defaults,
+      loadsTileLinkedMedia: services.loadsTileLinkedMedia,
     },
     services.fetchOptions,
   ).then(
@@ -185,11 +198,12 @@ export function launchSandbox(
   return runtime;
 }
 
-/** Every issue of a sandbox, in the order they were found: mod file, collection, then the others. */
+/** Every issue of a sandbox, in the order they were found: mod file, collection, tile links, then the others. */
 export function readSandboxIssues(runtime: SandboxRuntime): ModIssue[] {
   const issues: ModIssue[] = [
     ...runtime.fileIssues,
     ...runtime.collectionIssues,
+    ...runtime.tileLinkIssues,
     ...runtime.issues,
   ];
   return issues;
@@ -255,12 +269,60 @@ export function stopSandbox(
   }
 }
 
+/** The issues a reload replaces. */
+interface ReloadedIssues {
+  collectionIssues: TileIssue[];
+  /** `null` keeps the current tile link issues: tile links are off, or the collection did not load. */
+  tileLinkIssues: ModIssue[] | null;
+}
+
+function countNewSources(sources: string[], allowedSources: string[]): number {
+  const allowed = new Set(allowedSources);
+  let count = 0;
+  for (const source of sources) {
+    if (!allowed.has(source)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * The tile link issues of the reloaded tiles, compared against the launch,
+ * whose policy the frame keeps: the notice of links it does not allow yet,
+ * then the left-out links.
+ */
+function readReloadedTileLinkIssues(
+  launch: ModLaunch,
+  modTiles: ModTiles,
+  collectionSource: string,
+): ModIssue[] | null {
+  if (launch.tileLinks === null) {
+    return null;
+  }
+  const reloadedLinks = collectTileLinks(
+    modTiles.tiles,
+    launch.contentHosts,
+    launch.context.permissions.granted,
+  );
+  const newSourceCount = countNewSources(
+    reloadedLinks.sources,
+    launch.tileLinks.sources,
+  );
+  const issues: ModIssue[] = [];
+  if (newSourceCount > 0) {
+    issues.push(describeNewTileLinks(newSourceCount, collectionSource));
+  }
+  issues.push(...reloadedLinks.issues);
+  return issues;
+}
+
 async function readReloadedIssues(
   runtime: SandboxRuntime,
   launch: ModLaunch,
   collectionSource: string,
   services: SandboxServices,
-): Promise<TileIssue[]> {
+): Promise<ReloadedIssues> {
   try {
     const modTiles = await loadModTiles(
       launch.mod,
@@ -270,21 +332,36 @@ async function readReloadedIssues(
     if (runtime.session !== null && runtime.status === "running") {
       pushTilesChanged(runtime.session, modTiles.tiles, modTiles.issues);
     }
-    return modTiles.issues;
+    const reloadedIssues: ReloadedIssues = {
+      collectionIssues: modTiles.issues,
+      tileLinkIssues: readReloadedTileLinkIssues(
+        launch,
+        modTiles,
+        collectionSource,
+      ),
+    };
+    return reloadedIssues;
   } catch (error) {
     const reloadIssue: TileIssue = {
       level: "error",
       source: collectionSource,
       message: describeError(error),
     };
-    return [reloadIssue];
+    const failedIssues: ReloadedIssues = {
+      collectionIssues: [reloadIssue],
+      tileLinkIssues: null,
+    };
+    return failedIssues;
   }
 }
 
 /**
  * Loads and validates the sandbox's collection again, pushes `tiles.changed`
- * to the running mod and replaces the collection issues. A collection that
- * cannot be loaded becomes the only collection issue.
+ * to the running mod and replaces the collection issues. With tile links on,
+ * it also replaces the tile link issues with those of the reloaded tiles,
+ * led by a notice when they link files the frame does not allow yet. A
+ * collection that cannot be loaded becomes the only collection issue, and
+ * the tile link issues stay as they were.
  */
 export async function reloadSandboxTiles(
   runtime: SandboxRuntime,
@@ -303,6 +380,9 @@ export async function reloadSandboxTiles(
   if (runtime.status === "stopped") {
     return;
   }
-  runtime.collectionIssues = issues;
+  runtime.collectionIssues = issues.collectionIssues;
+  if (issues.tileLinkIssues !== null) {
+    runtime.tileLinkIssues = issues.tileLinkIssues;
+  }
   services.onChange();
 }

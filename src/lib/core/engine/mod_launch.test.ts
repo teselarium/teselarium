@@ -30,6 +30,7 @@ import {
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
 import {
+  buildTypeText,
   fetchTestFile,
   readRequestedUrl,
   testTexts,
@@ -63,6 +64,52 @@ const SAMPLE_LINK: RunLink = {
   params: {},
 };
 
+/** The covers of the sample tiles, sorted, which a mod gets as tile links when `show` is not granted. */
+const SAMPLE_COVER_URLS = [
+  "https://upload.wikimedia.org/wikipedia/en/a/ab/KallocainCover.jpg",
+  "https://upload.wikimedia.org/wikipedia/en/a/ae/The_library_of_babel_-_bookcover.jpg",
+  "https://upload.wikimedia.org/wikipedia/en/d/db/Fahrenheit_451_1st_ed_cover.jpg",
+];
+
+const LINKED_BOOK_COLLECTION_SOURCE = `${FIXTURES_BASE_URL}tiles/linked_book.yaml`;
+const LINKED_BOOK_TILE_SOURCE = `${FIXTURES_BASE_URL}tiles/books/linked_book.md`;
+
+/** Serves a collection with one book tile whose `image` and `logo` are the given URLs. */
+function serveLinkedBook(image: string, logo: string): void {
+  testTexts.set(
+    LINKED_BOOK_COLLECTION_SOURCE,
+    [
+      "collection:",
+      '  name: "Linked book"',
+      "  tiles:",
+      '    - path: "./books/linked_book.md"',
+    ].join("\n"),
+  );
+  testTexts.set(
+    LINKED_BOOK_TILE_SOURCE,
+    buildTypeText([
+      'title: "Linked book"',
+      'date: "2001-01-01"',
+      "authors:",
+      '  - "Anonymous"',
+      'country: "Sweden"',
+      "genres:",
+      '  - "Mystery"',
+      `image: "${image}"`,
+      `logo: "${logo}"`,
+    ]),
+  );
+}
+
+function readDirective(policy: string, name: string): string {
+  for (const directive of policy.split("; ")) {
+    if (directive.startsWith(`${name} `)) {
+      return directive;
+    }
+  }
+  return "";
+}
+
 afterEach(function clearTestTexts(): void {
   testTexts.clear();
 });
@@ -83,11 +130,13 @@ function listRequestedUrls(testFetch: Mock<typeof fetch>): string[] {
 function buildLaunchRequest(
   link: RunLink,
   appOrigin: string = APP_ORIGIN,
+  loadsTileLinkedMedia = true,
 ): ModLaunchRequest {
   const request: ModLaunchRequest = {
     link,
     appOrigin,
     defaults: TEST_DEFAULTS,
+    loadsTileLinkedMedia,
   };
   return request;
 }
@@ -96,8 +145,10 @@ function launchMod(
   link: RunLink,
   appOrigin: string = APP_ORIGIN,
   testFetch: typeof fetch = fetchTestFile,
+  loadsTileLinkedMedia = true,
 ): Promise<ModLaunch> {
-  return prepareModLaunch(buildLaunchRequest(link, appOrigin), {
+  const request = buildLaunchRequest(link, appOrigin, loadsTileLinkedMedia);
+  return prepareModLaunch(request, {
     baseUrl: APP_BASE_URL,
     fetch: testFetch,
   });
@@ -230,7 +281,12 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     );
 
     const launching = prepareModLaunch(
-      { link: SAMPLE_LINK, appOrigin: APP_ORIGIN, defaults },
+      {
+        link: SAMPLE_LINK,
+        appOrigin: APP_ORIGIN,
+        defaults,
+        loadsTileLinkedMedia: true,
+      },
       { baseUrl: APP_BASE_URL, fetch: testFetch },
     );
 
@@ -243,7 +299,12 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
   it("names the covers host in the policy only when granted", async function buildsPolicy(): Promise<void> {
     const grantedLaunch = await launchMod(SAMPLE_LINK);
-    const deniedLaunch = await launchMod(SAMPLE_LINK, OTHER_APP_ORIGIN);
+    const deniedLaunch = await launchMod(
+      SAMPLE_LINK,
+      OTHER_APP_ORIGIN,
+      fetchTestFile,
+      false,
+    );
 
     expect(grantedLaunch.sandboxDocument).toContain(
       "https://upload.wikimedia.org",
@@ -431,6 +492,118 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
         collection: `${FIXTURES_REFERENCE}tiles/not_a_collection.yaml`,
       }),
     ).rejects.toThrow(CollectionFormatError);
+  });
+});
+
+describe("Media linked by tiles", function describeTileLinkedMedia(): void {
+  it("adds no source for links a granted show host covers", async function skipsCoveredLinks(): Promise<void> {
+    const onLaunch = await launchMod(SAMPLE_LINK);
+    const offLaunch = await launchMod(
+      SAMPLE_LINK,
+      APP_ORIGIN,
+      fetchTestFile,
+      false,
+    );
+
+    expect(onLaunch.tileLinks).toEqual({ sources: [], issues: [] });
+    expect(onLaunch.policy).toBe(offLaunch.policy);
+  });
+
+  it("Mod from another origin", async function givesLinksToForeignMod(): Promise<void> {
+    const launch = await launchMod(SAMPLE_LINK, OTHER_APP_ORIGIN);
+
+    expect(launch.tileLinks).toEqual({
+      sources: SAMPLE_COVER_URLS,
+      issues: [],
+    });
+    const linkSources = SAMPLE_COVER_URLS.join(" ");
+    expect(readDirective(launch.policy, "img-src")).toBe(
+      `img-src data: blob: https://example.org ${linkSources}`,
+    );
+    expect(readDirective(launch.policy, "media-src")).toBe(
+      `media-src data: blob: https://example.org ${linkSources}`,
+    );
+    expect(readDirective(launch.policy, "style-src")).not.toContain(
+      "upload.wikimedia.org",
+    );
+    expect(readDirective(launch.policy, "connect-src")).toBe(
+      "connect-src 'none'",
+    );
+    expect(launch.sandboxDocument).toBe(
+      buildSandboxDocument(launch.policy, launch.mod.theme),
+    );
+  });
+
+  it("Setting switched off", async function collectsNothingWhenOff(): Promise<void> {
+    const launch = await launchMod(
+      SAMPLE_LINK,
+      OTHER_APP_ORIGIN,
+      fetchTestFile,
+      false,
+    );
+
+    expect(launch.tileLinks).toBeNull();
+    expect(launch.policy).not.toContain("upload.wikimedia.org");
+  });
+
+  it("collects nothing without a collection", async function collectsWithoutCollection(): Promise<void> {
+    const launch = await launchMod({ ...SAMPLE_LINK, collection: null });
+
+    expect(launch.tileLinks).toEqual({ sources: [], issues: [] });
+  });
+
+  it("keeps the left-out links out of the other issues", async function keepsLeftOutIssuesApart(): Promise<void> {
+    serveLinkedBook(
+      "https://media.example.net/covers/linked.jpg",
+      "http://192.168.1.1/logo.png",
+    );
+
+    const launch = await launchMod({
+      ...SAMPLE_LINK,
+      collection: LINKED_BOOK_COLLECTION_SOURCE,
+    });
+
+    expect(launch.tileLinks).toEqual({
+      sources: ["https://media.example.net/covers/linked.jpg"],
+      issues: [
+        {
+          level: "warning",
+          source: LINKED_BOOK_TILE_SOURCE,
+          message:
+            "Not loading http://192.168.1.1/logo.png: tiles from other sites cannot link addresses on your computer or network.",
+        },
+      ],
+    });
+    expect(launch.issues).toEqual([]);
+    expect(launch.fileIssues).toEqual([]);
+    expect(launch.context.issues).toEqual([]);
+  });
+
+  it("does not change the mount context", async function keepsMountContext(): Promise<void> {
+    serveLinkedBook(
+      "https://media.example.net/covers/linked.jpg",
+      "http://192.168.1.1/logo.png",
+    );
+    const link = { ...SAMPLE_LINK, collection: LINKED_BOOK_COLLECTION_SOURCE };
+
+    const onLaunch = await launchMod(link, OTHER_APP_ORIGIN);
+    const offLaunch = await launchMod(
+      link,
+      OTHER_APP_ORIGIN,
+      fetchTestFile,
+      false,
+    );
+
+    expect(onLaunch.context).toEqual(offLaunch.context);
+    expect(Object.keys(onLaunch.context).sort()).toEqual([
+      "api",
+      "config",
+      "issues",
+      "mod",
+      "params",
+      "permissions",
+      "tiles",
+    ]);
   });
 });
 

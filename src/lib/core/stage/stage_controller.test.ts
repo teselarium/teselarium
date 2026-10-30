@@ -40,6 +40,7 @@ import {
   answerStageAction,
   attachFrame,
   changeStageColorScheme,
+  changeStageTileLinkedMedia,
   closeSandbox,
   createStage,
   followHistory,
@@ -93,6 +94,7 @@ function buildStage(
     storage: createMemoryStorage(),
     fetch: fetchTestFile,
     colorScheme,
+    loadsTileLinkedMedia: true,
   });
   return stage;
 }
@@ -1159,6 +1161,56 @@ describe("subscribeStage", function describeSubscribeStage(): void {
     expect(readVisible(stage).issues[0].message).toContain(
       "https://images.example.net",
     );
+  });
+});
+
+describe("changeStageTileLinkedMedia", function describeChangeTileLinkedMedia(): void {
+  it("starts with the setting it was created with", function keepsStartSetting(): void {
+    const stage = buildStage(new FakeHistory(""));
+
+    expect(stage.loadsTileLinkedMedia).toBe(true);
+  });
+
+  it("Switched off before opening a mod", async function launchesWithoutTileLinks(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    changeStageTileLinkedMedia(stage, false);
+
+    await follow(stage, history.readNavigation());
+
+    expect(stage.runtimes.get("sandbox-1")?.launch?.tileLinks).toBeNull();
+  });
+
+  it("Running mod keeps its policy", async function keepsRunningLaunch(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const runtime = stage.runtimes.get("sandbox-1");
+    const launch = runtime?.launch;
+    const snapshot = readStageSnapshot(stage);
+    const listener = vi.fn<() => void>();
+    subscribeStage(stage, listener);
+
+    changeStageTileLinkedMedia(stage, false);
+
+    expect(launch?.tileLinks).not.toBeNull();
+    expect(stage.runtimes.get("sandbox-1")).toBe(runtime);
+    expect(runtime?.launch).toBe(launch);
+    expect(readStageSnapshot(stage)).toBe(snapshot);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("Applies when the mod is opened again", async function appliesToNextLaunch(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    changeStageTileLinkedMedia(stage, false);
+    openStageLink(stage, VIEWER_LINK, "sandbox-1");
+    await settleStage(stage);
+
+    expect(stage.runtimes.get("sandbox-1")?.launch?.tileLinks).not.toBeNull();
+    expect(stage.runtimes.get("sandbox-2")?.launch?.tileLinks).toBeNull();
   });
 });
 

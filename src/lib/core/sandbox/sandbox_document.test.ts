@@ -5,7 +5,7 @@ import SANDBOX_ASSERTIONS from "./sandbox_assertions.js?raw";
 import SANDBOX_LOADER from "./sandbox_loader.js?raw";
 import SANDBOX_TEST_RUNNER from "./sandbox_test_runner.js?raw";
 
-const POLICY = buildSandboxPolicy(["https://example.org"], []);
+const POLICY = buildSandboxPolicy(["https://example.org"], [], []);
 
 const TOP_LEVEL_NAME =
   /^(?:export )?(?:async )?(?:function|const|let) ([A-Za-z_$][\w$]*)/gm;

@@ -10,6 +10,9 @@ import type { AppFixture } from "../../test/test_app.ts";
 import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
 import { openStageSection } from "../../lib/core/stage/index.ts";
 import { settleStage } from "../../test/test_stages.ts";
+import { TILE_MEDIA_SETTING_KEY } from "./tile_media_setting.ts";
+
+const TILE_MEDIA_LABEL = "Load media linked by tiles";
 
 /** The version of the app's `package.json`, which the build gives to the app. */
 const PACKAGE_VERSION = (
@@ -28,6 +31,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       appTheme={fixture.appTheme}
       sections={fixture.sections}
       switches={fixture.switches}
+      tileMedia={fixture.tileMedia}
       layout={fixture.layout}
     />,
   );
@@ -92,12 +96,56 @@ describe("SettingsPage", function describeSettingsPage(): void {
     expect(findRow("Tiles")).toHaveTextContent("Coming soon");
     expect(findRow("Mosaics")).toHaveTextContent("Coming soon");
     expect(findRow("Mods")).not.toHaveTextContent("Coming soon");
+    expect(
+      screen.getByRole("switch", { name: TILE_MEDIA_LABEL }),
+    ).toBeChecked();
+  });
+
+  it("says what the Privacy switch shows the linked sites", async function describesPrivacy(): Promise<void> {
+    renderApp(await startTestApp("#/settings"));
+
+    expect(
+      screen.getByText(
+        "Mods can show the images, audio and video their tiles link to. The linked sites can see that you viewed the tile. Applies to mods opened after the change.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("Switched off before opening a mod", async function switchesTileMediaOff(): Promise<void> {
+    const fixture = await startTestApp("#/settings");
+    renderApp(fixture);
+
+    fireEvent.click(screen.getByRole("switch", { name: TILE_MEDIA_LABEL }));
+
+    expect(
+      screen.getByRole("switch", { name: TILE_MEDIA_LABEL }),
+    ).not.toBeChecked();
+    expect(fixture.stage.loadsTileLinkedMedia).toBe(false);
+    expect(fixture.storage.getItem(TILE_MEDIA_SETTING_KEY)).toBe("false");
+  });
+
+  it("switches the media setting on again", async function switchesTileMediaOn(): Promise<void> {
+    const fixture = await startTestApp("#/settings");
+    renderApp(fixture);
+
+    fireEvent.click(screen.getByRole("switch", { name: TILE_MEDIA_LABEL }));
+    fireEvent.click(screen.getByRole("switch", { name: TILE_MEDIA_LABEL }));
+
+    expect(
+      screen.getByRole("switch", { name: TILE_MEDIA_LABEL }),
+    ).toBeChecked();
+    expect(fixture.stage.loadsTileLinkedMedia).toBe(true);
   });
 
   it("Vanilla versions", async function showsVersions(): Promise<void> {
     renderApp(await startTestApp("#/settings"));
 
-    expect(readGroupHeadings()).toEqual(["Appearance", "Sidebar", "Version"]);
+    expect(readGroupHeadings()).toEqual([
+      "Appearance",
+      "Sidebar",
+      "Privacy",
+      "Version",
+    ]);
     expect(readVersions()).toEqual({
       OpenTesela: PACKAGE_VERSION,
       "Mod API": MOD_API_VERSION,

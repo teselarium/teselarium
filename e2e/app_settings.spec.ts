@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import type { Locator, Page } from "@playwright/test";
+import type { Frame, Locator, Page } from "@playwright/test";
 import {
   currentItem,
   openSection,
@@ -13,9 +13,15 @@ import {
   buildProbeFiles,
   findModFrame,
   isFrameMarked,
+  LINKED_APP_PROBE_LINK,
+  LINKED_COVER_URL,
   markFrame,
+  MEDIA_HOST,
   requestFromProbe,
+  routeImages,
   serveAppOriginMod,
+  serveLinkedTiles,
+  showImage,
   stageBar,
   waitForProbe,
 } from "./mod_routes.ts";
@@ -23,6 +29,7 @@ import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
 import { themeControl } from "./theme_probes.ts";
 
 const SECTION_SWITCHES_KEY = "opentesela.sidebar-sections";
+const TILE_MEDIA_LABEL = "Load media linked by tiles";
 
 /** The version of the app's `package.json`, which the vanilla build read when Playwright built it. */
 const PACKAGE_VERSION = (
@@ -50,7 +57,7 @@ function readSelectedText(): string {
 }
 
 function sectionSwitch(page: Page, name: string): Locator {
-  return page.getByRole("switch", { name });
+  return page.getByRole("switch", { name, exact: true });
 }
 
 function sectionRow(page: Page, name: string): Locator {
@@ -66,6 +73,35 @@ function readItemNames(element: Element): string[] {
     names.push(link.textContent?.replace("Coming soon", "") ?? "");
   }
   return names;
+}
+
+function tileMediaSwitch(page: Page): Locator {
+  return page.getByRole("switch", { name: TILE_MEDIA_LABEL });
+}
+
+/** Opens Settings and switches "Load media linked by tiles" off, as a user clicks it. */
+async function switchTileMediaOff(page: Page): Promise<void> {
+  if (!(await tileMediaSwitch(page).isVisible())) {
+    await openSection(page, "Settings");
+  }
+  await tileMediaSwitch(page).click();
+  await expect(tileMediaSwitch(page)).toHaveAttribute("aria-checked", "false");
+}
+
+/** Serves the probe and a tile linking `LINKED_COVER_URL`, whose requests the returned list records. */
+async function serveLinkedProbe(page: Page): Promise<string[]> {
+  await serveAppOriginMod(page, buildProbeFiles("probe"));
+  await serveLinkedTiles(page, [`image: "${LINKED_COVER_URL}"`]);
+  const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+  return seenUrls;
+}
+
+/** Opens the probe with the linked collection, from the page already open. */
+async function openLinkedProbe(page: Page): Promise<Frame> {
+  await page.goto(LINKED_APP_PROBE_LINK);
+  const frame = await findModFrame(page, "probe");
+  await waitForProbe(frame);
+  return frame;
 }
 
 /** Opens Settings and switches a section off or on, as a user clicks its switch. */
@@ -100,6 +136,54 @@ test.describe("Settings page", function describeSettingsPage(): void {
     }
     await expect(sectionRow(page, "Tiles")).toContainText("Coming soon");
     await expect(sectionRow(page, "Mosaics")).toContainText("Coming soon");
+    await expect(tileMediaSwitch(page)).toBeChecked();
+  });
+});
+
+test.describe("Load media linked by tiles", function describeTileMedia(): void {
+  test("Switched off before opening a mod", async function blocksAfterSwitchOff({
+    page,
+  }): Promise<void> {
+    const seenUrls = await serveLinkedProbe(page);
+    await page.goto("/#/settings");
+
+    await switchTileMediaOff(page);
+    const frame = await openLinkedProbe(page);
+
+    expect(await frame.evaluate(showImage, LINKED_COVER_URL)).toBe(false);
+    expect(seenUrls).toEqual([]);
+  });
+
+  test("Running mod keeps its policy", async function keepsRunningPolicy({
+    page,
+  }): Promise<void> {
+    const seenUrls = await serveLinkedProbe(page);
+    const frame = await openLinkedProbe(page);
+    await markFrame(frame);
+
+    await switchTileMediaOff(page);
+    await page.goBack();
+
+    expect(await frame.evaluate(showImage, LINKED_COVER_URL)).toBe(true);
+    expect(seenUrls).toEqual([LINKED_COVER_URL]);
+    expect(await isFrameMarked(frame)).toBe(true);
+  });
+});
+
+test.describe("The media switch is remembered", function describeTileMediaKept(): void {
+  test("Kept after a reload", async function keepsSwitchOff({
+    page,
+  }): Promise<void> {
+    const seenUrls = await serveLinkedProbe(page);
+    await page.goto("/#/settings");
+    await switchTileMediaOff(page);
+
+    await page.reload();
+
+    await expect(tileMediaSwitch(page)).not.toBeChecked();
+    const frame = await openLinkedProbe(page);
+    expect(await frame.evaluate(showImage, LINKED_COVER_URL)).toBe(false);
+    expect(seenUrls).toEqual([]);
   });
 });
 

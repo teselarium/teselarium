@@ -257,7 +257,7 @@ describe("What a case records", function describeCaseRecords(): void {
       source: TESTED_MOD_SOURCE,
     });
     expect(report.findings[0].message).toBe(
-      'In the test "shows covers": Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.',
+      'In the test "shows covers": Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml. If a tile links this file, link its final address: links that redirect to another site are blocked.',
     );
   });
 

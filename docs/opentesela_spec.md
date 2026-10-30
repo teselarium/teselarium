@@ -93,6 +93,8 @@ Source: https://en.wikipedia.org/wiki/Fahrenheit_451
 
 Metadata strings starting with `./` or `../` are paths next to the tile: mods receive `./fahrenheit_451.jpg` as an absolute URL, resolved against the tile's location, so the image can sit beside the tile.
 
+Metadata strings that are absolute `http:` or `https:` URLs of images, audio or video load in any mod without a permission, from any public site. Link the file itself, at its final address: not a page, a folder or a link that redirects to another site. See [Media linked by tiles](modules/lib/core/sandbox/README.md#media-linked-by-tiles).
+
 Tiles are organized in collections inside a yaml file. They are used as indexes of paths or urls, for example a collection of tiles named `science_fictions_books.yaml`:
 ```yaml
 collection:

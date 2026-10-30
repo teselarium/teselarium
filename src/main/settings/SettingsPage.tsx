@@ -24,6 +24,12 @@ import type {
 import { SectionIcon } from "../sidebar/SectionIcon.tsx";
 import type { AppTheme } from "../theme/app_theme.ts";
 import { ThemeControl } from "../theme/ThemeControl.tsx";
+import {
+  readTileMediaSnapshot,
+  subscribeTileMediaSetting,
+  switchTileLinkedMedia,
+} from "./tile_media_setting.ts";
+import type { TileMediaSetting } from "./tile_media_setting.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 
 interface SettingsPageProps {
@@ -31,6 +37,11 @@ interface SettingsPageProps {
   /** The available sections, in registry order. */
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
+  tileMedia: TileMediaSetting;
+}
+
+interface TileMediaRowProps {
+  tileMedia: TileMediaSetting;
 }
 
 interface SectionRowProps {
@@ -93,15 +104,45 @@ function SectionRow({
   );
 }
 
+const TILE_MEDIA_SWITCH_ID = "tile-linked-media-switch";
+
+/** The "Load media linked by tiles" switch. */
+function TileMediaRow({ tileMedia }: TileMediaRowProps): ReactElement {
+  const isOn = useStoreSnapshot(
+    tileMedia,
+    subscribeTileMediaSetting,
+    readTileMediaSnapshot,
+  );
+
+  function handleCheckedChange(isChecked: boolean): void {
+    switchTileLinkedMedia(tileMedia, isChecked);
+  }
+
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <Label htmlFor={TILE_MEDIA_SWITCH_ID} className="flex-1 font-normal">
+        Load media linked by tiles
+      </Label>
+      <Switch
+        id={TILE_MEDIA_SWITCH_ID}
+        checked={isOn}
+        onCheckedChange={handleCheckedChange}
+      />
+    </div>
+  );
+}
+
 /**
  * The Settings section's page: the Theme control, a switch for each optional
- * section of the sidebar, and the app's version and mod API version as text
- * to copy. A switch only hides the sidebar item.
+ * section of the sidebar, the "Load media linked by tiles" switch, and the
+ * app's version and mod API version as text to copy. A section switch only
+ * hides the sidebar item.
  */
 export function SettingsPage({
   appTheme,
   sections,
   switches,
+  tileMedia,
 }: SettingsPageProps): ReactElement {
   const snapshot = useStoreSnapshot(
     switches,
@@ -146,6 +187,21 @@ export function SettingsPage({
           <ul aria-label="Sidebar sections" className="divide-y">
             {rows}
           </ul>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>
+            Privacy
+          </CardTitle>
+          <CardDescription>
+            Mods can show the images, audio and video their tiles link to. The
+            linked sites can see that you viewed the tile. Applies to mods
+            opened after the change.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TileMediaRow tileMedia={tileMedia} />
         </CardContent>
       </Card>
       <Card>

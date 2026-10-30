@@ -55,6 +55,7 @@ export function buildTestStage(
     storage: createMemoryStorage(),
     fetch: fetchTestFile,
     colorScheme: "light",
+    loadsTileLinkedMedia: true,
   });
   return stage;
 }

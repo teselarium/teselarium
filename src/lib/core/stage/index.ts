@@ -4,6 +4,7 @@ export {
   attachCheckFrame,
   attachFrame,
   changeStageColorScheme,
+  changeStageTileLinkedMedia,
   checkFrameLoadedAgain,
   closeSandbox,
   createStage,

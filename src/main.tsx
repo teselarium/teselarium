@@ -17,6 +17,10 @@ import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import { createSectionSwitches } from "./main/sections/section_switches.ts";
 import { VANILLA_SECTIONS } from "./main/sections/vanilla_sections.ts";
 import {
+  createTileMediaSetting,
+  readStartTileLinkedMedia,
+} from "./main/settings/tile_media_setting.ts";
+import {
   changeSidebarViewport,
   createSidebarLayout,
   NARROW_VIEWPORT_QUERY,
@@ -51,8 +55,8 @@ function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
 }
 
 /**
- * Builds the stage, the app theme, the sidebar layout and the section
- * switches once, outside React, so StrictMode's double effect run in dev does
+ * Builds the stage, the app theme, the sidebar layout, the section switches
+ * and the tile media setting once, outside React, so StrictMode's double effect run in dev does
  * not launch mods twice.
  */
 function startApp(sections: readonly SectionDefinition[]): ReactElement {
@@ -65,6 +69,7 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
     baseUrl: document.baseURI,
     storage: window.localStorage,
     colorScheme: readStartColorScheme(window.localStorage, systemQuery),
+    loadsTileLinkedMedia: readStartTileLinkedMedia(window.localStorage),
   });
   // Same lifetime as the stage: it tells the stage when the color scheme changes.
   const appTheme = createAppTheme({
@@ -86,6 +91,11 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
     storage: window.localStorage,
     optionalIds: listOptionalIds(sections),
   });
+  // Same lifetime as the stage: it tells the stage when it is switched.
+  const tileMedia = createTileMediaSetting({
+    storage: window.localStorage,
+    stage,
+  });
   followCurrentEntry(stage);
   // Fragment navigations fire `popstate` too, so `hashchange` is not needed.
   window.addEventListener(
@@ -98,6 +108,7 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
       appTheme={appTheme}
       sections={sections}
       switches={switches}
+      tileMedia={tileMedia}
       layout={layout}
     />
   );

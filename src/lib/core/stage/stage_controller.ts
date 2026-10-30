@@ -97,6 +97,8 @@ export interface StageOptions {
   fetch?: typeof globalThis.fetch;
   /** The color scheme the app starts with. */
   colorScheme: ColorScheme;
+  /** Whether "Load media linked by tiles" is on as the app starts. */
+  loadsTileLinkedMedia: boolean;
 }
 
 /** What the page renders of one sandbox. Frozen. */
@@ -170,6 +172,8 @@ export interface Stage {
   storage: ModStorage;
   /** The current theme: new sessions connect with it, and running ones are told when it changes. */
   theme: Theme;
+  /** Whether mods launched from now on load the media their tiles link. Running mods keep their launch. */
+  loadsTileLinkedMedia: boolean;
   /** The actions the visible mod asked for, oldest first. */
   actions: StageActions;
   /** The running mod checks, apart from the sandboxes and the history. */
@@ -211,6 +215,7 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     onRequestAction: requestStageAction.bind(undefined, stage),
     onCheckMod: checkStageMod.bind(undefined, stage),
     readTheme: readStageTheme.bind(undefined, stage),
+    loadsTileLinkedMedia: stage.loadsTileLinkedMedia,
   };
   return services;
 }
@@ -227,6 +232,7 @@ function buildCheckServices(stage: Stage): CheckServices {
     readTheme: readStageTheme.bind(undefined, stage),
     isSandboxRunning: isSandboxRunning.bind(undefined, stage),
     onChange: publishStage.bind(undefined, stage),
+    loadsTileLinkedMedia: stage.loadsTileLinkedMedia,
   };
   return services;
 }
@@ -428,6 +434,7 @@ export function createStage(options: StageOptions): Stage {
     fetchOptions: { baseUrl: options.baseUrl, fetch: options.fetch },
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
+    loadsTileLinkedMedia: options.loadsTileLinkedMedia,
     actions: createStageActions(),
     checks: createStageChecks(),
     listeners: new Set(),
@@ -817,6 +824,15 @@ export function changeStageColorScheme(
   for (const runtime of stage.runtimes.values()) {
     pushSandboxTheme(runtime, stage.theme);
   }
+}
+
+/**
+ * Switches "Load media linked by tiles" for the mods launched and checked
+ * from now on. Running sandboxes keep their launch and their frame, and
+ * nothing is published, since the snapshot does not change.
+ */
+export function changeStageTileLinkedMedia(stage: Stage, isOn: boolean): void {
+  stage.loadsTileLinkedMedia = isOn;
 }
 
 export function readStageSnapshot(stage: Stage): StageSnapshot {

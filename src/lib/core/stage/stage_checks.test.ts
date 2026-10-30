@@ -52,6 +52,7 @@ import { readModValue, writeModValue } from "../storage/index.ts";
 import {
   attachCheckFrame,
   attachFrame,
+  changeStageTileLinkedMedia,
   checkFrameLoadedAgain,
   checkStageMod,
   closeSandbox,
@@ -273,6 +274,46 @@ describe("Mount check", function describeMountCheck(): void {
     expect(entry.sandboxDocument).toContain("<script");
     expect(readStageSnapshot(checkStage.stage).checks).toEqual([]);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("Media linked by tiles", function describeCheckTileLinks(): void {
+  it("gives the check frame the policy with the tile links", async function givesTileLinkPolicy(): Promise<void> {
+    serveUntypedMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: UNTYPED_MOD_SOURCE,
+      collection: SAMPLE_COLLECTION_SOURCE,
+    });
+    const entry = await waitForCheckEntry(checkStage.stage);
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    await reporting;
+
+    expect(entry.sandboxDocument).toContain(
+      "img-src data: blob: https://example.org https://upload.wikimedia.org/wikipedia/en/a/ab/KallocainCover.jpg",
+    );
+  });
+
+  it("gives the check frame no tile links with the setting off", async function omitsTileLinkPolicy(): Promise<void> {
+    serveUntypedMod();
+    const checkStage = await startCheckStage();
+    changeStageTileLinkedMedia(checkStage.stage, false);
+
+    const reporting = startCheck(checkStage, {
+      source: UNTYPED_MOD_SOURCE,
+      collection: SAMPLE_COLLECTION_SOURCE,
+    });
+    const entry = await waitForCheckEntry(checkStage.stage);
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    await reporting;
+
+    expect(entry.sandboxDocument).toContain(
+      "img-src data: blob: https://example.org;",
+    );
+    expect(entry.sandboxDocument).not.toContain("upload.wikimedia.org");
   });
 });
 

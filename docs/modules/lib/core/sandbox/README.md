@@ -38,6 +38,51 @@ cover.src = tile.metadata.image;
 
 For a tile at `https://example.org/books/kallocain.md` with `image: "./cover.jpg"`, the image loads from `https://example.org/books/cover.jpg`. A tile picked from the user's computer resolves to a `file:` URL, which is not a content host, so an image next to it does not load.
 
+### Media linked by tiles
+
+Tile authors choose the images, video and audio their tiles link to, so the policy allows exactly the files the tiles link, whatever site they are on, without a permission. The mod cannot choose these addresses, only whether to load them, so they give it no way to send data to a host of its choice. Mods from the app's origin and from other origins get them alike, as they get the content hosts.
+
+When "Load media linked by tiles" is on as the mod starts (see the [Settings page](../../../main/settings/README.md)), `collectTileLinks` reads every metadata string of the tiles the mod receives, after the tile type filter, inside lists and nested mappings too. Keys and the tile body are never read. Each string goes through these steps in order, and the first step that applies decides:
+
+1. Not an absolute `http:` or `https:` URL: skipped. Plain text, relative paths, `data:` and `file:` strings are never links.
+2. Its path ends with `/`: skipped. It names a folder or a page, not a file, and its source would allow every file under it.
+3. Its origin is covered by a content host or a granted `show` host, wildcard hosts included: skipped, because the policy already allows it.
+4. The policy cannot express it: left out and reported (see below).
+5. Its host is on the user's computer or network, and the tile's own host is not: left out and reported (see below).
+6. Otherwise its origin and path, without the query and fragment, which the browser does not match, are added to `img-src` and `media-src` as one exact source, sorted and without duplicates.
+
+For a tile with `image: "https://media.example.net/covers/kallocain.jpg?size=large"`, the policy gets `https://media.example.net/covers/kallocain.jpg`. It allows that file and no other file of `https://media.example.net`. Tile links are never added to `style-src`, `font-src`, `connect-src`, `frame-src` or `script-src`: tiles never let a mod load stylesheets, fonts, data, pages or code, whatever the linked file is.
+
+**What the policy cannot express.** A policy source is `scheme://host[:port]/path`. A link that does not fit is left out:
+
+- a user name or password in the URL (browsers block such subresource requests too);
+- an IPv6 address as host, which the source grammar has no form for;
+- a host name with a character other than letters, digits, `-` and `.`, such as `_`;
+- a path character other than letters, digits and `-._~!$&'()*+=:@%/`. The URL parser already percent-encodes spaces, quotes and non-ASCII characters; what is left out in practice is `;` and `,`, which separate directives and policies, and `|`, `[` and `]`.
+
+Each is reported once per tile as a warning whose source is the tile: `Not loading https://user:secret@media.example.net/cover.jpg: the sandbox cannot allow this address.`
+
+**Private network guard.** A tile from the web must not make the reader's browser send requests to their router or other devices. A link whose host is on the user's computer or network is left out, unless the tile itself was loaded over `http:` or `https:` from such a host, as when someone serves their tiles from `localhost` while working on them. A tile picked from the user's computer gets the guard, since the file may have been downloaded from the web. A host counts as on the user's computer or network when, after dropping a trailing `.`, it is:
+
+- `localhost`, a name without a dot, or a name ending with `.localhost`, `.local`, `.internal`, `.lan` or `.home.arpa`;
+- an IPv4 address in `0.0.0.0/8`, `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16` or `100.64.0.0/10`. The URL parser turns other forms of an address, such as `2130706433` or `0x7f.1`, into `127.0.0.1` first. Private IPv6 addresses are already left out by the previous step.
+
+Each is reported once per tile as a warning whose source is the tile: `Not loading http://192.168.1.1/logo.png: tiles from other sites cannot link addresses on your computer or network.` The guard checks names and addresses, not DNS: a public name that resolves to a private address, by DNS rebinding or a name such as `router.example.com` pointing at `192.168.1.1`, is not caught. The browser's own local network protections, such as Chrome's Local Network Access prompt, are a second line.
+
+A private link that a content host or a granted `show` host covers is skipped at step 3: that host's source allows it anyway.
+
+**Fixed when the mod starts.** The tile links are part of the policy, which cannot change while the mod runs. After "Reload tiles", the stage replaces the left-out link issues with those of the reloaded tiles, and when the reloaded tiles link files the policy does not allow, it reports one warning whose source is the collection: `The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.` (see the [stage module](../stage/README.md)).
+
+**The setting.** Each linked site sees that the reader viewed the tile, as with any image on the web. "Load media linked by tiles", in the Privacy group of Settings, is on by default. Switched off, no tile link is collected or reported, and mods show only media from content hosts and granted `show` hosts. A change applies to mods started after it.
+
+**Large collections.** Each source is about 100 bytes, written twice in the policy. A mod whose collections link thousands of files on one host can declare that host in `permissions.show`: step 3 then leaves the links out of the policy.
+
+**For tile authors.** Link the file itself, at its final address:
+
+- Link an image, audio or video file, not a page or a folder that shows it.
+- Avoid links that redirect. The browser checks only the host of a redirect's target, never its path, so a link to `https://media.example.net/cover.jpg` that redirects to `https://cdn.example.org/cover.jpg` is blocked. Open the link in a browser and copy the address it ends at.
+- Streams (HLS and DASH), whose segment addresses are not in the tile, and pages embedded in frames, such as videos on a video site, are not covered. Neither are URLs in the tile's body.
+
 ### Content policy
 
 The frame document carries a Content-Security-Policy. Directives come in this order, and the hosts of each directive are sorted and without duplicates, so the policy is the same for the same mod:
@@ -47,8 +92,8 @@ The frame document carries a Content-Security-Policy. Directives come in this or
 | `default-src` | `'none'` |
 | `script-src` | `'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:` + granted `code` hosts |
 | `style-src` | `'unsafe-inline' data: blob:` + content hosts + granted `show` hosts |
-| `img-src` | `data: blob:` + content hosts + granted `show` hosts |
-| `media-src` | `data: blob:` + content hosts + granted `show` hosts |
+| `img-src` | `data: blob:` + content hosts + granted `show` hosts + tile links |
+| `media-src` | `data: blob:` + content hosts + granted `show` hosts + tile links |
 | `font-src` | `data: blob:` + content hosts + granted `show` hosts |
 | `connect-src` | granted `connect` hosts, or `'none'` |
 | `frame-src` | granted `embed` hosts, or `'none'` |
@@ -60,6 +105,7 @@ The frame document carries a Content-Security-Policy. Directives come in this or
 - Workers fall back to `script-src`, so `blob:` workers are allowed and remote workers need `code`.
 - `object-src` and every other directive fall back to `default-src 'none'`.
 - `open` permissions are not in the policy: the engine enforces them.
+- Tile links (see [Media linked by tiles](#media-linked-by-tiles)) come after the sorted hosts, sorted among themselves. A mod whose tiles link nothing has the same policy as without them.
 - Granted hosts go in as written, including wildcard hosts such as `https://*.us.archive.org`. The browser's policy matches a leading `*.` against one or more subdomain labels, never against the bare host name, which is what the [mod module's host rules](../../mod/README.md) say a wildcard host covers. `*` sorts before letters and digits, so `https://*.us.archive.org` lists before `https://example.org`.
 
 The default policy of the sample book list mod, without grants:
@@ -92,6 +138,7 @@ When the policy blocks a request, the frame loader reports the blocked URL and t
 The blocked URL is reduced to its origin, since browsers sometimes report only the origin. Messages:
 
 - Not declared: `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.`
+- Not declared, for `img-src` and `media-src` when "Load media linked by tiles" was on as the mod started, the same message followed by a sentence for tile authors: `Blocked image request to https://cdn.example.org. Add it to permissions.show in mod_conf.yaml. If a tile links this file, link its final address: links that redirect to another site are blocked.` The hint does not say which tile link redirected, since browsers report either the original address or the target, sometimes only its origin.
 - Declared but not granted: `Blocked image request to https://upload.wikimedia.org: the mod declares it in permissions.show, but the permission was not granted.`
 - Any other directive, or a blocked URL that is not a web URL (such as `inline` or `eval`): `Blocked by the sandbox policy (object-src).`
 
@@ -234,15 +281,21 @@ Implemented in `src/lib/core/sandbox/`. Other modules import only from the publi
 ### Content policy and reports
 
 - `collectContentHosts(sources)`: the content hosts of a list of file URLs.
-- `buildSandboxPolicy(contentHosts, granted)`: the policy text for the content hosts and the granted permissions.
-- `describeBlockedRequest(blocked, mod, grants)`: the `ModIssue` for a `BlockedRequest` (`blockedUrl`, `directive`) of the mod with that `source`.
+- `collectTileLinks(tiles, contentHosts, granted)`: the `TileLinks` of the tiles a mod receives: `sources`, the exact sources to add, sorted and without duplicates, and `issues`, one warning per left-out URL and tile (see [Media linked by tiles](#media-linked-by-tiles)). The input tiles are not changed.
+- `buildSandboxPolicy(contentHosts, granted, tileLinkSources)`: the policy text for the content hosts, the granted permissions and the tile link sources, which go into `img-src` and `media-src` only. Pass `[]` when tile links are off.
+- `describeBlockedRequest(blocked, mod, grants, hintsTileLinks)`: the `ModIssue` for a `BlockedRequest` (`blockedUrl`, `directive`) of the mod with that `source`. With `hintsTileLinks`, an undeclared image or media host gets the redirect hint.
+- `describeNewTileLinks(count, collectionSource)`: the warning, whose source is the collection, that the reloaded tiles link `count` files the running mod does not allow yet.
 - `describeBlockedDialog(name, mod)`: the warning `ModIssue` for a blocked dialog function (`BlockedDialogName`) of the mod with that `source`.
-- Types: `BlockedRequest`, `BlockedDialogName` (`"alert"`, `"confirm"`, `"prompt"` or `"print"`).
+- Types: `BlockedRequest`, `BlockedDialogName` (`"alert"`, `"confirm"`, `"prompt"` or `"print"`), `TileLinks`.
 
 Example:
 
 ```ts
-import { buildSandboxPolicy, collectContentHosts } from "./lib/core/sandbox/index.ts";
+import {
+  buildSandboxPolicy,
+  collectContentHosts,
+  collectTileLinks,
+} from "./lib/core/sandbox/index.ts";
 
 const contentHosts = collectContentHosts([
   "https://example.org/samples/mods/book_list/mod_conf.yaml",
@@ -250,7 +303,12 @@ const contentHosts = collectContentHosts([
 ]);
 // contentHosts is ["https://example.org"]
 
-const policy = buildSandboxPolicy(contentHosts, grants.granted);
+const tileLinks = collectTileLinks(tiles, contentHosts, grants.granted);
+const policy = buildSandboxPolicy(
+  contentHosts,
+  grants.granted,
+  tileLinks.sources,
+);
 ```
 
 ### Frame document, messages and channel

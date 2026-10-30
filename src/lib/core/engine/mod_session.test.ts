@@ -55,6 +55,9 @@ interface PlayedSession {
 
 const openPorts: MessagePort[] = [];
 
+const REDIRECT_HINT =
+  "If a tile links this file, link its final address: links that redirect to another site are blocked.";
+
 afterEach(function closePorts(): void {
   for (const port of openPorts) {
     port.close();
@@ -62,7 +65,7 @@ afterEach(function closePorts(): void {
   openPorts.length = 0;
 });
 
-function launchSampleMod(): Promise<ModLaunch> {
+function launchSampleMod(loadsTileLinkedMedia = true): Promise<ModLaunch> {
   return prepareModLaunch(
     {
       link: {
@@ -72,6 +75,7 @@ function launchSampleMod(): Promise<ModLaunch> {
       },
       appOrigin: APP_ORIGIN,
       defaults: TEST_DEFAULTS,
+      loadsTileLinkedMedia,
     },
     { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
   );
@@ -81,8 +85,9 @@ function launchSampleMod(): Promise<ModLaunch> {
 async function playSession(
   theme: Theme = buildTheme("light"),
   hooks: SessionHooks = {},
+  loadsTileLinkedMedia = true,
 ): Promise<PlayedSession> {
-  const sampleLaunch = await launchSampleMod();
+  const sampleLaunch = await launchSampleMod(loadsTileLinkedMedia);
   const openPermission = {
     category: "open" as const,
     host: "*",
@@ -459,10 +464,44 @@ describe("connectModSession", function describeConnectModSession(): void {
     expect(played.onIssue).toHaveBeenCalledExactlyOnceWith({
       level: "warning",
       source: SAMPLE_MOD_SOURCE,
+      message: `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml. ${REDIRECT_HINT}`,
+    });
+    expect(played.received).toEqual([]);
+  });
+
+  it("Tile link that redirects", async function hintsWithTileLinks(): Promise<void> {
+    const played = await playSession();
+
+    sendNotification(played, "sandbox.blocked", {
+      directive: "img-src",
+      blockedUrl: "https://cdn.example.org/cover.jpg",
+    });
+    await waitForMessages();
+
+    expect(played.session.hintsTileLinks).toBe(true);
+    expect(played.onIssue).toHaveBeenCalledExactlyOnceWith({
+      level: "warning",
+      source: SAMPLE_MOD_SOURCE,
+      message: `Blocked image request to https://cdn.example.org. Add it to permissions.show in mod_conf.yaml. ${REDIRECT_HINT}`,
+    });
+  });
+
+  it("No hint with the setting off", async function omitsHintWithoutTileLinks(): Promise<void> {
+    const played = await playSession(buildTheme("light"), {}, false);
+
+    sendNotification(played, "sandbox.blocked", {
+      directive: "img-src",
+      blockedUrl: "https://images.example.net/cover.jpg",
+    });
+    await waitForMessages();
+
+    expect(played.session.hintsTileLinks).toBe(false);
+    expect(played.onIssue).toHaveBeenCalledExactlyOnceWith({
+      level: "warning",
+      source: SAMPLE_MOD_SOURCE,
       message:
         "Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.",
     });
-    expect(played.received).toEqual([]);
   });
 
   it("ignores sandbox.blocked with wrong params", async function ignoresWrongBlock(): Promise<void> {

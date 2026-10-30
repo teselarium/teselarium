@@ -9,6 +9,7 @@ import { SETTINGS_SECTION_ID } from "../sections/section_registry.ts";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import type { SectionSwitches } from "../sections/section_switches.ts";
 import { SettingsPage } from "../settings/SettingsPage.tsx";
+import type { TileMediaSetting } from "../settings/tile_media_setting.ts";
 import type { AppTheme } from "../theme/app_theme.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { MarkdownPage } from "./MarkdownPage.tsx";
@@ -20,6 +21,7 @@ interface PageViewProps {
   appTheme: AppTheme;
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
+  tileMedia: TileMediaSetting;
 }
 
 function buildPageFile(
@@ -44,6 +46,7 @@ export function PageView({
   appTheme,
   sections,
   switches,
+  tileMedia,
 }: PageViewProps): ReactElement | null {
   const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
   const visible = snapshot.visible;
@@ -65,6 +68,7 @@ export function PageView({
         appTheme={appTheme}
         sections={sections}
         switches={switches}
+        tileMedia={tileMedia}
       />
     );
   }

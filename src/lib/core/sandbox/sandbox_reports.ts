@@ -50,6 +50,13 @@ const DIRECTIVE_RULES: Record<string, DirectiveRule> = {
   "worker-src": { category: "code", noun: "worker" },
 };
 
+/** The directives tile links open, whose blocked requests get the redirect hint. */
+const TILE_LINK_DIRECTIVES = new Set(["img-src", "media-src"]);
+
+/** The sentence for tile authors at the end of a blocked image or media report. */
+const TILE_LINK_REDIRECT_HINT =
+  "If a tile links this file, link its final address: links that redirect to another site are blocked.";
+
 function readDirectiveRule(directive: string): DirectiveRule | null {
   if (!Object.hasOwn(DIRECTIVE_RULES, directive)) {
     return null;
@@ -85,7 +92,11 @@ function declaresHost(
   return false;
 }
 
-function describeBlock(blocked: BlockedRequest, grants: ModGrants): string {
+function describeBlock(
+  blocked: BlockedRequest,
+  grants: ModGrants,
+  hintsTileLinks: boolean,
+): string {
   const rule = readDirectiveRule(blocked.directive);
   const origin = readBlockedOrigin(blocked.blockedUrl);
   const hasFix =
@@ -101,23 +112,49 @@ function describeBlock(blocked: BlockedRequest, grants: ModGrants): string {
     return deniedMessage;
   }
   const undeclaredMessage = `Blocked ${rule.noun} request to ${origin}. Add it to permissions.${rule.category} in mod_conf.yaml.`;
+  if (hintsTileLinks && TILE_LINK_DIRECTIVES.has(blocked.directive)) {
+    const hintedMessage = `${undeclaredMessage} ${TILE_LINK_REDIRECT_HINT}`;
+    return hintedMessage;
+  }
   return undeclaredMessage;
 }
 
 /**
  * Turns a blocked request into a warning for the mod's issue list, with the
  * fix when there is one: the entry to add to `mod_conf.yaml`, or the note
- * that the declared permission was not granted.
+ * that the declared permission was not granted. With `hintsTileLinks`, an
+ * undeclared image or media host also gets a sentence for tile authors about
+ * links that redirect.
  */
 export function describeBlockedRequest(
   blocked: BlockedRequest,
   mod: Pick<ModFile, "source">,
   grants: ModGrants,
+  hintsTileLinks: boolean,
 ): ModIssue {
   const issue: ModIssue = {
     level: "warning",
     source: mod.source,
-    message: describeBlock(blocked, grants),
+    message: describeBlock(blocked, grants, hintsTileLinks),
+  };
+  return issue;
+}
+
+/**
+ * The warning, whose source is the collection, that the reloaded tiles link
+ * files the running mod's policy does not allow, and that opening the mod
+ * again shows them.
+ */
+export function describeNewTileLinks(
+  count: number,
+  collectionSource: string,
+): ModIssue {
+  const fileCount = count === 1 ? "1 file" : `${count} files`;
+  const pronoun = count === 1 ? "it" : "them";
+  const issue: ModIssue = {
+    level: "warning",
+    source: collectionSource,
+    message: `The reloaded tiles link ${fileCount} that this mod does not allow yet. Open the mod again to show ${pronoun}.`,
   };
   return issue;
 }

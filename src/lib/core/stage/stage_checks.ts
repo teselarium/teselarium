@@ -116,6 +116,8 @@ export interface CheckServices {
   isSandboxRunning: (sandboxId: string) => boolean;
   /** Called when a check started, changed its frame or ended, so the stage publishes a snapshot. */
   onChange: () => void;
+  /** Whether the checked mod's frames load the media its tiles link, as an opened mod would. */
+  loadsTileLinkedMedia: boolean;
 }
 
 type CheckDraft = Pick<
@@ -241,6 +243,7 @@ export async function runStageCheck(
     buildCheckLink(request.source, request.collection),
     bundleCheck.modTiles,
     services.appOrigin,
+    services.loadsTileLinkedMedia,
   );
   const draft: CheckDraft = {
     requesterId,

@@ -69,6 +69,7 @@ describe("default mods", function describeDefaultMods(): void {
         link: { mod: "mod_explorer", collection: null, params: {} },
         appOrigin: APP_ORIGIN,
         defaults: DEFAULTS,
+        loadsTileLinkedMedia: true,
       },
       { baseUrl: APP_BASE_URL, fetch: fetchAppFile },
     );
@@ -93,6 +94,7 @@ describe("default mods", function describeDefaultMods(): void {
         link: { mod: "mod_viewer", collection: null, params: {} },
         appOrigin: APP_ORIGIN,
         defaults: DEFAULTS,
+        loadsTileLinkedMedia: true,
       },
       { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     );

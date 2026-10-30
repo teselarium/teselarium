@@ -83,7 +83,7 @@ describe("collectContentHosts", function describeCollectContentHosts(): void {
 
 describe("buildSandboxPolicy", function describeBuildSandboxPolicy(): void {
   it("builds the default policy without grants", function buildsDefaultPolicy(): void {
-    const policy = buildSandboxPolicy(["https://example.org"], []);
+    const policy = buildSandboxPolicy(["https://example.org"], [], []);
 
     expect(policy).toBe(DEFAULT_POLICY);
   });
@@ -99,6 +99,7 @@ describe("buildSandboxPolicy", function describeBuildSandboxPolicy(): void {
         buildPermission("show", "https://upload.wikimedia.org"),
         buildPermission("open", "https://mods.example.net"),
       ],
+      [],
     );
 
     expect(policy).toBe(
@@ -129,6 +130,7 @@ describe("buildSandboxPolicy", function describeBuildSandboxPolicy(): void {
         buildPermission("connect", "https://a.example.net"),
         buildPermission("connect", "https://a.example.net"),
       ],
+      [],
     );
 
     expect(policy).toContain(
@@ -146,6 +148,7 @@ describe("buildSandboxPolicy", function describeBuildSandboxPolicy(): void {
         buildPermission("show", "https://upload.wikimedia.org"),
         buildPermission("show", "https://*.us.archive.org"),
       ],
+      [],
     );
 
     expect(policy).toBe(
@@ -164,8 +167,43 @@ describe("buildSandboxPolicy", function describeBuildSandboxPolicy(): void {
     );
   });
 
+  it("adds the tile link sources to img-src and media-src only", function addsTileLinkSources(): void {
+    const tileLinkSources = [
+      "https://media.example.net/covers/kallocain.jpg",
+      "https://media.example.net/sound/theme.mp3",
+    ];
+
+    const policy = buildSandboxPolicy(
+      ["https://example.org"],
+      [],
+      tileLinkSources,
+    );
+
+    expect(policy).toBe(
+      [
+        "default-src 'none'",
+        "script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:",
+        "style-src 'unsafe-inline' data: blob: https://example.org",
+        "img-src data: blob: https://example.org https://media.example.net/covers/kallocain.jpg https://media.example.net/sound/theme.mp3",
+        "media-src data: blob: https://example.org https://media.example.net/covers/kallocain.jpg https://media.example.net/sound/theme.mp3",
+        "font-src data: blob: https://example.org",
+        "connect-src 'none'",
+        "frame-src 'none'",
+        "base-uri 'none'",
+        "form-action 'none'",
+      ].join("; "),
+    );
+    const linkingDirectives: string[] = [];
+    for (const directive of policy.split("; ")) {
+      if (directive.includes("media.example.net")) {
+        linkingDirectives.push(directive.split(" ")[0]);
+      }
+    }
+    expect(linkingDirectives).toEqual(["img-src", "media-src"]);
+  });
+
   it("follows the directive order", function followsDirectiveOrder(): void {
-    const policy = buildSandboxPolicy([], []);
+    const policy = buildSandboxPolicy([], [], []);
 
     const directiveNames: string[] = [];
     for (const directive of policy.split("; ")) {
