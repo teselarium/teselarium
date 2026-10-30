@@ -135,8 +135,8 @@ The system SHALL reject a mod file that has a `schema` key under `mod` with a mo
 - **WHEN** a `connect` entry has a `host` and no `reason`
 - **THEN** loading fails with a mod format error whose message says that `reason` must be a non-empty string
 
-### Requirement: Permission hosts are origins
-Each permission `host` SHALL be an origin: an `http:` or `https:` scheme, a host name and an optional port, with no path, query or fragment. In `show`, `connect`, `embed` and `code`, the host SHALL also be allowed to be a wildcard host: an origin whose host name starts with `*.` as its whole leftmost label, followed by at least two labels, such as `https://*.us.archive.org`. A `*` anywhere else SHALL be rejected. In `open` only, the host SHALL also be allowed to be exactly `"*"`, meaning any site, and a wildcard host SHALL be rejected. Any other value SHALL fail with a mod format error that names the host.
+### Requirement: Permission host format
+Each permission `host` SHALL be an origin: an `http:` or `https:` scheme, a host name and an optional port, with no path, query or fragment, unless it is a wildcard host outside `open` or `"*"` in `open`, as the requirements "Wildcard hosts outside open" and "Any site in open" allow. Any other value SHALL fail with a mod format error that names the host.
 
 #### Scenario: Host with a port
 - **WHEN** a `connect` entry has host `"http://localhost:8080"`
@@ -145,6 +145,13 @@ Each permission `host` SHALL be an origin: an `http:` or `https:` scheme, a host
 #### Scenario: Host with a path
 - **WHEN** a `show` entry has host `"https://example.org/images"`
 - **THEN** loading fails with a mod format error whose message names `https://example.org/images` and says that a host must be an origin
+
+#### Scenario: Other scheme
+- **WHEN** a `connect` entry has host `"wss://example.org"`
+- **THEN** loading fails with a mod format error whose message names `wss://example.org`
+
+### Requirement: Wildcard hosts outside open
+In `show`, `connect`, `embed` and `code`, a permission `host` SHALL also be allowed to be a wildcard host: an origin whose host name starts with `*.` as its whole leftmost label, followed by at least two labels, such as `https://*.us.archive.org`. A `*` anywhere else SHALL be rejected, and a wildcard host in `open` SHALL be rejected, each with a mod format error that names the host.
 
 #### Scenario: Wildcard host
 - **WHEN** a `show` entry has host `"https://*.us.archive.org"`
@@ -170,9 +177,8 @@ Each permission `host` SHALL be an origin: an `http:` or `https:` scheme, a host
 - **WHEN** an `open` entry has host `"https://*.example.org"`
 - **THEN** loading fails with a mod format error whose message names `https://*.example.org` and says that wildcard hosts are not allowed in `permissions.open`
 
-#### Scenario: Other scheme
-- **WHEN** a `connect` entry has host `"wss://example.org"`
-- **THEN** loading fails with a mod format error whose message names `wss://example.org`
+### Requirement: Any site in open
+In `open` only, a permission `host` SHALL also be allowed to be exactly `"*"`, meaning any site. In `show`, `connect`, `embed` and `code`, `"*"` SHALL fail with a mod format error.
 
 #### Scenario: Any site for open
 - **WHEN** an `open` entry has host `"*"`
