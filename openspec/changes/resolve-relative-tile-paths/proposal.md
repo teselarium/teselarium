@@ -20,6 +20,7 @@ None.
 ### Modified Capabilities
 
 - `mod-engine-api`: the requirements on the mount context's `tiles` and on `tiles.changed` say that metadata strings starting with `./` or `../` are resolved against the tile's `source`.
+- `mod-api-version`: the mod API version becomes `0.1.4`.
 
 ## Impact
 
