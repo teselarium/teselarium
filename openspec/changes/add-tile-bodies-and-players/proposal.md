@@ -8,7 +8,7 @@ The engine can do both once for every mod: render a tile's body to safe HTML tha
 
 ## What Changes
 
-- **Rendered tile bodies**: a new request, `tiles.renderBody { source }`, returns the body of one of the mod's tiles as sanitized HTML: GitHub-flavored markdown, the HTML GitHub allows, relative paths resolved against the tile, images loaded lazily, `<video>` and `<audio>` of direct files kept with `preload="metadata"`, links marked to open through the app, and each embedded player replaced by a placeholder. Mermaid and other extras stay as code blocks.
+- **Rendered tile bodies**: a new request, `tiles.renderBody { source }`, returns the body of one of the mod's tiles as sanitized HTML: GitHub-flavored markdown, the HTML GitHub allows, relative paths resolved against the tile, images loaded lazily, `<picture>` with its sources, `<video>` and `<audio>` of direct files kept with `preload="metadata"`, links marked to open through the app, and each embedded player replaced by a placeholder. As on GitHub, `> [!NOTE]` and the other alert kinds become styled alerts, and headings get ids that `#heading` links scroll to. Math (`$…$`, `$$…$$`) is kept exactly as written, as code, instead of being mangled by markdown's emphasis and escapes; mermaid blocks stay as code.
 - **`<ot-tile-body>`**: an element the frame loader defines in every mod frame. Given a tile, it requests the rendered body and shows it in the light DOM, so the theme and the mod's CSS style it, and fires `ot-rendered`.
 - **Clicks handled by the frame loader**: in any rendered body, a click on a link sends `links.open`, and a click on a player placeholder sends `players.open`, so a mod writes no code for them.
 - **Media in bodies**: the images, video, audio and posters of a body count as media linked by tiles, with the same setting, the same rules and the same private network guard as metadata links.
@@ -34,18 +34,18 @@ The engine can do both once for every mod: render a tile's body to safe HTML tha
 ## Impact
 
 - **Code**:
-  - a body renderer in `src/lib/core/engine/` (or a new `src/lib/core/tile_bodies/`), from the markdown packages the app already uses for its pages, plus `rehype-stringify` to write HTML outside React;
+  - a body renderer in `src/lib/core/engine/` (or a new `src/lib/core/tile_bodies/`), from the markdown packages the app already uses for its pages, plus `rehype-stringify` to write HTML outside React, `remark-math` to keep formulas intact and `rehype-slug` for GitHub's heading ids;
   - `collectTileLinks` in `src/lib/core/sandbox/` reads the media of rendered bodies;
   - the session keeps the mod's current tiles, so rendering and player checks follow "Reload tiles";
-  - the frame loader (`sandbox_loader.js`) defines `<ot-tile-body>` and handles clicks; the base stylesheet styles placeholders;
+  - the frame loader (`sandbox_loader.js`) defines `<ot-tile-body>` and handles clicks on links, heading links and placeholders; the base stylesheet styles placeholders and alerts;
   - a player action and `PlayerDialog` in `src/main/stage/`; remembered player sites in the store of `add-site-consent-dialog`.
-- **Tests**: unit tests of the renderer (sanitizing, paths, links, media, placeholders), of player addresses and of the table; e2e tests that a body renders with images and links, that a placeholder opens the player dialog, that nothing is requested from the site before Play, that "Always play from" skips the question, and that a check's case can answer `players.open`.
+- **Tests**: unit tests of the renderer (sanitizing, paths, links, media, pictures, placeholders, alerts, heading ids, and math kept exactly while prices stay text), of player addresses and of the table; e2e tests that a body renders with images and links, that a placeholder opens the player dialog, that nothing is requested from the site before Play, that "Always play from" skips the question, and that a check's case can answer `players.open`.
 - **Docs**: the engine README (the two requests, the element, clicks), the sandbox README (media of bodies), the theme README (placeholders), the mod plugin spec (showing a body), and the settings docs.
 - **Mod API version**: patch, `0.1.4` to `0.1.5`. The change adds two methods (`tiles.renderBody`, `players.open`), an element and its event (`<ot-tile-body>`, `ot-rendered`), and a scripted answer to the test API. It removes and renames nothing, and a mod that ignores them keeps working, which the "Mod API version" section of the engine's README counts as an addition.
 - **App version**: patch bump while the app is `0.x`, as much as the mod API.
 - **Depends on**: `add-site-consent-dialog`, whose remembered decisions and Settings group this change extends. It is applied and archived first.
 - **Out of scope**:
-  - mermaid diagrams, math, alerts and other extras of GitHub's renderer: their blocks stay as written, and diagrams come in a change of their own;
+  - drawing mermaid diagrams (`add-tile-body-diagrams`), and rendering math, highlighting code and emoji shortcodes (a later change): their source stays as written;
   - players inline in the mod's layout, and controlling a player (play, pause, seek) from the mod;
   - pages that are not players from metadata: a metadata link to a page of an unknown site does not become a player;
   - rendering markdown that is not a tile's body.

@@ -33,7 +33,7 @@ The rendered HTML SHALL keep only the HTML GitHub allows in markdown, plus `<vid
 - **THEN** the rendered link has no `href` holding `javascript:`
 
 ### Requirement: Paths in bodies are resolved against the tile
-Each relative address of an image, video, audio, poster or link in a body SHALL be rendered as the absolute address it names, resolved against the tile's `source`. A link to a fragment of the same body (`#heading`) SHALL stay as written. The tile's `body` SHALL stay as written.
+Each relative address of an image, video, audio, poster, `srcset` candidate or link in a body SHALL be rendered as the absolute address it names, resolved against the tile's `source`. A link to a fragment of the same body (`#heading`) SHALL NOT be resolved (see "Heading anchors"). The tile's `body` SHALL stay as written.
 
 #### Scenario: Relative image
 - **WHEN** the body of `https://example.org/books/kallocain.md` holds `![Cover](./cover.jpg)`
@@ -101,12 +101,60 @@ In a mod's frame, a click on an element with `data-ot-player` that the mod did n
 - **WHEN** a mod shows a rendered body and the user clicks its player placeholder
 - **THEN** the player dialog of `media-players` is shown for that address
 
-### Requirement: Extras stay as written
-Fenced code blocks SHALL be rendered as `<pre><code>` with the class `language-<name>` of their info string, including `mermaid`. Math, alerts and emoji shortcodes SHALL be rendered as their text.
+### Requirement: Code blocks stay as written
+Fenced code blocks SHALL be rendered as `<pre><code>` with the class `language-<name>` of their info string, including `mermaid` and `math`, holding the block's text exactly. Emoji shortcodes such as `:tada:` SHALL be rendered as their text.
 
 #### Scenario: Mermaid block
 - **WHEN** a body holds a fenced block whose info string is `mermaid`
 - **THEN** the rendered HTML has `<pre><code class="language-mermaid">` holding the block's text
+
+### Requirement: Math is kept exactly
+Inline math (`$…$`) and display math (`$$…$$`) in a body SHALL be rendered as code holding the formula exactly as written, untouched by markdown: inline as `<code class="language-math math-inline">`, display as `<pre><code class="language-math math-display">`. Inline math SHALL need an opening `$` followed by a non-space character and a closing `$` preceded by a non-space character and not followed by a digit; other dollars, and `\$`, SHALL stay text.
+
+#### Scenario: Asterisks in a formula
+- **WHEN** a body holds `Inline $x*y*z$.`
+- **THEN** the rendered HTML has `<code class="language-math math-inline">` holding `x*y*z`, and no `<em>`
+
+#### Scenario: Backslashes in display math
+- **WHEN** a body holds `$$` on a line, then `\{x \mid x > 0\} \\ y`, then `$$`
+- **THEN** the rendered display math code holds `\{x \mid x > 0\} \\ y`, with every backslash
+
+#### Scenario: Prices are not math
+- **WHEN** a body holds `It costs $5 and $10.`
+- **THEN** the rendered paragraph's text is `It costs $5 and $10.` and has no math code
+
+#### Scenario: Escaped dollars
+- **WHEN** a body holds `It costs \$5 and \$10.`
+- **THEN** the rendered paragraph's text is `It costs $5 and $10.` and has no math code
+
+### Requirement: Alerts
+A blockquote whose first line is only `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, in any letter case, SHALL be rendered as `<aside class="ot-alert">` with `data-ot-alert` holding the kind in lower case, a first `<p class="ot-alert-title">` holding the kind's name (`Note`, `Tip`, `Important`, `Warning`, `Caution`), then the rest of the quote. Any other blockquote SHALL stay a blockquote.
+
+#### Scenario: Note
+- **WHEN** a body holds `> [!NOTE]` then `> Tiles are markdown files.`
+- **THEN** the rendered HTML has an `aside.ot-alert` with `data-ot-alert="note"`, a title `Note`, and a paragraph `Tiles are markdown files.`, and no text `[!NOTE]`
+
+#### Scenario: Unknown kind
+- **WHEN** a body holds `> [!TODO]` then `> Later.`
+- **THEN** the rendered HTML has a `<blockquote>` showing `[!TODO]`
+
+### Requirement: Heading anchors
+Each heading of a rendered body SHALL have an `id` made of `user-content-` and the heading's slug, as GitHub makes them: lower case, spaces as `-`, punctuation other than `-` and `_` removed, and `-1`, `-2` added to repeated slugs. A link to `#<slug>` SHALL carry `data-ot-fragment`. In a mod's frame, a click on it that the mod did not cancel SHALL scroll to the heading `user-content-<slug>` nearest to the link, and SHALL NOT navigate the frame.
+
+#### Scenario: Heading ids
+- **WHEN** a body holds `## Install it!` twice
+- **THEN** the rendered headings have the ids `user-content-install-it` and `user-content-install-it-1`
+
+#### Scenario: Link to a heading
+- **WHEN** a mod shows two rendered bodies that both have `## Notes`, and the user clicks `[See notes](#notes)` in the second one
+- **THEN** the frame scrolls to the `Notes` heading of the second body, and the mod keeps running
+
+### Requirement: Pictures in bodies
+A body's `<picture>` elements SHALL be kept with their `<source>` children's `srcset` and `media`, and the `<img>` inside. Each address of a `srcset` SHALL be resolved against the tile, and SHALL count as an image of the body for media linked by tiles.
+
+#### Scenario: Dark-mode picture
+- **WHEN** a body holds a `<picture>` with `<source srcset="https://media.example.net/dark.png" media="(prefers-color-scheme: dark)">` and `<img src="https://media.example.net/light.png">`, and the frame's color scheme is dark
+- **THEN** the image shown is `https://media.example.net/dark.png`, and it loads
 
 ### Requirement: The tile body element
 Every mod frame, including the frames of a check, SHALL define the element `ot-tile-body`. Setting its `tile` property to a tile of the mod SHALL send `tiles.renderBody` with the tile's `source` and show the result as the element's children, then fire a bubbling `ot-rendered` event. When the request fails, the element SHALL show the error's message as text with `role="alert"`.
@@ -120,8 +168,12 @@ Every mod frame, including the frames of a check, SHALL define the element `ot-t
 - **THEN** the element shows the message of the `-32602` error with `role="alert"`
 
 ### Requirement: Rendered bodies follow the theme
-The base stylesheet SHALL style the elements of a rendered body as it styles plain HTML, and SHALL style `button.ot-player` as a box that shows its title and site. A mod that opts out of the theme styles SHALL get the placeholders as plain buttons that still work.
+The base stylesheet SHALL style the elements of a rendered body as it styles plain HTML, SHALL style `button.ot-player` as a box that shows its title and site, and SHALL give each kind of `aside.ot-alert` a border in its own theme color. A mod that opts out of the theme styles SHALL get the placeholders as plain buttons that still work.
 
 #### Scenario: Placeholder shape
 - **WHEN** a mod that adds no styles shows a player placeholder
 - **THEN** the placeholder's computed `aspect-ratio` is `16 / 9`
+
+#### Scenario: Warning color
+- **WHEN** a mod that adds no styles shows a rendered `[!WARNING]` alert
+- **THEN** the alert's computed left border color is the value of `--ot-warning`

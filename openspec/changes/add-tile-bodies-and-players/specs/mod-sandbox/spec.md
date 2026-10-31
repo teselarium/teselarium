@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Media linked by tiles
-When "Load media linked by tiles" is on as a mod starts, the system SHALL let the mod load, as images, video and audio, each file whose `http:` or `https:` URL is a metadata string of a tile the mod receives, inside lists and nested mappings too, or the address of an image, video, audio, `<source>` or poster in that tile's rendered body (see `tile-bodies`). Mods from the app's origin and from other origins SHALL get them alike. Tiles the mod does not receive, and the other addresses of a body, SHALL allow nothing.
+When "Load media linked by tiles" is on as a mod starts, the system SHALL let the mod load, as images, video and audio, each file whose `http:` or `https:` URL is a metadata string of a tile the mod receives, inside lists and nested mappings too, or the address of an image, video, audio, `<source>`, poster or `srcset` candidate in that tile's rendered body (see `tile-bodies`). Mods from the app's origin and from other origins SHALL get them alike. Tiles the mod does not receive, and the other addresses of a body, SHALL allow nothing.
 
 #### Scenario: Image linked by a tile
 - **WHEN** a mod from the app's origin without permissions is opened with a collection whose tile has `image: "https://media.example.net/covers/kallocain.jpg"`, and shows that URL as an image

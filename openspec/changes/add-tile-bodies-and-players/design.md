@@ -21,7 +21,7 @@
 
 - Rendering markdown that is not a tile's body, or rendering in the mod's frame.
 - Player controls for mods, and players inline in the mod's layout.
-- Mermaid, math and alerts (kept as written).
+- Drawing mermaid diagrams (`add-tile-body-diagrams`), and rendering math, highlighting code and emoji shortcodes (a later change). This change only keeps math exact, so that change can render it from the same code elements.
 
 ## Decisions
 
@@ -44,13 +44,17 @@ Query parameters of page links are dropped, so a link cannot turn on autoplay. A
 
 ### D3. The renderer's pipeline
 
-`remark-parse` → `remark-gfm` → `remark-rehype` (with raw HTML) → `rehype-raw` → **players pass** → `rehype-sanitize` with the tile schema → **finishing pass** → `rehype-stringify`.
+`remark-parse` → `remark-gfm` → `remark-math` → **dollar pass** → **alerts pass** → `remark-rehype` (with raw HTML) → `rehype-raw` → `rehype-slug` → **players pass** → `rehype-sanitize` with the tile schema → **finishing pass** → `rehype-stringify`.
+
+- **Math**: `remark-math` takes `$…$` and `$$…$$` out of markdown's hands, so emphasis and backslash escapes never touch a formula; `remark-rehype` then writes them as `code.language-math.math-inline` and `pre > code.language-math.math-display`, the elements a later change can render. `remark-math` alone reads `It costs $5 and $10.` as a formula (checked with `remark-math` 6): the **dollar pass** turns back into text, from the source positions, each inline math whose opening `$` is followed by a space, or whose closing `$` follows a space or is followed by a digit, which is GitHub's and Pandoc's rule.
+- **Alerts pass**: a blockquote whose first paragraph starts with a line that is only `[!KIND]` (the five kinds, any case) becomes an `aside` (through `data.hName`) with `class="ot-alert"`, `data-ot-alert` and a title paragraph; the marker line is removed. No dependency.
+- **Heading ids**: `rehype-slug` gives GitHub's slugs (checked: `Install it!` twice gives `install-it` and `install-it-1`), and the sanitizer's clobber prefix turns them into `user-content-…`, as on GitHub. This also keeps a body's ids away from the mod's own.
 
 - **Players pass**, before sanitizing, because the schema removes iframes. For each `<iframe>`: resolve `src` against the tile; when it is a player address (D4), replace the element with `button.ot-player` holding `data-ot-player`, a span with the `title` and a span with the host; otherwise with a link (`http:`/`https:` allowed by the guard) or nothing, with an issue for a private address. For each `<img>` whose `src` is a known-site page link, the same placeholder with the alt text. The pass only reads `src`, `title`, `width`, `height` and `alt`; the elements it creates are new.
-- **Tile schema**: GitHub's default schema plus `video`, `audio` and `source` (`src`, `poster`, `width`, `height`, `type`), and `button` with `type`, `class` `ot-player` and `data-ot-player`. Sanitizing runs after the players pass, so a body cannot forge a placeholder with its own `data-ot-player` value that the engine did not produce: the attribute stays, but `players.open` only accepts addresses the renderer recorded (D4).
-- **Finishing pass**: resolve `src`, `poster` and `href` against the tile (fragment-only links stay); add `loading="lazy"` and `decoding="async"` to images; force `controls` and `preload="metadata"` and drop `autoplay` on video and audio; add `data-ot-link` to `http:`/`https:` links; collect the addresses of images, video, audio, sources and posters into `mediaUrls`.
+- **Tile schema**: GitHub's default schema (which keeps `picture`, `source` with `srcset`, `details`, `kbd`, `sup` and `sub`) plus `video`, `audio` and `source` (`src`, `poster`, `width`, `height`, `type`, `media`), `button` with `type`, `class` `ot-player` and `data-ot-player`, `aside` and `p` with the `ot-alert` classes and `data-ot-alert` (the five kinds), and `code` with the `math-inline` and `math-display` classes. Sanitizing runs after the players pass, so a body cannot forge a placeholder with its own `data-ot-player` value that the engine did not produce: the attribute stays, but `players.open` only accepts addresses the renderer recorded (D4).
+- **Finishing pass**: resolve `src`, `poster`, each `srcset` candidate and `href` against the tile; mark links to `#…` with `data-ot-fragment` and leave their `href`; add `loading="lazy"` and `decoding="async"` to images; force `controls` and `preload="metadata"` and drop `autoplay` on video and audio; add `data-ot-link` to `http:`/`https:` links; collect the addresses of images, video, audio, sources, posters and `srcset` candidates into `mediaUrls`.
 
-`unified`, `remark-parse`, `remark-rehype` and `rehype-stringify` become direct dependencies. The first three are already in the bundle through `react-markdown`; `rehype-stringify` adds the HTML writer.
+`unified`, `remark-parse`, `remark-rehype`, `rehype-stringify`, `remark-math` and `rehype-slug` become direct dependencies. The first three are already in the bundle through `react-markdown`; the others are small.
 
 *Alternative*: reuse `PageMarkdown` in a hidden React root and read its HTML. Rejected: it needs a DOM, runs in the app's realm on untrusted input, and its link rules are the pages'.
 
@@ -85,12 +89,12 @@ A small store, `src/main/settings/player_sites.ts`, with the key `opentesela.pla
 ### D9. The frame loader
 
 - **`ot-tile-body`**: a custom element defined in the loader, so check frames get it too. Setting `tile` sends `tiles.renderBody` with `tile.source`; a newer `tile` set before the answer wins (a request counter). On success it sets its `innerHTML` to the result and dispatches `ot-rendered` (`bubbles: true`); on failure it shows the message as text with `role="alert"`.
-- **Clicks**: one `click` listener on `window`, in the bubbling phase. When the event was not cancelled, `closest("[data-ot-player]")` sends `players.open`, and `closest("a[data-ot-link]")` cancels the navigation and sends `links.open` with the link's `href`. A rejected request is logged with `console.warn`.
+- **Clicks**: one `click` listener on `window`, in the bubbling phase. When the event was not cancelled, `closest("[data-ot-player]")` sends `players.open`, and `closest("a[data-ot-link]")` cancels the navigation and sends `links.open` with the link's `href`, and `closest("a[data-ot-fragment]")` cancels the navigation and scrolls to the heading: it walks up from the link and scrolls to the first `#user-content-<slug>` found inside an ancestor, so with several bodies on a page, a link reaches the heading of its own body. A fragment without such a heading does nothing. A rejected request is logged with `console.warn`.
 - `AnswerMethod` gains `players.open` (boolean).
 
 ### D10. Base stylesheet
 
-`button.ot-player` gets a block box, full width, `aspect-ratio: 16 / 9`, the card colors, the title on top and the host in the muted color, and a play mark drawn with CSS. A mod with `theme: "none"` gets a plain button.
+`button.ot-player` gets a block box, full width, `aspect-ratio: 16 / 9`, the card colors, the title on top and the host in the muted color, and a play mark drawn with CSS. `aside.ot-alert` gets a left border and a bold title in its kind's token: `note` `--ot-primary`, `tip` `--ot-success`, `important` `--ot-secondary`, `warning` `--ot-warning`, `caution` `--ot-destructive`. Math code looks like code. A mod with `theme: "none"` gets plain elements.
 
 ## Risks / Trade-offs
 
@@ -101,6 +105,8 @@ A small store, `src/main/settings/player_sites.ts`, with the key `opentesela.pla
 - [A site in the table changes its addresses] → The table is small, tested by address examples, and a broken entry only turns a page link back into a plain link; iframes pasted from the site keep working as generic players.
 - [The app's page has a Content-Security-Policy with `frame-src`] → Players are blocked by the host's own policy; the hosting note in the engine README says to allow the player sites.
 - [Vimeo was not verified by the spike] → The e2e tests stub the players; a manual check in a desktop browser is part of the verification task.
+- [The dollar rule differs from GitHub in rare cases (GitHub's exact rules are not published)] → It matches the common cases, prices and currency included; an author can always write `\$`. Tests pin the cases the spec names.
+- [Two rendered bodies on one page can repeat heading ids] → Fragment clicks search from the link outward (D9), so each body's links reach its own headings; the ids only matter to those clicks.
 
 ## Migration Plan
 
