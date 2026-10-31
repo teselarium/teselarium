@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page, Request, Route } from "@playwright/test";
 import {
+  answerSiteConsent,
   buildProbeFiles,
   COVER_HOST,
   findModFrame,
@@ -414,6 +415,7 @@ test.describe("Show the mod issues", function describeIssues(): void {
     await page.goto(
       `/#/run?mod=${encodeURIComponent(`${FOREIGN_HOST}/probe/`)}`,
     );
+    await answerSiteConsent(page, "Show without them");
 
     const issue = issueList(page).getByRole("listitem").first();
     await expect(issue).toContainText("warning");

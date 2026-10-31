@@ -7,6 +7,7 @@ import {
 } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  buildSampleCoversDecision,
   COVER_BOOK_COLLECTION_SOURCE,
   COVER_BOOK_IMAGE_URL,
   FOUR_BOOKS_SOURCE,
@@ -35,6 +36,7 @@ import {
   readRequestedUrl,
   testTexts,
 } from "../../../test/test_files.ts";
+import { launchTestMod } from "../../../test/test_launches.ts";
 import { FileFetchError, YamlParseError } from "../../files/index.ts";
 import { ModFormatError } from "../../mod/index.ts";
 import {
@@ -43,6 +45,8 @@ import {
   loadTileCollection,
   TileTypeError,
 } from "../../tile/index.ts";
+import type { Tile } from "../../tile/index.ts";
+import { grantModPermissions } from "../permissions/index.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
 import { ModSwitchedOffError } from "./engine_errors.ts";
 import { MOD_API_VERSION } from "./mod_api_version.ts";
@@ -51,12 +55,18 @@ import {
   SANDBOX_CASE_FINISHED_METHOD,
 } from "../sandbox/index.ts";
 import {
+  buildModLaunch,
   buildModTestDocument,
+  loadModLaunchInputs,
   loadModTiles,
-  prepareModLaunch,
   selectModTiles,
 } from "./mod_launch.ts";
-import type { ModLaunch, ModLaunchRequest, RunLink } from "./mod_launch.ts";
+import type {
+  ModLaunch,
+  ModLaunchInputs,
+  ModTiles,
+  RunLink,
+} from "./mod_launch.ts";
 
 const SAMPLE_LINK: RunLink = {
   mod: SAMPLE_MOD_REFERENCE,
@@ -127,42 +137,202 @@ function listRequestedUrls(testFetch: Mock<typeof fetch>): string[] {
   return requestedUrls;
 }
 
-function buildLaunchRequest(
-  link: RunLink,
-  appOrigin: string = APP_ORIGIN,
-  loadsTileLinkedMedia = true,
-): ModLaunchRequest {
-  const request: ModLaunchRequest = {
-    link,
-    appOrigin,
-    defaults: TEST_DEFAULTS,
-    loadsTileLinkedMedia,
-  };
-  return request;
-}
-
 function launchMod(
   link: RunLink,
   appOrigin: string = APP_ORIGIN,
   testFetch: typeof fetch = fetchTestFile,
   loadsTileLinkedMedia = true,
 ): Promise<ModLaunch> {
-  const request = buildLaunchRequest(link, appOrigin, loadsTileLinkedMedia);
-  return prepareModLaunch(request, {
-    baseUrl: APP_BASE_URL,
-    fetch: testFetch,
+  return launchTestMod(link, {
+    appOrigin,
+    loadsTileLinkedMedia,
+    fetchOptions: { baseUrl: APP_BASE_URL, fetch: testFetch },
   });
 }
 
-function listTileTypes(launch: ModLaunch): string[][] {
+function loadInputs(
+  link: RunLink,
+  testFetch: typeof fetch = fetchTestFile,
+): Promise<ModLaunchInputs> {
+  return loadModLaunchInputs(
+    { link, defaults: TEST_DEFAULTS },
+    { baseUrl: APP_BASE_URL, fetch: testFetch },
+  );
+}
+
+function readModTiles(inputs: ModLaunchInputs): ModTiles {
+  if (inputs.modTiles === null) {
+    throw new Error(`The link to ${inputs.mod.source} names no collection.`);
+  }
+  return inputs.modTiles;
+}
+
+function listTileTypes(tiles: Tile[]): string[][] {
   const tileTypes: string[][] = [];
-  for (const tile of launch.context.tiles) {
+  for (const tile of tiles) {
     tileTypes.push(tile.types);
   }
   return tileTypes;
 }
 
-describe("prepareModLaunch", function describePrepareModLaunch(): void {
+describe("loadModLaunchInputs", function describeLoadModLaunchInputs(): void {
+  it("loads the mod, the link and its tiles", async function loadsInputs(): Promise<void> {
+    const inputs = await loadInputs(SAMPLE_LINK);
+
+    expect(inputs.mod.source).toBe(SAMPLE_MOD_SOURCE);
+    expect(inputs.link).toEqual(SAMPLE_LINK);
+    expect(readModTiles(inputs).collectionSource).toBe(
+      SAMPLE_COLLECTION_SOURCE,
+    );
+    expect(listTileTypes(readModTiles(inputs).tiles)).toEqual([
+      ["book"],
+      ["book"],
+      ["book"],
+    ]);
+  });
+
+  it("Mod opened without a collection", async function loadsWithoutCollection(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const inputs = await loadInputs(
+      { ...SAMPLE_LINK, collection: null },
+      testFetch,
+    );
+
+    expect(inputs.modTiles).toBeNull();
+    expect(listRequestedUrls(testFetch)).not.toContain(
+      SAMPLE_COLLECTION_SOURCE,
+    );
+  });
+
+  it("Tile of another type is left out", async function leavesOutOtherType(): Promise<void> {
+    serveFourBooks();
+
+    const inputs = await loadInputs({
+      ...SAMPLE_LINK,
+      collection: FOUR_BOOKS_SOURCE,
+    });
+
+    const tileSources: string[] = [];
+    for (const tile of readModTiles(inputs).tiles) {
+      tileSources.push(tile.source);
+    }
+    expect(tileSources).toEqual(SAMPLE_TILE_SOURCES);
+    expect(readModTiles(inputs).issues).toHaveLength(1);
+    expect(readModTiles(inputs).issues[0].level).toBe("warning");
+    expect(readModTiles(inputs).issues[0].source).toBe(NO_COUNTRY_TILE_SOURCE);
+  });
+
+  it("Mod without a tile type", async function givesEveryTile(): Promise<void> {
+    serveUntypedMod();
+
+    const inputs = await loadInputs({
+      ...SAMPLE_LINK,
+      mod: UNTYPED_MOD_SOURCE,
+    });
+
+    expect(listTileTypes(readModTiles(inputs).tiles)).toEqual([[], [], []]);
+  });
+
+  it("Image next to the tile", async function resolvesTilePaths(): Promise<void> {
+    serveCoverBook();
+
+    const inputs = await loadInputs({
+      ...SAMPLE_LINK,
+      collection: COVER_BOOK_COLLECTION_SOURCE,
+    });
+
+    expect(readModTiles(inputs).tiles).toHaveLength(1);
+    expect(readModTiles(inputs).tiles[0].metadata.image).toBe(
+      COVER_BOOK_IMAGE_URL,
+    );
+  });
+
+  it("refuses a switched-off mod before any request", async function refusesSwitchedOff(): Promise<void> {
+    const testFetch = createTestFetch();
+    const defaults = resolveDefaultModSettings(
+      {
+        folder: `${FIXTURES_REFERENCE}mods/`,
+        switchedOff: ["book_list"],
+      },
+      APP_BASE_URL,
+    );
+
+    const launching = loadModLaunchInputs(
+      { link: SAMPLE_LINK, defaults },
+      { baseUrl: APP_BASE_URL, fetch: testFetch },
+    );
+
+    await expect(launching).rejects.toThrow(ModSwitchedOffError);
+    await expect(launching).rejects.toThrow(
+      'The default mod "book_list" is switched off.',
+    );
+    expect(testFetch).not.toHaveBeenCalled();
+  });
+
+  it("propagates mod file errors with their classes", async function propagatesModErrors(): Promise<void> {
+    testTexts.set(
+      `${FIXTURES_BASE_URL}mods/no_mod/mod_conf.yaml`,
+      'name: "no mod mapping"',
+    );
+    testTexts.set(
+      `${FIXTURES_BASE_URL}mods/bad_yaml/mod_conf.yaml`,
+      "mod: [unclosed",
+    );
+
+    await expect(
+      loadInputs({ ...SAMPLE_LINK, mod: MISSING_MOD_REFERENCE }),
+    ).rejects.toThrow(FileFetchError);
+    await expect(
+      loadInputs({ ...SAMPLE_LINK, mod: `${FIXTURES_REFERENCE}mods/no_mod` }),
+    ).rejects.toThrow(ModFormatError);
+    await expect(
+      loadInputs({ ...SAMPLE_LINK, mod: `${FIXTURES_REFERENCE}mods/bad_yaml` }),
+    ).rejects.toThrow(YamlParseError);
+  });
+
+  it("propagates type file errors with their classes", async function propagatesTypeErrors(): Promise<void> {
+    const brokenTypeSource = `${FIXTURES_BASE_URL}mods/broken_type/mod_conf.yaml`;
+    serveTestMod(brokenTypeSource, [
+      '  name: "broken_type"',
+      '  version: "0.1.0"',
+      '  entrypoint: "./main.js"',
+      '  type_path: "./type.md"',
+    ]);
+    testTexts.set(
+      `${FIXTURES_BASE_URL}mods/broken_type/type.md`,
+      "---\ntitle: no schema\n---\n",
+    );
+
+    await expect(
+      loadInputs({ ...SAMPLE_LINK, mod: brokenTypeSource }),
+    ).rejects.toThrow(TileTypeError);
+  });
+
+  it("propagates collection errors with their classes", async function propagatesCollectionErrors(): Promise<void> {
+    testTexts.set(
+      `${FIXTURES_BASE_URL}tiles/not_a_collection.yaml`,
+      'name: "no collection mapping"',
+    );
+
+    await expect(
+      loadInputs({
+        ...SAMPLE_LINK,
+        collection: `${FIXTURES_REFERENCE}tiles/missing.yaml`,
+      }),
+    ).rejects.toThrow(
+      `Cannot load file "${FIXTURES_BASE_URL}tiles/missing.yaml": HTTP 404`,
+    );
+    await expect(
+      loadInputs({
+        ...SAMPLE_LINK,
+        collection: `${FIXTURES_REFERENCE}tiles/not_a_collection.yaml`,
+      }),
+    ).rejects.toThrow(CollectionFormatError);
+  });
+});
+
+describe("buildModLaunch", function describeBuildModLaunch(): void {
   it("Sample mount context", async function buildsSampleContext(): Promise<void> {
     const launch = await launchMod(SAMPLE_LINK);
 
@@ -187,7 +357,11 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
   it("Sample tiles are books", async function givesBookTiles(): Promise<void> {
     const launch = await launchMod(SAMPLE_LINK);
 
-    expect(listTileTypes(launch)).toEqual([["book"], ["book"], ["book"]]);
+    expect(listTileTypes(launch.context.tiles)).toEqual([
+      ["book"],
+      ["book"],
+      ["book"],
+    ]);
     expect(launch.context.issues).toEqual([]);
   });
 
@@ -206,6 +380,30 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
     );
   });
 
+  it("Foreign mod with an allowed permission", async function grantsAllowedForeignPermission(): Promise<void> {
+    const inputs = await loadInputs(SAMPLE_LINK);
+    const grants = grantModPermissions(inputs.mod, OTHER_APP_ORIGIN, [
+      buildSampleCoversDecision(true),
+    ]);
+
+    const launch = buildModLaunch(
+      inputs.mod,
+      inputs.link,
+      inputs.modTiles,
+      grants,
+      false,
+    );
+
+    expect(launch.context.permissions).toEqual({
+      granted: [SAMPLE_COVERS_PERMISSION],
+      denied: [],
+    });
+    expect(readDirective(launch.policy, "img-src")).toContain(
+      "https://upload.wikimedia.org",
+    );
+    expect(launch.issues).toEqual([]);
+  });
+
   it("Link parameters", async function copiesParams(): Promise<void> {
     const params = { target: SAMPLE_MOD_SOURCE };
 
@@ -213,88 +411,6 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
     expect(launch.context.params).toEqual(params);
     expect(launch.context.params).not.toBe(params);
-  });
-
-  it("Mod opened without a collection", async function launchesWithoutCollection(): Promise<void> {
-    const testFetch = createTestFetch();
-
-    const launch = await launchMod(
-      { ...SAMPLE_LINK, collection: null },
-      APP_ORIGIN,
-      testFetch,
-    );
-
-    expect(launch.context.tiles).toEqual([]);
-    expect(launch.context.issues).toEqual([]);
-    expect(launch.collectionSource).toBeNull();
-    expect(listRequestedUrls(testFetch)).not.toContain(
-      SAMPLE_COLLECTION_SOURCE,
-    );
-  });
-
-  it("Tile of another type is left out", async function leavesOutOtherType(): Promise<void> {
-    serveFourBooks();
-
-    const launch = await launchMod({
-      ...SAMPLE_LINK,
-      collection: FOUR_BOOKS_SOURCE,
-    });
-
-    const tileSources: string[] = [];
-    for (const tile of launch.context.tiles) {
-      tileSources.push(tile.source);
-    }
-    expect(tileSources).toEqual(SAMPLE_TILE_SOURCES);
-    expect(launch.context.issues).toHaveLength(1);
-    expect(launch.context.issues[0].level).toBe("warning");
-    expect(launch.context.issues[0].source).toBe(NO_COUNTRY_TILE_SOURCE);
-  });
-
-  it("Mod without a tile type", async function givesEveryTile(): Promise<void> {
-    serveUntypedMod();
-
-    const launch = await launchMod({ ...SAMPLE_LINK, mod: UNTYPED_MOD_SOURCE });
-
-    expect(listTileTypes(launch)).toEqual([[], [], []]);
-  });
-
-  it("Image next to the tile", async function resolvesTilePaths(): Promise<void> {
-    serveCoverBook();
-
-    const launch = await launchMod({
-      ...SAMPLE_LINK,
-      collection: COVER_BOOK_COLLECTION_SOURCE,
-    });
-
-    expect(launch.context.tiles).toHaveLength(1);
-    expect(launch.context.tiles[0].metadata.image).toBe(COVER_BOOK_IMAGE_URL);
-  });
-
-  it("refuses a switched-off mod before any request", async function refusesSwitchedOff(): Promise<void> {
-    const testFetch = createTestFetch();
-    const defaults = resolveDefaultModSettings(
-      {
-        folder: `${FIXTURES_REFERENCE}mods/`,
-        switchedOff: ["book_list"],
-      },
-      APP_BASE_URL,
-    );
-
-    const launching = prepareModLaunch(
-      {
-        link: SAMPLE_LINK,
-        appOrigin: APP_ORIGIN,
-        defaults,
-        loadsTileLinkedMedia: true,
-      },
-      { baseUrl: APP_BASE_URL, fetch: testFetch },
-    );
-
-    await expect(launching).rejects.toThrow(ModSwitchedOffError);
-    await expect(launching).rejects.toThrow(
-      'The default mod "book_list" is switched off.',
-    );
-    expect(testFetch).not.toHaveBeenCalled();
   });
 
   it("names the covers host in the policy only when granted", async function buildsPolicy(): Promise<void> {
@@ -431,67 +547,6 @@ describe("prepareModLaunch", function describePrepareModLaunch(): void {
 
     expect(launch.apiCompatible).toBe(false);
     expect(launch.fileIssues).toEqual([]);
-  });
-
-  it("propagates mod file errors with their classes", async function propagatesModErrors(): Promise<void> {
-    testTexts.set(
-      `${FIXTURES_BASE_URL}mods/no_mod/mod_conf.yaml`,
-      'name: "no mod mapping"',
-    );
-    testTexts.set(
-      `${FIXTURES_BASE_URL}mods/bad_yaml/mod_conf.yaml`,
-      "mod: [unclosed",
-    );
-
-    await expect(
-      launchMod({ ...SAMPLE_LINK, mod: MISSING_MOD_REFERENCE }),
-    ).rejects.toThrow(FileFetchError);
-    await expect(
-      launchMod({ ...SAMPLE_LINK, mod: `${FIXTURES_REFERENCE}mods/no_mod` }),
-    ).rejects.toThrow(ModFormatError);
-    await expect(
-      launchMod({ ...SAMPLE_LINK, mod: `${FIXTURES_REFERENCE}mods/bad_yaml` }),
-    ).rejects.toThrow(YamlParseError);
-  });
-
-  it("propagates type file errors with their classes", async function propagatesTypeErrors(): Promise<void> {
-    const brokenTypeSource = `${FIXTURES_BASE_URL}mods/broken_type/mod_conf.yaml`;
-    serveTestMod(brokenTypeSource, [
-      '  name: "broken_type"',
-      '  version: "0.1.0"',
-      '  entrypoint: "./main.js"',
-      '  type_path: "./type.md"',
-    ]);
-    testTexts.set(
-      `${FIXTURES_BASE_URL}mods/broken_type/type.md`,
-      "---\ntitle: no schema\n---\n",
-    );
-
-    await expect(
-      launchMod({ ...SAMPLE_LINK, mod: brokenTypeSource }),
-    ).rejects.toThrow(TileTypeError);
-  });
-
-  it("propagates collection errors with their classes", async function propagatesCollectionErrors(): Promise<void> {
-    testTexts.set(
-      `${FIXTURES_BASE_URL}tiles/not_a_collection.yaml`,
-      'name: "no collection mapping"',
-    );
-
-    await expect(
-      launchMod({
-        ...SAMPLE_LINK,
-        collection: `${FIXTURES_REFERENCE}tiles/missing.yaml`,
-      }),
-    ).rejects.toThrow(
-      `Cannot load file "${FIXTURES_BASE_URL}tiles/missing.yaml": HTTP 404`,
-    );
-    await expect(
-      launchMod({
-        ...SAMPLE_LINK,
-        collection: `${FIXTURES_REFERENCE}tiles/not_a_collection.yaml`,
-      }),
-    ).rejects.toThrow(CollectionFormatError);
   });
 });
 

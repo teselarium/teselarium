@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { Alert, AlertDescription } from "@/vendor/shadcn/ui/alert.tsx";
 import {
   answerApiMismatch,
+  answerSiteConsent,
   answerStageAction,
   readStageSnapshot,
   subscribeStage,
@@ -10,6 +11,7 @@ import {
 import type {
   CheckSnapshot,
   SandboxSnapshot,
+  SiteConsentAnswer,
   Stage,
   StageSnapshot,
 } from "../../lib/core/stage/index.ts";
@@ -18,6 +20,7 @@ import { ActionDialog } from "./ActionDialog.tsx";
 import { ApiMismatchDialog } from "./ApiMismatchDialog.tsx";
 import { CheckFrame } from "./CheckFrame.tsx";
 import { SandboxFrame } from "./SandboxFrame.tsx";
+import { SiteConsentDialog } from "./SiteConsentDialog.tsx";
 import { StageBar } from "./StageBar.tsx";
 import "./stage.css";
 
@@ -101,8 +104,9 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
  * never moves in the DOM (moving an iframe reloads it). Only the visible one
  * is shown, under the stage bar. While a page is shown, the whole view is
  * hidden but stays mounted, so no frame reloads. The action dialog shows the action the
- * visible mod asked for, if any, and the API mismatch dialog asks about the
- * visible sandbox while its mod waits for an answer. When the visible sandbox
+ * visible mod asked for, if any, and the API mismatch dialog and then the
+ * site consent dialog ask about the visible sandbox while its mod waits for
+ * an answer; a sandbox asks one question at a time. When the visible sandbox
  * changes, the page leaves fullscreen. The frames of running mod checks sit
  * behind the sandboxes, hidden by layout (see CheckFrame).
  */
@@ -118,6 +122,13 @@ export function StageView({ stage }: StageViewProps): ReactElement {
     runAnyway: boolean,
   ): void {
     answerApiMismatch(stage, sandboxId, runAnyway);
+  }
+
+  function handleSiteConsentAnswer(
+    sandboxId: string,
+    answer: SiteConsentAnswer | null,
+  ): void {
+    answerSiteConsent(stage, sandboxId, answer);
   }
 
   const visibleSandbox = findVisibleSandbox(snapshot);
@@ -154,6 +165,13 @@ export function StageView({ stage }: StageViewProps): ReactElement {
         <ApiMismatchDialog
           sandbox={visibleSandbox}
           onAnswer={handleApiMismatchAnswer}
+        />
+      ) : null}
+      {visibleSandbox?.siteConsent ? (
+        <SiteConsentDialog
+          key={visibleSandbox.id}
+          sandbox={visibleSandbox}
+          onAnswer={handleSiteConsentAnswer}
         />
       ) : null}
     </div>

@@ -22,6 +22,8 @@ import {
   waitForMessages,
 } from "./fake_frames.ts";
 import { FakeHistory } from "./fake_history.ts";
+import { createMemorySiteDecisions } from "./memory_site_decisions.ts";
+import type { MemorySiteDecisions } from "./memory_site_decisions.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import type { MemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
@@ -37,6 +39,7 @@ export interface CheckStage {
   stage: Stage;
   history: FakeHistory;
   storage: MemoryStorage;
+  siteDecisions: MemorySiteDecisions;
   fetchSpy: Mock<typeof fetch>;
   requesterId: string;
 }
@@ -66,8 +69,10 @@ export function closeCheckPorts(): void {
   checkPorts.length = 0;
 }
 
-/** A stage showing the mod viewer, whose launch settled. */
-export async function startCheckStage(): Promise<CheckStage> {
+/** A stage showing the mod viewer, whose launch settled, with the remembered site decisions of `siteDecisions`. */
+export async function startCheckStage(
+  siteDecisions: MemorySiteDecisions = createMemorySiteDecisions(),
+): Promise<CheckStage> {
   const history = new FakeHistory(VIEWER_HASH);
   const storage = createMemoryStorage();
   const fetchSpy = vi.fn<typeof fetch>(fetchTestFile);
@@ -81,13 +86,22 @@ export async function startCheckStage(): Promise<CheckStage> {
     fetch: fetchSpy,
     colorScheme: "light",
     loadsTileLinkedMedia: true,
+    readSiteDecisions: siteDecisions.read,
+    rememberSiteDecisions: siteDecisions.remember,
   });
   followHistory(stage, history.hash, history.state);
   for (const runtime of stage.runtimes.values()) {
     await runtime.settled;
   }
   const requesterId = readStageSnapshot(stage).sandboxes[0].id;
-  const checkStage = { stage, history, storage, fetchSpy, requesterId };
+  const checkStage = {
+    stage,
+    history,
+    storage,
+    siteDecisions,
+    fetchSpy,
+    requesterId,
+  };
   return checkStage;
 }
 

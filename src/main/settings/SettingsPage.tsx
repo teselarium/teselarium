@@ -24,6 +24,8 @@ import type {
 import { SectionIcon } from "../sidebar/SectionIcon.tsx";
 import type { AppTheme } from "../theme/app_theme.ts";
 import { ThemeControl } from "../theme/ThemeControl.tsx";
+import type { SiteDecisions } from "./site_decisions.ts";
+import { SiteDecisionList } from "./SiteDecisionList.tsx";
 import {
   readTileMediaSnapshot,
   subscribeTileMediaSetting,
@@ -38,6 +40,7 @@ interface SettingsPageProps {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
+  siteDecisions: SiteDecisions;
 }
 
 interface TileMediaRowProps {
@@ -134,15 +137,17 @@ function TileMediaRow({ tileMedia }: TileMediaRowProps): ReactElement {
 
 /**
  * The Settings section's page: the Theme control, a switch for each optional
- * section of the sidebar, the "Load media linked by tiles" switch, and the
- * app's version and mod API version as text to copy. A section switch only
- * hides the sidebar item.
+ * section of the sidebar, the "Load media linked by tiles" switch, the
+ * remembered site decisions with their Remove buttons, and the app's version
+ * and mod API version as text to copy. A section switch only hides the
+ * sidebar item.
  */
 export function SettingsPage({
   appTheme,
   sections,
   switches,
   tileMedia,
+  siteDecisions,
 }: SettingsPageProps): ReactElement {
   const snapshot = useStoreSnapshot(
     switches,
@@ -202,6 +207,24 @@ export function SettingsPage({
         </CardHeader>
         <CardContent>
           <TileMediaRow tileMedia={tileMedia} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>
+            Mod permissions
+          </CardTitle>
+          <CardDescription>
+            The answers you asked the app to remember when a mod from another
+            site asked to use other sites. Each site a mod is allowed to use can
+            see that you used that mod. Sites allowed to exchange data or load
+            code can also receive what the mod shows or keeps. Changes apply the
+            next time a mod is opened: after you remove an answer, the app asks
+            again. Running mods keep their permissions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SiteDecisionList siteDecisions={siteDecisions} />
         </CardContent>
       </Card>
       <Card>

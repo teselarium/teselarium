@@ -3,6 +3,7 @@ import type { Mock } from "vitest";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  buildSampleCoversDecision,
   MISSING_MOD_SOURCE,
   OTHER_API_MOD_SOURCE,
   OTHER_API_RANGE,
@@ -48,7 +49,7 @@ describe("inspectMod", function describeInspectMod(): void {
   it("Inspect the sample mod", async function inspectsSampleMod(): Promise<void> {
     const testFetch = createTestFetch();
 
-    const inspection = await inspectMod(SAMPLE_MOD_SOURCE, APP_ORIGIN, {
+    const inspection = await inspectMod(SAMPLE_MOD_SOURCE, APP_ORIGIN, [], {
       baseUrl: APP_BASE_URL,
       fetch: testFetch,
     });
@@ -77,7 +78,7 @@ describe("inspectMod", function describeInspectMod(): void {
     );
     const testFetch = createTestFetch();
 
-    const inspection = await inspectMod(CLOCK_MOD_SOURCE, APP_ORIGIN, {
+    const inspection = await inspectMod(CLOCK_MOD_SOURCE, APP_ORIGIN, [], {
       fetch: testFetch,
     });
 
@@ -88,7 +89,7 @@ describe("inspectMod", function describeInspectMod(): void {
   it("Inspect a mod without tests", async function inspectsModWithoutTests(): Promise<void> {
     serveUntypedMod();
 
-    const inspection = await inspectMod(UNTYPED_MOD_SOURCE, APP_ORIGIN, {
+    const inspection = await inspectMod(UNTYPED_MOD_SOURCE, APP_ORIGIN, [], {
       fetch: fetchTestFile,
     });
 
@@ -96,9 +97,14 @@ describe("inspectMod", function describeInspectMod(): void {
   });
 
   it("gives the permissions a foreign mod would get", async function inspectsForeignMod(): Promise<void> {
-    const inspection = await inspectMod(SAMPLE_MOD_SOURCE, OTHER_APP_ORIGIN, {
-      fetch: fetchTestFile,
-    });
+    const inspection = await inspectMod(
+      SAMPLE_MOD_SOURCE,
+      OTHER_APP_ORIGIN,
+      [],
+      {
+        fetch: fetchTestFile,
+      },
+    );
 
     expect(inspection.permissions).toEqual({
       granted: [],
@@ -106,10 +112,24 @@ describe("inspectMod", function describeInspectMod(): void {
     });
   });
 
+  it("Inspect a foreign mod with a remembered allow", async function inspectsRememberedAllow(): Promise<void> {
+    const inspection = await inspectMod(
+      SAMPLE_MOD_SOURCE,
+      OTHER_APP_ORIGIN,
+      [buildSampleCoversDecision(true)],
+      { fetch: fetchTestFile },
+    );
+
+    expect(inspection.permissions).toEqual({
+      granted: [SAMPLE_COVERS_PERMISSION],
+      denied: [],
+    });
+  });
+
   it("Inspect a mod for another API", async function inspectsOtherApiMod(): Promise<void> {
     serveOtherApiMod();
 
-    const inspection = await inspectMod(OTHER_API_MOD_SOURCE, APP_ORIGIN, {
+    const inspection = await inspectMod(OTHER_API_MOD_SOURCE, APP_ORIGIN, [], {
       fetch: fetchTestFile,
     });
 
@@ -120,7 +140,7 @@ describe("inspectMod", function describeInspectMod(): void {
   it("Inspect a mod without a range", async function inspectsModWithoutRange(): Promise<void> {
     serveUntypedMod(null);
 
-    const inspection = await inspectMod(UNTYPED_MOD_SOURCE, APP_ORIGIN, {
+    const inspection = await inspectMod(UNTYPED_MOD_SOURCE, APP_ORIGIN, [], {
       fetch: fetchTestFile,
     });
 
@@ -129,7 +149,7 @@ describe("inspectMod", function describeInspectMod(): void {
   });
 
   it("Inspect a missing mod", async function inspectsMissingMod(): Promise<void> {
-    const inspecting = inspectMod(MISSING_MOD_SOURCE, APP_ORIGIN, {
+    const inspecting = inspectMod(MISSING_MOD_SOURCE, APP_ORIGIN, [], {
       fetch: fetchTestFile,
     });
 
@@ -138,7 +158,7 @@ describe("inspectMod", function describeInspectMod(): void {
   });
 
   it("Structured clone of an inspection", async function clonesInspection(): Promise<void> {
-    const inspection = await inspectMod(SAMPLE_MOD_SOURCE, APP_ORIGIN, {
+    const inspection = await inspectMod(SAMPLE_MOD_SOURCE, APP_ORIGIN, [], {
       fetch: fetchTestFile,
     });
 

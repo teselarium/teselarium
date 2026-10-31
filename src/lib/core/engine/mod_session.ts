@@ -19,6 +19,7 @@ import type {
   SandboxTestParams,
   SandboxTestReport,
 } from "../sandbox/index.ts";
+import type { SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
@@ -65,6 +66,8 @@ export interface ModSessionOptions {
   defaults: ResolvedDefaultModSettings;
   /** `baseUrl` is the app's address. */
   fetchOptions: FileFetchOptions;
+  /** The remembered site decisions, read by `mods.inspect`. */
+  readSiteDecisions: () => readonly SiteDecision[];
   onIssue: (issue: ModIssue) => void;
   /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */
   onOpenLink: (link: RunLink) => boolean;
@@ -371,6 +374,7 @@ export function connectModSession(
       appOrigin: options.appOrigin,
       defaults: options.defaults,
       fetchOptions: options.fetchOptions,
+      readSiteDecisions: options.readSiteDecisions,
       onOpenLink: options.onOpenLink,
       onRequestAction: options.onRequestAction,
       onCheckMod: options.onCheckMod,

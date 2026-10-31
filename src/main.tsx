@@ -17,6 +17,11 @@ import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import { createSectionSwitches } from "./main/sections/section_switches.ts";
 import { VANILLA_SECTIONS } from "./main/sections/vanilla_sections.ts";
 import {
+  createSiteDecisions,
+  readSiteDecisionsSnapshot,
+  rememberSiteDecisions,
+} from "./main/settings/site_decisions.ts";
+import {
   createTileMediaSetting,
   readStartTileLinkedMedia,
 } from "./main/settings/tile_media_setting.ts";
@@ -55,12 +60,14 @@ function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
 }
 
 /**
- * Builds the stage, the app theme, the sidebar layout, the section switches
- * and the tile media setting once, outside React, so StrictMode's double effect run in dev does
- * not launch mods twice.
+ * Builds the site decisions, the stage, the app theme, the sidebar layout,
+ * the section switches and the tile media setting once, outside React, so
+ * StrictMode's double effect run in dev does not launch mods twice.
  */
 function startApp(sections: readonly SectionDefinition[]): ReactElement {
   const systemQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  // Before the stage, which reads and remembers the decisions through it.
+  const siteDecisions = createSiteDecisions({ storage: window.localStorage });
   const stage = createStage({
     history: window.history,
     defaults: DEFAULT_MODS,
@@ -70,6 +77,8 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
     storage: window.localStorage,
     colorScheme: readStartColorScheme(window.localStorage, systemQuery),
     loadsTileLinkedMedia: readStartTileLinkedMedia(window.localStorage),
+    readSiteDecisions: readSiteDecisionsSnapshot.bind(undefined, siteDecisions),
+    rememberSiteDecisions: rememberSiteDecisions.bind(undefined, siteDecisions),
   });
   // Same lifetime as the stage: it tells the stage when the color scheme changes.
   const appTheme = createAppTheme({
@@ -109,6 +118,7 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
       sections={sections}
       switches={switches}
       tileMedia={tileMedia}
+      siteDecisions={siteDecisions}
       layout={layout}
     />
   );

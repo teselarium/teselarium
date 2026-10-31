@@ -1,6 +1,6 @@
 import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
 import type { LoadedMod } from "../../mod/index.ts";
-import type { ModGrants } from "../permissions/index.ts";
+import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { AppAction } from "./app_actions.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
@@ -24,6 +24,8 @@ export interface ModMethodContext {
   defaults: ResolvedDefaultModSettings;
   /** `baseUrl` is the app's address. */
   fetchOptions: FileFetchOptions;
+  /** The remembered site decisions, read when `mods.inspect` grants a mod's permissions. */
+  readSiteDecisions: () => readonly SiteDecision[];
   /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */
   onOpenLink: (link: RunLink) => boolean;
   /**

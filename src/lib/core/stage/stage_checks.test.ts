@@ -25,17 +25,22 @@ import {
   readModPort,
   waitForMessages,
 } from "../../../test/fake_frames.ts";
+import { createMemorySiteDecisions } from "../../../test/memory_site_decisions.ts";
 import { FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
+  buildProbeDecision,
   COVER_BOOK_COLLECTION_SOURCE,
   COVER_BOOK_IMAGE_URL,
   MISSING_TYPE_MOD_SOURCE,
+  PROBE_MOD_SOURCE,
   SAMPLE_COLLECTION_SOURCE,
+  SAMPLE_COVERS_PERMISSION,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TILE_SOURCES,
   serveCoverBook,
   serveMissingTypeMod,
+  serveProbeMod,
   serveTestMod,
   serveTwoBooks,
   serveTestedMod,
@@ -94,6 +99,14 @@ function listTileSources(context: ModContext): string[] {
   return tileSources;
 }
 
+function listSiteConsents(stage: Stage): unknown[] {
+  const siteConsents: unknown[] = [];
+  for (const sandbox of readStageSnapshot(stage).sandboxes) {
+    siteConsents.push(sandbox.siteConsent);
+  }
+  return siteConsents;
+}
+
 function recordCheckCount(stage: Stage, checkCounts: number[]): void {
   checkCounts.push(readStageSnapshot(stage).checks.length);
 }
@@ -125,6 +138,50 @@ describe("Check a mod", function describeCheckMod(): void {
     expect(listTileSources(checkFrame.context)).toEqual(SAMPLE_TILE_SOURCES);
     expect(checkFrame.context.mod.source).toBe(SAMPLE_MOD_SOURCE);
     expect(checkFrame.context.params).toEqual({});
+  });
+
+  it("Check a foreign mod without decisions", async function checksForeignMod(): Promise<void> {
+    serveProbeMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: PROBE_MOD_SOURCE,
+      collection: null,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    await reporting;
+
+    expect(checkFrame.context.permissions).toEqual({
+      granted: [],
+      denied: [SAMPLE_COVERS_PERMISSION],
+    });
+    expect(listSiteConsents(checkStage.stage)).toEqual([null]);
+    expect(checkStage.siteDecisions.decisions).toEqual([]);
+  });
+
+  it("Check a foreign mod with a remembered allow", async function checksRememberedAllow(): Promise<void> {
+    serveProbeMod();
+    const checkStage = await startCheckStage(
+      createMemorySiteDecisions([
+        buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      ]),
+    );
+
+    const reporting = startCheck(checkStage, {
+      source: PROBE_MOD_SOURCE,
+      collection: null,
+    });
+    const entry = await waitForCheckEntry(checkStage.stage);
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    await reporting;
+
+    expect(checkFrame.context.permissions).toEqual({
+      granted: [SAMPLE_COVERS_PERMISSION],
+      denied: [],
+    });
+    expect(entry.sandboxDocument).toContain("https://upload.wikimedia.org");
   });
 
   it("Check with another collection", async function checksWithCollection(): Promise<void> {

@@ -1,12 +1,14 @@
 import type { FileFetchOptions } from "../../files/index.ts";
-import type { ModIssue } from "../../mod/index.ts";
+import type { LoadedMod, ModIssue, ModPermission } from "../../mod/index.ts";
 import { collectTileLinks, describeNewTileLinks } from "../sandbox/index.ts";
 import type { TileIssue } from "../../tile/index.ts";
 import {
+  buildModLaunch,
   connectModSession,
   describeCancelledApiMismatch,
+  loadModLaunchInputs,
   loadModTiles,
-  prepareModLaunch,
+  matchModApiRange,
   pushThemeChanged,
   pushTilesChanged,
   stopModSession,
@@ -16,11 +18,14 @@ import type {
   ModCheckReport,
   ModCheckRequest,
   ModLaunch,
+  ModLaunchInputs,
   ModSession,
   ModTiles,
   ResolvedDefaultModSettings,
   RunLink,
 } from "../engine/index.ts";
+import { grantModPermissions, listConsentLines } from "../permissions/index.ts";
+import type { SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { StageSandbox } from "./stage_state.ts";
@@ -47,18 +52,42 @@ export interface SandboxServices {
   ) => Promise<ModCheckReport> | null;
   /** The stage's current theme, read when a session connects. */
   readTheme: () => Theme;
-  /** Whether "Load media linked by tiles" is on, read when a sandbox is launched. */
+  /** Whether "Load media linked by tiles" is on, read when a sandbox's mod starts. */
   loadsTileLinkedMedia: boolean;
+  /** The remembered site decisions, read before the site consent question and when a mod starts. */
+  readSiteDecisions: () => readonly SiteDecision[];
+  /** Keeps the decisions of an answer whose Remember was checked. */
+  rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
 }
 
-/** `asking`: the mod is loaded, but written for another mod API, and waits for the user's answer. */
+/**
+ * `asking`: the mod is loaded and waits for the user's answer to its
+ * `question`, before its frame exists.
+ */
 export type SandboxStatus =
   "loading" | "asking" | "failed" | "running" | "stopped";
+
+/** What an `asking` runtime waits for: the mod API question, or the site consent question. */
+export type SandboxQuestion = "api" | "sites";
+
+/** The user's answer in the site consent dialog. */
+export interface SiteConsentAnswer {
+  /** The keys of the checked lines (`buildConsentLineKey`). */
+  allowed: string[];
+  remember: boolean;
+}
 
 /** The runtime of one sandbox. Mutable, because it follows a launch and a session. */
 export interface SandboxRuntime {
   id: string;
   status: SandboxStatus;
+  /** The loaded mod while the runtime asks, before its launch is built. */
+  pending: ModLaunchInputs | null;
+  /** The question of an `asking` runtime, `null` otherwise. */
+  question: SandboxQuestion | null;
+  /** The lines of the site consent question, while it is asked. */
+  consentLines: ModPermission[];
+  /** Set when the mod starts. */
   launch: ModLaunch | null;
   session: ModSession | null;
   /** The issues of the mod file itself, such as a missing `api` range. */
@@ -116,56 +145,182 @@ function failRuntime(
   services.onChange();
 }
 
-/** Keeps the launch of a mod written for another mod API, without starting it. */
+/** Puts a loaded mod's runtime in the `asking` status, until the user answers `question`. */
 function askRuntime(
   runtime: SandboxRuntime,
   services: SandboxServices,
-  launch: ModLaunch,
+  question: SandboxQuestion,
+): void {
+  runtime.status = "asking";
+  runtime.question = question;
+  services.onChange();
+}
+
+/** Builds the pending mod's launch with the remembered decisions and `answers`, and starts it. */
+function startPendingRuntime(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  inputs: ModLaunchInputs,
+  answers: SiteDecision[],
+): void {
+  const decisions = [...services.readSiteDecisions(), ...answers];
+  const grants = grantModPermissions(inputs.mod, services.appOrigin, decisions);
+  const launch = buildModLaunch(
+    inputs.mod,
+    inputs.link,
+    inputs.modTiles,
+    grants,
+    services.loadsTileLinkedMedia,
+  );
+  runtime.pending = null;
+  runtime.question = null;
+  runtime.consentLines = [];
+  startRuntime(runtime, services, launch);
+}
+
+/** The second question: asks about the sites of the pending mod, or starts it when there is nothing to ask. */
+function askSitesOrStart(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  inputs: ModLaunchInputs,
+): void {
+  const lines = listConsentLines(
+    inputs.mod,
+    services.appOrigin,
+    services.readSiteDecisions(),
+  );
+  if (lines.length === 0) {
+    startPendingRuntime(runtime, services, inputs, []);
+    return;
+  }
+  runtime.consentLines = lines;
+  askRuntime(runtime, services, "sites");
+}
+
+/**
+ * Settles a loaded mod before its frame exists: first the question of a mod
+ * written for another mod API, then the site consent question, then the
+ * launch is built and the mod starts.
+ */
+function settleLaunchInputs(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  inputs: ModLaunchInputs,
 ): void {
   if (runtime.status === "stopped") {
     return;
   }
-  runtime.status = "asking";
-  runtime.launch = launch;
-  services.onChange();
-}
-
-function settleLaunch(
-  runtime: SandboxRuntime,
-  services: SandboxServices,
-  launch: ModLaunch,
-): void {
-  if (launch.apiCompatible === false) {
-    askRuntime(runtime, services, launch);
+  runtime.pending = inputs;
+  if (matchModApiRange(inputs.mod.api) === false) {
+    askRuntime(runtime, services, "api");
     return;
   }
-  startRuntime(runtime, services, launch);
+  askSitesOrStart(runtime, services, inputs);
+}
+
+/** The pending inputs of a runtime asking `question`, or `null` when it is not asking it. */
+function readAskedInputs(
+  runtime: SandboxRuntime,
+  question: SandboxQuestion,
+): ModLaunchInputs | null {
+  if (runtime.status !== "asking" || runtime.question !== question) {
+    return null;
+  }
+  return runtime.pending;
 }
 
 /**
- * Answers the question of an `asking` runtime: "Run anyway" starts its mod as
- * a matching launch would, and "Cancel" fails it with an error naming the
- * mod's range and the mod API version. Does nothing for any other runtime.
+ * Answers the mod API question of an `asking` runtime: "Run anyway" goes on
+ * to the site consent question, or starts the mod when there is nothing to
+ * ask, and "Cancel" fails it with an error naming the mod's range and the mod
+ * API version. Does nothing for any other runtime.
  */
 export function answerSandboxApiMismatch(
   runtime: SandboxRuntime,
   services: SandboxServices,
   runAnyway: boolean,
 ): void {
-  const launch = runtime.launch;
-  if (runtime.status !== "asking" || launch === null) {
+  const inputs = readAskedInputs(runtime, "api");
+  if (inputs === null) {
     return;
   }
   if (runAnyway) {
-    startRuntime(runtime, services, launch);
+    askSitesOrStart(runtime, services, inputs);
     return;
   }
-  failRuntime(runtime, services, describeCancelledApiMismatch(launch.mod.api));
+  runtime.pending = null;
+  runtime.question = null;
+  failRuntime(runtime, services, describeCancelledApiMismatch(inputs.mod.api));
+}
+
+/** The key of a consent line in `SiteConsentAnswer.allowed`: its category and host. */
+export function buildConsentLineKey(
+  line: Pick<ModPermission, "category" | "host">,
+): string {
+  const key = `${line.category} ${line.host}`;
+  return key;
+}
+
+function isLineAllowed(
+  line: ModPermission,
+  answer: SiteConsentAnswer | null,
+): boolean {
+  if (answer === null) {
+    return false;
+  }
+  return answer.allowed.includes(buildConsentLineKey(line));
+}
+
+/** One decision per consent line: the lines `answer` allows are allowed, the others refused. */
+function buildConsentDecisions(
+  mod: LoadedMod,
+  lines: ModPermission[],
+  answer: SiteConsentAnswer | null,
+): SiteDecision[] {
+  const decisions: SiteDecision[] = [];
+  for (const line of lines) {
+    decisions.push({
+      mod: mod.source,
+      title: mod.title,
+      category: line.category,
+      host: line.host,
+      allowed: isLineAllowed(line, answer),
+    });
+  }
+  return decisions;
+}
+
+/**
+ * Answers the site consent question of an `asking` runtime and starts its
+ * mod: the lines `answer.allowed` names are granted and the others refused,
+ * and the decisions are remembered when `answer.remember` is `true`. `null`
+ * (Escape) refuses every line without remembering. Does nothing for any
+ * other runtime.
+ */
+export function answerSandboxSiteConsent(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  answer: SiteConsentAnswer | null,
+): void {
+  const inputs = readAskedInputs(runtime, "sites");
+  if (inputs === null) {
+    return;
+  }
+  const decisions = buildConsentDecisions(
+    inputs.mod,
+    runtime.consentLines,
+    answer,
+  );
+  if (answer !== null && answer.remember) {
+    services.rememberSiteDecisions(decisions);
+  }
+  startPendingRuntime(runtime, services, inputs, decisions);
 }
 
 /**
  * Starts loading a sandbox's mod. The runtime is `loading`, then `running` or
- * `failed`, or `asking` when the mod was written for another mod API.
+ * `failed`, or `asking` when the mod was written for another mod API or
+ * needs the user's consent for sites.
  */
 export function launchSandbox(
   sandbox: StageSandbox,
@@ -174,6 +329,9 @@ export function launchSandbox(
   const runtime: SandboxRuntime = {
     id: sandbox.id,
     status: "loading",
+    pending: null,
+    question: null,
+    consentLines: [],
     launch: null,
     session: null,
     fileIssues: [],
@@ -183,16 +341,11 @@ export function launchSandbox(
     errorMessage: null,
     settled: Promise.resolve(),
   };
-  runtime.settled = prepareModLaunch(
-    {
-      link: sandbox.link,
-      appOrigin: services.appOrigin,
-      defaults: services.defaults,
-      loadsTileLinkedMedia: services.loadsTileLinkedMedia,
-    },
+  runtime.settled = loadModLaunchInputs(
+    { link: sandbox.link, defaults: services.defaults },
     services.fetchOptions,
   ).then(
-    settleLaunch.bind(undefined, runtime, services),
+    settleLaunchInputs.bind(undefined, runtime, services),
     failRuntime.bind(undefined, runtime, services),
   );
   return runtime;
@@ -236,6 +389,7 @@ export function attachSandboxFrame(
     appOrigin: services.appOrigin,
     defaults: services.defaults,
     fetchOptions: services.fetchOptions,
+    readSiteDecisions: services.readSiteDecisions,
     onIssue: addRuntimeIssue.bind(undefined, runtime, services),
     onOpenLink: services.onOpenLink.bind(undefined, runtime.id),
     onRequestAction: services.onRequestAction.bind(undefined, runtime.id),

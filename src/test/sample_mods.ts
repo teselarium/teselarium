@@ -3,6 +3,7 @@ import {
   FIXTURES_BASE_URL,
   FIXTURES_REFERENCE,
 } from "./sample_files.ts";
+import type { SiteDecision } from "../lib/core/permissions/index.ts";
 import { buildTypeText, testTexts } from "./test_files.ts";
 
 /** The app's origin in tests. Mods under `APP_BASE_URL` are on it and get their permissions. */
@@ -61,6 +62,21 @@ export const SAMPLE_COVERS_PERMISSION = {
   host: "https://upload.wikimedia.org",
   reason: "Shows the book covers",
 } as const;
+
+/**
+ * The user's answer about the covers of the sample mod, which counts for it
+ * as a foreign mod on `OTHER_APP_ORIGIN`.
+ */
+export function buildSampleCoversDecision(allowed: boolean): SiteDecision {
+  const decision: SiteDecision = {
+    mod: SAMPLE_MOD_SOURCE,
+    title: "Book List",
+    category: SAMPLE_COVERS_PERMISSION.category,
+    host: SAMPLE_COVERS_PERMISSION.host,
+    allowed,
+  };
+  return decision;
+}
 
 /** The vanilla default mod settings, resolved for the app at `APP_BASE_URL`. */
 export const TEST_DEFAULTS = {
@@ -145,6 +161,59 @@ export function serveOtherApiMod(): void {
     ],
     OTHER_API_RANGE,
   );
+}
+
+/** A mod on another origin than the app's, served by `fetchTestFile` once `serveProbeMod` ran. */
+export const PROBE_MOD_SOURCE = "https://mods.example.net/probe/mod_conf.yaml";
+
+export const PROBE_CONNECT_PERMISSION = {
+  category: "connect",
+  host: "https://api.example.net",
+  reason: "Reads the prices",
+} as const;
+
+/**
+ * Serves the probe mod, titled "Probe": it declares the sample mod's covers
+ * permission (`SAMPLE_COVERS_PERMISSION`) and, with `withConnect`,
+ * `PROBE_CONNECT_PERMISSION`. It declares `apiRange` as `api`.
+ */
+export function serveProbeMod(
+  withConnect = false,
+  apiRange: string = TEST_MOD_API_RANGE,
+): void {
+  const lines = [
+    '  name: "probe"',
+    '  title: "Probe"',
+    '  version: "1.0.0"',
+    '  entrypoint: "./main.js"',
+    "  permissions:",
+    "    show:",
+    `      - host: "${SAMPLE_COVERS_PERMISSION.host}"`,
+    `        reason: "${SAMPLE_COVERS_PERMISSION.reason}"`,
+  ];
+  if (withConnect) {
+    lines.push(
+      "    connect:",
+      `      - host: "${PROBE_CONNECT_PERMISSION.host}"`,
+      `        reason: "${PROBE_CONNECT_PERMISSION.reason}"`,
+    );
+  }
+  serveTestMod(PROBE_MOD_SOURCE, lines, apiRange);
+}
+
+/** The user's answer about one declared permission of the probe mod. */
+export function buildProbeDecision(
+  permission: { category: SiteDecision["category"]; host: string },
+  allowed: boolean,
+): SiteDecision {
+  const decision: SiteDecision = {
+    mod: PROBE_MOD_SOURCE,
+    title: "Probe",
+    category: permission.category,
+    host: permission.host,
+    allowed,
+  };
+  return decision;
 }
 
 /** A mod of the sample book type that declares no `api` range, served by `fetchTestFile` once `serveNoApiBookMod` ran. */

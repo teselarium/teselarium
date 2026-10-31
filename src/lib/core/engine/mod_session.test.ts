@@ -21,7 +21,8 @@ import type { Tile } from "../../tile/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
-import { prepareModLaunch } from "./mod_launch.ts";
+import { readNoSiteDecisions } from "../../../test/method_contexts.ts";
+import { launchTestMod } from "../../../test/test_launches.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModContext, ModLaunch, RunLink } from "./mod_launch.ts";
 import type { ModCheckRequest } from "./mod_methods.ts";
@@ -66,18 +67,13 @@ afterEach(function closePorts(): void {
 });
 
 function launchSampleMod(loadsTileLinkedMedia = true): Promise<ModLaunch> {
-  return prepareModLaunch(
+  return launchTestMod(
     {
-      link: {
-        mod: SAMPLE_MOD_REFERENCE,
-        collection: SAMPLE_COLLECTION_REFERENCE,
-        params: {},
-      },
-      appOrigin: APP_ORIGIN,
-      defaults: TEST_DEFAULTS,
-      loadsTileLinkedMedia,
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: SAMPLE_COLLECTION_REFERENCE,
+      params: {},
     },
-    { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    { loadsTileLinkedMedia },
   );
 }
 
@@ -119,6 +115,7 @@ async function playSession(
     appOrigin: APP_ORIGIN,
     defaults: TEST_DEFAULTS,
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    readSiteDecisions: readNoSiteDecisions,
     onIssue,
     onOpenLink,
     onRequestAction,
@@ -148,6 +145,7 @@ function buildPlainOptions(): ModSessionOptions {
     appOrigin: APP_ORIGIN,
     defaults: TEST_DEFAULTS,
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    readSiteDecisions: readNoSiteDecisions,
     onIssue: vi.fn<(issue: ModIssue) => void>(),
     onOpenLink: vi.fn<(link: RunLink) => boolean>(),
     onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
@@ -204,6 +202,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       appOrigin: APP_ORIGIN,
       defaults: TEST_DEFAULTS,
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+      readSiteDecisions: readNoSiteDecisions,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
@@ -233,6 +232,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       appOrigin: APP_ORIGIN,
       defaults: TEST_DEFAULTS,
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+      readSiteDecisions: readNoSiteDecisions,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
@@ -256,6 +256,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       appOrigin: APP_ORIGIN,
       defaults: TEST_DEFAULTS,
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+      readSiteDecisions: readNoSiteDecisions,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink: vi.fn<(link: RunLink) => boolean>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),

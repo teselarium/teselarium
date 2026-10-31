@@ -23,6 +23,8 @@ import type {
   ResponseError,
   RunLink,
 } from "../engine/index.ts";
+import { grantModPermissions } from "../permissions/index.ts";
+import type { SiteDecision } from "../permissions/index.ts";
 import { createMemoryStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
 import {
@@ -118,6 +120,11 @@ export interface CheckServices {
   onChange: () => void;
   /** Whether the checked mod's frames load the media its tiles link, as an opened mod would. */
   loadsTileLinkedMedia: boolean;
+  /**
+   * The remembered site decisions: the checked mod gets the permissions they
+   * allow, and nothing is asked. Its `mods.inspect` reads them too.
+   */
+  readSiteDecisions: () => readonly SiteDecision[];
 }
 
 type CheckDraft = Pick<
@@ -242,7 +249,11 @@ export async function runStageCheck(
     bundleCheck.mod,
     buildCheckLink(request.source, request.collection),
     bundleCheck.modTiles,
-    services.appOrigin,
+    grantModPermissions(
+      bundleCheck.mod,
+      services.appOrigin,
+      services.readSiteDecisions(),
+    ),
     services.loadsTileLinkedMedia,
   );
   const draft: CheckDraft = {
@@ -538,6 +549,7 @@ function connectCheckSession(
     appOrigin: services.appOrigin,
     defaults: services.defaults,
     fetchOptions: services.fetchOptions,
+    readSiteDecisions: services.readSiteDecisions,
     theme: services.readTheme(),
     ...hooks,
   });

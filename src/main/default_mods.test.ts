@@ -1,12 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  prepareModLaunch,
-  resolveDefaultModSettings,
-} from "../lib/core/engine/index.ts";
+import { resolveDefaultModSettings } from "../lib/core/engine/index.ts";
 import { loadMod } from "../lib/mod/index.ts";
 import { APP_BASE_URL, fetchAppFile } from "../test/sample_files.ts";
-import { APP_ORIGIN } from "../test/sample_mods.ts";
 import { fetchTestFile, testTexts } from "../test/test_files.ts";
+import { launchTestMod } from "../test/test_launches.ts";
 import { DEFAULT_MODS } from "./default_mods.ts";
 
 const DEFAULTS = resolveDefaultModSettings(DEFAULT_MODS, APP_BASE_URL);
@@ -64,14 +61,12 @@ describe("default mods", function describeDefaultMods(): void {
   });
 
   it("Explorer from the default folder", async function launchesExplorer(): Promise<void> {
-    const launch = await prepareModLaunch(
+    const launch = await launchTestMod(
+      { mod: "mod_explorer", collection: null, params: {} },
       {
-        link: { mod: "mod_explorer", collection: null, params: {} },
-        appOrigin: APP_ORIGIN,
         defaults: DEFAULTS,
-        loadsTileLinkedMedia: true,
+        fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchAppFile },
       },
-      { baseUrl: APP_BASE_URL, fetch: fetchAppFile },
     );
 
     expect(launch.mod.source).toBe(
@@ -89,14 +84,12 @@ describe("default mods", function describeDefaultMods(): void {
       'mod:\n  name: "fancy_viewer"\n  version: "2.0.0"\n  entrypoint: "./main.js"',
     );
 
-    const launch = await prepareModLaunch(
+    const launch = await launchTestMod(
+      { mod: "mod_viewer", collection: null, params: {} },
       {
-        link: { mod: "mod_viewer", collection: null, params: {} },
-        appOrigin: APP_ORIGIN,
         defaults: DEFAULTS,
-        loadsTileLinkedMedia: true,
+        fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       },
-      { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     );
 
     expect(launch.mod.name).toBe("fancy_viewer");

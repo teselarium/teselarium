@@ -6,6 +6,7 @@ import type {
   ModCheckRequest,
   ModMethodContext,
 } from "../lib/core/engine/mod_methods.ts";
+import type { SiteDecision } from "../lib/core/permissions/index.ts";
 import type { LoadedMod, ModPermission } from "../lib/mod/index.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
@@ -64,6 +65,12 @@ export async function catchMethodError(
   throw new Error("Expected a ModMethodError, but nothing was thrown");
 }
 
+/** The `readSiteDecisions` of tests where the user remembered nothing. */
+export function readNoSiteDecisions(): SiteDecision[] {
+  const decisions: SiteDecision[] = [];
+  return decisions;
+}
+
 function acceptOpenLink(): boolean {
   return true;
 }
@@ -81,7 +88,8 @@ function failOnCheckMod(request: ModCheckRequest): never {
 
 /**
  * A method context for a mod on the app's origin with the given granted
- * permissions, a `Map`-backed storage and `fetchTestFile`. The mod is
+ * permissions, a `Map`-backed storage, `fetchTestFile` and no remembered
+ * site decision. The mod is
  * visible, and the user accepts every action.
  */
 export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
@@ -92,6 +100,7 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
     appOrigin: APP_ORIGIN,
     defaults: TEST_DEFAULTS,
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    readSiteDecisions: readNoSiteDecisions,
     onOpenLink: acceptOpenLink,
     onRequestAction: acceptAction,
     onCheckMod: failOnCheckMod,

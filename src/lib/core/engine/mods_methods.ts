@@ -66,6 +66,7 @@ async function inspectRequestedMod(
     const inspection = await inspectMod(
       source,
       context.appOrigin,
+      context.readSiteDecisions(),
       context.fetchOptions,
     );
     return inspection;

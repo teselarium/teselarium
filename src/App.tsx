@@ -5,6 +5,7 @@ import { AppHeader } from "./main/AppHeader.tsx";
 import { PageView } from "./main/pages/PageView.tsx";
 import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import type { SectionSwitches } from "./main/sections/section_switches.ts";
+import type { SiteDecisions } from "./main/settings/site_decisions.ts";
 import type { TileMediaSetting } from "./main/settings/tile_media_setting.ts";
 import { Sidebar } from "./main/sidebar/Sidebar.tsx";
 import {
@@ -27,6 +28,7 @@ interface AppProps {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
+  siteDecisions: SiteDecisions;
   layout: SidebarLayoutStore;
 }
 
@@ -52,6 +54,7 @@ function App({
   sections,
   switches,
   tileMedia,
+  siteDecisions,
   layout,
 }: AppProps): ReactElement {
   const layoutSnapshot = useStoreSnapshot(
@@ -80,6 +83,7 @@ function App({
               sections={sections}
               switches={switches}
               tileMedia={tileMedia}
+              siteDecisions={siteDecisions}
             />
           </div>
           <StageView stage={stage} />

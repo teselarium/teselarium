@@ -7,10 +7,12 @@ import {
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  buildSampleCoversDecision,
   MISSING_MOD_REFERENCE,
   MISSING_MOD_SOURCE,
   OTHER_API_MOD_SOURCE,
   OTHER_API_RANGE,
+  OTHER_APP_ORIGIN,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
@@ -21,6 +23,7 @@ import {
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
+import type { SiteDecision } from "../permissions/index.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
 import { checkModBundle } from "./mod_bundle_check.ts";
@@ -91,6 +94,12 @@ function buildSpiedContext(
   context.onOpenLink = openLinkSpy;
   const spiedContext = { context, fetchSpy, openLinkSpy };
   return spiedContext;
+}
+
+/** The `readSiteDecisions` of a user who remembered Allow for the sample mod's covers. */
+function readCoversAllow(): SiteDecision[] {
+  const decisions = [buildSampleCoversDecision(true)];
+  return decisions;
 }
 
 function switchViewerOff(context: ModMethodContext): void {
@@ -272,6 +281,18 @@ describe("mods.inspect", function describeModsInspect(): void {
 
     expect(inspection).toMatchObject({ name: "clock" });
     expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it("Inspect a foreign mod with a remembered allow", async function inspectsRememberedAllow(): Promise<void> {
+    const { context } = buildSpiedContext(["*"]);
+    context.appOrigin = OTHER_APP_ORIGIN;
+    context.readSiteDecisions = readCoversAllow;
+
+    const inspection = await inspect(context, { mod: SAMPLE_MOD_SOURCE });
+
+    expect(inspection).toMatchObject({
+      permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
+    });
   });
 
   it("refuses a foreign mod's denied grant before any request", async function refusesDeniedGrant(): Promise<void> {

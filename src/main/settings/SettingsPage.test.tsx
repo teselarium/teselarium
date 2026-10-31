@@ -10,6 +10,16 @@ import type { AppFixture } from "../../test/test_app.ts";
 import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
 import { openStageSection } from "../../lib/core/stage/index.ts";
 import { settleStage } from "../../test/test_stages.ts";
+import type { SiteDecision } from "../../lib/core/permissions/index.ts";
+import { createMemoryStorage } from "../../test/memory_storage.ts";
+import type { MemoryStorage } from "../../test/memory_storage.ts";
+import {
+  buildProbeDecision,
+  PROBE_CONNECT_PERMISSION,
+  PROBE_MOD_SOURCE,
+  SAMPLE_COVERS_PERMISSION,
+} from "../../test/sample_mods.ts";
+import { SITE_DECISIONS_KEY } from "./site_decisions.ts";
 import { TILE_MEDIA_SETTING_KEY } from "./tile_media_setting.ts";
 
 const TILE_MEDIA_LABEL = "Load media linked by tiles";
@@ -32,6 +42,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       sections={fixture.sections}
       switches={fixture.switches}
       tileMedia={fixture.tileMedia}
+      siteDecisions={fixture.siteDecisions}
       layout={fixture.layout}
     />,
   );
@@ -60,6 +71,70 @@ function findRow(name: string): HTMLElement {
     }
   }
   throw new Error(`Expected a row for ${name}`);
+}
+
+const COVERS_LINE = "show content from https://upload.wikimedia.org";
+const COVERS_REMOVE_LABEL = `Remove Probe: ${COVERS_LINE}`;
+const COVERS_CHECKBOX_LABEL = `Allow Probe: ${COVERS_LINE}`;
+const ATLAS_SOURCE = "https://mods.example.net/atlas/mod_conf.yaml";
+
+function buildAtlasDecision(): SiteDecision {
+  const decision: SiteDecision = {
+    ...buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+    mod: ATLAS_SOURCE,
+    title: "Atlas",
+  };
+  return decision;
+}
+
+function buildDecisionsStorage(decisions: SiteDecision[]): MemoryStorage {
+  const storage = createMemoryStorage();
+  storage.setItem(SITE_DECISIONS_KEY, JSON.stringify(decisions));
+  return storage;
+}
+
+/** The groups of the Mod permissions list, without the decision rows inside them. */
+function readModGroups(): HTMLElement[] {
+  const list = screen.getByRole("list", { name: "Remembered mods" });
+  const groups = [...list.querySelectorAll<HTMLElement>(":scope > li")];
+  return groups;
+}
+
+/** The group of the mod titled `title`, found by its expand button. */
+function readModGroup(title: string): HTMLElement {
+  for (const group of readModGroups()) {
+    if (group.textContent?.startsWith(title) === true) {
+      return group;
+    }
+  }
+  throw new Error(`Expected a group for the mod "${title}"`);
+}
+
+function readGroupToggle(title: string): HTMLElement {
+  return screen.getByRole("button", { name: new RegExp(`^${title} `) });
+}
+
+/** The same decisions in any order: the order of the store is not part of what Settings shows. */
+function expectSameDecisions(actual: unknown, expected: SiteDecision[]): void {
+  expect(actual).toHaveLength(expected.length);
+  expect(actual).toEqual(expect.arrayContaining(expected));
+}
+
+function readGroupCheckbox(title: string): HTMLElement {
+  return screen.getByRole("checkbox", {
+    name: `Allow all decisions of ${title}`,
+  });
+}
+
+function expandGroup(title: string): void {
+  fireEvent.click(readGroupToggle(title));
+}
+
+function readStoredDecisions(storage: MemoryStorage): unknown {
+  const stored: unknown = JSON.parse(
+    storage.getItem(SITE_DECISIONS_KEY) ?? "null",
+  );
+  return stored;
 }
 
 function readGroupHeadings(): string[] {
@@ -99,6 +174,234 @@ describe("SettingsPage", function describeSettingsPage(): void {
     expect(
       screen.getByRole("switch", { name: TILE_MEDIA_LABEL }),
     ).toBeChecked();
+    expect(screen.getByText("No remembered decisions.")).toBeInTheDocument();
+  });
+
+  it("One remembered allow", async function listsRememberedAllow(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+    ]);
+    renderApp(await startTestApp("#/settings", { storage }));
+
+    const group = readModGroup("Probe");
+    expect(group).toHaveTextContent(PROBE_MOD_SOURCE);
+    expect(readGroupToggle("Probe")).toHaveAccessibleName("Probe 1 allowed");
+    expect(readGroupToggle("Probe")).toHaveAttribute("aria-expanded", "false");
+    expect(readGroupCheckbox("Probe")).toHaveAttribute("aria-checked", "true");
+    expect(
+      within(group).getByRole("button", {
+        name: "Remove all decisions of Probe",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: COVERS_CHECKBOX_LABEL }),
+    ).toBeNull();
+
+    expandGroup("Probe");
+
+    expect(readGroupToggle("Probe")).toHaveAttribute("aria-expanded", "true");
+    expect(group).toHaveTextContent(COVERS_LINE);
+    expect(group).toHaveTextContent("Allowed");
+    expect(
+      screen.getByRole("checkbox", { name: COVERS_CHECKBOX_LABEL }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      within(group).getByRole("button", { name: COVERS_REMOVE_LABEL }),
+    ).toBeInTheDocument();
+  });
+
+  it("A remembered refusal", async function listsRememberedRefusal(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, false),
+    ]);
+    renderApp(await startTestApp("#/settings", { storage }));
+
+    expect(readGroupToggle("Probe")).toHaveAccessibleName("Probe 1 refused");
+    expect(readGroupCheckbox("Probe")).toHaveAttribute("aria-checked", "false");
+    expandGroup("Probe");
+
+    expect(readModGroup("Probe")).toHaveTextContent("Refused");
+    expect(
+      screen.getByRole("checkbox", { name: COVERS_CHECKBOX_LABEL }),
+    ).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("Decisions of two mods", async function groupsByMod(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      buildAtlasDecision(),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
+    ]);
+    renderApp(await startTestApp("#/settings", { storage }));
+
+    const groups = readModGroups();
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toHaveTextContent(/^Atlas/);
+    expect(groups[1]).toHaveTextContent(/^Probe/);
+    expect(readGroupToggle("Probe")).toHaveAccessibleName(
+      "Probe 1 allowed, 1 refused",
+    );
+    expect(readGroupToggle("Atlas")).toHaveAttribute("aria-expanded", "false");
+    expect(readGroupToggle("Probe")).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryAllByRole("checkbox", { name: /^Allow [^:]+: / }),
+    ).toEqual([]);
+  });
+
+  it("lists a mod's decisions by category and host once expanded", async function sortsDecisions(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
+    ]);
+    renderApp(await startTestApp("#/settings", { storage }));
+
+    expandGroup("Probe");
+
+    const checkboxes = screen.getAllByRole("checkbox", {
+      name: /^Allow Probe: /,
+    });
+    expect(checkboxes[0]).toHaveAccessibleName(
+      "Allow Probe: exchange data with https://api.example.net",
+    );
+    expect(checkboxes[1]).toHaveAccessibleName(COVERS_CHECKBOX_LABEL);
+  });
+
+  it("The cost is stated", async function statesCost(): Promise<void> {
+    renderApp(await startTestApp("#/settings"));
+
+    expect(
+      screen.getByText(
+        /Each site a mod is allowed to use can see that you used that mod\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("Allow a remembered refusal", async function allowsRememberedRefusal(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, false),
+    ]);
+    const fixture = await startTestApp("#/settings", { storage });
+    renderApp(fixture);
+    expandGroup("Probe");
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: COVERS_CHECKBOX_LABEL }),
+    );
+
+    expect(
+      screen.getByRole("checkbox", { name: COVERS_CHECKBOX_LABEL }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(readModGroup("Probe")).toHaveTextContent("Allowed");
+    expect(readGroupToggle("Probe")).toHaveAccessibleName("Probe 1 allowed");
+    expect(readStoredDecisions(storage)).toEqual([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+    ]);
+    expect(fixture.stage.readSiteDecisions()).toEqual([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+    ]);
+  });
+
+  it("Some allowed, some refused", async function showsMixedGroup(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
+    ]);
+    renderApp(await startTestApp("#/settings", { storage }));
+
+    expect(readGroupCheckbox("Probe")).toHaveAttribute("aria-checked", "mixed");
+    expect(readGroupToggle("Probe")).toHaveAccessibleName(
+      "Probe 1 allowed, 1 refused",
+    );
+  });
+
+  it("Allow all of a mod", async function allowsAllOfMod(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
+    ]);
+    const fixture = await startTestApp("#/settings", { storage });
+    renderApp(fixture);
+
+    fireEvent.click(readGroupCheckbox("Probe"));
+
+    const allowedDecisions = [
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, true),
+    ];
+    expect(readGroupCheckbox("Probe")).toHaveAttribute("aria-checked", "true");
+    expect(readGroupToggle("Probe")).toHaveAccessibleName("Probe 2 allowed");
+    expect(readGroupToggle("Probe")).toHaveAttribute("aria-expanded", "false");
+    expectSameDecisions(readStoredDecisions(storage), allowedDecisions);
+    expectSameDecisions(fixture.stage.readSiteDecisions(), allowedDecisions);
+  });
+
+  it("Refuse all of a mod", async function refusesAllOfMod(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, true),
+    ]);
+    const fixture = await startTestApp("#/settings", { storage });
+    renderApp(fixture);
+
+    fireEvent.click(readGroupCheckbox("Probe"));
+
+    const refusedDecisions = [
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, false),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
+    ];
+    expect(readGroupCheckbox("Probe")).toHaveAttribute("aria-checked", "false");
+    expect(readGroupToggle("Probe")).toHaveAccessibleName("Probe 2 refused");
+    expectSameDecisions(readStoredDecisions(storage), refusedDecisions);
+    expectSameDecisions(fixture.stage.readSiteDecisions(), refusedDecisions);
+  });
+
+  it("Other mods unchanged", async function keepsOtherMods(): Promise<void> {
+    const atlasRefusal: SiteDecision = {
+      ...buildAtlasDecision(),
+      allowed: false,
+    };
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, false),
+      atlasRefusal,
+    ]);
+    renderApp(await startTestApp("#/settings", { storage }));
+
+    fireEvent.click(readGroupCheckbox("Probe"));
+
+    expect(readGroupCheckbox("Atlas")).toHaveAttribute("aria-checked", "false");
+    expect(readStoredDecisions(storage)).toContainEqual(atlasRefusal);
+  });
+
+  it("Remove all of a mod", async function removesAllOfMod(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
+      buildAtlasDecision(),
+    ]);
+    renderApp(await startTestApp("#/settings", { storage }));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove all decisions of Probe" }),
+    );
+
+    expect(readModGroups()).toHaveLength(1);
+    expect(readModGroups()[0]).toHaveTextContent(/^Atlas/);
+    expect(readStoredDecisions(storage)).toEqual([buildAtlasDecision()]);
+  });
+
+  it("Remove", async function removesDecision(): Promise<void> {
+    const storage = buildDecisionsStorage([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+    ]);
+    const fixture = await startTestApp("#/settings", { storage });
+    renderApp(fixture);
+    expandGroup("Probe");
+
+    fireEvent.click(screen.getByRole("button", { name: COVERS_REMOVE_LABEL }));
+
+    expect(screen.getByText("No remembered decisions.")).toBeInTheDocument();
+    expect(storage.getItem(SITE_DECISIONS_KEY)).toBe("[]");
+    expect(fixture.stage.readSiteDecisions()).toEqual([]);
   });
 
   it("says what the Privacy switch shows the linked sites", async function describesPrivacy(): Promise<void> {
@@ -144,6 +447,7 @@ describe("SettingsPage", function describeSettingsPage(): void {
       "Appearance",
       "Sidebar",
       "Privacy",
+      "Mod permissions",
       "Version",
     ]);
     expect(readVersions()).toEqual({

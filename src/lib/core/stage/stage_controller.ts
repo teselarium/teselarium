@@ -1,15 +1,15 @@
 import type { FileFetchOptions } from "../../files/index.ts";
-import type { ModIssue } from "../../mod/index.ts";
+import type { ModIssue, ModPermission } from "../../mod/index.ts";
 import { MOD_API_VERSION, resolveDefaultModSettings } from "../engine/index.ts";
 import type {
   AppAction,
   DefaultModSettings,
   ModCheckReport,
   ModCheckRequest,
-  ModLaunch,
   ResolvedDefaultModSettings,
   RunLink,
 } from "../engine/index.ts";
+import type { SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme, Theme } from "../theme/index.ts";
@@ -48,7 +48,9 @@ import {
 import type { StageRoute, StageRouting } from "./stage_routes.ts";
 import {
   answerSandboxApiMismatch,
+  answerSandboxSiteConsent,
   attachSandboxFrame,
+  buildConsentLineKey,
   launchSandbox,
   pushSandboxTheme,
   readSandboxIssues,
@@ -59,6 +61,7 @@ import type {
   SandboxRuntime,
   SandboxServices,
   SandboxStatus,
+  SiteConsentAnswer,
 } from "./stage_sandboxes.ts";
 import {
   createSectionMemory,
@@ -99,6 +102,16 @@ export interface StageOptions {
   colorScheme: ColorScheme;
   /** Whether "Load media linked by tiles" is on as the app starts. */
   loadsTileLinkedMedia: boolean;
+  /** The remembered site decisions, read before a mod from another origin starts, by checks and by `mods.inspect`. */
+  readSiteDecisions: () => readonly SiteDecision[];
+  /** Keeps the decisions of a site consent answer whose Remember was checked. */
+  rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
+}
+
+/** One line of the site consent dialog: a declared category and host, and the mod's reason. Frozen. */
+export interface SiteConsentLine extends ModPermission {
+  /** Passed back in `SiteConsentAnswer.allowed` when the line is checked. */
+  key: string;
 }
 
 /** What the page renders of one sandbox. Frozen. */
@@ -116,8 +129,10 @@ export interface SandboxSnapshot {
   canReloadTiles: boolean;
   issues: readonly ModIssue[];
   errorMessage: string | null;
-  /** The mod's `api` range and the app's mod API version, only while the sandbox is `asking`. */
+  /** The mod's `api` range and the app's mod API version, only while the sandbox asks the mod API question. */
   apiMismatch: { range: string; apiVersion: string } | null;
+  /** The lines to ask about, in the order declared, only while the sandbox asks the site consent question. */
+  siteConsent: { lines: readonly SiteConsentLine[] } | null;
 }
 
 /** What the page renders of one check: its hidden frame running now. Frozen. */
@@ -174,6 +189,8 @@ export interface Stage {
   theme: Theme;
   /** Whether mods launched from now on load the media their tiles link. Running mods keep their launch. */
   loadsTileLinkedMedia: boolean;
+  readSiteDecisions: () => readonly SiteDecision[];
+  rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
   /** The actions the visible mod asked for, oldest first. */
   actions: StageActions;
   /** The running mod checks, apart from the sandboxes and the history. */
@@ -216,6 +233,8 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     onCheckMod: checkStageMod.bind(undefined, stage),
     readTheme: readStageTheme.bind(undefined, stage),
     loadsTileLinkedMedia: stage.loadsTileLinkedMedia,
+    readSiteDecisions: stage.readSiteDecisions,
+    rememberSiteDecisions: stage.rememberSiteDecisions,
   };
   return services;
 }
@@ -233,6 +252,7 @@ function buildCheckServices(stage: Stage): CheckServices {
     isSandboxRunning: isSandboxRunning.bind(undefined, stage),
     onChange: publishStage.bind(undefined, stage),
     loadsTileLinkedMedia: stage.loadsTileLinkedMedia,
+    readSiteDecisions: stage.readSiteDecisions,
   };
   return services;
 }
@@ -240,7 +260,7 @@ function buildCheckServices(stage: Stage): CheckServices {
 function buildModSummary(
   runtime: SandboxRuntime | undefined,
 ): SandboxSnapshot["mod"] {
-  const mod = runtime?.launch?.mod;
+  const mod = runtime?.launch?.mod ?? runtime?.pending?.mod;
   if (mod === undefined) {
     return null;
   }
@@ -261,14 +281,37 @@ function freezeIssues(issues: ModIssue[]): readonly ModIssue[] {
 }
 
 function buildApiMismatch(
-  status: SandboxStatus,
-  launch: ModLaunch | null,
+  runtime: SandboxRuntime | undefined,
 ): SandboxSnapshot["apiMismatch"] {
-  if (status !== "asking" || launch === null || launch.mod.api === null) {
+  if (runtime?.status !== "asking" || runtime.question !== "api") {
     return null;
   }
-  const mismatch = { range: launch.mod.api, apiVersion: MOD_API_VERSION };
+  const range = runtime.pending?.mod.api ?? null;
+  if (range === null) {
+    return null;
+  }
+  const mismatch = { range, apiVersion: MOD_API_VERSION };
   return Object.freeze(mismatch);
+}
+
+function buildSiteConsent(
+  runtime: SandboxRuntime | undefined,
+): SandboxSnapshot["siteConsent"] {
+  if (runtime?.status !== "asking" || runtime.question !== "sites") {
+    return null;
+  }
+  const lines: SiteConsentLine[] = [];
+  for (const line of runtime.consentLines) {
+    const consentLine: SiteConsentLine = {
+      key: buildConsentLineKey(line),
+      category: line.category,
+      host: line.host,
+      reason: line.reason,
+    };
+    lines.push(Object.freeze(consentLine));
+  }
+  const siteConsent = { lines: Object.freeze(lines) };
+  return Object.freeze(siteConsent);
 }
 
 function buildSandboxSnapshot(
@@ -292,7 +335,8 @@ function buildSandboxSnapshot(
       runtime === undefined ? [] : readSandboxIssues(runtime),
     ),
     errorMessage: runtime?.errorMessage ?? null,
-    apiMismatch: buildApiMismatch(status, launch),
+    apiMismatch: buildApiMismatch(runtime),
+    siteConsent: buildSiteConsent(runtime),
   };
   return Object.freeze(snapshot);
 }
@@ -435,6 +479,8 @@ export function createStage(options: StageOptions): Stage {
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
     loadsTileLinkedMedia: options.loadsTileLinkedMedia,
+    readSiteDecisions: options.readSiteDecisions,
+    rememberSiteDecisions: options.rememberSiteDecisions,
     actions: createStageActions(),
     checks: createStageChecks(),
     listeners: new Set(),
@@ -718,6 +764,29 @@ export function answerApiMismatch(
     return;
   }
   answerSandboxApiMismatch(runtime, buildSandboxServices(stage), runAnyway);
+}
+
+/**
+ * Answers the site consent question of the visible sandbox and starts its
+ * mod: the lines whose keys `answer.allowed` holds are granted and the
+ * others refused, and the decisions are remembered when `answer.remember` is
+ * `true`. `null` (Escape) refuses every line and remembers nothing. Does
+ * nothing unless the sandbox is visible and still asking, so a late or
+ * repeated answer is ignored.
+ */
+export function answerSiteConsent(
+  stage: Stage,
+  sandboxId: string,
+  answer: SiteConsentAnswer | null,
+): void {
+  const runtime = stage.runtimes.get(sandboxId);
+  if (
+    runtime === undefined ||
+    readVisibleSandbox(stage.state)?.id !== sandboxId
+  ) {
+    return;
+  }
+  answerSandboxSiteConsent(runtime, buildSandboxServices(stage), answer);
 }
 
 /** Connects a sandbox's frame, on the frame's first `load`. */

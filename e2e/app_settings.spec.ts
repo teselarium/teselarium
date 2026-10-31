@@ -9,19 +9,28 @@ import {
   sectionsNav,
 } from "./app_layout.ts";
 import {
+  answerSiteConsent,
   APP_MOD_API_VERSION,
   buildProbeFiles,
+  clickCheckedTo,
+  COVER_HOST,
   findModFrame,
+  findVisibleFrame,
+  followLink,
+  FOREIGN_HOST,
   isFrameMarked,
   LINKED_APP_PROBE_LINK,
   LINKED_COVER_URL,
   markFrame,
   MEDIA_HOST,
   requestFromProbe,
+  routeCovers,
   routeImages,
   serveAppOriginMod,
+  serveForeignMod,
   serveLinkedTiles,
   showImage,
+  siteConsentDialog,
   stageBar,
   waitForProbe,
 } from "./mod_routes.ts";
@@ -30,6 +39,8 @@ import { themeControl } from "./theme_probes.ts";
 
 const SECTION_SWITCHES_KEY = "opentesela.sidebar-sections";
 const TILE_MEDIA_LABEL = "Load media linked by tiles";
+const PROBE_HASH = `#/run?mod=${encodeURIComponent(`${FOREIGN_HOST}/probe/`)}`;
+const COVERS_LINE = `show content from ${COVER_HOST}`;
 
 /** The version of the app's `package.json`, which the vanilla build read when Playwright built it. */
 const PACKAGE_VERSION = (
@@ -104,6 +115,123 @@ async function openLinkedProbe(page: Page): Promise<Frame> {
   return frame;
 }
 
+function modPermissionsGroup(page: Page): Locator {
+  return page
+    .getByRole("main")
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByRole("heading", { name: "Mod permissions" }) });
+}
+
+function readHeadingTexts(element: Element): string[] {
+  const texts: string[] = [];
+  for (const heading of element.querySelectorAll('[aria-level="2"]')) {
+    texts.push(heading.textContent ?? "");
+  }
+  return texts;
+}
+
+/**
+ * Opens the foreign probe "Probe", which declares `show` for the covers,
+ * answers with `answer` and Remember, Allow unless given, and returns its frame.
+ */
+async function openRememberedProbe(
+  page: Page,
+  answer: "Allow" | "Show without them" = "Allow",
+): Promise<Frame> {
+  await routeCovers(page);
+  await serveForeignMod(
+    page,
+    buildProbeFiles("probe", [
+      '  title: "Probe"',
+      "  permissions:",
+      "    show:",
+      `      - host: "${COVER_HOST}"`,
+      '        reason: "Shows the book covers"',
+    ]),
+  );
+  await page.goto(`/${PROBE_HASH}`);
+  await answerSiteConsent(page, answer, { remember: true });
+  const frame = await findModFrame(page, "Probe");
+  await waitForProbe(frame);
+  return frame;
+}
+
+/** The expand button of the mod titled `title` in the Mod permissions group. */
+function modGroupToggle(page: Page, title: string): Locator {
+  return modPermissionsGroup(page).getByRole("button", {
+    name: new RegExp(`^${title} `),
+  });
+}
+
+/** Opens Settings and expands the group of the mod titled `title`, as a user clicks its header. */
+async function expandModGroup(page: Page, title: string): Promise<void> {
+  await openSection(page, "Settings");
+  await modGroupToggle(page, title).click();
+  await expect(modGroupToggle(page, title)).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+}
+
+/** Opens Settings and removes the remembered allow of the probe's covers, as a user clicks Remove. */
+async function removeProbeDecision(page: Page): Promise<void> {
+  await expandModGroup(page, "Probe");
+  await expect(modPermissionsGroup(page)).toContainText("Allowed");
+  await modPermissionsGroup(page)
+    .getByRole("button", { name: `Remove Probe: ${COVERS_LINE}` })
+    .click();
+  await expect(modPermissionsGroup(page)).toContainText(
+    "No remembered decisions.",
+  );
+}
+
+/** Opens Settings and checks or unchecks the probe's covers decision, as a user clicks its checkbox. */
+async function changeProbeDecision(
+  page: Page,
+  isAllowed: boolean,
+): Promise<void> {
+  await expandModGroup(page, "Probe");
+  await clickCheckedTo(
+    modPermissionsGroup(page).getByRole("checkbox", {
+      name: `Allow Probe: ${COVERS_LINE}`,
+    }),
+    isAllowed,
+  );
+}
+
+/** The group checkbox of the mod titled `title`. */
+function modGroupCheckbox(page: Page, title: string): Locator {
+  return modPermissionsGroup(page).getByRole("checkbox", {
+    name: `Allow all decisions of ${title}`,
+  });
+}
+
+function writeStoredDecisions(decisions: unknown[]): void {
+  localStorage.setItem("opentesela.site-decisions", JSON.stringify(decisions));
+}
+
+function readStoredDecisions(): unknown {
+  return JSON.parse(
+    localStorage.getItem("opentesela.site-decisions") ?? "null",
+  );
+}
+
+/** A remembered decision about the covers, as the store keeps it. */
+function buildCoversDecision(
+  mod: string,
+  title: string,
+  category: string,
+): Record<string, unknown> {
+  const decision = {
+    mod,
+    title,
+    category,
+    host: category === "show" ? COVER_HOST : "https://api.example.net",
+    allowed: true,
+  };
+  return decision;
+}
+
 /** Opens Settings and switches a section off or on, as a user clicks its switch. */
 async function switchSectionTo(
   page: Page,
@@ -137,6 +265,191 @@ test.describe("Settings page", function describeSettingsPage(): void {
     await expect(sectionRow(page, "Tiles")).toContainText("Coming soon");
     await expect(sectionRow(page, "Mosaics")).toContainText("Coming soon");
     await expect(tileMediaSwitch(page)).toBeChecked();
+    await expect(modPermissionsGroup(page)).toContainText(
+      "No remembered decisions.",
+    );
+    const headings = await page.getByRole("main").evaluate(readHeadingTexts);
+    expect(headings.indexOf("Mod permissions")).toBe(
+      headings.indexOf("Privacy") + 1,
+    );
+  });
+});
+
+test.describe("Removing a remembered decision", function describeRemoving(): void {
+  test("Asked again after removing", async function asksAgain({
+    page,
+  }): Promise<void> {
+    await openRememberedProbe(page);
+
+    await removeProbeDecision(page);
+    await followLink(page, PROBE_HASH);
+
+    await expect(
+      siteConsentDialog(page).getByRole("checkbox", { name: COVERS_LINE }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("Running mod keeps its permission", async function keepsRunningPermission({
+    page,
+  }): Promise<void> {
+    const frame = await openRememberedProbe(page);
+    await markFrame(frame);
+
+    await removeProbeDecision(page);
+    await page.goBack();
+
+    await expect(stageBar(page)).toContainText("Probe");
+    expect(await frame.evaluate(showImage, `${COVER_HOST}/later.jpg`)).toBe(
+      true,
+    );
+    expect(await isFrameMarked(frame)).toBe(true);
+  });
+  test("Remove all of a mod", async function removesAllOfMod({
+    page,
+  }): Promise<void> {
+    const atlasDecision = buildCoversDecision(
+      `${FOREIGN_HOST}/atlas/mod_conf.yaml`,
+      "Atlas",
+      "show",
+    );
+    await page.goto("/#/settings");
+    await page.evaluate(writeStoredDecisions, [
+      buildCoversDecision(
+        `${FOREIGN_HOST}/probe/mod_conf.yaml`,
+        "Probe",
+        "show",
+      ),
+      buildCoversDecision(
+        `${FOREIGN_HOST}/probe/mod_conf.yaml`,
+        "Probe",
+        "connect",
+      ),
+      atlasDecision,
+    ]);
+    await page.reload();
+    await expect(modGroupToggle(page, "Probe")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    await modPermissionsGroup(page)
+      .getByRole("button", { name: "Remove all decisions of Probe" })
+      .click();
+
+    await expect(modGroupToggle(page, "Probe")).toHaveCount(0);
+    await expect(modGroupToggle(page, "Atlas")).toBeVisible();
+    expect(await page.evaluate(readStoredDecisions)).toEqual([atlasDecision]);
+  });
+
+  test("Asked again after removing all", async function asksAgainAfterRemovingAll({
+    page,
+  }): Promise<void> {
+    await openRememberedProbe(page);
+    await openSection(page, "Settings");
+
+    await modPermissionsGroup(page)
+      .getByRole("button", { name: "Remove all decisions of Probe" })
+      .click();
+    await expect(modPermissionsGroup(page)).toContainText(
+      "No remembered decisions.",
+    );
+    await followLink(page, PROBE_HASH);
+
+    await expect(
+      siteConsentDialog(page).getByRole("checkbox", { name: COVERS_LINE }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+test.describe("Changing a remembered decision", function describeChanging(): void {
+  test("Allow a remembered refusal", async function allowsRememberedRefusal({
+    page,
+  }): Promise<void> {
+    await openRememberedProbe(page, "Show without them");
+
+    await changeProbeDecision(page, true);
+    await followLink(page, PROBE_HASH);
+    await expect(stageBar(page)).toContainText("Probe");
+    const frame = await findVisibleFrame(page);
+    await waitForProbe(frame);
+
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`)).toBe(
+      true,
+    );
+  });
+
+  test("Running mod keeps its policy after a change", async function keepsRunningPolicyAfterChange({
+    page,
+  }): Promise<void> {
+    const frame = await openRememberedProbe(page);
+    await markFrame(frame);
+
+    await changeProbeDecision(page, false);
+    await page.goBack();
+
+    await expect(stageBar(page)).toContainText("Probe");
+    expect(await frame.evaluate(showImage, `${COVER_HOST}/later.jpg`)).toBe(
+      true,
+    );
+    expect(await isFrameMarked(frame)).toBe(true);
+  });
+});
+
+test.describe("Changing every decision of a mod", function describeChangingAll(): void {
+  test("Allow all of a mod", async function allowsAllOfMod({
+    page,
+  }): Promise<void> {
+    const probeSource = `${FOREIGN_HOST}/probe/mod_conf.yaml`;
+    const connectRefusal = {
+      ...buildCoversDecision(probeSource, "Probe", "connect"),
+      allowed: false,
+    };
+    await page.goto("/#/settings");
+    await page.evaluate(writeStoredDecisions, [
+      buildCoversDecision(probeSource, "Probe", "show"),
+      connectRefusal,
+    ]);
+    await page.reload();
+    await expect(modGroupCheckbox(page, "Probe")).toHaveAttribute(
+      "aria-checked",
+      "mixed",
+    );
+
+    await clickCheckedTo(modGroupCheckbox(page, "Probe"), true);
+
+    await expect(modGroupToggle(page, "Probe")).toContainText("2 allowed");
+    await expect(modGroupToggle(page, "Probe")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    const stored = await page.evaluate(readStoredDecisions);
+    expect(stored).toHaveLength(2);
+    expect(stored).toEqual(
+      expect.arrayContaining([
+        buildCoversDecision(probeSource, "Probe", "show"),
+        { ...connectRefusal, allowed: true },
+      ]),
+    );
+  });
+
+  test("Refuse all of a mod", async function refusesAllOfMod({
+    page,
+  }): Promise<void> {
+    await openRememberedProbe(page);
+    await openSection(page, "Settings");
+
+    await clickCheckedTo(modGroupCheckbox(page, "Probe"), false);
+    await expect(modGroupToggle(page, "Probe")).toContainText("1 refused");
+    await followLink(page, PROBE_HASH);
+    await expect(stageBar(page)).toContainText("Probe");
+    const frame = await findVisibleFrame(page);
+    await waitForProbe(frame);
+
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`)).toBe(
+      false,
+    );
   });
 });
 

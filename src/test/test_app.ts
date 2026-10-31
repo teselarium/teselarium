@@ -5,6 +5,12 @@ import type { SectionDefinition } from "../main/sections/section_registry.ts";
 import { createSectionSwitches } from "../main/sections/section_switches.ts";
 import type { SectionSwitches } from "../main/sections/section_switches.ts";
 import { VANILLA_SECTIONS } from "../main/sections/vanilla_sections.ts";
+import {
+  createSiteDecisions,
+  readSiteDecisionsSnapshot,
+  rememberSiteDecisions,
+} from "../main/settings/site_decisions.ts";
+import type { SiteDecisions } from "../main/settings/site_decisions.ts";
 import { createTileMediaSetting } from "../main/settings/tile_media_setting.ts";
 import type { TileMediaSetting } from "../main/settings/tile_media_setting.ts";
 import { createSidebarLayout } from "../main/sidebar/sidebar_layout.ts";
@@ -18,7 +24,7 @@ import { createMemoryStorage } from "./memory_storage.ts";
 import type { MemoryStorage } from "./memory_storage.ts";
 import { buildTestStage, settleStage } from "./test_stages.ts";
 
-/** Everything `App` gets, built as `main.tsx` builds it, on fakes. */
+/** Everything `App` gets, built as `main.tsx` builds it, on fakes. The site decisions use `storage`. */
 export interface AppFixture {
   history: FakeHistory;
   stage: Stage;
@@ -26,6 +32,7 @@ export interface AppFixture {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
+  siteDecisions: SiteDecisions;
   layout: SidebarLayoutStore;
   storage: MemoryStorage;
   narrowQuery: FakeColorSchemeQuery;
@@ -58,9 +65,14 @@ export async function startTestApp(
   const storage = options.storage ?? createMemoryStorage();
   const isNarrow = options.isNarrow ?? false;
   const history = new FakeHistory(hash);
+  const siteDecisions = createSiteDecisions({ storage });
   const stage = buildTestStage(
     history,
     options.routing ?? buildStageRouting(sections),
+    {
+      read: readSiteDecisionsSnapshot.bind(undefined, siteDecisions),
+      remember: rememberSiteDecisions.bind(undefined, siteDecisions),
+    },
   );
   const narrowQuery = createFakeColorSchemeQuery(isNarrow);
   const fixture: AppFixture = {
@@ -78,6 +90,7 @@ export async function startTestApp(
       optionalIds: listOptionalIds(sections),
     }),
     tileMedia: createTileMediaSetting({ storage, stage }),
+    siteDecisions,
     layout: createSidebarLayout({
       storage,
       narrowQuery,

@@ -107,16 +107,18 @@ async function answerModFile(
 }
 
 /**
- * Serves inline mod files under `https://mods.example.net/` with CORS, like a
- * foreign mod host. Returns the list of URLs the route saw.
+ * Serves inline mod files under `host`, `https://mods.example.net` unless
+ * given, with CORS, like a foreign mod host. The files are read at each
+ * request, so a test can change them. Returns the list of URLs the route saw.
  */
 export async function serveForeignMod(
   page: Page,
   files: ModFiles,
+  host: string = FOREIGN_HOST,
 ): Promise<string[]> {
   const seenUrls: string[] = [];
   await page.route(
-    `${FOREIGN_HOST}/**`,
+    `${host}/**`,
     answerModFile.bind(
       undefined,
       files,
@@ -592,6 +594,58 @@ export async function exposeSampleEngine(page: Page): Promise<void> {
 /** The app's action dialog, while it is open. */
 export function actionDialog(page: Page): Locator {
   return page.getByRole("dialog");
+}
+
+/** The label of the site consent dialog's Remember checkbox. */
+export const REMEMBER_LABEL = "Remember my answer for this mod";
+
+/** The app's site consent dialog, while it is open. */
+export function siteConsentDialog(page: Page): Locator {
+  return page.getByRole("dialog");
+}
+
+/** What to change in the site consent dialog before answering. */
+export interface SiteConsentChoice {
+  /** The lines to uncheck, by their text, such as `exchange data with https://api.example.net`. */
+  unchecked?: string[];
+  remember?: boolean;
+}
+
+/**
+ * Clicks a checkbox or a switch whose `aria-checked` is not yet `isChecked`,
+ * mixed included, as a user does, and waits until it is.
+ */
+export async function clickCheckedTo(
+  toggle: Locator,
+  isChecked: boolean,
+): Promise<void> {
+  await expect(toggle).not.toHaveAttribute("aria-checked", String(isChecked));
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", String(isChecked));
+}
+
+/**
+ * Answers the site consent dialog with `button`, after unchecking the lines
+ * and checking Remember as `choice` says, as a user clicks them, and waits
+ * until it closed.
+ */
+export async function answerSiteConsent(
+  page: Page,
+  button: "Allow" | "Show without them",
+  choice: SiteConsentChoice = {},
+): Promise<void> {
+  const dialog = siteConsentDialog(page);
+  for (const line of choice.unchecked ?? []) {
+    await clickCheckedTo(dialog.getByRole("checkbox", { name: line }), false);
+  }
+  if (choice.remember === true) {
+    await clickCheckedTo(
+      dialog.getByRole("checkbox", { name: REMEMBER_LABEL }),
+      true,
+    );
+  }
+  await dialog.getByRole("button", { name: button }).click();
+  await expect(dialog).toHaveCount(0);
 }
 
 /**

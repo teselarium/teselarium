@@ -35,14 +35,15 @@ export type { ModInspection } from "./mod_inspection.ts";
 export {
   buildModLaunch,
   buildModTestDocument,
+  loadModLaunchInputs,
   loadModTiles,
-  prepareModLaunch,
   selectModTiles,
 } from "./mod_launch.ts";
 export type {
   LaunchContext,
   ModContext,
   ModLaunch,
+  ModLaunchInputs,
   ModLaunchRequest,
   ModTiles,
   RunLink,

@@ -22,7 +22,7 @@ When a mod whose mod file is served from another origin than the app declares a 
 - **THEN** no site consent dialog is shown and the mod starts
 
 ### Requirement: What the dialog lists
-The dialog SHALL name the mod by its title and the address of its mod file. It SHALL list one line for each declared category and host that has no remembered decision for that mod, with the category's verb, the host (`"*"` read as "any site") and the mod's reason, shown as plain text that the mod wrote. Each line SHALL have a checkbox, checked when the dialog opens.
+The dialog SHALL name the mod by its title and the address of its mod file. It SHALL list one line for each declared category and host that has no remembered decision for that mod, with the category's verb, the host (`"*"` read as "any site") and the mod's reason, shown as plain text that the mod wrote. Each line SHALL have a checkbox labeled with the category's verb and the host, checked when the dialog opens.
 
 #### Scenario: Lines of a foreign mod
 - **WHEN** the dialog is shown for a mod that declares `show` for `https://upload.wikimedia.org` with reason `"Shows the book covers"` and `open` for `"*"` with reason `"Opens the mods you pick"`

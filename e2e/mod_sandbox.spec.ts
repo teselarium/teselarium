@@ -9,6 +9,7 @@ import type {
 } from "@playwright/test";
 import {
   addFullscreenButton,
+  answerSiteConsent,
   buildProbeFiles,
   COVER_HOST,
   embedObject,
@@ -58,6 +59,7 @@ const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 const APP_PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const FOREIGN_PROBE_LINK = `/#/run?mod=${encodeURIComponent(`${FOREIGN_HOST}/probe/`)}`;
 const IMAGES_HOST = "https://images.example.net";
+const OTHER_MODS_HOST = "https://other.example.net";
 const API_HOST = "https://api.example.net";
 const SHOW_COVERS_LINES = [
   "  permissions:",
@@ -96,15 +98,29 @@ async function openAppProbe(
   return frame;
 }
 
+/** Whether a probe's extra mod lines declare permissions, so a foreign probe asks for consent. */
+function declaresPermissions(extraLines: string[]): boolean {
+  return extraLines.includes("  permissions:");
+}
+
+/**
+ * Opens the probe from the foreign host. When it declares permissions, the
+ * site consent dialog is answered with `answer`, Show without them unless
+ * given, so the probe runs as a foreign mod without its permissions.
+ */
 async function openForeignProbe(
   page: Page,
   extraLines: string[] = [],
+  answer: "Allow" | "Show without them" = "Show without them",
 ): Promise<{ frame: Frame; seenUrls: string[] }> {
   const seenUrls = await serveForeignMod(
     page,
     buildProbeFiles("probe", extraLines),
   );
   await page.goto(FOREIGN_PROBE_LINK);
+  if (declaresPermissions(extraLines)) {
+    await answerSiteConsent(page, answer);
+  }
   const frame = await findModFrame(page, "probe");
   await waitForProbe(frame);
   const openedProbe = { frame, seenUrls };
@@ -433,7 +449,7 @@ function countItems(items: unknown[]): number {
   return items.length;
 }
 
-test.describe("Mods from other origins run with the default policy", function describeForeignMods(): void {
+test.describe("Mods from other origins get the permissions the user allows", function describeForeignMods(): void {
   test("Foreign mod with a show permission", async function deniesForeignShow({
     page,
   }): Promise<void> {
@@ -442,12 +458,49 @@ test.describe("Mods from other origins run with the default policy", function de
 
     await expect(issueList(page)).toContainText("warning");
     await expect(issueList(page)).toContainText(
-      `show content from ${COVER_HOST} ("Shows the book covers")`,
+      `Permission not granted: show content from ${COVER_HOST} ("Shows the book covers"). Mods from other sites get only the permissions you allow.`,
     );
     expect(await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`)).toBe(
       false,
     );
     expect(coverUrls).toEqual([]);
+  });
+
+  test("Foreign mod with an allowed show permission", async function grantsForeignShow({
+    page,
+  }): Promise<void> {
+    const coverUrls = await routeCovers(page);
+    const { frame } = await openForeignProbe(page, SHOW_COVERS_LINES, "Allow");
+
+    expect(await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`)).toBe(
+      true,
+    );
+    expect(coverUrls).toEqual([`${COVER_HOST}/cover.jpg`]);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("Foreign mod with an allowed open permission", async function grantsForeignOpen({
+    page,
+  }): Promise<void> {
+    const clockUrls = await serveForeignMod(
+      page,
+      buildProbeFiles("clock"),
+      OTHER_MODS_HOST,
+    );
+    const { frame } = await openForeignProbe(
+      page,
+      buildPermissionLines("open", "*"),
+      "Allow",
+    );
+
+    const answer = await frame.evaluate(requestFromProbe, [
+      "mods.inspect",
+      { mod: `${OTHER_MODS_HOST}/clock/` },
+    ]);
+
+    expect(answer.code).toBeUndefined();
+    expect(answer.result).toMatchObject({ name: "clock" });
+    expect(clockUrls).toEqual([`${OTHER_MODS_HOST}/clock/mod_conf.yaml`]);
   });
 
   test("Foreign mod without permissions", async function reportsNothing({

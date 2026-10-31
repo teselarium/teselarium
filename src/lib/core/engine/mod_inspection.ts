@@ -1,7 +1,7 @@
 import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
 import { loadModFile } from "../../mod/index.ts";
 import { grantModPermissions } from "../permissions/index.ts";
-import type { ModGrants } from "../permissions/index.ts";
+import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import { matchModApiRange } from "./mod_api_version.ts";
 
 /** A mod's metadata, without running it. `permissions` are what it would get if it were opened. */
@@ -25,11 +25,13 @@ export interface ModInspection {
 
 /**
  * Loads the mod file at `source` without fetching its entrypoint, and builds
- * its inspection. Load errors propagate.
+ * its inspection, with the permissions granted by `decisions` as a launch
+ * would grant them. Load errors propagate.
  */
 export async function inspectMod(
   source: string,
   appOrigin: string,
+  decisions: readonly SiteDecision[],
   options: FileFetchOptions,
 ): Promise<ModInspection> {
   const modFile = await loadModFile(source, options);
@@ -45,7 +47,7 @@ export async function inspectMod(
     sampleCollection: modFile.sampleCollection,
     testSource: modFile.testSource,
     config: structuredClone(modFile.config),
-    permissions: grantModPermissions(modFile, appOrigin),
+    permissions: grantModPermissions(modFile, appOrigin, decisions),
   };
   return inspection;
 }

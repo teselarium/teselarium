@@ -5,6 +5,7 @@ describe("stage module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(stageModule).sort()).toEqual([
       "answerApiMismatch",
+      "answerSiteConsent",
       "answerStageAction",
       "attachCheckFrame",
       "attachFrame",

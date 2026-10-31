@@ -6,10 +6,14 @@ import {
   readModPort,
   waitForMessages,
 } from "../../../test/fake_frames.ts";
+import { createMemorySiteDecisions } from "../../../test/memory_site_decisions.ts";
+import type { MemorySiteDecisions } from "../../../test/memory_site_decisions.ts";
 import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL, FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  buildProbeDecision,
+  buildSampleCoversDecision,
   COVER_BOOK_COLLECTION_SOURCE,
   COVER_BOOK_IMAGE_URL,
   FOUR_BOOKS_SOURCE,
@@ -17,12 +21,17 @@ import {
   MISSING_MOD_SOURCE,
   NO_API_BOOK_MOD_SOURCE,
   NO_COUNTRY_TILE_SOURCE,
+  OTHER_API_RANGE,
   OTHER_APP_ORIGIN,
+  PROBE_CONNECT_PERMISSION,
+  PROBE_MOD_SOURCE,
+  SAMPLE_COVERS_PERMISSION,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   serveCoverBook,
   serveFourBooks,
   serveNoApiBookMod,
+  serveProbeMod,
   serveTestMod,
   serveUntypedMod,
   TEST_DEFAULTS,
@@ -48,6 +57,8 @@ import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { StageSandbox } from "./stage_state.ts";
 import {
+  answerSandboxApiMismatch,
+  answerSandboxSiteConsent,
   attachSandboxFrame,
   launchSandbox,
   readSandboxIssues,
@@ -100,6 +111,7 @@ afterEach(function cleanUp(): void {
 
 interface SpiedServices {
   services: SandboxServices;
+  siteDecisions: MemorySiteDecisions;
   onChange: Mock<() => void>;
   onOpenLink: Mock<(openerId: string, link: RunLink) => boolean>;
   onRequestAction: Mock<
@@ -111,7 +123,10 @@ function readLightTheme(): Theme {
   return buildTheme("light");
 }
 
-function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
+function buildServices(
+  appOrigin: string = APP_ORIGIN,
+  siteDecisions: MemorySiteDecisions = createMemorySiteDecisions(),
+): SpiedServices {
   const onChange = vi.fn<() => void>();
   const onOpenLink = vi.fn<(openerId: string, link: RunLink) => boolean>();
   onOpenLink.mockReturnValue(true);
@@ -137,9 +152,12 @@ function buildServices(appOrigin: string = APP_ORIGIN): SpiedServices {
     onCheckMod,
     readTheme: readLightTheme,
     loadsTileLinkedMedia: true,
+    readSiteDecisions: siteDecisions.read,
+    rememberSiteDecisions: siteDecisions.remember,
   };
   const spiedServices: SpiedServices = {
     services,
+    siteDecisions,
     onChange,
     onOpenLink,
     onRequestAction,
@@ -183,7 +201,10 @@ async function startSandbox(
 
 describe("launchSandbox", function describeLaunchSandbox(): void {
   it("is loading, then running with the launch's issues", async function launches(): Promise<void> {
-    const spied = buildServices(OTHER_APP_ORIGIN);
+    const spied = buildServices(
+      OTHER_APP_ORIGIN,
+      createMemorySiteDecisions([buildSampleCoversDecision(false)]),
+    );
 
     const runtime = launchSandbox(
       buildSandbox(SAMPLE_MOD_REFERENCE, null),
@@ -204,7 +225,10 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
 
   it("lists the collection issues before the permission issues", async function ordersIssues(): Promise<void> {
     serveFourBooks();
-    const spied = buildServices(OTHER_APP_ORIGIN);
+    const spied = buildServices(
+      OTHER_APP_ORIGIN,
+      createMemorySiteDecisions([buildSampleCoversDecision(false)]),
+    );
 
     const runtime = launchSandbox(
       buildSandbox(SAMPLE_MOD_REFERENCE, FOUR_BOOKS_SOURCE),
@@ -310,6 +334,240 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     expect(runtime.status).toBe("stopped");
     expect(runtime.launch).toBeNull();
     expect(spied.onChange).not.toHaveBeenCalled();
+  });
+});
+
+const COVERS_KEY = "show https://upload.wikimedia.org";
+
+/** Launches a sandbox and waits until it settled or asks. */
+async function settleSandbox(
+  sandbox: StageSandbox,
+  spied: SpiedServices,
+): Promise<SandboxRuntime> {
+  const runtime = launchSandbox(sandbox, spied.services);
+  await runtime.settled;
+  return runtime;
+}
+
+describe("Site consent question", function describeSiteConsentQuestion(): void {
+  it("asks nothing for a mod from the app's origin", async function startsAppOriginMod(): Promise<void> {
+    const runtime = await settleSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, null),
+      buildServices(),
+    );
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.question).toBeNull();
+  });
+
+  it("asks nothing for a foreign mod without permissions", async function startsModWithoutPermissions(): Promise<void> {
+    serveUntypedMod();
+
+    const runtime = await settleSandbox(
+      buildSandbox(UNTYPED_MOD_SOURCE, null),
+      buildServices(OTHER_APP_ORIGIN),
+    );
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.question).toBeNull();
+  });
+
+  it("asks nothing for a foreign mod whose every permission is decided", async function startsDecidedMod(): Promise<void> {
+    serveProbeMod(true);
+    const siteDecisions = createMemorySiteDecisions([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
+    ]);
+
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      buildServices(APP_ORIGIN, siteDecisions),
+    );
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.launch?.context.permissions).toEqual({
+      granted: [SAMPLE_COVERS_PERMISSION],
+      denied: [PROBE_CONNECT_PERMISSION],
+    });
+  });
+
+  it("asks about the undecided lines before the launch exists", async function asksForeignMod(): Promise<void> {
+    serveProbeMod(true);
+    const siteDecisions = createMemorySiteDecisions([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+    ]);
+    const spied = buildServices(APP_ORIGIN, siteDecisions);
+
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    expect(runtime.status).toBe("asking");
+    expect(runtime.question).toBe("sites");
+    expect(runtime.consentLines).toEqual([PROBE_CONNECT_PERMISSION]);
+    expect(runtime.launch).toBeNull();
+    expect(runtime.pending?.mod.source).toBe(PROBE_MOD_SOURCE);
+    expect(spied.onChange).toHaveBeenCalledOnce();
+  });
+
+  it("Another API first", async function asksApiFirst(): Promise<void> {
+    serveProbeMod(false, OTHER_API_RANGE);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    expect(runtime.question).toBe("api");
+    answerSandboxApiMismatch(runtime, spied.services, true);
+
+    expect(runtime.status).toBe("asking");
+    expect(runtime.question).toBe("sites");
+    expect(runtime.consentLines).toEqual([SAMPLE_COVERS_PERMISSION]);
+  });
+
+  it("Cancelled for another API", async function cancelsBeforeSites(): Promise<void> {
+    serveProbeMod(false, OTHER_API_RANGE);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    answerSandboxApiMismatch(runtime, spied.services, false);
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [COVERS_KEY],
+      remember: true,
+    });
+
+    expect(runtime.status).toBe("failed");
+    expect(runtime.question).toBeNull();
+    expect(runtime.launch).toBeNull();
+    expect(spied.siteDecisions.decisions).toEqual([]);
+  });
+
+  it("Allow with one line unchecked", async function allowsCheckedLines(): Promise<void> {
+    serveProbeMod(true);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [COVERS_KEY],
+      remember: false,
+    });
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.question).toBeNull();
+    expect(runtime.launch?.context.permissions).toEqual({
+      granted: [SAMPLE_COVERS_PERMISSION],
+      denied: [PROBE_CONNECT_PERMISSION],
+    });
+    expect(runtime.launch?.policy).toContain("https://upload.wikimedia.org");
+    expect(runtime.launch?.policy).not.toContain("https://api.example.net");
+    expect(readSandboxIssues(runtime)).toHaveLength(1);
+    expect(readSandboxIssues(runtime)[0].message).toContain(
+      "exchange data with https://api.example.net",
+    );
+    expect(spied.siteDecisions.decisions).toEqual([]);
+  });
+
+  it("Show without them, remembered", async function refusesAndRemembers(): Promise<void> {
+    serveProbeMod(true);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [],
+      remember: true,
+    });
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.launch?.context.permissions.granted).toEqual([]);
+    expect(spied.siteDecisions.decisions).toEqual([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, false),
+      buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
+    ]);
+  });
+
+  it("Remembered allow", async function remembersAllow(): Promise<void> {
+    serveProbeMod();
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [COVERS_KEY],
+      remember: true,
+    });
+
+    const reopened = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    expect(reopened.status).toBe("running");
+    expect(reopened.launch?.context.permissions.granted).toEqual([
+      SAMPLE_COVERS_PERMISSION,
+    ]);
+  });
+
+  it("Escape refuses every line and remembers nothing", async function refusesOnEscape(): Promise<void> {
+    serveProbeMod();
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, null);
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.launch?.context.permissions).toEqual({
+      granted: [],
+      denied: [SAMPLE_COVERS_PERMISSION],
+    });
+    expect(spied.siteDecisions.decisions).toEqual([]);
+  });
+
+  it("ignores an answer to a question the runtime does not ask", async function ignoresOtherQuestion(): Promise<void> {
+    serveProbeMod(false, OTHER_API_RANGE);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, null);
+
+    expect(runtime.status).toBe("asking");
+    expect(runtime.question).toBe("api");
+  });
+
+  it("starts nothing for a runtime stopped while asking", async function ignoresStoppedRuntime(): Promise<void> {
+    serveProbeMod();
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    stopSandbox(runtime, null);
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [COVERS_KEY],
+      remember: true,
+    });
+
+    expect(runtime.status).toBe("stopped");
+    expect(runtime.launch).toBeNull();
+    expect(spied.siteDecisions.decisions).toEqual([]);
   });
 });
 

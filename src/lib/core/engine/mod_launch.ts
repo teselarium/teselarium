@@ -12,10 +12,7 @@ import type {
   TileIssue,
   TileValidator,
 } from "../../tile/index.ts";
-import {
-  describeDeniedPermission,
-  grantModPermissions,
-} from "../permissions/index.ts";
+import { describeDeniedPermission } from "../permissions/index.ts";
 import type { ModGrants } from "../permissions/index.ts";
 import {
   buildSandboxDocument,
@@ -96,10 +93,15 @@ export interface ModLaunch {
 
 export interface ModLaunchRequest {
   link: RunLink;
-  appOrigin: string;
   defaults: ResolvedDefaultModSettings;
-  /** Whether "Load media linked by tiles" is on as the mod starts. */
-  loadsTileLinkedMedia: boolean;
+}
+
+/** What a launch is built from once loaded: the mod, the link and the link's tiles. Plain data. */
+export interface ModLaunchInputs {
+  mod: LoadedMod;
+  link: RunLink;
+  /** `null` when the link names no collection. */
+  modTiles: ModTiles | null;
 }
 
 /** The tiles a mod receives from a collection, and the collection's issues. */
@@ -284,8 +286,8 @@ function collectLaunchTileLinks(
 }
 
 /**
- * Builds everything a loaded mod's frame needs from its tiles: grants its
- * permissions and builds its policy, its frame document, its mount context
+ * Builds everything a loaded mod's frame needs from its tiles and its grants
+ * (`grantModPermissions`): its policy, its frame document, its mount context
  * and its issues. With `loadsTileLinkedMedia`, the policy also allows the
  * files the tiles link (`collectTileLinks`); the mount context does not list
  * them. Requests nothing.
@@ -294,10 +296,9 @@ export function buildModLaunch(
   mod: LoadedMod,
   link: RunLink,
   modTiles: ModTiles | null,
-  appOrigin: string,
+  grants: ModGrants,
   loadsTileLinkedMedia: boolean,
 ): ModLaunch {
-  const grants = grantModPermissions(mod, appOrigin);
   const contentHosts = collectContentHosts(listContentSources(mod, modTiles));
   const tileLinks = collectLaunchTileLinks(
     modTiles,
@@ -336,24 +337,18 @@ export function buildModTestDocument(launch: ModLaunch): string {
 }
 
 /**
- * Prepares everything a mod's frame needs: refuses a switched-off default mod
+ * Loads what a mod's launch is built from: refuses a switched-off default mod
  * before any request, loads the mod and, when the link names one, its
- * collection; then builds the launch (`buildModLaunch`). Every error
- * propagates.
+ * collection. Every error propagates. The launch itself is built later with
+ * `buildModLaunch`, once the grants are known.
  */
-export async function prepareModLaunch(
+export async function loadModLaunchInputs(
   request: ModLaunchRequest,
   options: FileFetchOptions,
-): Promise<ModLaunch> {
+): Promise<ModLaunchInputs> {
   const source = resolveLaunchSource(request, options);
   const mod = await loadMod(source, options);
   const modTiles = await loadLinkTiles(mod, request.link, options);
-  const launch = buildModLaunch(
-    mod,
-    request.link,
-    modTiles,
-    request.appOrigin,
-    request.loadsTileLinkedMedia,
-  );
-  return launch;
+  const inputs: ModLaunchInputs = { mod, link: request.link, modTiles };
+  return inputs;
 }

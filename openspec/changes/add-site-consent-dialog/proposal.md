@@ -12,9 +12,9 @@ Asking in one clear dialog, rarely, and remembering the answer keeps the default
 - **The dialog**:
   - It is shown by the app, outside every frame, before a mod's frame starts, as the question for a mod written for another API is today, and only when something needs consent.
   - It lists one line per site and category, with the verb of the category, the mod's `reason` for it, and one sentence on the cost: these sites see that you viewed this content.
-  - **Allow** grants the checked lines. **Show without them** runs the mod as it runs today. A **Remember** choice keeps the decision per site and category.
+  - Each line and the **Remember** choice are checkboxes, the control every site-permission choice of the app uses. **Allow** grants the checked lines. **Show without them** runs the mod as it runs today. Remember keeps the decision per site and category.
 - **What it asks about**: the permissions declared by a mod from another origin. It never asks about what is allowed without asking (content hosts, permissions of mods from the app's origin, media linked by tiles).
-- **Remembered sites in Settings**: a new group lists the remembered decisions and lets the user remove each one.
+- **Remembered sites in Settings**: a new group lists the remembered decisions grouped by mod, each group collapsed until opened. Each decision has a checkbox (checked when allowed) and a Remove button, and each mod a group checkbox, mixed when some of its sites are allowed and some refused, that allows or refuses all of them at once, and a **Remove all** button that removes all its decisions at once.
 - **Checks and inspection never ask**: a mod check and `mods.inspect` use the remembered decisions and treat everything else as not granted, so they never show the dialog.
 
 ## Capabilities
@@ -26,7 +26,7 @@ Asking in one clear dialog, rarely, and remembering the answer keeps the default
 ### Modified Capabilities
 
 - `mod-sandbox`: a mod from another origin gets the permissions the user allowed, instead of none.
-- `app-settings`: a new group lists remembered site decisions and removes them.
+- `app-settings`: a new group lists remembered site decisions grouped by mod, changes one decision or all of a mod's between allowed and refused, and removes one decision or all of a mod's at once.
 
 ## Impact
 

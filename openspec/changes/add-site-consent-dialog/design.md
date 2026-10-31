@@ -89,19 +89,27 @@ The runtime keeps the `asking` status and gains `question: "api" | "sites" | nul
 
 ### D5. The store in `src/main/settings/site_decisions.ts`
 
-Same shape as `tile_media_setting.ts`: `createSiteDecisions({ storage })`, `rememberSiteDecisions`, `removeSiteDecision`, `readSiteDecisionsSnapshot`, `subscribeSiteDecisions`.
+Same shape as `tile_media_setting.ts`: `createSiteDecisions({ storage })`, `rememberSiteDecisions`, `removeSiteDecision`, `removeModSiteDecisions(store, mod)`, `readSiteDecisionsSnapshot`, `subscribeSiteDecisions`. `removeModSiteDecisions` drops every decision of one mod file address with one write and one notification, for Remove all. Checking or unchecking decisions in Settings needs no function of its own: `rememberSiteDecisions` with their `allowed` changed replaces them, one decision or all of a mod's in one call, with one write, and keeps their titles.
 
 - Key `opentesela.site-decisions`, outside the mod storage slots. Value: a JSON array of `SiteDecision`.
 - Reading drops entries that are not valid decisions: `mod` an absolute `http:` or `https:` URL, a known category, a non-empty `host`, a string `title`, a boolean `allowed`. A later entry with the same `mod`, `category` and `host` replaces an earlier one. The cleaned list is written back on the next write.
 - A failed write is ignored: the in-memory list still applies until the page is closed.
 
-Removing an entry only changes what later launches read (D4), so running mods keep their policy without any extra code.
+Removing or changing an entry only changes what later launches read (D4), so running mods keep their policy without any extra code.
 
 ### D6. The dialog: `SiteConsentDialog` in `src/main/stage/`
 
-A `StageDialog` like `ApiMismatchDialog`: the mod's title, then its source in `code` under it, so a mod that borrows a title still shows where it comes from. One row per line: a checkbox (checked), the verb and host drawn by the app, and the reason as React text, labeled as the mod's own words. Then the cost sentence, plus the data sentence when a `connect` or `code` line is listed. Then the Remember checkbox (unchecked), and the buttons **Show without them** (focused, the dialog's cancel action, so Escape uses it) and **Allow**.
+A `StageDialog` like `ApiMismatchDialog`: the mod's title, then its source in `code` under it, so a mod that borrows a title still shows where it comes from. One row per line: a shadcn `Checkbox` (checked) labeled through `Label` with the verb and host drawn by the app, and the reason as React text under it, labeled as the mod's own words. Then the cost sentence, plus the data sentence when a `connect` or `code` line is listed. Then the Remember `Checkbox` (unchecked), and the buttons **Show without them** (focused, the dialog's cancel action, so Escape uses it) and **Allow**.
 
 The verbs come from the permissions module's `CATEGORY_VERBS`, exported as `describePermissionLine(permission)`, so the dialog, the denial message and Settings use the same words.
+
+Checkboxes for every site-permission choice of the app: the dialog's lines and Remember, and in Settings each decision and each mod's group (D8). The dialog's choices apply only with Allow, which is what a checkbox means, while a switch means a choice that applies at once; and a mod's group needs a mixed state, which a checkbox has (`aria-checked="mixed"`) and a switch cannot have, since `role="switch"` reads a mixed value as off. One control for every such choice keeps the dialog and Settings coherent. The Settings groups for single on/off settings (sections, "Load media linked by tiles") keep their switches.
+
+The `Checkbox` is shadcn's, vendored with its CLI (`npx shadcn@4.22.1 add checkbox`) into `src/vendor/shadcn/ui/checkbox.tsx`, on Radix's Checkbox, which takes `checked="indeterminate"` for the mixed state.
+
+*Alternative*: shadcn `Switch`es, used for a time. Rejected: no mixed state for a mod's group, and switch semantics do not fit choices confirmed with Allow.
+
+*Alternative*: native checkboxes styled with utilities. Rejected: a shadcn component exists for the control, and the UI conventions keep native controls for cases where they work better; the mixed state would also need a ref to set `indeterminate`.
 
 ### D7. Denial message
 
@@ -109,7 +117,14 @@ The verbs come from the permissions module's `CATEGORY_VERBS`, exported as `desc
 
 ### D8. Settings group
 
-A Mod permissions group after Privacy and before Version. Each row: title, source in `code`, `describePermissionLine`, `Allowed` or `Refused`, and a Remove button whose accessible name includes the mod's title and the line. Empty state: `No remembered decisions.` Rows sorted by title, then source, then category and host, so the list is stable.
+A Mod permissions group after Privacy and before Version. Its description states the cost, as the dialog does: each site a mod is allowed to use can see that you used that mod, and sites allowed to exchange data or load code can receive what the mod shows or keeps. A checkbox in Settings grants a site without the dialog, and a decision does not keep the mod's reason, which can change when the mod does; the verb and host on each row are drawn by the app, so the user still sees what is allowed. Empty state: `No remembered decisions.`
+
+- **Groups**: one per `mod`, sorted by title, then source. The title is the one of the mod's last remembered decision, so a renamed mod shows its newer title. Decisions in a group are sorted by category, then host, so the list is stable.
+- **Group header**: a group `Checkbox` whose accessible name is `Allow all decisions of <title>`, checked when every decision of the mod is allowed, unchecked when every one is refused, and `indeterminate` otherwise; checking it when unchecked or mixed allows all, unchecking it when checked refuses all, in one `rememberSiteDecisions` call. Then a disclosure button (shadcn `Button`, `aria-expanded`, `aria-controls` naming the group's list) holding the title and the counts (`1 allowed, 2 refused`, leaving out a zero), the source in `code`, and a **Remove all** button whose accessible name is `Remove all decisions of <title>`. The group checkbox and Remove all work without expanding the group. Every group is collapsed when the page opens; the expanded state lives in the component only.
+- **Decision row**: a `Checkbox` whose accessible name is `Allow <title>: <line>`, checked when allowed, `describePermissionLine`, `Allowed` or `Refused`, and a Remove button whose accessible name is `Remove <title>: <line>`.
+- **No confirmation** for Remove, Remove all or a checkbox: each only changes what later starts read, the dialog asks again after a removal, and running mods keep their policy.
+
+*Alternative*: native `<details>` and `<summary>`. Rejected: Remove all must work without expanding the group, and a button inside `<summary>` is interactive content inside the toggle, which assistive technologies announce poorly and which toggles the group on click.
 
 ## Risks / Trade-offs
 

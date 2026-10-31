@@ -1,5 +1,6 @@
 export {
   answerApiMismatch,
+  answerSiteConsent,
   answerStageAction,
   attachCheckFrame,
   attachFrame,
@@ -20,6 +21,7 @@ export type {
   ActionSnapshot,
   CheckSnapshot,
   SandboxSnapshot,
+  SiteConsentLine,
   Stage,
   StageOptions,
   StageSnapshot,
@@ -35,4 +37,4 @@ export type { ActionMod } from "./stage_actions.ts";
 export type { StageHistory } from "./stage_history.ts";
 export { buildSectionHash } from "./stage_routes.ts";
 export type { SectionLink, StageHome, StageRouting } from "./stage_routes.ts";
-export type { SandboxStatus } from "./stage_sandboxes.ts";
+export type { SandboxStatus, SiteConsentAnswer } from "./stage_sandboxes.ts";

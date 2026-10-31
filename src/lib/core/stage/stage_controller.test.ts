@@ -7,18 +7,25 @@ import {
 } from "../../../test/fake_frames.ts";
 import { FakeHistory } from "../../../test/fake_history.ts";
 import type { FakeNavigation } from "../../../test/fake_history.ts";
+import { createMemorySiteDecisions } from "../../../test/memory_site_decisions.ts";
+import type { MemorySiteDecisions } from "../../../test/memory_site_decisions.ts";
 import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
+  buildProbeDecision,
   OTHER_API_MOD_SOURCE,
   OTHER_API_RANGE,
+  PROBE_CONNECT_PERMISSION,
+  PROBE_MOD_SOURCE,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_RUN_HASH,
+  SAMPLE_COVERS_PERMISSION,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   SAMPLE_RUN_HASH,
   serveOtherApiMod,
+  serveProbeMod,
   serveUntypedMod,
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
@@ -37,6 +44,7 @@ import type { ColorScheme } from "../theme/index.ts";
 import type { StageRouting } from "./stage_routes.ts";
 import {
   answerApiMismatch,
+  answerSiteConsent,
   answerStageAction,
   attachFrame,
   changeStageColorScheme,
@@ -84,6 +92,7 @@ function buildStage(
   history: FakeHistory,
   colorScheme: ColorScheme = "light",
   routing: StageRouting = MOD_HOME_ROUTING,
+  siteDecisions: MemorySiteDecisions = createMemorySiteDecisions(),
 ): Stage {
   const stage = createStage({
     history,
@@ -95,6 +104,8 @@ function buildStage(
     fetch: fetchTestFile,
     colorScheme,
     loadsTileLinkedMedia: true,
+    readSiteDecisions: siteDecisions.read,
+    rememberSiteDecisions: siteDecisions.remember,
   });
   return stage;
 }
@@ -1112,6 +1123,219 @@ describe("answerApiMismatch", function describeAnswerApiMismatch(): void {
       status: "asking",
       apiMismatch: { range: OTHER_API_RANGE, apiVersion: MOD_API_VERSION },
     });
+  });
+});
+
+const PROBE_HASH = `#/run?mod=${encodeURIComponent(PROBE_MOD_SOURCE)}`;
+const COVERS_KEY = "show https://upload.wikimedia.org";
+const CONNECT_KEY = "connect https://api.example.net";
+
+/** Starts at the Home mod, then follows the link of the foreign probe mod, in `sandbox-2`. */
+async function openProbeFromHome(
+  history: FakeHistory,
+  siteDecisions: MemorySiteDecisions = createMemorySiteDecisions(),
+): Promise<Stage> {
+  const stage = buildStage(history, "light", MOD_HOME_ROUTING, siteDecisions);
+  await follow(stage, history.readNavigation());
+  await follow(stage, history.followLink(PROBE_HASH));
+  return stage;
+}
+
+describe("answerSiteConsent", function describeAnswerSiteConsent(): void {
+  it("asks nothing for the sample mod, from the app's origin", async function startsSampleMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+
+    await follow(stage, history.readNavigation());
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "running",
+      siteConsent: null,
+    });
+  });
+
+  it("Foreign mod with a declared permission", async function asksForeignMod(): Promise<void> {
+    serveProbeMod(true);
+    const history = new FakeHistory("");
+
+    const stage = await openProbeFromHome(history);
+
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-2",
+      status: "asking",
+      mod: { title: "Probe", version: "1.0.0", source: PROBE_MOD_SOURCE },
+      sandboxDocument: null,
+      apiMismatch: null,
+      siteConsent: {
+        lines: [
+          { key: COVERS_KEY, ...SAMPLE_COVERS_PERMISSION },
+          { key: CONNECT_KEY, ...PROBE_CONNECT_PERMISSION },
+        ],
+      },
+    });
+    expect(Object.isFrozen(readVisible(stage).siteConsent?.lines[0])).toBe(
+      true,
+    );
+  });
+
+  it("Allow with one line unchecked", async function allowsCheckedLines(): Promise<void> {
+    serveProbeMod(true);
+    const history = new FakeHistory("");
+    const siteDecisions = createMemorySiteDecisions();
+    const stage = await openProbeFromHome(history, siteDecisions);
+
+    answerSiteConsent(stage, "sandbox-2", {
+      allowed: [COVERS_KEY],
+      remember: false,
+    });
+
+    const visible = readVisible(stage);
+    expect(visible).toMatchObject({ status: "running", siteConsent: null });
+    expect(visible.sandboxDocument).toContain("https://upload.wikimedia.org");
+    expect(visible.sandboxDocument).not.toContain("https://api.example.net");
+    expect(siteDecisions.decisions).toEqual([]);
+  });
+
+  it("Show without them", async function runsWithout(): Promise<void> {
+    serveProbeMod();
+    const history = new FakeHistory("");
+    const stage = await openProbeFromHome(history);
+
+    answerSiteConsent(stage, "sandbox-2", { allowed: [], remember: false });
+
+    const visible = readVisible(stage);
+    expect(visible.status).toBe("running");
+    expect(visible.sandboxDocument).not.toContain(
+      "https://upload.wikimedia.org",
+    );
+    expect(visible.issues).toHaveLength(1);
+    expect(visible.issues[0].message).toBe(
+      'Permission not granted: show content from https://upload.wikimedia.org ("Shows the book covers"). Mods from other sites get only the permissions you allow.',
+    );
+  });
+
+  it("Escape with Remember", async function escapesWithoutRemembering(): Promise<void> {
+    serveProbeMod();
+    const history = new FakeHistory("");
+    const siteDecisions = createMemorySiteDecisions();
+    const stage = await openProbeFromHome(history, siteDecisions);
+
+    answerSiteConsent(stage, "sandbox-2", null);
+    closeSandbox(stage, "sandbox-2");
+    await follow(stage, history.followLink(PROBE_HASH));
+
+    expect(siteDecisions.decisions).toEqual([]);
+    expect(readVisible(stage)).toMatchObject({
+      status: "asking",
+      siteConsent: { lines: [{ key: COVERS_KEY }] },
+    });
+  });
+
+  it("Remembered allow", async function remembersAllow(): Promise<void> {
+    serveProbeMod();
+    const history = new FakeHistory("");
+    const siteDecisions = createMemorySiteDecisions();
+    const stage = await openProbeFromHome(history, siteDecisions);
+
+    answerSiteConsent(stage, "sandbox-2", {
+      allowed: [COVERS_KEY],
+      remember: true,
+    });
+    const reloadedStage = buildStage(
+      history,
+      "light",
+      MOD_HOME_ROUTING,
+      siteDecisions,
+    );
+    await follow(reloadedStage, history.readNavigation());
+
+    expect(siteDecisions.decisions).toEqual([
+      buildProbeDecision(SAMPLE_COVERS_PERMISSION, true),
+    ]);
+    expect(readVisible(reloadedStage)).toMatchObject({
+      status: "running",
+      siteConsent: null,
+    });
+    expect(readVisible(reloadedStage).sandboxDocument).toContain(
+      "https://upload.wikimedia.org",
+    );
+  });
+
+  it("Another API first", async function asksApiFirst(): Promise<void> {
+    serveProbeMod(false, OTHER_API_RANGE);
+    const history = new FakeHistory("");
+    const stage = await openProbeFromHome(history);
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "asking",
+      apiMismatch: { range: OTHER_API_RANGE, apiVersion: MOD_API_VERSION },
+      siteConsent: null,
+    });
+    answerApiMismatch(stage, "sandbox-2", true);
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "asking",
+      apiMismatch: null,
+      siteConsent: { lines: [{ key: COVERS_KEY }] },
+    });
+  });
+
+  it("Cancelled for another API", async function cancelsBeforeSites(): Promise<void> {
+    serveProbeMod(false, OTHER_API_RANGE);
+    const history = new FakeHistory("");
+    const stage = await openProbeFromHome(history);
+
+    answerApiMismatch(stage, "sandbox-2", false);
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "failed",
+      apiMismatch: null,
+      siteConsent: null,
+      sandboxDocument: null,
+    });
+  });
+
+  it("keeps a hidden sandbox waiting", async function waitsWhileHidden(): Promise<void> {
+    serveProbeMod();
+    const history = new FakeHistory("");
+    const stage = await openProbeFromHome(history);
+
+    await follow(stage, history.goBack());
+    answerSiteConsent(stage, "sandbox-2", {
+      allowed: [COVERS_KEY],
+      remember: true,
+    });
+
+    expect(readVisible(stage).id).toBe("sandbox-1");
+    expect(findSandboxSnapshot(stage, "sandbox-2")).toMatchObject({
+      isVisible: false,
+      status: "asking",
+      sandboxDocument: null,
+    });
+    await follow(stage, history.goForward());
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-2",
+      status: "asking",
+      siteConsent: { lines: [{ key: COVERS_KEY }] },
+    });
+  });
+
+  it("ignores a repeated answer", async function ignoresRepeatedAnswer(): Promise<void> {
+    serveProbeMod();
+    const history = new FakeHistory("");
+    const siteDecisions = createMemorySiteDecisions();
+    const stage = await openProbeFromHome(history, siteDecisions);
+
+    answerSiteConsent(stage, "sandbox-2", {
+      allowed: [COVERS_KEY],
+      remember: false,
+    });
+    answerSiteConsent(stage, "sandbox-2", { allowed: [], remember: true });
+
+    expect(readVisible(stage).sandboxDocument).toContain(
+      "https://upload.wikimedia.org",
+    );
+    expect(siteDecisions.decisions).toEqual([]);
   });
 });
 

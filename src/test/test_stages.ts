@@ -2,10 +2,15 @@ import type { RunLink } from "../lib/core/engine/index.ts";
 import { createStage, followHistory } from "../lib/core/stage/index.ts";
 import type { Stage, StageRouting } from "../lib/core/stage/index.ts";
 import { FakeHistory } from "./fake_history.ts";
+import { createMemorySiteDecisions } from "./memory_site_decisions.ts";
+import type { MemorySiteDecisions } from "./memory_site_decisions.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
 import { APP_ORIGIN, SAMPLE_MOD_REFERENCE } from "./sample_mods.ts";
 import { fetchTestFile } from "./test_files.ts";
+
+/** Where a test stage reads and remembers its site decisions. */
+export type StageSiteDecisions = Pick<MemorySiteDecisions, "read" | "remember">;
 
 export const EXPLORER_LINK: RunLink = Object.freeze({
   mod: "mod_explorer",
@@ -39,12 +44,14 @@ export const MOD_HOME_ROUTING: StageRouting = Object.freeze({
 });
 
 /**
- * A stage on a fake history, serving `public/` at `APP_BASE_URL`. Home is the
- * sample mod unless `routing` says otherwise.
+ * A stage on a fake history, serving `public/` at `APP_BASE_URL`, with the
+ * remembered site decisions of `siteDecisions`. Home is the sample mod unless
+ * `routing` says otherwise.
  */
 export function buildTestStage(
   history: FakeHistory,
   routing: StageRouting = MOD_HOME_ROUTING,
+  siteDecisions: StageSiteDecisions = createMemorySiteDecisions(),
 ): Stage {
   const stage = createStage({
     history,
@@ -56,6 +63,8 @@ export function buildTestStage(
     fetch: fetchTestFile,
     colorScheme: "light",
     loadsTileLinkedMedia: true,
+    readSiteDecisions: siteDecisions.read,
+    rememberSiteDecisions: siteDecisions.remember,
   });
   return stage;
 }
@@ -73,9 +82,10 @@ export async function settleStage(stage: Stage): Promise<void> {
 export async function startTestStage(
   hash: string,
   routing: StageRouting = MOD_HOME_ROUTING,
+  siteDecisions: StageSiteDecisions = createMemorySiteDecisions(),
 ): Promise<Stage> {
   const history = new FakeHistory(hash);
-  const stage = buildTestStage(history, routing);
+  const stage = buildTestStage(history, routing, siteDecisions);
   followHistory(stage, history.hash, history.state);
   await settleStage(stage);
   return stage;
