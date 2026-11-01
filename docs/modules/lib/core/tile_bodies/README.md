@@ -83,9 +83,31 @@ Inline math (`$…$`) and display math (`$$…$$`) are kept exactly as written, 
 
 Dollars follow the rule of GitHub and Pandoc: inline math needs an opening `$` followed by a non-space character, and a closing `$` preceded by a non-space character and not followed by a digit. Other dollars stay text, so `It costs $5 and $10.` is a sentence. Authors can always write `\$` for a dollar.
 
+### Diagrams
+
+The renderer keeps a fenced `mermaid` block as code, `<pre><code class="language-mermaid">`, so the HTML of `tiles.renderBody` holds no diagram. The `<ot-tile-body>` element draws it afterwards, in the mod's frame, with the copy of mermaid the app ships (see [Libraries](../engine/README.md#libraries) in the engine module): a diagram source is untrusted tile content, so it is parsed only in a mod's sandbox, never in the app's page.
+
+- **Text first.** The element shows the body and fires `ot-rendered` before any diagram is drawn. Each block stays as code until its diagram replaces it.
+- **When in view.** A block is drawn when it comes into the frame's view, one block at a time, with a paint and a task between two, so the frame and the app keep responding. The library is requested with the first block in view: a body whose blocks are never seen never loads it.
+- **The diagram** replaces the `<pre>` with a `<figure>` holding the SVG, which keeps the block's text in `data-mermaid-source`. Mermaid draws at its `strict` security level and without HTML labels, so labels are text and a diagram holds no click handler; `<img src=x onerror=alert(1)>` in a label is shown as text. The layout and the look are mermaid 12's defaults, ELK and neo, which a diagram may change in its front matter or an `%%{init}%%` directive; it cannot turn HTML labels on there.
+- **Labels** are SVG text, so a label holds no element: markup in a tile's diagram cannot add an image, which would send a request to any address the tile's author wrote, nor anything else. Line breaks (`<br>`) and mermaid's markdown strings (`` "`**bold** and *italic*`" ``) still work; other tags, such as `<b>`, show as written.
+- **Images** of image shapes (`A@{ img: "https://…" }`) load only from the hosts in the mod's `show` permissions, like the mod's other images: an address in a diagram is not a tile link. From another host the frame's policy blocks the image, mermaid cannot draw the diagram, and the block stays as code; the mod's issues list a blocked image request.
+- **Icons.** The icons mermaid builds in, such as those of architecture diagrams (`cloud`, `database`, `disk`, `internet`, `server`), are drawn, in mermaid's own colors rather than the theme's. The element registers no icon pack, so an icon shape from a pack (`A@{ icon: "fa:user" }`) is drawn with mermaid's "?" placeholder, and the older `fa:fa-car` syntax in a label shows as written.
+- **Colors.** Diagrams take the theme's colors (`background`, `card` for the nodes, `foreground`, `border`, `muted-foreground` for the lines, `muted`, `accent`, the `font-sans` font, and `border` for the neo look's shadow), and are drawn again from their kept text when the color scheme changes, without reloading the frame. The theme styles the figure (see the [theme module](../theme/README.md#write-html-get-the-apps-look)).
+- **Busy.** A block in view has `aria-busy="true"` from the moment it waits to be drawn until its figure replaces it, and the base stylesheet pulses it (dimmed and still under `prefers-reduced-motion: reduce`); the first diagram of a frame waits for the library's download and install. The new figure has no `aria-busy`. After a color scheme change, a figure in view is busy until its new drawing replaces it. A block that fails, or that the element drops, loses the mark; a block out of view, and every block with `diagrams = "source"`, never gets it. The pulse is an opacity animation, which keeps moving while mermaid draws in Chromium and Firefox, and stops until the frame is free in WebKit.
+- **Failures.** A block mermaid cannot draw, such as `A -->`, stays as code, is logged with `console.warn`, and the element goes on with the next one.
+- **`ot-diagrams-drawn`**, a bubbling event, fires on the element each time every block in view has been drawn or has failed: once for a body whose blocks are all in view, and again when the user scrolls to more blocks or the color scheme changes. A body without mermaid blocks fires none. When `tile` is set again, or the element leaves the document, before its diagrams are drawn, it draws none of them and fires no event for that body.
+- **`diagrams`**, a property of the element: `"draw"` by default, or `"source"`, which keeps every block as code and never loads the library. Any other value throws a `TypeError`.
+
+```html
+<figure data-mermaid-source="flowchart LR
+  Tile --> Mod
+"><svg id="ot-mermaid-1" …>…</svg></figure>
+```
+
 ### What stays as written
 
-- Fenced code blocks are `<pre><code class="language-<name>">` with the block's text, including `mermaid` and `math` blocks: diagrams are not drawn.
+- Fenced code blocks are `<pre><code class="language-<name>">` with the block's text, including `mermaid` and `math` blocks. The `<ot-tile-body>` element draws mermaid blocks afterwards (see [Diagrams](#diagrams)); a mod that places the HTML itself shows them as code.
 - Math is not rendered and code is not highlighted, as seen above.
 - Emoji shortcodes such as `:tada:` stay text.
 

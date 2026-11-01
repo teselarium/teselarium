@@ -211,6 +211,7 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       'aside[data-ot-alert="important"]',
       'aside[data-ot-alert="warning"]',
       'aside[data-ot-alert="caution"]',
+      "figure[data-mermaid-source]",
     ];
     for (const pattern of patterns) {
       expect(selectors).toContain(pattern);

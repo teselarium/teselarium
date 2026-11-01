@@ -26,6 +26,7 @@ import type { AppAction } from "./app_actions.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { describeEngineError, ModMethodError } from "./engine_errors.ts";
 import { FILES_METHODS } from "./files_methods.ts";
+import { LIBS_METHODS } from "./libs_methods.ts";
 import { LINKS_METHODS } from "./links_methods.ts";
 import type {
   LaunchContext,
@@ -139,6 +140,7 @@ export const ENGINE_METHODS: ModMethodTable = {
   ...UI_METHODS,
   ...TILES_METHODS,
   ...PLAYERS_METHODS,
+  ...LIBS_METHODS,
 };
 
 /** Two issues are equal when their level, source and message are equal. */

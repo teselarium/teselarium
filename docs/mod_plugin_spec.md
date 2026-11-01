@@ -92,7 +92,17 @@ export default function mount(engine, context) {
 }
 ```
 
-The element sends `tiles.renderBody`, shows the result as its children and fires a bubbling `ot-rendered` event. The theme styles the rendered body, alerts and player placeholders, and the mod's CSS can style it too, since it is in the light DOM. To place the HTML yourself, send the request:
+The element sends `tiles.renderBody`, shows the result as its children and fires a bubbling `ot-rendered` event. The theme styles the rendered body, alerts and player placeholders, and the mod's CSS can style it too, since it is in the light DOM.
+
+The element also draws the body's diagrams: each fenced `mermaid` block becomes a `<figure data-mermaid-source>` holding the diagram as an SVG, in the theme's colors, drawn again when the color scheme changes. The text shows first: a block stays as code until its diagram replaces it, blocks are drawn one at a time as they come into view, and a block mermaid cannot draw stays as code. A block waiting for its diagram, or a diagram being drawn again, has `aria-busy="true"`, which the base stylesheet pulses; the drawn figure, a failed block and a block out of view have none. Labels are text, so a diagram's markup adds no element; an image shape's picture loads only from a host in `permissions.show`, and from another host the block stays as code. Mermaid's built-in icons are drawn, but icon packs are not registered (see [Diagrams](modules/lib/core/tile_bodies/README.md#diagrams) in the tile bodies module). The element fires a bubbling `ot-diagrams-drawn` event each time the blocks in view are drawn; `ot-rendered` still fires first, as soon as the text is shown. A body without mermaid blocks fires none, and so does a body replaced or removed before its diagrams are drawn. To keep the blocks as code, and never load the library, set `diagrams` to `"source"` before `tile` (the default is `"draw"`):
+
+```js
+const body = document.createElement("ot-tile-body");
+body.diagrams = "source";
+body.tile = tile;
+```
+
+To place the HTML yourself, send the request:
 
 ```js
 const { html } = await engine.request("tiles.renderBody", {
@@ -117,6 +127,47 @@ function openInViewer(event) {
 
 document.addEventListener("click", openInViewer);
 ```
+
+A body placed this way shows its mermaid blocks as code: to draw them, load the library as the next section shows.
+
+## Libraries
+
+The app ships some large libraries that a mod can use without bundling them or loading code from another site: `libs.load` installs one in the mod's frame, from the app's own copy (see [Libraries](modules/lib/core/engine/README.md#libraries) in the engine's README). Today there is one, `mermaid` at major version `12`, ready as `globalThis.mermaid`. A mod asks for a major version, and the result gives the full version installed.
+
+This mod draws a diagram and draws it again in the new colors when the user switches between light and dark:
+
+```js
+const SOURCE = "flowchart LR\n  Tile --> Mod";
+
+let diagramCount = 0;
+
+async function drawDiagram(figure, theme) {
+  globalThis.mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    htmlLabels: false,
+    theme: theme.colorScheme === "dark" ? "dark" : "default",
+  });
+  diagramCount += 1;
+  const diagram = await globalThis.mermaid.render(
+    `diagram-${diagramCount}`,
+    SOURCE,
+  );
+  figure.innerHTML = diagram.svg;
+}
+
+export default async function mount(engine, context) {
+  await engine.request("libs.load", { name: "mermaid", version: "12" });
+  const figure = document.createElement("figure");
+  document.body.append(figure);
+  await drawDiagram(figure, context.theme);
+  engine.on("theme.changed", drawDiagram.bind(undefined, figure));
+}
+```
+
+- Draw with `securityLevel: "strict"` and `htmlLabels: false` when the source comes from tiles: labels are then SVG text, and diagrams hold no click handlers. Add `"htmlLabels"` to `secure` too (`secure: [...globalThis.mermaid.mermaidAPI.defaultConfig.secure, "htmlLabels"]`), or a diagram can turn HTML labels back on in its front matter or an `%%{init}%%` directive.
+- Load the library only when the mod needs it: it is about 5.5 MB, and each frame that loads it pays its install, a few tenths of a second.
+- A second `libs.load` resolves at once with the same result, so a mod can ask before each use.
 
 ## Checking a mod
 

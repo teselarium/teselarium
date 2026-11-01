@@ -13,12 +13,38 @@ After showing a body, the `ot-tile-body` element SHALL replace each `<pre>` whos
 - **WHEN** a mermaid block has a node labeled `<img src=x onerror=alert(1)>`
 - **THEN** the drawn diagram holds no `<img>` element and no `onerror` attribute
 
+### Requirement: A diagram's own configuration
+The element SHALL draw with mermaid's default layout and look, which a diagram MAY change in its own configuration (front matter or an `%%{init}%%` directive). A diagram's own configuration SHALL NOT turn HTML labels on.
+
+#### Scenario: HTML labels in the diagram's configuration
+- **WHEN** a mermaid block turns `htmlLabels` on in its front matter or in an `%%{init}%%` directive, and has a node labeled `<img src=x>`
+- **THEN** the drawn diagram holds no `<img>` element and no `<foreignObject>`
+
 ### Requirement: Diagrams are drawn when they come into view
 The element SHALL request the library and draw a block only when the block comes into the frame's view, one block at a time, letting the frame paint between two blocks. A body whose blocks never come into view SHALL never request the library.
 
 #### Scenario: Block below the fold
 - **WHEN** a mod shows a long body whose only mermaid block is out of view
 - **THEN** no `libs.load` request is sent until the user scrolls the block into view
+
+### Requirement: Blocks being drawn are marked busy
+While a mermaid block in view waits to be drawn or is being drawn, the element SHALL set `aria-busy="true"` on it, so that the base stylesheet pulses it. A block that fails SHALL lose the mark. After a color scheme change, a diagram in view SHALL carry the mark until its new drawing replaces it. A block out of view, and every block when `diagrams` is `"source"`, SHALL NOT be marked.
+
+#### Scenario: Busy while drawing
+- **WHEN** a body with a mermaid block in view is shown
+- **THEN** the block has `aria-busy="true"` until the `<figure>` replaces it, and the `<figure>` has no `aria-busy`
+
+#### Scenario: Failed block is not busy
+- **WHEN** a mermaid block in view fails to draw
+- **THEN** it stays as code with no `aria-busy` attribute
+
+#### Scenario: Busy while redrawn
+- **WHEN** a diagram in view is drawn and the user switches the app to dark
+- **THEN** its `<figure>` has `aria-busy="true"` until the new drawing replaces it
+
+#### Scenario: Not busy out of view or as code
+- **WHEN** a body has a mermaid block out of view, or `diagrams` is `"source"`
+- **THEN** the block has no `aria-busy` attribute
 
 ### Requirement: A block that fails stays as code
 When mermaid cannot draw a block, the block SHALL stay as written, as code, and the element SHALL go on with the other blocks.

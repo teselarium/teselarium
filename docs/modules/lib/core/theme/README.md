@@ -143,7 +143,7 @@ An empty `role="status"` or `role="alert"` element draws nothing, so a live regi
 
 Any other value leaves the element's plain look, and so does an unprefixed `data-variant`, which shadcn/ui and other libraries use for their own components.
 
-**Rendered tile bodies.** A tile body the engine renders (see [Tile bodies](../engine/README.md#tile-bodies)) is plain HTML, styled like any other, plus two elements of its own, which the stylesheet selects by attribute:
+**Rendered tile bodies.** A tile body the engine renders (see [Tile bodies](../engine/README.md#tile-bodies)) is plain HTML, styled like any other, plus two elements of its own, which the stylesheet selects by attribute, and the diagrams the tile body element draws:
 
 - A player placeholder, `button[data-ot-player]`, is a slot of fixed size, the same whatever its title: at most 20rem wide (never wider than its container) and three lines high. Its `<span>` is the visible box, with the outline button's look: a play mark, then the player's title (its first inner `<span>`) on two lines, cut with "…" when it is longer, the second line left empty for a short title, then the player's site (its last inner `<span>`) on one line in `muted-foreground`. On hover and keyboard focus, the box takes the accent colors and a shadow and grows to show the whole title, over the content below, so the page does not move; the focus ring goes around the box.
 - An alert, `aside[data-ot-alert]`, has a left border and a bold title, its first `<p>`, both in its kind's color: `note` in `primary`, `tip` in `success`, `important` in `secondary`, `warning` in `warning` and `caution` in `destructive`.
@@ -156,6 +156,8 @@ Any other value leaves the element's plain look, and so does an unprefixed `data
   <p>Spoilers below.</p>
 </aside>
 ```
+
+A diagram the `<ot-tile-body>` element drew, `figure[data-mermaid-source]` (see [Diagrams](../tile_bodies/README.md#diagrams)), is centered and never wider than its container: a diagram wider than that scrolls sideways. Its colors come from the theme tokens when it is drawn, not from the stylesheet.
 
 Math kept as code (`code.language-math`) looks like code. The classes are for the mod's own CSS: the stylesheet never uses them.
 

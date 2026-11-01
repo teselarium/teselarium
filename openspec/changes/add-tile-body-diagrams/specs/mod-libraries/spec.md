@@ -7,11 +7,11 @@ Lets mods use large libraries the app ships and vets, such as mermaid, without b
 ## ADDED Requirements
 
 ### Requirement: Load a library
-`libs.load` with `{ name, version }` SHALL install the library `name`, at the major version `version`, in the requesting mod's frame, and resolve with `{ name, version }`, where `version` is the full version installed, once the library is ready to use. The app SHALL ship one library, `mermaid` at major version `11`, which SHALL be ready as `globalThis.mermaid`.
+`libs.load` with `{ name, version }` SHALL install the library `name`, at the major version `version`, in the requesting mod's frame, and resolve with `{ name, version }`, where `version` is the full version installed, once the library is ready to use. The app SHALL ship one library, `mermaid` at major version `12`, which SHALL be ready as `globalThis.mermaid`.
 
 #### Scenario: Load mermaid
-- **WHEN** a mod sends `libs.load` with `{ "name": "mermaid", "version": "11" }`
-- **THEN** the request resolves with `name` `"mermaid"` and a `version` starting with `11.`, and `globalThis.mermaid.render` is a function in the mod's frame
+- **WHEN** a mod sends `libs.load` with `{ "name": "mermaid", "version": "12" }`
+- **THEN** the request resolves with `name` `"mermaid"` and a `version` starting with `12.`, and `globalThis.mermaid.render` is a function in the mod's frame
 
 ### Requirement: Unknown libraries and versions
 The engine SHALL answer `libs.load` with error code `-32602`, without installing anything, when `name` is not a library the app ships, or `version` is not a string naming a major version the app ships. The message SHALL name `libs.load` and the problem, and for a known library, the major versions the app has.
@@ -21,8 +21,8 @@ The engine SHALL answer `libs.load` with error code `-32602`, without installing
 - **THEN** the response has an error with code `-32602` whose message names `libs.load` and says that the app has no library `katex`
 
 #### Scenario: Other major version
-- **WHEN** a mod sends `libs.load` with `{ "name": "mermaid", "version": "10" }`
-- **THEN** the response has an error with code `-32602` whose message says that the app has mermaid `11`
+- **WHEN** a mod sends `libs.load` with `{ "name": "mermaid", "version": "11" }`
+- **THEN** the response has an error with code `-32602` whose message says that the app has mermaid `12`
 
 ### Requirement: A frame receives a library once
 A second `libs.load` for the same library from the same frame SHALL resolve with the same result without sending the library to the frame again, and SHALL leave the library's object as it was.

@@ -693,6 +693,13 @@
     color: var(--ot-destructive);
   }
 
+  /* A diagram the tile body element drew: centered, and scrolling sideways when wider than its container. */
+  figure[data-mermaid-source] {
+    max-width: 100%;
+    overflow-x: auto;
+    text-align: center;
+  }
+
   /* Math kept as code looks like code: the code rules above already apply. */
 
   a,

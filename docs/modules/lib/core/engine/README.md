@@ -66,6 +66,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
 | `tiles.renderBody` | `{ source }`, the `source` of one of the mod's tiles | `{ html }`: the tile's body rendered to safe HTML (see [Tile bodies](#tile-bodies)). Added in mod API `0.1.5`. |
 | `players.open` | `{ url }`, a player address of the mod's tiles | `true` once the player was shown and closed, `false` if the user cancelled (see [Players](#players)). Added in mod API `0.1.5`. |
+| `libs.load` | `{ name, version }`, a library the app ships and its major version, such as `{ name: "mermaid", version: "12" }` | `{ name, version }`, with the full version installed, once the library is ready in the mod's frame (see [Libraries](#libraries)). Added in mod API `0.1.6`. |
 
 | Event | Params |
 |---|---|
@@ -91,7 +92,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.5"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.6"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -114,7 +115,7 @@ A tile's `body` reaches the mod as written. The engine can render it for the mod
 
 **`tiles.renderBody { source }`** answers `{ html }`, the body of the mod's tile whose `source` is `source`. The tiles are those the mod currently receives, after "Reload tiles" too. An empty body gives `""`. A `source` that is not a string is `-32602` (`tiles.renderBody: "source" must be a string`), and so is one that names no tile of the mod (`tiles.renderBody: the source https://example.org/other.md is not one of the mod's tiles`). A body renders on its first request and is kept.
 
-**`<ot-tile-body>`** is an element the frame loader defines in every mod frame, the frames of a check's tests included. Setting its `tile` property to a tile sends `tiles.renderBody` with the tile's `source`, and shows the result as the element's children, in the light DOM, so the theme and the mod's CSS style it. It then fires `ot-rendered`, which bubbles. When the request fails, the element shows the error's message as text with `role="alert"`. When `tile` is set again before the answer, the newest tile wins.
+**`<ot-tile-body>`** is an element the frame loader defines in every mod frame, the frames of a check's tests included. Setting its `tile` property to a tile sends `tiles.renderBody` with the tile's `source`, and shows the result as the element's children, in the light DOM, so the theme and the mod's CSS style it. It then fires `ot-rendered`, which bubbles. When the request fails, the element shows the error's message as text with `role="alert"`. When `tile` is set again before the answer, the newest tile wins. After showing a body, the element draws its mermaid blocks as diagrams in the mod's frame, with the [mermaid library](#libraries), and fires `ot-diagrams-drawn`; `diagrams = "source"` keeps them as code (see [Diagrams](../tile_bodies/README.md#diagrams) in the tile bodies module).
 
 ```js
 const body = document.createElement("ot-tile-body");
@@ -168,7 +169,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.5"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.6"
     }
   ]
 }
@@ -242,6 +243,32 @@ await engine.request("players.open", {
 ```
 
 A mod rarely sends it itself: a click on a placeholder of a rendered body sends it (see [Tile bodies](#tile-bodies)).
+
+### Libraries
+
+Some libraries are too large for a mod to bundle, and loading them from another site needs the `code` permission. The app ships a vetted copy of them and installs one in the frame of a mod that asks, from the app's own host.
+
+| Name | Major version | Global |
+|---|---|---|
+| `mermaid` | `12` | `globalThis.mermaid` |
+
+**`libs.load { name, version }`** installs the library `name` at the major version `version` in the mod's frame, and resolves with `{ name, version }`, where `version` is the full version installed, such as `"12.2.0"`, once the library is ready to use:
+
+```js
+const { version } = await engine.request("libs.load", {
+  name: "mermaid",
+  version: "12",
+});
+```
+
+- `version` is a major version, as a string: `"12"`, not `"12.2"` nor `12`.
+- A library the app does not ship is `-32602` (`libs.load: the app has no library "katex" (it has mermaid)`), and so is another major version (`libs.load: the app has mermaid 12, not mermaid "11"`) or a `version` that is not a string. Nothing is installed.
+- A frame receives a library once: a second `libs.load` resolves with the same result and leaves the library's object as it was. A failed request is not kept, so a later one tries again.
+- The library runs only in the frame that asked, under its sandbox and content policy, not in the app's page nor in another mod's frame. It works in the frames of a check's tests too, and a case's `requests` record `{ name, version }`, never the code.
+
+How it works: the engine's handler (`libs_methods.ts`) answers the library's code, and the frame loader installs it as a classic `<script>` from a `blob:` address, which the frame's policy allows, before it resolves the mod's request without the code. The app downloads a library on the first request in a page, not before, and keeps it for the page; a page that runs no mod asking for one never downloads it.
+
+**Size.** Mermaid's single-file build is about 5.5 MB, 1.6 MB gzipped, in a chunk of its own, `assets/mermaid.min-<hash>.js`, which an instantiation serves with the rest of the build. The app's first load does not include it. Each frame that loads it pays its install, 0.2 to 0.6 s on a desktop, a first diagram slower than the next ones, up to about 0.25 s on a desktop and close to 1 s on a slower CPU, and its memory: two mods that draw diagrams each install their own copy.
 
 ### Default mod settings
 
@@ -332,7 +359,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.5` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.6` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -423,7 +450,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.5"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.6"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.7` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -497,7 +524,7 @@ const report = buildModCheckReport(source, bundleCheck.findings, false, null);
 
 ### Request handlers
 
-Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`), `ui_methods.ts` (`UI_METHODS`), `tiles_methods.ts` (`TILES_METHODS`) and `players_methods.ts` (`PLAYERS_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `tileBodies`, `readSiteDecisions`, `onOpenLink`, `onRequestAction`, `onCheckMod`). `tileBodies` is the session's current `TileBodies`, which `pushTilesChanged` replaces.
+Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`), `ui_methods.ts` (`UI_METHODS`), `tiles_methods.ts` (`TILES_METHODS`), `players_methods.ts` (`PLAYERS_METHODS`) and `libs_methods.ts` (`LIBS_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `tileBodies`, `readSiteDecisions`, `onOpenLink`, `onRequestAction`, `onCheckMod`). `tileBodies` is the session's current `TileBodies`, which `pushTilesChanged` replaces.
 
 The `links.*`, `files.*`, `ui.*` and `players.*` handlers check their params into an `AppAction` (`app_actions.ts`), data the app can perform with no more checks:
 
