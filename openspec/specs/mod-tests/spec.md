@@ -78,7 +78,7 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 - **THEN** `requests` lists `storage.get` with its result and then `storage.set` with key `selected` and the first tile's source
 
 ### Requirement: Scripted answers
-`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save` or `ui.confirm` with a boolean value, or `mods.open` with `null`. The request SHALL resolve with the queued value without any dialog. A `mods.open` answered this way SHALL NOT open anything. Requests without a queued answer SHALL be answered as in the mount check. In cases, no request that needs the user SHALL be a finding, answered or not.
+`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean value, or `mods.open` with `null`. The request SHALL resolve with the queued value without any dialog. A `mods.open` answered this way SHALL NOT open anything. Requests without a queued answer SHALL be answered as in the mount check. In cases, no request that needs the user SHALL be a finding, answered or not.
 
 #### Scenario: Confirm answered yes
 - **WHEN** a case calls `answer("ui.confirm", true)` and the mod then sends `ui.confirm`
@@ -91,6 +91,10 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 #### Scenario: Wrong answer type
 - **WHEN** a case calls `answer("ui.confirm", "yes")`
 - **THEN** the call throws an error that says the answer to `ui.confirm` must be a boolean
+
+#### Scenario: Player answered
+- **WHEN** a case calls `answer("players.open", true)` and the mod then sends `players.open` with a player address of its tiles
+- **THEN** the request resolves with `true`, no dialog is shown and nothing is requested from the player's site
 
 ### Requirement: What a case records
 While a case runs, the check SHALL record as `test` findings what the mount check records as `mount` findings, with the same level and source and a message that also names the case: blocked requests and blocked browser dialogs as warnings, and each request answered with `-32600`, `-32601` or `-32602` as an error. A mount that throws or rejects SHALL NOT be a finding, since it rejects the case's `mount` call.
