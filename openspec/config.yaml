@@ -45,3 +45,7 @@ rules:
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - Read docs/code_conventions.md before writing code
