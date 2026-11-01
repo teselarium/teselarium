@@ -61,6 +61,8 @@ The engine's handler (`libs_methods.ts`) checks `name` and `version` (D1's table
 2. On the answer, it creates a `blob:` URL from `code`, appends a classic `<script>` with it, waits for `load`, revokes the URL, and resolves the mod's promise with `{ name, version }`. The mod never receives `code`, so a test case's `requests` record does not hold 3.4 MB.
 3. A script error rejects the promise with a message naming the library.
 
+The special case lives in `requestEngine`, the one function every request of the frame goes through: the mod's `engine.request`, the test runner's recording engine (`requestRecorded`, which records what `requestEngine` resolves with) and `ot-tile-body`. So a test case's record of a `libs.load` holds `{ name, version }` and never the code.
+
 *Alternatives*: a `sandbox.*` notification carrying the code before the response (two messages to keep in order for no gain), or a transferred `ArrayBuffer` (faster in Chromium, but responses are built as plain data today; worth it only if the measurements of D6 show the send matters).
 
 ### D3. Drawing in `ot-tile-body`
@@ -75,9 +77,13 @@ After it sets its HTML and fires `ot-rendered`, the element:
 
 `mermaid.initialize` options: `startOnLoad: false`, `securityLevel: "strict"`, `theme: "base"`, and `themeVariables` from the theme tokens (`background`, `primaryColor` from `card`, `primaryTextColor` from `foreground`, `primaryBorderColor` from `border`, `lineColor` from `muted-foreground`, `secondaryColor` from `muted`, `tertiaryColor` from `accent`, `darkMode` from the color scheme). The token mapping lives in one function, tested by the e2e color check.
 
+The tokens come from the theme object, not from the frame's CSS: mermaid computes colors from its variables, so it needs values rather than `var(--ot-…)`, and a mod with `theme: "none"` has no theme styles in its frame. Today the loader keeps the theme only until the mod mounts (`applyThemeChanged` updates `loader.context.theme` while `loader.mounted` is false) and afterwards keeps only the `data-ot-color-scheme` attribute. It now keeps the newest theme in `loader.theme`, set from the connect message's context and from every `theme.changed`, mounted or not, and the queue reads it there.
+
+A new body replaces the old one's blocks. Setting `tile` again, or removing the element from the document, drops the element's waiting blocks from the queue and stops observing them. A block being drawn when that happens finishes, but its SVG is not inserted, since its `<pre>` is no longer in the element. `ot-diagrams-drawn` fires only for the blocks of the body the element shows, so a body replaced before its diagrams are drawn fires none. The element keeps a body counter, like `#requestCount`, and each queued block carries the body it belongs to.
+
 ### D4. Redrawing on a theme change
 
-The loader keeps a set of connected `ot-tile-body` elements. On `theme.changed`, after it updates the color scheme attribute, it asks each element to redraw: every `figure[data-mermaid-source]` becomes a pending block again, kept in place until its new SVG replaces it, and goes through the same queue when it is in view.
+The loader keeps a set of connected `ot-tile-body` elements. On `theme.changed`, after it updates the color scheme attribute and `loader.theme` (D3), it asks each element to redraw: every `figure[data-mermaid-source]` becomes a pending block again, kept in place until its new SVG replaces it, and goes through the same queue when it is in view.
 
 ### D5. Where the measurements go
 

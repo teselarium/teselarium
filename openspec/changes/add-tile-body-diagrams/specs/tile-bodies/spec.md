@@ -35,11 +35,15 @@ Diagrams SHALL be drawn with the theme's colors for the frame's current color sc
 - **THEN** the diagram is drawn again with the dark theme's colors, and the frame was not reloaded
 
 ### Requirement: Diagrams drawn event
-The element SHALL fire a bubbling `ot-diagrams-drawn` event each time every mermaid block in view has been drawn or has failed. `ot-rendered` SHALL keep firing when the body's HTML is shown, before any diagram is drawn. A body without mermaid blocks SHALL fire no `ot-diagrams-drawn` event.
+The element SHALL fire a bubbling `ot-diagrams-drawn` event each time every mermaid block in view has been drawn or has failed. `ot-rendered` SHALL keep firing when the body's HTML is shown, before any diagram is drawn. A body without mermaid blocks SHALL fire no `ot-diagrams-drawn` event. When the element shows another body, or leaves the document, before the diagrams of its body are drawn, it SHALL draw none of them and SHALL fire no `ot-diagrams-drawn` event for that body.
 
 #### Scenario: Events in order
 - **WHEN** a mod listens for both events and shows a body with one mermaid block in view
 - **THEN** `ot-rendered` reaches the listener first, while the block is code, and `ot-diagrams-drawn` after the diagram is shown
+
+#### Scenario: New tile while drawing
+- **WHEN** a mod shows a body with a mermaid block in view, and sets the element's `tile` to a tile whose body has no mermaid block before that diagram is drawn
+- **THEN** the element shows the second body with no diagram in it, and no `ot-diagrams-drawn` event is fired
 
 ### Requirement: Keep diagrams as code
 Setting the element's `diagrams` property to `"source"` SHALL keep every mermaid block as code and SHALL never request the library. Its default value SHALL be `"draw"`.
