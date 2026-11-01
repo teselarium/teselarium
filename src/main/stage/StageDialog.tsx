@@ -6,7 +6,10 @@ import type { ReactElement, ReactNode, RefObject, SyntheticEvent } from "react";
  * margin reset of the native `<dialog>`), in the popover colors.
  */
 const DIALOG_CLASSES =
-  "m-auto w-full max-w-[calc(100%-2rem)] rounded-lg border bg-popover p-6 text-popover-foreground shadow-lg backdrop:bg-black/50 sm:max-w-lg";
+  "m-auto w-full max-w-[calc(100%-2rem)] rounded-lg border bg-popover p-6 text-popover-foreground shadow-lg backdrop:bg-black/50";
+
+/** The dialog's width from the `sm` breakpoint: a question's, or a wide one for a player. */
+const WIDTH_CLASSES = { default: "sm:max-w-lg", wide: "sm:max-w-3xl" };
 
 interface StageDialogProps {
   /** Identifies what the dialog asks, or `null` to keep it closed. Cancel gets the focus again when it changes. */
@@ -17,6 +20,8 @@ interface StageDialogProps {
   cancelRef: RefObject<HTMLButtonElement | null>;
   /** Escape: answers as Cancel. */
   onCancel: () => void;
+  /** A wider box, for content such as a player. */
+  isWide?: boolean;
   children?: ReactNode;
 }
 
@@ -33,6 +38,7 @@ export function StageDialog({
   labelledBy,
   cancelRef,
   onCancel,
+  isWide = false,
   children,
 }: StageDialogProps): ReactElement {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -78,7 +84,7 @@ export function StageDialog({
   return (
     <dialog
       ref={dialogRef}
-      className={DIALOG_CLASSES}
+      className={`${DIALOG_CLASSES} ${isWide ? WIDTH_CLASSES.wide : WIDTH_CLASSES.default}`}
       aria-labelledby={shownKey === null ? undefined : labelledBy}
       onCancel={handleDialogCancel}
       onClose={handleDialogClose}

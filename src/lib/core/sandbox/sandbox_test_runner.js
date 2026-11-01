@@ -14,6 +14,7 @@ const ANSWER_KINDS = {
   "links.open": "boolean",
   "files.save": "boolean",
   "ui.confirm": "boolean",
+  "players.open": "boolean",
   "mods.open": "null",
 };
 
@@ -76,7 +77,7 @@ async function listCases(test) {
 }
 
 function reportListFailure(error) {
-  sendNotification(TESTS_FAILED_METHOD, { message: describeMountError(error) });
+  sendNotification(TESTS_FAILED_METHOD, { message: describeError(error) });
 }
 
 function startListMode(params) {
@@ -86,7 +87,7 @@ function startListMode(params) {
 function describeResponseError(error) {
   const responseError = {
     code: typeof error?.code === "number" ? error.code : null,
-    message: describeMountError(error),
+    message: describeError(error),
   };
   return responseError;
 }
@@ -186,7 +187,7 @@ function setCaseValue(key, value) {
 function checkAnswer(method, value) {
   if (typeof method !== "string" || !Object.hasOwn(ANSWER_KINDS, method)) {
     throw new Error(
-      `answer: ${describeValue(method)} cannot be answered, only links.open, files.save, ui.confirm and mods.open`,
+      `answer: ${describeValue(method)} cannot be answered, only links.open, files.save, ui.confirm, players.open and mods.open`,
     );
   }
   if (ANSWER_KINDS[method] === "null" && value !== null) {
@@ -245,7 +246,7 @@ function reportCasePassed() {
 }
 
 function reportCaseFailed(error) {
-  sendCaseFinished("fail", describeMountError(error));
+  sendCaseFinished("fail", describeError(error));
 }
 
 function startCaseMode(params) {

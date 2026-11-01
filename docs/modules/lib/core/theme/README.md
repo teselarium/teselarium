@@ -41,7 +41,7 @@ Each token is a CSS custom property. The color tokens are roles, named like shad
 | `--ot-line-height` | `1.5` | same | |
 | `--ot-space-1` / `-2` / `-3` / `-4` / `-6` | `0.25rem` / `0.5rem` / `0.75rem` / `1rem` / `1.5rem` | same | spacing |
 | `--ot-radius` | `0.625rem` | same | corners |
-| `--ot-shadow` | `0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` | same | dialogs |
+| `--ot-shadow` | `0 10px 15px -3px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.12)` | same | dialogs, player placeholders on hover |
 
 The palette comes from Gaudí's trencadís mosaics: cobalt and turquoise glazes, saffron and leaf-green shards, on stone and white ceramic, or on night blue in dark. `accent` follows shadcn's meaning, the hover fill, not a brand color. Links are `secondary`; selection and the main action are `primary`.
 
@@ -143,6 +143,22 @@ An empty `role="status"` or `role="alert"` element draws nothing, so a live regi
 
 Any other value leaves the element's plain look, and so does an unprefixed `data-variant`, which shadcn/ui and other libraries use for their own components.
 
+**Rendered tile bodies.** A tile body the engine renders (see [Tile bodies](../engine/README.md#tile-bodies)) is plain HTML, styled like any other, plus two elements of its own, which the stylesheet selects by attribute:
+
+- A player placeholder, `button[data-ot-player]`, is a slot of fixed size, the same whatever its title: at most 20rem wide (never wider than its container) and three lines high. Its `<span>` is the visible box, with the outline button's look: a play mark, then the player's title (its first inner `<span>`) on two lines, cut with "…" when it is longer, the second line left empty for a short title, then the player's site (its last inner `<span>`) on one line in `muted-foreground`. On hover and keyboard focus, the box takes the accent colors and a shadow and grows to show the whole title, over the content below, so the page does not move; the focus ring goes around the box.
+- An alert, `aside[data-ot-alert]`, has a left border and a bold title, its first `<p>`, both in its kind's color: `note` in `primary`, `tip` in `success`, `important` in `secondary`, `warning` in `warning` and `caution` in `destructive`.
+
+```html
+<button type="button" class="ot-player" data-ot-player="https://www.youtube.com/embed/aqz-KE-bpKQ"><span class="ot-player-box"><span class="ot-player-title">Big Buck Bunny</span><span class="ot-player-host">youtube.com</span></span></button>
+
+<aside class="ot-alert" data-ot-alert="warning">
+  <p class="ot-alert-title">Warning</p>
+  <p>Spoilers below.</p>
+</aside>
+```
+
+Math kept as code (`code.language-math`) looks like code. The classes are for the mod's own CSS: the stylesheet never uses them.
+
 **Undoing a pattern.** When an element means something else in a mod, for example an `<article>` that should not look like a card, one unlayered rule undoes the pattern (see the next section):
 
 ```css
@@ -234,7 +250,7 @@ mod:
   theme: "none"
 ```
 
-Its frame has neither the tokens nor the base stylesheet: the browser's defaults apply. It still receives `context.theme`, `theme.changed` and the color scheme attribute, so it can follow the app with its own styles. `theme: "default"` is the default.
+Its frame has neither the tokens nor the base stylesheet: the browser's defaults apply. Player placeholders of rendered tile bodies are then plain buttons, which still open their player when clicked. It still receives `context.theme`, `theme.changed` and the color scheme attribute, so it can follow the app with its own styles. `theme: "default"` is the default.
 
 ### Do not use `prefers-color-scheme`
 

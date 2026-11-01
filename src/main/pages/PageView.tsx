@@ -8,6 +8,7 @@ import type { Stage } from "../../lib/core/stage/index.ts";
 import { SETTINGS_SECTION_ID } from "../sections/section_registry.ts";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import type { SectionSwitches } from "../sections/section_switches.ts";
+import type { PlayerSites } from "../settings/player_sites.ts";
 import type { SiteDecisions } from "../settings/site_decisions.ts";
 import { SettingsPage } from "../settings/SettingsPage.tsx";
 import type { TileMediaSetting } from "../settings/tile_media_setting.ts";
@@ -24,6 +25,7 @@ interface PageViewProps {
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
   siteDecisions: SiteDecisions;
+  playerSites: PlayerSites;
 }
 
 function buildPageFile(
@@ -50,6 +52,7 @@ export function PageView({
   switches,
   tileMedia,
   siteDecisions,
+  playerSites,
 }: PageViewProps): ReactElement | null {
   const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
   const visible = snapshot.visible;
@@ -73,6 +76,7 @@ export function PageView({
         switches={switches}
         tileMedia={tileMedia}
         siteDecisions={siteDecisions}
+        playerSites={playerSites}
       />
     );
   }

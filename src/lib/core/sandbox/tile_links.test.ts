@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildTestTile } from "../../../test/test_files.ts";
 import type { ModIssue, ModPermission } from "../../mod/index.ts";
 import type { Tile } from "../../tile/index.ts";
+import { renderTileBody } from "../tile_bodies/index.ts";
 import { collectTileLinks } from "./tile_links.ts";
 
 const TILE_SOURCE = "https://tiles.example.net/books/kallocain.md";
@@ -9,6 +10,8 @@ const TILE_SOURCE = "https://tiles.example.net/books/kallocain.md";
 const OTHER_TILE_SOURCE = "https://tiles.example.net/books/we.md";
 
 const CONTENT_HOSTS = ["https://example.org", "https://tiles.example.net"];
+
+const NO_BODY_MEDIA = new Map<string, string[]>();
 
 function buildShowPermission(host: string): ModPermission {
   const permission: ModPermission = { category: "show", host, reason: "Test" };
@@ -35,7 +38,20 @@ function buildPrivateIssue(source: string, url: string): ModIssue {
 
 function collectImageLink(image: string): ReturnType<typeof collectTileLinks> {
   const tiles = [buildTestTile(TILE_SOURCE, { image })];
-  const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+  const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
+  return tileLinks;
+}
+
+/** The links of one tile with `body`, whose rendered body media are passed as the renderer collects them. */
+function collectBodyLinks(body: string): ReturnType<typeof collectTileLinks> {
+  const tile: Tile = {
+    source: TILE_SOURCE,
+    metadata: { title: "Kallocain" },
+    body,
+    types: [],
+  };
+  const bodyMedia = new Map([[tile.source, renderTileBody(tile).mediaUrls]]);
+  const tileLinks = collectTileLinks([tile], CONTENT_HOSTS, [], bodyMedia);
   return tileLinks;
 }
 
@@ -58,7 +74,7 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
       }),
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks.sources).toEqual([
       "https://media.example.net/sound/theme.mp3",
@@ -73,7 +89,7 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
       }),
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks.sources).toEqual([
       "https://media.example.net/a.jpg",
@@ -89,17 +105,56 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
     expect(tileLinks.sources).toEqual(["https://media.example.net/cover.jpg"]);
   });
 
-  it("URL in the body", function ignoresBody(): void {
-    const tile: Tile = {
-      source: TILE_SOURCE,
-      metadata: { title: "Kallocain" },
-      body: "![Cover](https://media.example.net/body.jpg)",
-      types: [],
-    };
+  it("Image in the body", function collectsBodyImage(): void {
+    const tileLinks = collectBodyLinks(
+      "![Still](https://media.example.net/body.jpg)",
+    );
 
-    const tileLinks = collectTileLinks([tile], CONTENT_HOSTS, []);
+    expect(tileLinks).toEqual({
+      sources: ["https://media.example.net/body.jpg"],
+      issues: [],
+    });
+  });
+
+  it("Video and poster in the body", function collectsBodyVideo(): void {
+    const tileLinks = collectBodyLinks(
+      '<video src="https://media.example.net/trailer.mp4" poster="https://media.example.net/still.jpg"></video>',
+    );
+
+    expect(tileLinks.sources).toEqual([
+      "https://media.example.net/still.jpg",
+      "https://media.example.net/trailer.mp4",
+    ]);
+  });
+
+  it("URL in the body", function ignoresBodyText(): void {
+    const tileLinks = collectBodyLinks(
+      "See https://media.example.net/text.jpg and [this](https://media.example.net/link.jpg).",
+    );
 
     expect(tileLinks).toEqual({ sources: [], issues: [] });
+  });
+
+  it("collects the srcset candidates of a picture in the body", function collectsBodyPicture(): void {
+    const tileLinks = collectBodyLinks(
+      '<picture><source srcset="https://media.example.net/dark.png" media="(prefers-color-scheme: dark)"><img src="https://media.example.net/light.png"></picture>',
+    );
+
+    expect(tileLinks.sources).toEqual([
+      "https://media.example.net/dark.png",
+      "https://media.example.net/light.png",
+    ]);
+  });
+
+  it("reports a private address of a body image with the guard's issue", function reportsPrivateBodyImage(): void {
+    const tileLinks = collectBodyLinks(
+      "![Router](http://192.168.1.1/logo.png)",
+    );
+
+    expect(tileLinks).toEqual({
+      sources: [],
+      issues: [buildPrivateIssue(TILE_SOURCE, "http://192.168.1.1/logo.png")],
+    });
   });
 
   it("ignores keys", function ignoresKeys(): void {
@@ -109,7 +164,7 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
       }),
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks.sources).toEqual([]);
   });
@@ -128,7 +183,7 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
       }),
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks).toEqual({ sources: [], issues: [] });
   });
@@ -144,7 +199,7 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
       }),
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks.sources).toEqual([
       "https://alpha.example.net/a.jpg",
@@ -172,7 +227,12 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
       buildShowPermission("https://*.us.archive.org"),
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, granted);
+    const tileLinks = collectTileLinks(
+      tiles,
+      CONTENT_HOSTS,
+      granted,
+      NO_BODY_MEDIA,
+    );
 
     expect(tileLinks).toEqual({ sources: [], issues: [] });
   });
@@ -185,7 +245,12 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
       { category: "connect", host: "https://api.example.net", reason: "Test" },
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, granted);
+    const tileLinks = collectTileLinks(
+      tiles,
+      CONTENT_HOSTS,
+      granted,
+      NO_BODY_MEDIA,
+    );
 
     expect(tileLinks.sources).toEqual(["https://api.example.net/a.jpg"]);
   });
@@ -204,7 +269,7 @@ describe("Media linked by tiles", function describeMediaLinkedByTiles(): void {
     ];
     const tilesCopy = structuredClone(tiles);
 
-    collectTileLinks(tiles, CONTENT_HOSTS, []);
+    collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tiles).toEqual(tilesCopy);
   });
@@ -230,7 +295,7 @@ describe("A tile link allows only the linked file", function describeOnlyLinkedF
       }),
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks).toEqual({ sources: [], issues: [] });
   });
@@ -333,7 +398,7 @@ describe("Tile links the sandbox cannot express", function describeUnexpressible
     const url = "https://[2001:db8::1]/cover.jpg";
     const tiles = [buildTestTile(TILE_SOURCE, { image: url, thumbnail: url })];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks.issues).toEqual([
       buildUnexpressibleIssue(TILE_SOURCE, url),
@@ -347,7 +412,7 @@ describe("Tile links the sandbox cannot express", function describeUnexpressible
       buildTestTile(OTHER_TILE_SOURCE, { image: url }),
     ];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks.issues).toEqual([
       buildUnexpressibleIssue(TILE_SOURCE, url),
@@ -374,7 +439,12 @@ describe("Private network guard", function describePrivateNetworkGuard(): void {
       buildTestTile(tileSource, { image: "http://192.168.1.20/cover.png" }),
     ];
 
-    const tileLinks = collectTileLinks(tiles, ["http://localhost:8080"], []);
+    const tileLinks = collectTileLinks(
+      tiles,
+      ["http://localhost:8080"],
+      [],
+      NO_BODY_MEDIA,
+    );
 
     expect(tileLinks).toEqual({
       sources: ["http://192.168.1.20/cover.png"],
@@ -387,7 +457,7 @@ describe("Private network guard", function describePrivateNetworkGuard(): void {
     const url = "http://localhost:3000/cover.png";
     const tiles = [buildTestTile(tileSource, { image: url })];
 
-    const tileLinks = collectTileLinks(tiles, [], []);
+    const tileLinks = collectTileLinks(tiles, [], [], NO_BODY_MEDIA);
 
     expect(tileLinks).toEqual({
       sources: [],
@@ -399,7 +469,7 @@ describe("Private network guard", function describePrivateNetworkGuard(): void {
     const url = "http://192.168.1.1/logo.png";
     const tiles = [buildTestTile(TILE_SOURCE, { logo: url, icon: [url] })];
 
-    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, []);
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
 
     expect(tileLinks.issues).toEqual([buildPrivateIssue(TILE_SOURCE, url)]);
   });
@@ -413,6 +483,7 @@ describe("Private network guard", function describePrivateNetworkGuard(): void {
       tiles,
       [...CONTENT_HOSTS, "http://localhost:5173"],
       [],
+      NO_BODY_MEDIA,
     );
 
     expect(tileLinks).toEqual({ sources: [], issues: [] });

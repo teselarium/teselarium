@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import type { ActionSnapshot, AppAction } from "../../lib/core/stage/index.ts";
+import type { QuestionAction, QuestionSnapshot } from "./ActionDialog.tsx";
 import { SAMPLE_MOD_SOURCE } from "../../test/sample_mods.ts";
 import { ActionDialog } from "./ActionDialog.tsx";
 
@@ -31,15 +31,15 @@ afterEach(function restoreEffects(): void {
   vi.restoreAllMocks();
 });
 
-function buildShown(action: AppAction, id: number = 3): ActionSnapshot {
-  const shown: ActionSnapshot = { id, mod: MOD, action };
+function buildShown(action: QuestionAction, id: number = 3): QuestionSnapshot {
+  const shown: QuestionSnapshot = { id, mod: MOD, action };
   return shown;
 }
 
 function buildConfirm(
   message: string,
   confirmLabel: string = "OK",
-): ActionSnapshot {
+): QuestionSnapshot {
   return buildShown({
     kind: "confirm",
     message,
@@ -48,7 +48,7 @@ function buildConfirm(
   });
 }
 
-function renderDialog(shown: ActionSnapshot | null): HTMLDialogElement {
+function renderDialog(shown: QuestionSnapshot | null): HTMLDialogElement {
   render(<ActionDialog shown={shown} onAnswer={onAnswer} />);
   const dialog = document.querySelector("dialog");
   if (dialog === null) {

@@ -532,6 +532,169 @@
     color: var(--ot-warning);
   }
 
+  /*
+   * A player placeholder of a rendered tile body: a slot of fixed size, the
+   * same whatever its title, whose span is the visible box: a play mark, two
+   * lines for the player's title and one for its site.
+   */
+  button[data-ot-player] {
+    position: relative;
+    display: inline-block;
+    width: min(100%, 20rem);
+    height: calc(3 * 1.25rem + 2 * var(--ot-space-2) + 2px);
+    margin: 0 0 var(--ot-space-4);
+    padding: 0;
+    border: none;
+    background: none;
+    vertical-align: middle;
+    text-align: left;
+  }
+
+  /* A pasted player stands alone, spaced as a paragraph; one in a paragraph uses the paragraph's spacing. */
+  p > button[data-ot-player] {
+    margin: 0;
+  }
+
+  /* The visible box, which fills the slot and grows over the content below. */
+  button[data-ot-player] > span {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    /* The play mark gets half a step more room on both sides than the text's right edge. */
+    column-gap: calc(var(--ot-space-3) * 1.5);
+    min-height: 100%;
+    padding: var(--ot-space-2) var(--ot-space-3) var(--ot-space-2)
+      calc(var(--ot-space-3) * 1.5);
+    border: 1px solid var(--ot-border);
+    border-radius: var(--ot-radius);
+    background-color: var(--ot-background);
+    color: var(--ot-foreground);
+    line-height: 1.25rem;
+    overflow-wrap: anywhere;
+  }
+
+  /* The title: two lines, the second one empty for a short title, cut with "…" for a long one. */
+  button[data-ot-player] > span > span:first-child {
+    grid-column: 2;
+    display: -webkit-box;
+    min-height: 2.5rem;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  button[data-ot-player] > span > span:last-child {
+    grid-column: 2;
+    overflow: hidden;
+    color: var(--ot-muted-foreground);
+    font-weight: 400;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* The play mark: a triangle cut out of a box in the text color. */
+  button[data-ot-player] > span::before {
+    content: "";
+    grid-row: 1 / span 2;
+    align-self: center;
+    width: 0.9375rem;
+    height: 1.125rem;
+    background-color: var(--ot-foreground);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+
+  /* Hover and keyboard focus show the whole title, over the content below. */
+  button[data-ot-player]:hover > span,
+  button[data-ot-player]:focus-visible > span {
+    z-index: 1;
+    background-color: var(--ot-accent);
+    color: var(--ot-accent-foreground);
+    box-shadow: var(--ot-shadow);
+  }
+
+  button[data-ot-player]:hover > span > span:first-child,
+  button[data-ot-player]:focus-visible > span > span:first-child {
+    display: block;
+    overflow: visible;
+  }
+
+  button[data-ot-player]:hover > span::before,
+  button[data-ot-player]:focus-visible > span::before {
+    background-color: var(--ot-accent-foreground);
+  }
+
+  /* The focus ring goes around the visible box, not the slot. */
+  button[data-ot-player]:focus-visible {
+    outline: none;
+  }
+
+  button[data-ot-player]:focus-visible > span {
+    border-color: var(--ot-ring);
+    outline: 3px solid var(--ot-ring);
+  }
+
+  /* An alert of a rendered tile body: a left border and a bold title in its kind's color. */
+  aside[data-ot-alert] {
+    margin: 0 0 var(--ot-space-4);
+    padding: var(--ot-space-2) var(--ot-space-4);
+    border-left: 3px solid var(--ot-border);
+  }
+
+  aside[data-ot-alert] > p:first-child {
+    font-weight: 600;
+  }
+
+  aside[data-ot-alert] > :last-child {
+    margin-bottom: 0;
+  }
+
+  aside[data-ot-alert="note"] {
+    border-left-color: var(--ot-primary);
+  }
+
+  aside[data-ot-alert="note"] > p:first-child {
+    color: var(--ot-primary);
+  }
+
+  aside[data-ot-alert="tip"] {
+    border-left-color: var(--ot-success);
+  }
+
+  aside[data-ot-alert="tip"] > p:first-child {
+    color: var(--ot-success);
+  }
+
+  aside[data-ot-alert="important"] {
+    border-left-color: var(--ot-secondary);
+  }
+
+  aside[data-ot-alert="important"] > p:first-child {
+    color: var(--ot-secondary);
+  }
+
+  aside[data-ot-alert="warning"] {
+    border-left-color: var(--ot-warning);
+  }
+
+  aside[data-ot-alert="warning"] > p:first-child {
+    color: var(--ot-warning);
+  }
+
+  aside[data-ot-alert="caution"] {
+    border-left-color: var(--ot-destructive);
+  }
+
+  aside[data-ot-alert="caution"] > p:first-child {
+    color: var(--ot-destructive);
+  }
+
+  /* Math kept as code looks like code: the code rules above already apply. */
+
   a,
   button,
   input,

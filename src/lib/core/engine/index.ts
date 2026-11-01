@@ -2,6 +2,7 @@ export type {
   AppAction,
   ConfirmAction,
   LinkAction,
+  PlayerAction,
   SaveFileAction,
 } from "./app_actions.ts";
 export {
@@ -55,6 +56,8 @@ export type {
   ModMethodContext,
   ModMethodTable,
 } from "./mod_methods.ts";
+export { buildTileBodies, collectModTileLinks } from "./mod_tile_bodies.ts";
+export type { TileBodies } from "./mod_tile_bodies.ts";
 export {
   connectModSession,
   pushThemeChanged,

@@ -13,5 +13,10 @@ export type {
   MetadataValue,
   ParsedMarkdown,
 } from "./markdown_parser.ts";
-export { describeYamlValue, isYamlMapping, parseYaml } from "./yaml_parser.ts";
+export {
+  describeYamlValue,
+  isYamlMapping,
+  listYamlStrings,
+  parseYaml,
+} from "./yaml_parser.ts";
 export type { ParsedYaml, YamlMapping, YamlValue } from "./yaml_parser.ts";

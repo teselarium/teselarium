@@ -55,8 +55,11 @@ import type {
   ModMethodContext,
   ModMethodTable,
 } from "./mod_methods.ts";
+import type { TileBodies } from "./mod_tile_bodies.ts";
 import { MODS_METHODS } from "./mods_methods.ts";
+import { PLAYERS_METHODS } from "./players_methods.ts";
 import { STORAGE_METHODS } from "./storage_methods.ts";
+import { TILES_METHODS } from "./tiles_methods.ts";
 import { UI_METHODS } from "./ui_methods.ts";
 
 /** The services a session needs from the app. */
@@ -134,6 +137,8 @@ export const ENGINE_METHODS: ModMethodTable = {
   ...LINKS_METHODS,
   ...FILES_METHODS,
   ...UI_METHODS,
+  ...TILES_METHODS,
+  ...PLAYERS_METHODS,
 };
 
 /** Two issues are equal when their level, source and message are equal. */
@@ -374,6 +379,7 @@ export function connectModSession(
       appOrigin: options.appOrigin,
       defaults: options.defaults,
       fetchOptions: options.fetchOptions,
+      tileBodies: launch.tileBodies,
       readSiteDecisions: options.readSiteDecisions,
       onOpenLink: options.onOpenLink,
       onRequestAction: options.onRequestAction,
@@ -391,12 +397,18 @@ export function connectModSession(
   return session;
 }
 
-/** Pushes `tiles.changed` with the reloaded tiles and their issues. */
+/**
+ * Pushes `tiles.changed` with the reloaded tiles and their issues, and
+ * replaces the session's tile bodies with theirs, so `tiles.renderBody` and
+ * `players.open` follow the reloaded tiles.
+ */
 export function pushTilesChanged(
   session: ModSession,
   tiles: Tile[],
   issues: TileIssue[],
+  tileBodies: TileBodies,
 ): void {
+  session.methodContext.tileBodies = tileBodies;
   sendToMod(
     session,
     buildNotification(TILES_CHANGED_METHOD, { tiles, issues }),

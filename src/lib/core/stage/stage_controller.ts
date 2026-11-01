@@ -18,6 +18,7 @@ import {
   answerAction,
   createStageActions,
   dropActions,
+  markActionPlaying,
   readShownAction,
 } from "./stage_actions.ts";
 import type { ActionMod, StageActions } from "./stage_actions.ts";
@@ -742,6 +743,15 @@ export function answerStageAction(
     return;
   }
   publishStage(stage);
+}
+
+/**
+ * Records that the user pressed Play in the player dialog of action `id`, so
+ * a player removed with its mod answers `true`. Does nothing for an unknown
+ * id. Changes nothing the page shows.
+ */
+export function markStageActionPlaying(stage: Stage, id: number): void {
+  markActionPlaying(stage.actions, id);
 }
 
 /**

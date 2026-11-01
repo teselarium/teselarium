@@ -72,14 +72,14 @@ Reads `source` and returns `{ html }` from the session's `TileBodies`, rendering
 
 ### D6. `players.open` is an app action
 
-A new `PlayerAction` (`kind: "player"`, `frameUrl`, `host`, `siteName`, `shape`) joins `AppAction`, so the action queue gives `players.open` the visibility, ordering and dropping rules of `mod-app-actions` without new code. The handler checks `url` (`-32602` when it is not an absolute `https:` address), looks it up in the session's player addresses (`-32002` otherwise), builds the action with `readPlayer` (or the iframe's own data) and calls `askUser`. A dropped player resolves `true` when it was already playing: the stage records on the entry whether Play was pressed.
+A new `PlayerAction` (`kind: "player"`, `title`, `frameUrl`, `host`, `siteName`, `shape`) joins `AppAction`, so the action queue gives `players.open` the visibility, ordering and dropping rules of `mod-app-actions` without new code. The handler checks `url` (`-32602` when it is not an absolute `https:` address), looks it up in the session's player addresses (`-32002` otherwise), builds the action with `readPlayer` (or the iframe's own data) and the title recorded with the address (the iframe's `title`, the image's alt text, or the tile's `title` for a metadata page link, or `null`), and calls `askUser`. A dropped player resolves `true` when it was already playing: the stage records on the entry whether Play was pressed.
 
 ### D7. `PlayerDialog`
 
 A `StageDialog` rendered by `StageView` when the shown action's kind is `player`; `ActionDialog` keeps the other three.
 
-- **Question**: mod title and source, site name and host, the cost sentence, the **Always play from <host>** checkbox, Cancel (focused) and Play.
-- **Player**: a frame with `src` = `frameUrl`, `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation"`, `allow="autoplay; encrypted-media; picture-in-picture; fullscreen"`, `referrerPolicy="strict-origin"`, sized by `shape`, and a Close button. `allow-same-origin` is safe here because the frame's origin is the site's, never the app's; popups let the player's own "Watch on YouTube" link open a tab.
+- **Question**: mod title and source, the player's whole title (the placeholder may cut it), site name and host, the cost sentence, the **Always play from <host>** checkbox, Cancel (focused) and Play.
+- **Player**: a frame with `src` = `frameUrl`, `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation"`, `allow="autoplay; encrypted-media; picture-in-picture; fullscreen"`, `referrerPolicy="strict-origin"`, sized by `shape`, covered by a loading status (spinner and "Loading the player from <host>…") until the frame fires `load`, and a Close button. `allow-same-origin` is safe here because the frame's origin is the site's, never the app's; popups let the player's own "Watch on YouTube" link open a tab.
 - The dialog reads the remembered hosts (D8) when it opens: a remembered host skips the question.
 
 ### D8. Remembered player hosts
@@ -94,7 +94,7 @@ A small store, `src/main/settings/player_sites.ts`, with the key `opentesela.pla
 
 ### D10. Base stylesheet
 
-`button.ot-player` gets a block box, full width, `aspect-ratio: 16 / 9`, the card colors, the title on top and the host in the muted color, and a play mark drawn with CSS. `aside.ot-alert` gets a left border and a bold title in its kind's token: `note` `--ot-primary`, `tip` `--ot-success`, `important` `--ot-secondary`, `warning` `--ot-warning`, `caution` `--ot-destructive`. Math code looks like code. A mod with `theme: "none"` gets plain elements.
+`button.ot-player` is a slot of fixed size (at most 20rem wide, three lines high), the same for every title, so bodies with several players line up. Its inner `span.ot-player-box` draws the box: a play mark drawn with CSS, two lines for the title, cut with "…", and one for the host in the muted color. On hover and keyboard focus the box grows over the content below to show the whole title, so the page does not move; the dialog's question shows the whole title too, for touch screens. Nothing is loaded before Play, so there is no thumbnail to fill a large video-shaped box, and a compact box suits audio players too. A scrolling title was rejected: it needs JavaScript to measure each title, is hard to read, and does not help keyboard, touch or reduced-motion users. `aside.ot-alert` gets a left border and a bold title in its kind's token: `note` `--ot-primary`, `tip` `--ot-success`, `important` `--ot-secondary`, `warning` `--ot-warning`, `caution` `--ot-destructive`. Math code looks like code. A mod with `theme: "none"` gets plain elements.
 
 ## Risks / Trade-offs
 

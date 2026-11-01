@@ -64,6 +64,8 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
+| `tiles.renderBody` | `{ source }`, the `source` of one of the mod's tiles | `{ html }`: the tile's body rendered to safe HTML (see [Tile bodies](#tile-bodies)). Added in mod API `0.1.5`. |
+| `players.open` | `{ url }`, a player address of the mod's tiles | `true` once the player was shown and closed, `false` if the user cancelled (see [Players](#players)). Added in mod API `0.1.5`. |
 
 | Event | Params |
 |---|---|
@@ -89,7 +91,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.4"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.5"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -105,6 +107,33 @@ A collection is optional. Without one, `tiles` and `issues` are empty and no col
 - Without a `type_path`, the mod receives every tile, each with `types` `[]`.
 - The validator is built again on each load, so "Reload tiles" picks up a changed type file too.
 - Each metadata string that starts with `./` or `../`, also inside lists and nested mappings, arrives as the absolute URL it names, resolved against the tile's `source`: `image: "./cover.jpg"` in `https://example.org/books/kallocain.md` arrives as `"https://example.org/books/cover.jpg"`. Only that prefix counts: strings such as `/r/books`, `cover.jpg` or absolute URLs, other values and mapping keys arrive as written. The tiles of `tiles.changed` and of a checked mod are resolved the same way; tiles a test passes to `mount(options)` are used as given. The loaded tile, which the collection is validated against, and the tile's `body` stay as written. A mod that shows such a string as text shows the absolute URL.
+
+### Tile bodies
+
+A tile's `body` reaches the mod as written. The engine can render it for the mod, so no mod has to bundle a markdown parser or sanitize what tile authors write. What the rendered HTML holds is described in the [tile bodies module](../tile_bodies/README.md): GitHub-flavored markdown and the HTML GitHub allows, `<video>`, `<audio>` and `<picture>`, paths resolved against the tile, alerts, heading ids, math kept as code, and a placeholder for each player.
+
+**`tiles.renderBody { source }`** answers `{ html }`, the body of the mod's tile whose `source` is `source`. The tiles are those the mod currently receives, after "Reload tiles" too. An empty body gives `""`. A `source` that is not a string is `-32602` (`tiles.renderBody: "source" must be a string`), and so is one that names no tile of the mod (`tiles.renderBody: the source https://example.org/other.md is not one of the mod's tiles`). A body renders on its first request and is kept.
+
+**`<ot-tile-body>`** is an element the frame loader defines in every mod frame, the frames of a check's tests included. Setting its `tile` property to a tile sends `tiles.renderBody` with the tile's `source`, and shows the result as the element's children, in the light DOM, so the theme and the mod's CSS style it. It then fires `ot-rendered`, which bubbles. When the request fails, the element shows the error's message as text with `role="alert"`. When `tile` is set again before the answer, the newest tile wins.
+
+```js
+const body = document.createElement("ot-tile-body");
+body.addEventListener("ot-rendered", function markShown() {
+  body.dataset.shown = "true";
+});
+body.tile = tile;
+document.body.append(body);
+```
+
+**Clicks in rendered bodies.** The frame loader listens to `click` on `window`, in the bubbling phase, so a mod writes no code for the links and players of a body. For a click the mod did not cancel:
+
+- on an element with `data-ot-player`: it sends `players.open` with the attribute's value (see [Players](#players));
+- on a link with `data-ot-link`: it cancels the navigation and sends `links.open` with the link's `href`, so the action dialog asks to open it and the mod keeps running;
+- on a link with `data-ot-fragment` (`#notes`): it cancels the navigation and scrolls to the heading `user-content-notes` nearest to the link. It looks inside the link's ancestors from the nearest outward, so with several bodies on a page, a link reaches the heading of its own body. A fragment without such a heading does nothing.
+
+A rejected request is logged with `console.warn`. To handle a body's clicks yourself, call `preventDefault()` on the click in your own listener: the frame loader then does nothing. Stopping the click's propagation without cancelling it lets a link navigate the frame, which stops the mod.
+
+The engine also reads the bodies at launch and after "Reload tiles": their images, video, audio, sources, posters and `srcset` candidates count as media linked by tiles (see the [sandbox module](../sandbox/README.md#media-linked-by-tiles)), and their players are the mod's player addresses. Bodies without `<`, `![` or `://` are skipped then, so plain-text bodies cost nothing until the mod asks for them. A body with media takes about 2 ms to read: 500 such tiles add about a second to a mod's start.
 
 ### Inspecting and opening mods
 
@@ -139,7 +168,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.4"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.5"
     }
   ]
 }
@@ -188,6 +217,31 @@ await engine.request("links.open", { url: tile.data.url });
 ```
 
 The request stays pending while the dialog is open, for as long as the user needs, so a mod must not rely on a quick answer.
+
+### Players
+
+A video or audio player from a site such as YouTube does not play inside a mod's frame, whose origin is opaque. So the app shows players itself, in a dialog of its own page, outside the mod's frame, after asking the user. `players.open { url }` follows the rules of the other actions above: only the visible mod asks, one dialog at a time, in the order the requests arrived, and a mod that leaves gets an answer.
+
+**Player addresses.** `url` must be a player address of the mod's current tiles:
+
+- the `src` of an `<iframe>` in a tile's body, resolved against the tile, when it is `https:` and allowed by the private network guard (see the [sandbox module](../sandbox/README.md#media-linked-by-tiles)). The rendered body holds it as a placeholder's `data-ot-player`;
+- a page link or player address of a known site (YouTube, Vimeo, SoundCloud) that is a metadata string of a tile, such as `video: "https://www.youtube.com/watch?v=aqz-KE-bpKQ"`, or an image address in its body, such as `![Trailer](https://www.youtube.com/watch?v=aqz-KE-bpKQ)`.
+
+No other address is one: `homepage: "https://example.org/about"` is not a player. The [players module](../players/README.md) lists the known sites and what each plays from: YouTube plays from `youtube-nocookie.com`, and any other iframe from its own `src`.
+
+**Errors**, without a dialog: a `url` that is not a string holding an absolute `https:` address is `-32602` (`players.open: "url" must be an absolute https: address`), and one that is not a player address of the mod's tiles is `-32002` (`players.open: https://www.youtube.com/watch?v=dQw4w9WgXcQ is not a player of the mod's tiles`). A hidden mod gets `-32002` (`players.open: only the visible mod can ask the user`).
+
+**The player dialog** names the mod by its title and source, shows the whole title the tile gives the player (the iframe's `title`, the image's alt text, or the tile's `title` for a metadata page link), the site's name for a known site and the host the player loads, and says that this site will see that the user played this. Until the user presses Play, nothing is requested from the site. Cancel is focused; Cancel and Escape answer `false`. **Always play from <host>**, unchecked by default, remembers the host for every mod when Play is pressed, and later players of that host play at once. Settings lists and removes these hosts (see the [Settings page](../../../main/settings/README.md)).
+
+After Play, the player plays in a frame of the app's page, sized for the site, with a Close button; Escape closes it too. The app sets the frame's sandbox, permissions and referrer policy itself, and never copies an attribute of the tile's iframe: the player gets autoplay, encrypted media, picture-in-picture and fullscreen, and the app's origin, and no more, as the referrer. Closing removes the frame, so playback stops, and answers `true`. A player removed because its mod stopped being visible, was closed or was stopped answers `true` too.
+
+```js
+await engine.request("players.open", {
+  url: tile.metadata.video,
+});
+```
+
+A mod rarely sends it itself: a click on a placeholder of a rendered body sends it (see [Tile bodies](#tile-bodies)).
 
 ### Default mod settings
 
@@ -278,7 +332,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.4` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.5` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -298,7 +352,7 @@ An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-lo
 
 ### Hosting note
 
-Mods run in `srcdoc` frames, which inherit the Content-Security-Policy of the page that embeds them. The app sends none on static hosts. A page that embeds OpenTesela with its own Content-Security-Policy must allow inline scripts in frames (`script-src 'unsafe-inline' blob:`), or no mod can start. The app also needs `unsafe-eval` to build tile validators (see the [tile module](../../tile/README.md)).
+Mods run in `srcdoc` frames, which inherit the Content-Security-Policy of the page that embeds them. The app sends none on static hosts. A page that embeds OpenTesela with its own Content-Security-Policy must allow inline scripts in frames (`script-src 'unsafe-inline' blob:`), or no mod can start. The app also needs `unsafe-eval` to build tile validators (see the [tile module](../../tile/README.md)). A policy with `frame-src` (or `child-src`) must also allow the player sites, such as `https://www.youtube-nocookie.com https://player.vimeo.com https://w.soundcloud.com`, and the sites of the iframes tile bodies hold, or players stay blank.
 
 ## Module Details
 
@@ -369,7 +423,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.4"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.5"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.7` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -381,7 +435,7 @@ Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `a
 
 - `loadModLaunchInputs(request, options)`: loads what a mod's launch is built from. `request` is a `ModLaunchRequest` (`link`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `params`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` before any request, loads the mod and its entrypoint, and loads the collection when `link.collection` is not `null`. Returns `ModLaunchInputs` (`mod`, `link`, `modTiles`), with `modTiles` `null` without a collection. Every error propagates, and each names its source. The stage keeps the inputs while it asks the user (see the [stage module](../stage/README.md)), and builds the launch once the grants are known.
 - `buildModLaunch(mod, link, modTiles, grants, loadsTileLinkedMedia)`: builds the `ModLaunch` of a loaded mod, its `ModTiles` (or `null`) and its `grants`, the `ModGrants` of `grantModPermissions` (see the [permissions module](../permissions/README.md)), without requesting anything: collects the content hosts and the tile links (when `loadsTileLinkedMedia` is `true`), builds the policy, the frame document, the mount context and the issues. Opening a mod and checking it both call it, so a checked mod gets the frame it would get if it were opened with the same grants.
-  Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `tileLinks`, `policy`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects, and whose `permissions` are `grants`. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. `tileLinks` is the `TileLinks` of the tiles the mod receives (`collectTileLinks`, see [Media linked by tiles](../sandbox/README.md#media-linked-by-tiles)): `sources`, the files the policy allows as images, video and audio, and `issues`, the left-out links, kept apart from `issues` so the stage can replace them after "Reload tiles". It is `{ sources: [], issues: [] }` without a collection, and `null` when `loadsTileLinkedMedia` is `false`: then nothing is collected or reported, and blocked image reports get no redirect hint. The mount context does not list the tile links, so the mod API does not change.
+  Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `tileLinks`, `tileBodies`, `policy`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects, and whose `permissions` are `grants`. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. `tileBodies` is the `TileBodies` of the tiles the mod receives (`buildTileBodies`, below), which the session keeps. `tileLinks` is the `TileLinks` of the tiles the mod receives and their body media (`collectModTileLinks`, below, see [Media linked by tiles](../sandbox/README.md#media-linked-by-tiles)): `sources`, the files the policy allows as images, video and audio, and `issues`, the left-out links and the iframes the bodies left out, kept apart from `issues` so the stage can replace them after "Reload tiles". It is `{ sources: [], issues: [] }` without a collection, and `null` when `loadsTileLinkedMedia` is `false`: then nothing is collected or reported, and blocked image reports get no redirect hint. The mount context does not list the tile links, so the mod API does not change.
 - `buildModTestDocument(launch)`: the `srcdoc` HTML of a frame of the mod's tests: the launch's `policy` (the frame's Content-Security-Policy) and the mod's theme setting, as in `sandboxDocument`, with the assertions and the test runner after the frame loader (see the [sandbox module](../sandbox/README.md#frames-of-a-checks-tests)). So a case runs the mod with the content policy it gets when it is opened.
 - `loadModTiles(mod, collectionLocation, options?)`: loads a collection for a mod and selects its tiles with `selectModTiles`. Returns `ModTiles` (`collectionSource`, `tiles`, `issues`). The stage's "Reload tiles" calls it again.
 - `selectModTiles(collection, tileValidator)`: the `ModTiles` of a loaded collection. With a validator, the collection is validated and only the tiles of its type are kept, the others appearing as warnings in `issues`. With `null`, every tile is kept. The kept tiles are new tiles whose metadata strings starting with `./` or `../` are resolved against the tile's `source` (`resolveTilePaths` in `tile_paths.ts`, not exported by `index.ts`), so opening, "Reload tiles" and checks all get resolved tiles. The collection's tiles stay as written and are validated as written.
@@ -407,6 +461,14 @@ const launch = buildModLaunch(inputs.mod, inputs.link, inputs.modTiles, grants, 
 // launch.contentHosts is ["https://example.org"]
 // launch.tileLinks is { sources: [], issues: [] }: the granted show hosts cover the covers
 ```
+
+### Tile bodies of a launch
+
+Implemented in `mod_tile_bodies.ts`, with the renderer of the [tile bodies module](../tile_bodies/README.md) and the table of the [players module](../players/README.md).
+
+- `buildTileBodies(tiles)`: the `TileBodies` of the tiles a mod receives: `tiles` (each tile by source), `renderedBodies` (the `RenderedBody` of each body rendered so far, by source), `playerAddresses` (each player address, normalized as `URL.href`, with its `TilePlayer`: the `Player` and the title the tile gives it, which is the tile's `title` for a metadata page link), `mediaByTile` (the `mediaUrls` of each collected body, by source) and `issues` (the warnings of iframes the bodies left out). Each metadata string that `readPlayer` recognizes is a player address; each body holding `<`, `![` or `://` is rendered, and its media, players and issues are collected. `buildModLaunch` and the stage's "Reload tiles" call it. The tiles are not changed.
+- `collectModTileLinks(tiles, tileBodies, contentHosts, granted)`: `collectTileLinks` with the bodies' media, followed by the bodies' issues.
+- `readTileBodyHtml(tileBodies, source)` and `findTilePlayer(tileBodies, url)`, used by the handlers and not exported by `index.ts`: the HTML of a tile's body, rendered on first request and kept, or `null` for a source of no tile; and the `TilePlayer` of a player address, or `null`.
 
 ### Mod check
 
@@ -435,19 +497,20 @@ const report = buildModCheckReport(source, bundleCheck.findings, false, null);
 
 ### Request handlers
 
-Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`) and `ui_methods.ts` (`UI_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `readSiteDecisions`, `onOpenLink`, `onRequestAction`, `onCheckMod`).
+Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`), `ui_methods.ts` (`UI_METHODS`), `tiles_methods.ts` (`TILES_METHODS`) and `players_methods.ts` (`PLAYERS_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `tileBodies`, `readSiteDecisions`, `onOpenLink`, `onRequestAction`, `onCheckMod`). `tileBodies` is the session's current `TileBodies`, which `pushTilesChanged` replaces.
 
-The `links.*`, `files.*` and `ui.*` handlers check their params into an `AppAction` (`app_actions.ts`), data the app can perform with no more checks:
+The `links.*`, `files.*`, `ui.*` and `players.*` handlers check their params into an `AppAction` (`app_actions.ts`), data the app can perform with no more checks:
 
 - `LinkAction`: `{ kind: "link", url }`, with `url` the normalized `href`.
 - `SaveFileAction`: `{ kind: "save", name, type, bytes }`, with `bytes` a `Uint8Array` holding the file, so the size the dialog shows is the size downloaded. `MAX_SAVE_BYTES` is 20 MB.
 - `ConfirmAction`: `{ kind: "confirm", message, confirmLabel, cancelLabel }`, with the labels defaulted.
+- `PlayerAction`: `{ kind: "player", title, frameUrl, host, siteName, shape }`: the title recorded with the address (plain text, or `null`), and the `Player` of the address: what the player frame loads, the host the dialog asks about, the known site's name or `null`, and the frame's `PlayerShape`. The tile's iframe attributes are never part of it.
 
 Then they call `askUser(context, method, action)`, which calls `context.onRequestAction(action)`: a promise of the user's answer, or `null` when the sandbox is not the visible one, which `askUser` turns into `-32002`. Actions never cross `postMessage`: they go from the session to the stage and the page in the same window. The types are exported from `index.ts` as types only.
 
-To add a namespace, for example `tiles.*`:
+To add a namespace, for example `notes.*`:
 
-1. Write `tiles_methods.ts` with module-level named handlers and `export const TILES_METHODS: ModMethodTable = { "tiles.list": listTiles }`. Check the params with `readRequiredText` and `throwInvalidParams` from `mod_methods.ts`, and turn the errors you expect into `ModMethodError`.
+1. Write `notes_methods.ts` with module-level named handlers and `export const NOTES_METHODS: ModMethodTable = { "notes.list": listNotes }`. Check the params with `readRequiredText` and `throwInvalidParams` from `mod_methods.ts`, and turn the errors you expect into `ModMethodError`.
 2. Test the handlers directly with a plain context.
 3. Add the table to `ENGINE_METHODS` in `mod_session.ts`.
 
@@ -460,7 +523,7 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
   - `test`: `{ code, caseName }` (`SandboxTestParams`), sent in `sandbox.connect` so the frame lists the cases of the test file (`caseName` `null`) or runs one. Only the frames of a check's tests, built with `buildModTestDocument`, pass it.
   - `onTestReport(report)`: called with each test notification of the frame, read as a `SandboxTestReport` (`listed`, `listFailed`, `answerQueued` or `caseFinished`, see the [sandbox module](../sandbox/README.md#frame-loader-messages)). Notifications of the wrong shape are ignored. Running sandboxes pass none, so a mod that sends them outside a check changes nothing.
   - `onErrorResponse(method, error)`: called for every error response the session sends, with the request's method, or `null` for a message that is not a request (`-32600`), and the response's `error` (`ResponseError`: `code`, `message`). The mod check keeps `-32600`, `-32601` and `-32602`, the signal that a mod uses the API wrongly. Without it, nothing outside the session sees the responses.
-- `pushTilesChanged(session, tiles, issues)`: pushes `tiles.changed`.
+- `pushTilesChanged(session, tiles, issues, tileBodies)`: pushes `tiles.changed`, and replaces the session's `TileBodies` with `tileBodies`, those of the reloaded tiles, so `tiles.renderBody` and `players.open` follow them. The policy stays the launch's.
 - `pushThemeChanged(session, theme)`: pushes `theme.changed` with the `Theme`.
 - `THEME_CHANGED_METHOD`: `"theme.changed"`, shared with the frame loader. `TILES_CHANGED_METHOD`, `"tiles.changed"`, and `ENGINE_METHODS`, the merged handler table, are exported by `mod_session.ts` for the surface guard, not by `index.ts`.
 - `stopModSession(session)`: closes the channel. Later messages, pushes and answers to pending requests do nothing.
@@ -470,11 +533,15 @@ Lifecycle:
 1. The stage loads the mod with `loadModLaunchInputs`, asks the user what it needs to, builds the launch with `buildModLaunch` and renders its frame with `launch.sandboxDocument`.
 2. On the frame's first `load`, the stage calls `connectModSession` with the frame's window.
 3. The session answers each request once with the same `id`. `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked` from the frame loader become issues through `onIssue`, each reported once. `sandbox.mounted` and `sandbox.mountFailed` call `onMounted`, and the test runner's notifications `onTestReport`, when given.
-4. "Reload tiles" calls `loadModTiles` and `pushTilesChanged`. A color scheme change calls `pushThemeChanged` for every running session.
+4. "Reload tiles" calls `loadModTiles`, `buildTileBodies` and `pushTilesChanged`. A color scheme change calls `pushThemeChanged` for every running session.
 5. Closing the sandbox, or the frame loading another document, calls `stopModSession`.
 
 ```ts
-import { connectModSession, pushTilesChanged } from "./lib/core/engine/index.ts";
+import {
+  buildTileBodies,
+  connectModSession,
+  pushTilesChanged,
+} from "./lib/core/engine/index.ts";
 
 const session = connectModSession(frame.contentWindow, launch, {
   storage: localStorage,
@@ -486,5 +553,10 @@ const session = connectModSession(frame.contentWindow, launch, {
   onRequestAction: showActionFromThisSandbox,
   theme: buildTheme("dark"),
 });
-pushTilesChanged(session, reloadedTiles.tiles, reloadedTiles.issues);
+pushTilesChanged(
+  session,
+  reloadedTiles.tiles,
+  reloadedTiles.issues,
+  buildTileBodies(reloadedTiles.tiles),
+);
 ```

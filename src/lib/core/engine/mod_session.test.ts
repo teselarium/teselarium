@@ -26,6 +26,7 @@ import { launchTestMod } from "../../../test/test_launches.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModContext, ModLaunch, RunLink } from "./mod_launch.ts";
 import type { ModCheckRequest } from "./mod_methods.ts";
+import { buildTileBodies } from "./mod_tile_bodies.ts";
 import {
   connectModSession,
   pushThemeChanged,
@@ -418,7 +419,7 @@ describe("connectModSession", function describeConnectModSession(): void {
     const played = await playSession();
     const tiles: Tile[] = played.launch.context.tiles.slice(0, 2);
 
-    pushTilesChanged(played.session, tiles, []);
+    pushTilesChanged(played.session, tiles, [], buildTileBodies(tiles));
     await waitForReceived(played, 1);
 
     expect(played.received).toEqual([
@@ -429,6 +430,23 @@ describe("connectModSession", function describeConnectModSession(): void {
       },
     ]);
     expect(played.received[0]).not.toHaveProperty("id");
+  });
+
+  it("replaces the player addresses with those of the reloaded tiles", async function replacesTileBodies(): Promise<void> {
+    const played = await playSession();
+    const reloadedTile: Tile = {
+      ...played.launch.context.tiles[0],
+      body: '<iframe src="https://maps.example.net/embed?id=7"></iframe>',
+    };
+    const reloadedBodies = buildTileBodies([reloadedTile]);
+
+    pushTilesChanged(played.session, [reloadedTile], [], reloadedBodies);
+
+    const tileBodies = played.session.methodContext.tileBodies;
+    expect(tileBodies).toBe(reloadedBodies);
+    expect([...tileBodies.playerAddresses.keys()]).toEqual([
+      "https://maps.example.net/embed?id=7",
+    ]);
   });
 
   it("pushes theme.changed with the theme", async function pushesThemeChanged(): Promise<void> {
@@ -765,7 +783,7 @@ describe("stopModSession", function describeStopModSession(): void {
     });
     stopModSession(played.session);
     sendRequest(played, 2, "storage.get", { key: "selected" });
-    pushTilesChanged(played.session, [], []);
+    pushTilesChanged(played.session, [], [], buildTileBodies([]));
     pushThemeChanged(played.session, buildTheme("dark"));
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await waitForMessages();

@@ -18,7 +18,6 @@ import {
   buildSandboxDocument,
   buildSandboxPolicy,
   collectContentHosts,
-  collectTileLinks,
 } from "../sandbox/index.ts";
 import type { TileLinks } from "../sandbox/index.ts";
 import type { Theme } from "../theme/index.ts";
@@ -30,6 +29,8 @@ import {
   matchModApiRange,
   MOD_API_VERSION,
 } from "./mod_api_version.ts";
+import { buildTileBodies, collectModTileLinks } from "./mod_tile_bodies.ts";
+import type { TileBodies } from "./mod_tile_bodies.ts";
 import { resolveTilePaths } from "./tile_paths.ts";
 
 /** What to run: a mod reference, a collection location and the link parameters. Not an address. */
@@ -79,6 +80,8 @@ export interface ModLaunch {
    * was off as the mod started.
    */
   tileLinks: TileLinks | null;
+  /** The bodies of the tiles the mod receives at launch, which "Reload tiles" replaces in the session. */
+  tileBodies: TileBodies;
   /** The frame's Content-Security-Policy, which the frames of the mod's tests also get. */
   policy: string;
   /** The frame's `srcdoc` HTML. */
@@ -272,7 +275,8 @@ function buildModContext(
 }
 
 function collectLaunchTileLinks(
-  modTiles: ModTiles | null,
+  tiles: Tile[],
+  tileBodies: TileBodies,
   contentHosts: string[],
   grants: ModGrants,
   loadsTileLinkedMedia: boolean,
@@ -280,17 +284,22 @@ function collectLaunchTileLinks(
   if (!loadsTileLinkedMedia) {
     return null;
   }
-  const tiles = modTiles === null ? [] : modTiles.tiles;
-  const tileLinks = collectTileLinks(tiles, contentHosts, grants.granted);
+  const tileLinks = collectModTileLinks(
+    tiles,
+    tileBodies,
+    contentHosts,
+    grants.granted,
+  );
   return tileLinks;
 }
 
 /**
  * Builds everything a loaded mod's frame needs from its tiles and its grants
  * (`grantModPermissions`): its policy, its frame document, its mount context
- * and its issues. With `loadsTileLinkedMedia`, the policy also allows the
- * files the tiles link (`collectTileLinks`); the mount context does not list
- * them. Requests nothing.
+ * and its issues, and renders the bodies the tiles need collected
+ * (`buildTileBodies`). With `loadsTileLinkedMedia`, the policy also allows
+ * the files the tiles and their bodies link (`collectModTileLinks`); the
+ * mount context does not list them. Requests nothing.
  */
 export function buildModLaunch(
   mod: LoadedMod,
@@ -300,8 +309,11 @@ export function buildModLaunch(
   loadsTileLinkedMedia: boolean,
 ): ModLaunch {
   const contentHosts = collectContentHosts(listContentSources(mod, modTiles));
+  const tiles = modTiles === null ? [] : modTiles.tiles;
+  const tileBodies = buildTileBodies(tiles);
   const tileLinks = collectLaunchTileLinks(
-    modTiles,
+    tiles,
+    tileBodies,
     contentHosts,
     grants,
     loadsTileLinkedMedia,
@@ -317,6 +329,7 @@ export function buildModLaunch(
     context: buildModContext(mod, link, modTiles, grants),
     contentHosts,
     tileLinks,
+    tileBodies,
     policy,
     sandboxDocument: buildSandboxDocument(policy, mod.theme),
     apiCompatible: matchModApiRange(mod.api),

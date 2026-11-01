@@ -13,6 +13,8 @@ export interface StageActionEntry {
   sandboxId: string;
   mod: ActionMod;
   action: AppAction;
+  /** Whether the user pressed Play on a player action: dropping it then answers `true`. */
+  isPlaying: boolean;
   resolve: (accepted: boolean) => void;
 }
 
@@ -34,7 +36,14 @@ function placeEntry(
   action: AppAction,
   resolve: (accepted: boolean) => void,
 ): void {
-  actions.entries.push({ id: actions.nextId, sandboxId, mod, action, resolve });
+  actions.entries.push({
+    id: actions.nextId,
+    sandboxId,
+    mod,
+    action,
+    isPlaying: false,
+    resolve,
+  });
   actions.nextId += 1;
 }
 
@@ -78,8 +87,24 @@ export function answerAction(
 }
 
 /**
- * Resolves with `false` and removes every action whose sandbox `canAsk`
- * refuses. Returns whether any action was dropped.
+ * Records that the player of action `id` is playing, so dropping it answers
+ * `true`. Returns `false`, and does nothing, for an unknown id or an action
+ * that is not a player.
+ */
+export function markActionPlaying(actions: StageActions, id: number): boolean {
+  for (const entry of actions.entries) {
+    if (entry.id === id && entry.action.kind === "player") {
+      entry.isPlaying = true;
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Removes every action whose sandbox `canAsk` refuses, and resolves it with
+ * `false`, or `true` for a player that was playing. Returns whether any
+ * action was dropped.
  */
 export function dropActions(
   actions: StageActions,
@@ -96,7 +121,7 @@ export function dropActions(
   }
   actions.entries = kept;
   for (const entry of dropped) {
-    entry.resolve(false);
+    entry.resolve(entry.isPlaying);
   }
   return dropped.length > 0;
 }

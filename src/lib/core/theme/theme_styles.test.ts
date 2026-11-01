@@ -205,6 +205,12 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       "details",
       "summary",
       '[aria-busy="true"]',
+      "button[data-ot-player]",
+      'aside[data-ot-alert="note"]',
+      'aside[data-ot-alert="tip"]',
+      'aside[data-ot-alert="important"]',
+      'aside[data-ot-alert="warning"]',
+      'aside[data-ot-alert="caution"]',
     ];
     for (const pattern of patterns) {
       expect(selectors).toContain(pattern);

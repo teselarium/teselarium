@@ -32,9 +32,19 @@ import {
   showImage,
   siteConsentDialog,
   stageBar,
+  visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
 import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
+import {
+  openBodyProbe,
+  playerDialog,
+  playerFrame,
+  pressPlay,
+  routePlayerSites,
+  YOUTUBE_FRAME_HOST,
+  YOUTUBE_PAGE,
+} from "./tile_body_routes.ts";
 import { themeControl } from "./theme_probes.ts";
 
 const SECTION_SWITCHES_KEY = "opentesela.sidebar-sections";
@@ -174,6 +184,38 @@ async function expandModGroup(page: Page, title: string): Promise<void> {
 }
 
 /** Opens Settings and removes the remembered allow of the probe's covers, as a user clicks Remove. */
+const PLAYER_SITE_LINE = `play media from ${YOUTUBE_FRAME_HOST}`;
+
+/** Opens the probe with a tile that links a YouTube page, and plays it with Always play from checked. */
+async function rememberPlayerSite(page: Page): Promise<Frame> {
+  await routePlayerSites(page);
+  const { frame } = await openBodyProbe(page, [
+    {
+      name: "bunny",
+      metadataLines: [`video: "${YOUTUBE_PAGE}"`],
+      body: "Big Buck Bunny.",
+    },
+  ]);
+  await frame.evaluate(startPlayer);
+  await playerDialog(page)
+    .getByLabel(`Always play from ${YOUTUBE_FRAME_HOST}`)
+    .check();
+  await pressPlay(page);
+  await playerDialog(page).getByRole("button", { name: "Close" }).click();
+  await expect(playerDialog(page)).toBeHidden();
+  return frame;
+}
+
+/** Runs in the probe's frame: asks for the player of the YouTube page its tile links. */
+function startPlayer(): void {
+  const probeGlobal = globalThis as unknown as {
+    probe: { engine: { request: (method: string, params: object) => unknown } };
+  };
+  void probeGlobal.probe.engine.request("players.open", {
+    url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+  });
+}
+
 async function removeProbeDecision(page: Page): Promise<void> {
   await expandModGroup(page, "Probe");
   await expect(modPermissionsGroup(page)).toContainText("Allowed");
@@ -272,6 +314,44 @@ test.describe("Settings page", function describeSettingsPage(): void {
     expect(headings.indexOf("Mod permissions")).toBe(
       headings.indexOf("Privacy") + 1,
     );
+  });
+});
+
+test.describe("Sites always played from in Settings", function describePlayerSites(): void {
+  test("Remembered player site", async function listsPlayerSite({
+    page,
+  }): Promise<void> {
+    await rememberPlayerSite(page);
+
+    await openSection(page, "Settings");
+
+    await expect(modPermissionsGroup(page)).toContainText(PLAYER_SITE_LINE);
+    await expect(modPermissionsGroup(page)).toContainText("Every mod");
+    await expect(
+      modPermissionsGroup(page).getByRole("button", {
+        name: `Remove: ${PLAYER_SITE_LINE}`,
+      }),
+    ).toBeVisible();
+  });
+
+  test("Asked again after removing", async function asksAgainForPlayer({
+    page,
+  }): Promise<void> {
+    const frame = await rememberPlayerSite(page);
+    await openSection(page, "Settings");
+
+    await modPermissionsGroup(page)
+      .getByRole("button", { name: `Remove: ${PLAYER_SITE_LINE}` })
+      .click();
+    await expect(modPermissionsGroup(page)).not.toContainText(PLAYER_SITE_LINE);
+    await page.goBack();
+    await expect(visibleSandbox(page)).toBeVisible();
+    await frame.evaluate(startPlayer);
+
+    await expect(
+      playerDialog(page).getByRole("button", { name: "Play" }),
+    ).toBeVisible();
+    await expect(playerFrame(page)).toHaveCount(0);
   });
 });
 

@@ -8,7 +8,7 @@ import SANDBOX_TEST_RUNNER from "./sandbox_test_runner.js?raw";
 const POLICY = buildSandboxPolicy(["https://example.org"], [], []);
 
 const TOP_LEVEL_NAME =
-  /^(?:export )?(?:async )?(?:function|const|let) ([A-Za-z_$][\w$]*)/gm;
+  /^(?:export )?(?:async )?(?:function|const|let|class) ([A-Za-z_$][\w$]*)/gm;
 
 /** The names a frame script declares at its top level. */
 function listTopLevelNames(script: string): string[] {
@@ -95,6 +95,21 @@ describe("buildSandboxDocument", function describeBuildSandboxDocument(): void {
     expect(sandboxDocument).toContain(`content="${POLICY}">`);
   });
 
+  it("defines the tile body element in every frame, check frames too", function definesTileBody(): void {
+    const definition =
+      "customElements.define(TILE_BODY_ELEMENT, TileBodyElement)";
+    const runningDocument = buildSandboxDocument(POLICY, "default");
+    const checkDocument = buildSandboxDocument(POLICY, "none", {
+      testRunner: true,
+    });
+
+    expect(SANDBOX_LOADER).toContain(
+      'const TILE_BODY_ELEMENT = "ot-tile-body";',
+    );
+    expect(runningDocument).toContain(definition);
+    expect(checkDocument).toContain(definition);
+  });
+
   it("has frame scripts without a closing script tag", function checksScriptTexts(): void {
     for (const script of [
       SANDBOX_LOADER,
@@ -113,6 +128,7 @@ describe("buildSandboxDocument", function describeBuildSandboxDocument(): void {
     ];
 
     expect(names).toContain("frameModes");
+    expect(names).toContain("TileBodyElement");
     expect(names).toContain("waitFor");
     expect(new Set(names).size).toBe(names.length);
   });

@@ -1,8 +1,10 @@
 import type { SiteDecision } from "../../lib/core/permissions/index.ts";
 import { PERMISSION_CATEGORIES } from "../../lib/mod/index.ts";
+import { readStoredJson, writeStoredJson } from "./stored_json.ts";
+import type { SettingsStorage } from "./stored_json.ts";
 
 /** The part of `Storage` the store uses. The app passes `localStorage`. */
-export type SiteDecisionsStorage = Pick<Storage, "getItem" | "setItem">;
+export type SiteDecisionsStorage = SettingsStorage;
 
 export interface SiteDecisionsOptions {
   storage: SiteDecisionsStorage;
@@ -21,29 +23,6 @@ export type SiteDecisionLine = Pick<SiteDecision, "mod" | "category" | "host">;
 
 /** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
 export const SITE_DECISIONS_KEY = "opentesela.site-decisions";
-
-function readStoredValue(storage: SiteDecisionsStorage): unknown {
-  try {
-    const stored: unknown = JSON.parse(
-      storage.getItem(SITE_DECISIONS_KEY) ?? "null",
-    );
-    return stored;
-  } catch {
-    // Unreadable or not JSON: counts as no stored value.
-    return null;
-  }
-}
-
-function writeDecisions(
-  storage: SiteDecisionsStorage,
-  decisions: readonly SiteDecision[],
-): void {
-  try {
-    storage.setItem(SITE_DECISIONS_KEY, JSON.stringify(decisions));
-  } catch {
-    // The decisions still apply until the page is closed.
-  }
-}
 
 function isWebAddress(value: unknown): boolean {
   if (typeof value !== "string" || !URL.canParse(value)) {
@@ -138,7 +117,7 @@ function publishDecisions(
   decisions: readonly SiteDecision[],
 ): void {
   store.snapshot = decisions;
-  writeDecisions(store.storage, decisions);
+  writeStoredJson(store.storage, SITE_DECISIONS_KEY, decisions);
   for (const listener of store.listeners) {
     listener();
   }
@@ -154,7 +133,9 @@ export function createSiteDecisions(
   const store: SiteDecisions = {
     storage: options.storage,
     listeners: new Set(),
-    snapshot: readValidDecisions(readStoredValue(options.storage)),
+    snapshot: readValidDecisions(
+      readStoredJson(options.storage, SITE_DECISIONS_KEY),
+    ),
   };
   return store;
 }

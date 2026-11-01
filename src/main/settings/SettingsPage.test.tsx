@@ -19,6 +19,7 @@ import {
   PROBE_MOD_SOURCE,
   SAMPLE_COVERS_PERMISSION,
 } from "../../test/sample_mods.ts";
+import { PLAYER_SITES_KEY, readPlayerSitesSnapshot } from "./player_sites.ts";
 import { SITE_DECISIONS_KEY } from "./site_decisions.ts";
 import { TILE_MEDIA_SETTING_KEY } from "./tile_media_setting.ts";
 
@@ -43,6 +44,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       switches={fixture.switches}
       tileMedia={fixture.tileMedia}
       siteDecisions={fixture.siteDecisions}
+      playerSites={fixture.playerSites}
       layout={fixture.layout}
     />,
   );
@@ -402,6 +404,54 @@ describe("SettingsPage", function describeSettingsPage(): void {
     expect(screen.getByText("No remembered decisions.")).toBeInTheDocument();
     expect(storage.getItem(SITE_DECISIONS_KEY)).toBe("[]");
     expect(fixture.stage.readSiteDecisions()).toEqual([]);
+  });
+
+  it("Remembered player site", async function listsPlayerSite(): Promise<void> {
+    const storage = createMemoryStorage();
+    storage.setItem(PLAYER_SITES_KEY, '["www.youtube-nocookie.com"]');
+
+    renderApp(await startTestApp("#/settings", { storage }));
+
+    const list = screen.getByRole("list", { name: "Sites always played from" });
+    expect(list).toHaveTextContent("play media from www.youtube-nocookie.com");
+    expect(list).toHaveTextContent("Every mod");
+    expect(
+      within(list).getByRole("button", {
+        name: "Remove: play media from www.youtube-nocookie.com",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("removes a player site", async function removesPlayerSite(): Promise<void> {
+    const storage = createMemoryStorage();
+    storage.setItem(
+      PLAYER_SITES_KEY,
+      '["www.youtube-nocookie.com","player.vimeo.com"]',
+    );
+    const fixture = await startTestApp("#/settings", { storage });
+    renderApp(fixture);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Remove: play media from www.youtube-nocookie.com",
+      }),
+    );
+
+    expect(readPlayerSitesSnapshot(fixture.playerSites)).toEqual([
+      "player.vimeo.com",
+    ]);
+    expect(storage.getItem(PLAYER_SITES_KEY)).toBe('["player.vimeo.com"]');
+    expect(
+      screen.queryByText("play media from www.youtube-nocookie.com"),
+    ).toBeNull();
+  });
+
+  it("lists no player site when none is remembered", async function listsNoPlayerSite(): Promise<void> {
+    renderApp(await startTestApp("#/settings"));
+
+    expect(
+      screen.queryByRole("list", { name: "Sites always played from" }),
+    ).toBeNull();
   });
 
   it("says what the Privacy switch shows the linked sites", async function describesPrivacy(): Promise<void> {

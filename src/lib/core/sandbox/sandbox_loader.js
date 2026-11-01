@@ -11,6 +11,14 @@ const MOUNT_FAILED_METHOD = "sandbox.mountFailed";
 const MOUNTED_METHOD = "sandbox.mounted";
 const DIALOG_BLOCKED_METHOD = "sandbox.dialogBlocked";
 const THEME_CHANGED_METHOD = "theme.changed";
+const RENDER_BODY_METHOD = "tiles.renderBody";
+const OPEN_LINK_METHOD = "links.open";
+const OPEN_PLAYER_METHOD = "players.open";
+
+const TILE_BODY_ELEMENT = "ot-tile-body";
+const RENDERED_EVENT = "ot-rendered";
+// The prefix of the ids of a rendered body, which its `#…` links leave out.
+const HEADING_ID_PREFIX = "user-content-";
 
 const loader = {
   port: null,
@@ -188,7 +196,7 @@ function isConnectMessage(event) {
   );
 }
 
-function describeMountError(error) {
+function describeError(error) {
   if (error instanceof Error) {
     return error.message;
   }
@@ -218,7 +226,7 @@ async function mountMod(code) {
 }
 
 function reportMountFailure(error) {
-  sendNotification(MOUNT_FAILED_METHOD, { message: describeMountError(error) });
+  sendNotification(MOUNT_FAILED_METHOD, { message: describeError(error) });
 }
 
 function flushPendingReports() {
@@ -276,5 +284,128 @@ function connectToEngine(event) {
   startFrameMode(params);
 }
 
+// A rendered tile body: setting `tile` asks the engine for its body and shows
+// it in the light DOM, so the theme and the mod's CSS style it. A custom
+// element must extend HTMLElement.
+class TileBodyElement extends HTMLElement {
+  #tile = null;
+  // Counts the requests, so only the answer for the newest tile is shown.
+  #requestCount = 0;
+
+  get tile() {
+    return this.#tile;
+  }
+
+  set tile(tile) {
+    this.#tile = tile;
+    this.#requestCount += 1;
+    const requestNumber = this.#requestCount;
+    requestEngine(RENDER_BODY_METHOD, { source: tile?.source }).then(
+      this.#showBody.bind(this, requestNumber),
+      this.#showError.bind(this, requestNumber),
+    );
+  }
+
+  #showBody(requestNumber, result) {
+    if (requestNumber !== this.#requestCount) {
+      return;
+    }
+    this.innerHTML = result.html;
+    this.dispatchEvent(new Event(RENDERED_EVENT, { bubbles: true }));
+  }
+
+  #showError(requestNumber, error) {
+    if (requestNumber !== this.#requestCount) {
+      return;
+    }
+    const message = document.createElement("p");
+    message.setAttribute("role", "alert");
+    message.textContent = describeError(error);
+    this.replaceChildren(message);
+  }
+}
+
+function defineTileBodyElement() {
+  if (customElements.get(TILE_BODY_ELEMENT) === undefined) {
+    customElements.define(TILE_BODY_ELEMENT, TileBodyElement);
+  }
+}
+
+function warnRejectedRequest(method, error) {
+  console.warn(`${method} was rejected: ${describeError(error)}`);
+}
+
+function sendBodyRequest(method, params) {
+  requestEngine(method, params).catch(
+    warnRejectedRequest.bind(undefined, method),
+  );
+}
+
+function findClickedElement(event, selector) {
+  if (!(event.target instanceof Element)) {
+    return null;
+  }
+  return event.target.closest(selector);
+}
+
+// `#notes` names the heading `user-content-notes`. A malformed escape is read as written.
+function readHeadingId(link) {
+  const fragment = link.getAttribute("href").slice(1);
+  try {
+    return HEADING_ID_PREFIX + decodeURIComponent(fragment);
+  } catch {
+    return HEADING_ID_PREFIX + fragment;
+  }
+}
+
+// The heading nearest to the link: the first one inside the link's
+// ancestors, from the nearest outward, so each body's links reach its own.
+function findFragmentHeading(link) {
+  const selector = `#${CSS.escape(readHeadingId(link))}`;
+  let ancestor = link.parentElement;
+  while (ancestor !== null) {
+    const heading = ancestor.querySelector(selector);
+    if (heading !== null) {
+      return heading;
+    }
+    ancestor = ancestor.parentElement;
+  }
+  return null;
+}
+
+function scrollToFragment(link) {
+  const heading = findFragmentHeading(link);
+  if (heading !== null) {
+    heading.scrollIntoView();
+  }
+}
+
+// Clicks in rendered bodies that the mod did not cancel: a placeholder asks
+// for its player, a link asks to open it, and a link to a heading scrolls to
+// it. Neither link navigates the frame, which would stop the mod.
+function handleBodyClick(event) {
+  if (event.defaultPrevented) {
+    return;
+  }
+  const placeholder = findClickedElement(event, "[data-ot-player]");
+  if (placeholder !== null) {
+    sendBodyRequest(OPEN_PLAYER_METHOD, { url: placeholder.dataset.otPlayer });
+    return;
+  }
+  const link = findClickedElement(event, "a[data-ot-link]");
+  if (link !== null) {
+    event.preventDefault();
+    sendBodyRequest(OPEN_LINK_METHOD, { url: link.href });
+    return;
+  }
+  const fragmentLink = findClickedElement(event, "a[data-ot-fragment]");
+  if (fragmentLink !== null) {
+    event.preventDefault();
+    scrollToFragment(fragmentLink);
+  }
+}
+
+defineTileBodyElement();
 document.addEventListener("securitypolicyviolation", reportViolation);
 window.addEventListener("message", connectToEngine);
+window.addEventListener("click", handleBodyClick);

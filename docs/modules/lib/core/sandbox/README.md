@@ -42,7 +42,7 @@ For a tile at `https://example.org/books/kallocain.md` with `image: "./cover.jpg
 
 Tile authors choose the images, video and audio their tiles link to, so the policy allows exactly the files the tiles link, whatever site they are on, without a permission. The mod cannot choose these addresses, only whether to load them, so they give it no way to send data to a host of its choice. Mods from the app's origin and from other origins get them alike, as they get the content hosts.
 
-When "Load media linked by tiles" is on as the mod starts (see the [Settings page](../../../main/settings/README.md)), `collectTileLinks` reads every metadata string of the tiles the mod receives, after the tile type filter, inside lists and nested mappings too. Keys and the tile body are never read. Each string goes through these steps in order, and the first step that applies decides:
+When "Load media linked by tiles" is on as the mod starts (see the [Settings page](../../../main/settings/README.md)), `collectTileLinks` reads every metadata string of the tiles the mod receives, after the tile type filter, inside lists and nested mappings too, then the media addresses of each tile's rendered body (see the [tile bodies module](../tile_bodies/README.md#media-and-pictures)): the addresses of its images, video, audio, `<source>` elements, posters and `srcset` candidates, resolved against the tile. Keys, and the body's text URLs and links, are never read. Each string or address goes through these steps in order, and the first step that applies decides:
 
 1. Not an absolute `http:` or `https:` URL: skipped. Plain text, relative paths, `data:` and `file:` strings are never links.
 2. Its path ends with `/`: skipped. It names a folder or a page, not a file, and its source would allow every file under it.
@@ -81,7 +81,8 @@ A private link that a content host or a granted `show` host covers is skipped at
 
 - Link an image, audio or video file, not a page or a folder that shows it.
 - Avoid links that redirect. The browser checks only the host of a redirect's target, never its path, so a link to `https://media.example.net/cover.jpg` that redirects to `https://cdn.example.org/cover.jpg` is blocked. Open the link in a browser and copy the address it ends at.
-- Streams (HLS and DASH), whose segment addresses are not in the tile, and pages embedded in frames, such as videos on a video site, are not covered. Neither are URLs in the tile's body.
+- In the body, show media as images, `<video>`, `<audio>` or `<picture>`: `![Still](https://media.example.net/body.jpg)` loads, but the text `https://media.example.net/body.jpg` or a link to it does not make it loadable.
+- Streams (HLS and DASH), whose segment addresses are not in the tile, are not covered. Pages embedded in frames, such as videos on a video site, are not media: the app shows them as players (see the [players module](../players/README.md)).
 
 ### Content policy
 
@@ -190,6 +191,7 @@ The frame loader (`sandbox_loader.js`) is the only script the app puts in a runn
 7. Before importing the mod, it replaces `alert`, `confirm`, `prompt` and `print` on `window` with functions that send `sandbox.dialogBlocked` and return what the blocked originals return: `undefined`, `false`, `null` and `undefined`.
 8. It starts the frame's mode, read from the connect params: `mount` without a `test` param, `list` for a `test` whose `caseName` is `null`, and `case` for a `test` with a case name. The modes live in a table, `frameModes`. The loader has only `mount`; the test runner adds `list` and `case`, so the loader does not depend on it. A mode the frame does not have (a `test` param in a frame without the runner) becomes `sandbox.mountFailed`.
 9. In the `mount` mode, it turns the mod's code into a `blob:` URL, `import()`s it, revokes the URL, checks that the default export is a function and calls `mount(engine, context)`, awaiting the result. A missing default export, an import error, a throw or a rejection becomes `sandbox.mountFailed`. When `mount` resolves, and only then, it sends `sandbox.mounted`.
+10. While the document loads, it defines the `ot-tile-body` element and listens to `click` on `window`, in the bubbling phase, for the links and player placeholders of rendered tile bodies. Both are in every frame, the frames of a check's tests too (see [Tile bodies](../engine/README.md#tile-bodies) in the engine's README).
 
 ### Frames of a check's tests
 
@@ -223,7 +225,7 @@ The frame loader and the engine use five notifications, and the test runner four
 | `sandbox.dialogBlocked` | frame to engine, on the port | `{ name }`: `"alert"`, `"confirm"`, `"prompt"` or `"print"`, the blocked function the mod called |
 | `sandbox.testsListed` | list frame to engine, on the port | `{ names }`: the names of the cases, in registration order |
 | `sandbox.testsFailed` | list frame to engine, on the port | `{ message }`: why the test file gives no cases |
-| `sandbox.answerQueued` | case frame to engine, on the port | `{ method, value }`: a scripted answer, a boolean for `links.open`, `files.save` and `ui.confirm`, and `null` for `mods.open` |
+| `sandbox.answerQueued` | case frame to engine, on the port | `{ method, value }`: a scripted answer, a boolean for `links.open`, `files.save`, `ui.confirm` and `players.open`, and `null` for `mods.open` |
 | `sandbox.caseFinished` | case frame to engine, on the port | `{ status, message }`: `"pass"` with `null`, or `"fail"` with the error's message |
 
 The frame loader also knows the engine's `theme.changed` event (see the [engine module](../engine/README.md)), to keep the color scheme attribute up to date. The name test in `sandbox_messages.test.ts` checks it against the engine's `THEME_CHANGED_METHOD`.
@@ -281,7 +283,9 @@ Implemented in `src/lib/core/sandbox/`. Other modules import only from the publi
 ### Content policy and reports
 
 - `collectContentHosts(sources)`: the content hosts of a list of file URLs.
-- `collectTileLinks(tiles, contentHosts, granted)`: the `TileLinks` of the tiles a mod receives: `sources`, the exact sources to add, sorted and without duplicates, and `issues`, one warning per left-out URL and tile (see [Media linked by tiles](#media-linked-by-tiles)). The input tiles are not changed.
+- `collectTileLinks(tiles, contentHosts, granted, bodyMedia)`: the `TileLinks` of the tiles a mod receives: `sources`, the exact sources to add, sorted and without duplicates, and `issues`, one warning per left-out URL and tile (see [Media linked by tiles](#media-linked-by-tiles)). `bodyMedia` maps a tile's `source` to the `mediaUrls` of its rendered body; a tile missing from it has no body media. The input tiles are not changed.
+- `isGuardedLink(url, tileSource)`: whether the private network guard leaves out a link of the tile at `tileSource`. The tile bodies module uses it for iframes.
+- `buildPrivateLinkIssue(tileSource, value)`: the guard's warning for a left-out link.
 - `buildSandboxPolicy(contentHosts, granted, tileLinkSources)`: the policy text for the content hosts, the granted permissions and the tile link sources, which go into `img-src` and `media-src` only. Pass `[]` when tile links are off.
 - `describeBlockedRequest(blocked, mod, grants, hintsTileLinks)`: the `ModIssue` for a `BlockedRequest` (`blockedUrl`, `directive`) of the mod with that `source`. With `hintsTileLinks`, an undeclared image or media host gets the redirect hint.
 - `describeNewTileLinks(count, collectionSource)`: the warning, whose source is the collection, that the reloaded tiles link `count` files the running mod does not allow yet.
@@ -303,7 +307,12 @@ const contentHosts = collectContentHosts([
 ]);
 // contentHosts is ["https://example.org"]
 
-const tileLinks = collectTileLinks(tiles, contentHosts, grants.granted);
+const tileLinks = collectTileLinks(
+  tiles,
+  contentHosts,
+  grants.granted,
+  tileBodies.mediaByTile,
+);
 const policy = buildSandboxPolicy(
   contentHosts,
   grants.granted,

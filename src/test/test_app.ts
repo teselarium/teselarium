@@ -5,6 +5,8 @@ import type { SectionDefinition } from "../main/sections/section_registry.ts";
 import { createSectionSwitches } from "../main/sections/section_switches.ts";
 import type { SectionSwitches } from "../main/sections/section_switches.ts";
 import { VANILLA_SECTIONS } from "../main/sections/vanilla_sections.ts";
+import { createPlayerSites } from "../main/settings/player_sites.ts";
+import type { PlayerSites } from "../main/settings/player_sites.ts";
 import {
   createSiteDecisions,
   readSiteDecisionsSnapshot,
@@ -24,7 +26,7 @@ import { createMemoryStorage } from "./memory_storage.ts";
 import type { MemoryStorage } from "./memory_storage.ts";
 import { buildTestStage, settleStage } from "./test_stages.ts";
 
-/** Everything `App` gets, built as `main.tsx` builds it, on fakes. The site decisions use `storage`. */
+/** Everything `App` gets, built as `main.tsx` builds it, on fakes. The site decisions and player sites use `storage`. */
 export interface AppFixture {
   history: FakeHistory;
   stage: Stage;
@@ -33,6 +35,7 @@ export interface AppFixture {
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
   siteDecisions: SiteDecisions;
+  playerSites: PlayerSites;
   layout: SidebarLayoutStore;
   storage: MemoryStorage;
   narrowQuery: FakeColorSchemeQuery;
@@ -91,6 +94,7 @@ export async function startTestApp(
     }),
     tileMedia: createTileMediaSetting({ storage, stage }),
     siteDecisions,
+    playerSites: createPlayerSites({ storage }),
     layout: createSidebarLayout({
       storage,
       narrowQuery,

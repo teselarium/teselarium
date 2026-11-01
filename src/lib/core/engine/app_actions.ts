@@ -1,3 +1,5 @@
+import type { PlayerShape } from "../players/index.ts";
+
 /** The largest file `files.save` accepts, in bytes: 20 MB. */
 export const MAX_SAVE_BYTES = 20 * 1024 * 1024;
 
@@ -25,9 +27,24 @@ export interface ConfirmAction {
   cancelLabel: string;
 }
 
+/** `players.open`: show a player of the mod's tiles in the app's dialog, after asking. */
+export interface PlayerAction {
+  kind: "player";
+  /** The title the tile gives the player, which the dialog shows as plain text, or `null`. */
+  title: string | null;
+  /** The address the player frame loads. */
+  frameUrl: string;
+  /** The host of `frameUrl`, which the dialog asks about. */
+  host: string;
+  /** The name of a known site, or `null`. */
+  siteName: string | null;
+  shape: PlayerShape;
+}
+
 /**
  * Something a mod asks the app to do for the user, checked and decoded, so
  * the app can perform it without more checks. Actions never cross
  * `postMessage`: they go from the session to the stage and the page.
  */
-export type AppAction = LinkAction | SaveFileAction | ConfirmAction;
+export type AppAction =
+  LinkAction | SaveFileAction | ConfirmAction | PlayerAction;

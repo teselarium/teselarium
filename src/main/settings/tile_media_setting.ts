@@ -1,8 +1,10 @@
 import { changeStageTileLinkedMedia } from "../../lib/core/stage/index.ts";
 import type { Stage } from "../../lib/core/stage/index.ts";
+import { readStoredJson, writeStoredJson } from "./stored_json.ts";
+import type { SettingsStorage } from "./stored_json.ts";
 
 /** The part of `Storage` the setting uses. The app passes `localStorage`. */
-export type TileMediaStorage = Pick<Storage, "getItem" | "setItem">;
+export type TileMediaStorage = SettingsStorage;
 
 export interface TileMediaSettingOptions {
   storage: TileMediaStorage;
@@ -22,23 +24,12 @@ export interface TileMediaSetting {
 export const TILE_MEDIA_SETTING_KEY = "opentesela.tile-linked-media";
 
 function readStoredValue(storage: TileMediaStorage): unknown {
-  try {
-    const stored: unknown = JSON.parse(
-      storage.getItem(TILE_MEDIA_SETTING_KEY) ?? "null",
-    );
-    return stored;
-  } catch {
-    // Unreadable or not JSON: counts as no stored value.
-    return null;
-  }
+  const stored = readStoredJson(storage, TILE_MEDIA_SETTING_KEY);
+  return stored;
 }
 
 function writeSetting(storage: TileMediaStorage, isOn: boolean): void {
-  try {
-    storage.setItem(TILE_MEDIA_SETTING_KEY, JSON.stringify(isOn));
-  } catch {
-    // The setting still applies until the page is closed.
-  }
+  writeStoredJson(storage, TILE_MEDIA_SETTING_KEY, isOn);
 }
 
 /**

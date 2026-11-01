@@ -701,3 +701,116 @@ describe("selectModTiles", function describeSelectModTiles(): void {
     expect(collection.tiles[0].metadata.image).toBe("./cover.jpg");
   });
 });
+
+/** The sample mod's launch, built with tiles whose bodies and metadata the test gives. */
+async function launchWithTiles(
+  tiles: Tile[],
+  loadsTileLinkedMedia: boolean = true,
+): Promise<ModLaunch> {
+  const inputs = await loadInputs(SAMPLE_LINK);
+  const modTiles: ModTiles = { ...readModTiles(inputs), tiles };
+  const grants = grantModPermissions(inputs.mod, APP_ORIGIN, []);
+  const launch = buildModLaunch(
+    inputs.mod,
+    inputs.link,
+    modTiles,
+    grants,
+    loadsTileLinkedMedia,
+  );
+  return launch;
+}
+
+function buildLaunchTile(
+  name: string,
+  metadata: Tile["metadata"],
+  body: string,
+): Tile {
+  const tile: Tile = {
+    source: `https://tiles.example.net/books/${name}.md`,
+    metadata,
+    body,
+    types: [],
+  };
+  return tile;
+}
+
+describe("Tile bodies at launch", function describeLaunchTileBodies(): void {
+  it("holds the player addresses of a body iframe and of a metadata page link", async function collectsPlayerAddresses(): Promise<void> {
+    const launch = await launchWithTiles([
+      buildLaunchTile(
+        "map",
+        { title: "Map" },
+        '<iframe src="https://maps.example.net/embed?id=7"></iframe>',
+      ),
+      buildLaunchTile(
+        "film",
+        {
+          title: "Film",
+          video: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+          homepage: "https://example.org/about",
+        },
+        "",
+      ),
+    ]);
+
+    expect([...launch.tileBodies.playerAddresses.keys()]).toEqual([
+      "https://maps.example.net/embed?id=7",
+      "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    ]);
+  });
+
+  it("allows the media of the bodies in the policy", async function allowsBodyMedia(): Promise<void> {
+    const launch = await launchWithTiles([
+      buildLaunchTile(
+        "still",
+        { title: "Still" },
+        "![Still](https://media.example.net/body.jpg)",
+      ),
+    ]);
+
+    expect(readDirective(launch.policy, "img-src")).toContain(
+      "https://media.example.net/body.jpg",
+    );
+  });
+
+  it("reports the iframes a body leaves out with the tile links", async function reportsLeftOutIframes(): Promise<void> {
+    const tile = buildLaunchTile(
+      "router",
+      { title: "Router" },
+      '<iframe src="https://192.168.1.1/"></iframe>',
+    );
+
+    const launch = await launchWithTiles([tile]);
+    const offLaunch = await launchWithTiles([tile], false);
+
+    expect(launch.tileLinks?.issues).toEqual([
+      {
+        level: "warning",
+        source: tile.source,
+        message:
+          "Not loading https://192.168.1.1/: tiles from other sites cannot link addresses on your computer or network.",
+      },
+    ]);
+    expect(offLaunch.tileLinks).toBeNull();
+    expect(offLaunch.tileBodies.playerAddresses.size).toBe(0);
+  });
+
+  it("skips the collection for bodies without HTML, images or addresses", async function skipsPlainBodies(): Promise<void> {
+    const plainTile = buildLaunchTile("plain", { title: "Plain" }, "# Notes");
+    const imageTile = buildLaunchTile(
+      "image",
+      { title: "Image" },
+      "![A](./a.jpg)",
+    );
+
+    const launch = await launchWithTiles([plainTile, imageTile]);
+
+    expect([...launch.tileBodies.renderedBodies.keys()]).toEqual([
+      imageTile.source,
+    ]);
+    expect([...launch.tileBodies.tiles.keys()]).toEqual([
+      plainTile.source,
+      imageTile.source,
+    ]);
+  });
+});

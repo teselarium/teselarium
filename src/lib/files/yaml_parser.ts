@@ -29,6 +29,27 @@ export function isYamlMapping(value: unknown): value is YamlMapping {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Every string of a YAML value, inside lists and nested mappings too, in order. Keys are not read. */
+export function listYamlStrings(value: YamlValue): string[] {
+  if (typeof value === "string") {
+    const strings = [value];
+    return strings;
+  }
+  const strings: string[] = [];
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      strings.push(...listYamlStrings(item));
+    }
+    return strings;
+  }
+  if (isYamlMapping(value)) {
+    for (const item of Object.values(value)) {
+      strings.push(...listYamlStrings(item));
+    }
+  }
+  return strings;
+}
+
 /** Describes a YAML value that is not a mapping, for error messages. */
 export function describeYamlValue(value: unknown): string {
   if (value === null) {

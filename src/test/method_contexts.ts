@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type { Mock } from "vitest";
 import type { AppAction } from "../lib/core/engine/app_actions.ts";
 import { ModMethodError } from "../lib/core/engine/engine_errors.ts";
+import { buildTileBodies } from "../lib/core/engine/mod_tile_bodies.ts";
 import type {
   ModCheckRequest,
   ModMethodContext,
@@ -100,6 +101,7 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
     appOrigin: APP_ORIGIN,
     defaults: TEST_DEFAULTS,
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    tileBodies: buildTileBodies([]),
     readSiteDecisions: readNoSiteDecisions,
     onOpenLink: acceptOpenLink,
     onRequestAction: acceptAction,

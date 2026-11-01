@@ -58,7 +58,7 @@ export interface SandboxConnectParams {
 
 /** The methods a case can script the answer to: those that ask the user, and `mods.open`. */
 export type AnswerMethod =
-  "links.open" | "files.save" | "ui.confirm" | "mods.open";
+  "links.open" | "files.save" | "ui.confirm" | "players.open" | "mods.open";
 
 /** A test notification of a check's frame, read by `readSandboxTestReport`. */
 export type SandboxTestReport =
@@ -155,6 +155,7 @@ function isAnswerMethod(method: string): method is AnswerMethod {
     method === "links.open" ||
     method === "files.save" ||
     method === "ui.confirm" ||
+    method === "players.open" ||
     method === "mods.open"
   );
 }

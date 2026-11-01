@@ -5,6 +5,7 @@ import {
   answerAction,
   createStageActions,
   dropActions,
+  markActionPlaying,
   readShownAction,
 } from "./stage_actions.ts";
 
@@ -19,6 +20,15 @@ function buildConfirm(message: string): AppAction {
   };
   return action;
 }
+
+const PLAYER: AppAction = {
+  kind: "player",
+  title: "Big Buck Bunny",
+  frameUrl: "https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ",
+  host: "www.youtube-nocookie.com",
+  siteName: "YouTube",
+  shape: { ratio: 16 / 9 },
+};
 
 function isSandboxOne(sandboxId: string): boolean {
   return sandboxId === "sandbox-1";
@@ -83,6 +93,27 @@ describe("stage actions", function describeStageActions(): void {
     expect(readShownAction(actions)?.action).toMatchObject({ message: "Kept" });
     answerAction(actions, 1, false);
     await expect(kept).resolves.toBe(false);
+  });
+
+  it("drops a playing player with true, and one not played yet with false", async function dropsPlayers(): Promise<void> {
+    const actions = createStageActions();
+    const played = addStageAction(actions, "sandbox-2", MOD, PLAYER);
+    const waiting = addStageAction(actions, "sandbox-2", MOD, PLAYER);
+
+    expect(markActionPlaying(actions, 1)).toBe(true);
+    dropActions(actions, isSandboxOne);
+
+    await expect(played).resolves.toBe(true);
+    await expect(waiting).resolves.toBe(false);
+  });
+
+  it("marks only player actions as playing", function marksOnlyPlayers(): void {
+    const actions = createStageActions();
+    addStageAction(actions, "sandbox-1", MOD, buildConfirm("Kept"));
+
+    expect(markActionPlaying(actions, 1)).toBe(false);
+    expect(markActionPlaying(actions, 9)).toBe(false);
+    expect(actions.entries[0].isPlaying).toBe(false);
   });
 
   it("tells when it dropped nothing", function dropsNothing(): void {

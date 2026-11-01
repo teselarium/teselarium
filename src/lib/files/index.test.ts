@@ -11,6 +11,7 @@ describe("files module", function describeFilesModule(): void {
       "fetchFile",
       "indexLocalFiles",
       "isYamlMapping",
+      "listYamlStrings",
       "parseMarkdown",
       "parseYaml",
       "resolveLocation",

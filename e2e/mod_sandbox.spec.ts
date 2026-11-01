@@ -48,6 +48,7 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
+import { openBodyProbe, showTileBodies } from "./tile_body_routes.ts";
 import {
   SAMPLE_COLLECTION_GLOB,
   SAMPLE_COLLECTION_PATH,
@@ -603,6 +604,12 @@ async function answerRedirect(location: string, route: Route): Promise<void> {
   await route.fulfill({ status: 302, headers: { Location: location } });
 }
 
+/** Runs in a mod frame: whether the image of the rendered body loaded. */
+function isBodyImageLoaded(): boolean {
+  const image = document.querySelector("ot-tile-body img") as HTMLImageElement;
+  return image.complete && image.naturalWidth > 0;
+}
+
 function reloadTilesButton(page: Page): Locator {
   return stageBar(page).getByRole("button", { name: "Reload tiles" });
 }
@@ -636,6 +643,55 @@ test.describe("Media linked by tiles", function describeLinkedMedia(): void {
       })
       .toContain(audioUrl);
     await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("Image in the body", async function loadsBodyImage({
+    page,
+  }): Promise<void> {
+    const imageUrl = `${MEDIA_HOST}/body.jpg`;
+    const { frame, mediaUrls } = await openBodyProbe(page, [
+      { name: "still", body: `![Still](${imageUrl})` },
+    ]);
+
+    await frame.evaluate(showTileBodies, [0]);
+
+    await expect.poll(frame.evaluate.bind(frame, isBodyImageLoaded)).toBe(true);
+    expect(mediaUrls).toEqual([imageUrl]);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("Video and poster in the body", async function sendsBodyVideo({
+    page,
+  }): Promise<void> {
+    const videoUrl = `${MEDIA_HOST}/trailer.mp4`;
+    const posterUrl = `${MEDIA_HOST}/still.jpg`;
+    const { frame, mediaUrls } = await openBodyProbe(page, [
+      {
+        name: "trailer",
+        body: `<video src="${videoUrl}" poster="${posterUrl}"></video>`,
+      },
+    ]);
+
+    await frame.evaluate(showTileBodies, [0]);
+
+    await expect
+      .poll(function readMediaUrls(): string[] {
+        return [...mediaUrls].sort();
+      })
+      .toEqual([posterUrl, videoUrl]);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("URL in the body", async function blocksBodyText({
+    page,
+  }): Promise<void> {
+    const textUrl = `${MEDIA_HOST}/text.jpg`;
+    const { frame, mediaUrls } = await openBodyProbe(page, [
+      { name: "text", body: `See ${textUrl}` },
+    ]);
+
+    expect(await frame.evaluate(showImage, textUrl)).toBe(false);
+    expect(mediaUrls).toEqual([]);
   });
 
   test("Mod from another origin", async function loadsLinkForForeignMod({

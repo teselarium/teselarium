@@ -1,7 +1,12 @@
 import { useId, useRef } from "react";
 import type { ReactElement } from "react";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
-import type { ActionSnapshot, AppAction } from "../../lib/core/stage/index.ts";
+import type {
+  ActionMod,
+  ConfirmAction,
+  LinkAction,
+  SaveFileAction,
+} from "../../lib/core/stage/index.ts";
 import {
   downloadFile,
   formatFileSize,
@@ -12,9 +17,19 @@ import { StageDialog } from "./StageDialog.tsx";
 /** The box of the action's detail: the address, the file or the message. */
 const DETAIL_CLASSES = "m-0 rounded-md bg-muted p-2 [overflow-wrap:anywhere]";
 
+/** The actions this dialog asks about: every action but a player, which has its own dialog. */
+export type QuestionAction = LinkAction | SaveFileAction | ConfirmAction;
+
+/** The shown action when it is a question. */
+export interface QuestionSnapshot {
+  id: number;
+  mod: ActionMod;
+  action: QuestionAction;
+}
+
 interface ActionDialogProps {
   /** The action to show, or `null` to keep the dialog closed. */
-  shown: ActionSnapshot | null;
+  shown: QuestionSnapshot | null;
   onAnswer: (id: number, accepted: boolean) => void;
 }
 
@@ -26,7 +41,7 @@ interface ActionTexts {
   cancelLabel: string;
 }
 
-function describeAction(action: AppAction): ActionTexts {
+function describeAction(action: QuestionAction): ActionTexts {
   if (action.kind === "link") {
     const linkTexts: ActionTexts = {
       lead: "wants to open this address in a new tab:",
@@ -68,7 +83,7 @@ function describeAction(action: AppAction): ActionTexts {
 }
 
 /** Opens the tab or starts the download. Must run inside the accept click. */
-function performAction(action: AppAction): void {
+function performAction(action: QuestionAction): void {
   if (action.kind === "link") {
     openLinkInNewTab(action.url);
   }

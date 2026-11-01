@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 import type { Page, Request } from "@playwright/test";
 import {
   ANSWER_TEST_CODE,
+  buildModConf,
+  buildTestCode,
+  PROBE_MOD_CODE,
   buildExpectedFailureCaseFiles,
   buildSampleCaseFiles,
   buildTestedProbeFiles,
@@ -39,6 +42,12 @@ import type {
   ModFiles,
   ProbeAnswer,
 } from "./mod_routes.ts";
+import {
+  BODIES_COLLECTION_URL,
+  routePlayerSites,
+  serveBodyTiles,
+  YOUTUBE_PAGE,
+} from "./tile_body_routes.ts";
 
 /** Opens the checker with `files` served, checks the test mod in the folder `name/` and returns the report. */
 async function checkTestMod(
@@ -92,6 +101,32 @@ function readWaitedMs(message: string | null): number {
 }
 
 /** The two cases of the shipped sample, both passing. */
+/** A case that answers `players.open` for the YouTube page its sample tile links. */
+const PLAYER_ANSWER_TEST_CODE = buildTestCode(
+  [
+    "async function playsAnswered(context) {",
+    "  await context.mount();",
+    '  context.answer("players.open", true);',
+    `  const played = await globalThis.probe.engine.request("players.open", { url: "${YOUTUBE_PAGE}" });`,
+    "  context.expect(played).toBe(true);",
+    "}",
+  ],
+  [["plays the answered player", "playsAnswered"]],
+);
+
+/** A probe whose sample collection is the body tiles, with `PLAYER_ANSWER_TEST_CODE` as its tests. */
+function buildPlayerAnswerFiles(): ModFiles {
+  const files: ModFiles = {
+    "player_answer/mod_conf.yaml": buildModConf("player_answer", [
+      '  test_path: "./test.js"',
+      `  sample_collection: "${BODIES_COLLECTION_URL}"`,
+    ]),
+    "player_answer/main.js": PROBE_MOD_CODE,
+    "player_answer/test.js": PLAYER_ANSWER_TEST_CODE,
+  };
+  return files;
+}
+
 const SAMPLE_TEST_RESULTS: CheckTestResult[] = [
   { name: "lists the sample books", status: "pass", message: null },
   { name: "highlights the remembered book", status: "pass", message: null },
@@ -292,6 +327,34 @@ test.describe("Scripted answers", function describeScriptedAnswers(): void {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.locator("[data-sandbox-id]")).toHaveCount(1);
     expect(report.findings).toEqual([]);
+  });
+
+  test("Player answered", async function answersPlayer({
+    page,
+  }): Promise<void> {
+    const playerRequests = await routePlayerSites(page);
+    await serveBodyTiles(page, [
+      {
+        name: "bunny",
+        metadataLines: [`video: "${YOUTUBE_PAGE}"`],
+        body: "Big Buck Bunny.",
+      },
+    ]);
+
+    const report = await checkTestMod(
+      page,
+      buildPlayerAnswerFiles(),
+      "player_answer",
+    );
+
+    expect(findCase(report, "plays the answered player")).toEqual({
+      name: "plays the answered player",
+      status: "pass",
+      message: null,
+    });
+    expect(report.findings).toEqual([]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(playerRequests).toEqual([]);
   });
 
   test("Wrong answer type", async function rejectsWrongAnswer({

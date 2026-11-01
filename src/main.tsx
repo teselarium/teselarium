@@ -16,6 +16,7 @@ import {
 import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import { createSectionSwitches } from "./main/sections/section_switches.ts";
 import { VANILLA_SECTIONS } from "./main/sections/vanilla_sections.ts";
+import { createPlayerSites } from "./main/settings/player_sites.ts";
 import {
   createSiteDecisions,
   readSiteDecisionsSnapshot,
@@ -60,14 +61,15 @@ function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
 }
 
 /**
- * Builds the site decisions, the stage, the app theme, the sidebar layout,
- * the section switches and the tile media setting once, outside React, so
+ * Builds the site decisions, the player sites, the stage, the app theme, the
+ * sidebar layout, the section switches and the tile media setting once, outside React, so
  * StrictMode's double effect run in dev does not launch mods twice.
  */
 function startApp(sections: readonly SectionDefinition[]): ReactElement {
   const systemQuery = window.matchMedia("(prefers-color-scheme: dark)");
   // Before the stage, which reads and remembers the decisions through it.
   const siteDecisions = createSiteDecisions({ storage: window.localStorage });
+  const playerSites = createPlayerSites({ storage: window.localStorage });
   const stage = createStage({
     history: window.history,
     defaults: DEFAULT_MODS,
@@ -119,6 +121,7 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
       switches={switches}
       tileMedia={tileMedia}
       siteDecisions={siteDecisions}
+      playerSites={playerSites}
       layout={layout}
     />
   );

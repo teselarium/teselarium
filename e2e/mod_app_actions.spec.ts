@@ -281,7 +281,7 @@ test.describe("One action dialog at a time", function describeQueue(): void {
     ]);
 
     await expect(actionDialog(page)).toContainText("First");
-    await expect(page.locator("dialog")).toHaveCount(1);
+    await expect(page.locator("dialog[open]")).toHaveCount(1);
     await expect(actionDialog(page)).not.toContainText("Second");
     await actionDialog(page).getByRole("button", { name: "OK" }).click();
     await expect(actionDialog(page)).toContainText("Second");

@@ -1,9 +1,11 @@
 import type { FileFetchOptions } from "../../files/index.ts";
 import type { LoadedMod, ModIssue, ModPermission } from "../../mod/index.ts";
-import { collectTileLinks, describeNewTileLinks } from "../sandbox/index.ts";
+import { describeNewTileLinks } from "../sandbox/index.ts";
 import type { TileIssue } from "../../tile/index.ts";
 import {
   buildModLaunch,
+  buildTileBodies,
+  collectModTileLinks,
   connectModSession,
   describeCancelledApiMismatch,
   loadModLaunchInputs,
@@ -23,6 +25,7 @@ import type {
   ModTiles,
   ResolvedDefaultModSettings,
   RunLink,
+  TileBodies,
 } from "../engine/index.ts";
 import { grantModPermissions, listConsentLines } from "../permissions/index.ts";
 import type { SiteDecision } from "../permissions/index.ts";
@@ -449,13 +452,15 @@ function countNewSources(sources: string[], allowedSources: string[]): number {
 function readReloadedTileLinkIssues(
   launch: ModLaunch,
   modTiles: ModTiles,
+  tileBodies: TileBodies,
   collectionSource: string,
 ): ModIssue[] | null {
   if (launch.tileLinks === null) {
     return null;
   }
-  const reloadedLinks = collectTileLinks(
+  const reloadedLinks = collectModTileLinks(
     modTiles.tiles,
+    tileBodies,
     launch.contentHosts,
     launch.context.permissions.granted,
   );
@@ -483,14 +488,21 @@ async function readReloadedIssues(
       collectionSource,
       services.fetchOptions,
     );
+    const tileBodies = buildTileBodies(modTiles.tiles);
     if (runtime.session !== null && runtime.status === "running") {
-      pushTilesChanged(runtime.session, modTiles.tiles, modTiles.issues);
+      pushTilesChanged(
+        runtime.session,
+        modTiles.tiles,
+        modTiles.issues,
+        tileBodies,
+      );
     }
     const reloadedIssues: ReloadedIssues = {
       collectionIssues: modTiles.issues,
       tileLinkIssues: readReloadedTileLinkIssues(
         launch,
         modTiles,
+        tileBodies,
         collectionSource,
       ),
     };

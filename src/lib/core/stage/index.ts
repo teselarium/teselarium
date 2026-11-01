@@ -11,6 +11,7 @@ export {
   createStage,
   followHistory,
   frameLoadedAgain,
+  markStageActionPlaying,
   openStageLink,
   openStageSection,
   readStageSnapshot,
@@ -31,6 +32,7 @@ export type {
   AppAction,
   ConfirmAction,
   LinkAction,
+  PlayerAction,
   SaveFileAction,
 } from "../engine/index.ts";
 export type { ActionMod } from "./stage_actions.ts";

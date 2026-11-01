@@ -16,6 +16,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       switches={fixture.switches}
       tileMedia={fixture.tileMedia}
       siteDecisions={fixture.siteDecisions}
+      playerSites={fixture.playerSites}
       layout={fixture.layout}
     />,
   );

@@ -1,9 +1,8 @@
-import { isYamlMapping } from "../../files/index.ts";
-import type { YamlValue } from "../../files/index.ts";
+import { listYamlStrings } from "../../files/index.ts";
 import type { ModIssue, ModPermission } from "../../mod/index.ts";
 import { permissionHostCovers } from "../../mod/index.ts";
 import type { Tile } from "../../tile/index.ts";
-import { isPrivateHost } from "./private_hosts.ts";
+import { isGuardedLink } from "./private_hosts.ts";
 import { listCategoryHosts, sortSources } from "./sandbox_policy.ts";
 
 /** What a mod's tiles link: the exact sources the policy adds, and the links left out. */
@@ -36,26 +35,6 @@ type LinkOutcome =
   | { kind: "skipped" };
 
 const SKIPPED_LINK: LinkOutcome = { kind: "skipped" };
-
-function listValueStrings(value: YamlValue): string[] {
-  if (typeof value === "string") {
-    const strings = [value];
-    return strings;
-  }
-  const strings: string[] = [];
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      strings.push(...listValueStrings(item));
-    }
-    return strings;
-  }
-  if (isYamlMapping(value)) {
-    for (const item of Object.values(value)) {
-      strings.push(...listValueStrings(item));
-    }
-  }
-  return strings;
-}
 
 function readLinkUrl(value: string): URL | null {
   if (!URL.canParse(value)) {
@@ -107,20 +86,11 @@ function coversOrigin(coveringHosts: string[], origin: string): boolean {
   return false;
 }
 
-/** A tile served from the user's computer or network; a picked `file:` tile is not. */
-function isPrivateTileSource(tileSource: string): boolean {
-  const url = readLinkUrl(tileSource);
-  if (url === null) {
-    return false;
-  }
-  return isPrivateHost(url.hostname);
-}
-
 /** Sorts one metadata string; the first step that applies decides. */
 function judgeTileLink(
   value: string,
   coveringHosts: string[],
-  isTileHostPrivate: boolean,
+  tileSource: string,
 ): LinkOutcome {
   const url = readLinkUrl(value);
   if (url === null || url.pathname.endsWith("/")) {
@@ -136,7 +106,7 @@ function judgeTileLink(
     };
     return unexpressibleOutcome;
   }
-  if (isPrivateHost(url.hostname) && !isTileHostPrivate) {
+  if (isGuardedLink(url, tileSource)) {
     const privateOutcome: LinkOutcome = {
       kind: "left-out",
       reason: PRIVATE_LINK_REASON,
@@ -163,14 +133,27 @@ function buildLeftOutIssue(
   return issue;
 }
 
+/** The warning for a link to the user's computer or network that a tile's link is left out for. */
+export function buildPrivateLinkIssue(
+  tileSource: string,
+  value: string,
+): ModIssue {
+  const issue = buildLeftOutIssue(tileSource, value, PRIVATE_LINK_REASON);
+  return issue;
+}
+
 /** The links of one tile, with each left-out URL reported once. Sources are not sorted yet. */
-function collectLinksOfTile(tile: Tile, coveringHosts: string[]): TileLinks {
-  const isTileHostPrivate = isPrivateTileSource(tile.source);
+function collectLinksOfTile(
+  tile: Tile,
+  bodyMediaUrls: string[],
+  coveringHosts: string[],
+): TileLinks {
   const sources: string[] = [];
   const issues: ModIssue[] = [];
   const reportedValues = new Set<string>();
-  for (const value of listValueStrings(tile.metadata)) {
-    const outcome = judgeTileLink(value, coveringHosts, isTileHostPrivate);
+  const values = [...listYamlStrings(tile.metadata), ...bodyMediaUrls];
+  for (const value of values) {
+    const outcome = judgeTileLink(value, coveringHosts, tile.source);
     if (outcome.kind === "allowed") {
       sources.push(outcome.source);
     }
@@ -186,15 +169,18 @@ function collectLinksOfTile(tile: Tile, coveringHosts: string[]): TileLinks {
 /**
  * Finds the images, video and audio a mod's tiles link: each `http:` or
  * `https:` URL that is a metadata string, inside lists and nested mappings
- * too. A link to a folder, or one whose origin a content host or a granted
- * `show` host covers, adds nothing. A link the policy cannot express, or one
- * to the user's computer or network from a tile that is not, is left out and
- * reported. The input tiles are not changed.
+ * too, or a media address of the tile's rendered body, which `bodyMedia`
+ * holds by tile source (`renderTileBody`'s `mediaUrls`). A link to a folder,
+ * or one whose origin a content host or a granted `show` host covers, adds
+ * nothing. A link the policy cannot express, or one to the user's computer
+ * or network from a tile that is not, is left out and reported. The input
+ * tiles are not changed.
  */
 export function collectTileLinks(
   tiles: Tile[],
   contentHosts: string[],
   granted: ModPermission[],
+  bodyMedia: ReadonlyMap<string, string[]>,
 ): TileLinks {
   const coveringHosts = [
     ...contentHosts,
@@ -203,7 +189,11 @@ export function collectTileLinks(
   const sources: string[] = [];
   const issues: ModIssue[] = [];
   for (const tile of tiles) {
-    const tileLinks = collectLinksOfTile(tile, coveringHosts);
+    const tileLinks = collectLinksOfTile(
+      tile,
+      bodyMedia.get(tile.source) ?? [],
+      coveringHosts,
+    );
     sources.push(...tileLinks.sources);
     issues.push(...tileLinks.issues);
   }

@@ -95,3 +95,26 @@ export function isPrivateHost(hostname: string): boolean {
   }
   return isPrivateName(name);
 }
+
+/** A tile served over `http:` or `https:` from the user's computer or network; a picked `file:` tile is not. */
+function isPrivateTileSource(tileSource: string): boolean {
+  if (!URL.canParse(tileSource)) {
+    return false;
+  }
+  const url = new URL(tileSource);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return false;
+  }
+  return isPrivateHost(url.hostname);
+}
+
+/**
+ * Whether the private network guard leaves out a tile's link: its host is on
+ * the user's computer or network, and the tile was not itself loaded over
+ * `http:` or `https:` from such a host.
+ */
+export function isGuardedLink(url: URL, tileSource: string): boolean {
+  const isGuarded =
+    isPrivateHost(url.hostname) && !isPrivateTileSource(tileSource);
+  return isGuarded;
+}

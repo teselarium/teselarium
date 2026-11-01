@@ -72,6 +72,52 @@ schema:
 Tiles with a title and the country they are located in.
 ```
 
+## Showing a tile's body
+
+A tile's `body` is markdown, as its author wrote it. A mod does not need a markdown parser to show it: the engine renders it to safe HTML that works inside the mod's sandbox, with images, video, audio and pictures, paths resolved against the tile, links that open through the app and a placeholder for each video or audio player (see [Tile bodies](modules/lib/core/engine/README.md#tile-bodies) in the engine's README).
+
+The simplest way is the `ot-tile-body` element, which every mod frame defines. Set its `tile` to one of the tiles of the mount context:
+
+```js
+export default function mount(engine, context) {
+  for (const tile of context.tiles) {
+    const article = document.createElement("article");
+    const title = document.createElement("h2");
+    title.textContent = tile.metadata.title;
+    const body = document.createElement("ot-tile-body");
+    body.tile = tile;
+    article.append(title, body);
+    document.body.append(article);
+  }
+}
+```
+
+The element sends `tiles.renderBody`, shows the result as its children and fires a bubbling `ot-rendered` event. The theme styles the rendered body, alerts and player placeholders, and the mod's CSS can style it too, since it is in the light DOM. To place the HTML yourself, send the request:
+
+```js
+const { html } = await engine.request("tiles.renderBody", {
+  source: tile.source,
+});
+container.innerHTML = html;
+```
+
+Either way, the frame loader handles clicks in the rendered body: a link asks the user to open it in a new tab (`links.open`), a link to a heading of the body scrolls to it, and a click on a player placeholder asks the user to play it in the app's player dialog (`players.open`). A mod writes no code for them.
+
+To handle a click yourself, cancel it in your own listener with `preventDefault()`: the frame loader then leaves it alone. Do not only stop its propagation: a link click that is not cancelled navigates the mod's frame, which stops the mod.
+
+```js
+function openInViewer(event) {
+  const link = event.target.closest("a[data-ot-link]");
+  if (link === null) {
+    return;
+  }
+  event.preventDefault();
+  showTileFromLink(link.href);
+}
+
+document.addEventListener("click", openInViewer);
+```
+
 ## Checking a mod
 
 A mod can be checked before anyone runs it, with no code from its author. Open the mod in the mod viewer (`#/run?mod=mod_viewer&target=<mod reference>`) and press "Check mod". The viewer sends `mods.check` with the mod's source, and with the collection field's address when it holds one; otherwise the mod's sample collection is used. Any visible mod with an `open` permission for the mod's site can send `mods.check` the same way.
@@ -79,7 +125,7 @@ A mod can be checked before anyone runs it, with no code from its author. Open t
 The check has three steps:
 
 - **Bundle check**: the mod file, the entrypoint, the tile type and the collection must load, and the collection's tiles are validated against the tile type. A file that cannot be loaded or has the wrong format is an error naming that file. A tile that does not match the type is a warning naming the tile. A missing `api` range, or one that does not match the app's mod API version, is a warning: the check asks nothing.
-- **Mount check**: when the bundle check found no error, the mod is mounted in a hidden frame, with the permissions it would get if it were opened, the tiles of its type and an empty storage slot that is thrown away afterwards; the mod's real slot is never read nor written. The check records a `mount` that throws or rejects, a mod that left its page, blocked requests and blocked browser dialogs, every request answered with `-32600`, `-32601` or `-32602` (a message that is not a request, an unknown method, bad params), and the requests that would need the user (`links.open`, `files.save` and `ui.confirm` answer `false`, `mods.open` and `mods.check` are refused), without showing any dialog. A `mount` that has not finished after 10 seconds is an error. Only the start of the mod is watched: the mount check ends 1 second after `mount` finished, so timers and requests that start later are not recorded.
+- **Mount check**: when the bundle check found no error, the mod is mounted in a hidden frame, with the permissions it would get if it were opened, the tiles of its type and an empty storage slot that is thrown away afterwards; the mod's real slot is never read nor written. The check records a `mount` that throws or rejects, a mod that left its page, blocked requests and blocked browser dialogs, every request answered with `-32600`, `-32601` or `-32602` (a message that is not a request, an unknown method, bad params), and the requests that would need the user (`links.open`, `files.save`, `ui.confirm` and `players.open` answer `false`, `mods.open` and `mods.check` are refused), without showing any dialog. A `mount` that has not finished after 10 seconds is an error. Only the start of the mod is watched: the mount check ends 1 second after `mount` finished, so timers and requests that start later are not recorded.
 - **Tests**: when the mod declares `test_path` and neither step found an error, the mod's own tests run, one case after another (see [Mod tests](#mod-tests)).
 
 The report's status is `pass` when there are no findings, `warn` when there are only warnings and `fail` when a finding is an error. Each finding names its step (`bundle`, `mount` or `test`), its level, the file or mod it is about and a message. `tests` lists each case with its status (`pass` or `fail`) and, for a failed case, the message, and `testsChecked` says whether the cases ran. The check leaves the app as it was: no new sandbox, history entry or stage bar item.
@@ -147,7 +193,7 @@ Each case runs in a fresh hidden frame, with the content policy and permissions 
 
 ### Scripted answers
 
-A check shows no dialog. `answer(method, value)` queues the answer to the next request for `method`: `links.open`, `files.save` or `ui.confirm` with a boolean, or `mods.open` with `null`. The request resolves with it, and a `mods.open` answered this way opens nothing. Requests without a queued answer get what the mount check gives: `false` for `links.open`, `files.save` and `ui.confirm`, and `-32002` for `mods.open` and `mods.check`. In a case, none of them is a finding. A wrong method or value throws at once, for example `the answer to ui.confirm must be a boolean`. The app still checks each request's params, so a `links.open` with a bad address fails as it would in the app, and leaves its answer queued.
+A check shows no dialog. `answer(method, value)` queues the answer to the next request for `method`: `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean, or `mods.open` with `null`. The request resolves with it, a `mods.open` answered this way opens nothing, and a `players.open` answered this way requests nothing from the player's site. Requests without a queued answer get what the mount check gives: `false` for `links.open`, `files.save`, `ui.confirm` and `players.open`, and `-32002` for `mods.open` and `mods.check`. In a case, none of them is a finding. A wrong method or value throws at once, for example `the answer to ui.confirm must be a boolean`. The app still checks each request's params, so a `links.open` with a bad address fails as it would in the app, and leaves its answer queued.
 
 ```js
 function hasNoBooks(context) {

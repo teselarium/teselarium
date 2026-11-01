@@ -17,6 +17,7 @@ describe("stage module entry point", function describeEntryPoint(): void {
       "createStage",
       "followHistory",
       "frameLoadedAgain",
+      "markStageActionPlaying",
       "openStageLink",
       "openStageSection",
       "readStageSnapshot",

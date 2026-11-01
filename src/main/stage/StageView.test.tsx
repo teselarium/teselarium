@@ -30,7 +30,15 @@ import {
   startTestStage,
 } from "../../test/test_stages.ts";
 import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
+import { createMemoryStorage } from "../../test/memory_storage.ts";
+import { createPlayerSites } from "../settings/player_sites.ts";
+import type { PlayerSites } from "../settings/player_sites.ts";
 import { StageView } from "./StageView.tsx";
+
+function createTestPlayerSites(): PlayerSites {
+  const playerSites = createPlayerSites({ storage: createMemoryStorage() });
+  return playerSites;
+}
 
 const OTHER_API_HASH = `#/run?mod=${encodeURIComponent(OTHER_API_MOD_SOURCE)}`;
 
@@ -64,7 +72,9 @@ function listWrappers(container: HTMLElement): HTMLElement[] {
 async function renderAskingStage(): Promise<HTMLElement> {
   serveOtherApiMod();
   const stage = await startTestStage(OTHER_API_HASH);
-  const { container } = render(<StageView stage={stage} />);
+  const { container } = render(
+    <StageView stage={stage} playerSites={createTestPlayerSites()} />,
+  );
   return container;
 }
 
@@ -98,7 +108,9 @@ async function waitForCheck(stage: Stage): Promise<CheckSnapshot> {
 describe("StageView", function describeStageView(): void {
   it("renders one wrapper per sandbox, only the visible one shown", async function rendersWrappers(): Promise<void> {
     const stage = await startTestStage("");
-    const { container } = render(<StageView stage={stage} />);
+    const { container } = render(
+      <StageView stage={stage} playerSites={createTestPlayerSites()} />,
+    );
 
     await openFromVisible(stage, "sandbox-1");
 
@@ -115,7 +127,7 @@ describe("StageView", function describeStageView(): void {
 
   it("renders the running mod's frame with its sandbox and document", async function rendersFrame(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     const frame = screen.getByTitle("Book List");
 
@@ -128,7 +140,7 @@ describe("StageView", function describeStageView(): void {
 
   it("Home mod has no close button", async function hidesHomeClose(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     expect(screen.getByText("Book List")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
@@ -136,14 +148,14 @@ describe("StageView", function describeStageView(): void {
 
   it("shows the close button for a mod opened from a link", async function showsClose(): Promise<void> {
     const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
   it("No collection, no reload", async function hidesReload(): Promise<void> {
     const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     expect(screen.queryByRole("button", { name: "Reload tiles" })).toBeNull();
   });
@@ -152,7 +164,7 @@ describe("StageView", function describeStageView(): void {
     const stage = await startTestStage(
       `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
     );
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     expect(
       screen.getByRole("button", { name: "Reload tiles" }),
@@ -161,7 +173,7 @@ describe("StageView", function describeStageView(): void {
 
   it("shows the title and the version of the visible mod", async function showsTitle(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
 
@@ -171,7 +183,9 @@ describe("StageView", function describeStageView(): void {
 
   it("Missing mod file", async function showsLoadFailure(): Promise<void> {
     const stage = await startTestStage(`#/run?mod=${MISSING_MOD_REFERENCE}`);
-    const { container } = render(<StageView stage={stage} />);
+    const { container } = render(
+      <StageView stage={stage} playerSites={createTestPlayerSites()} />,
+    );
 
     expect(screen.getByRole("alert")).toHaveTextContent(MISSING_MOD_SOURCE);
     expect(screen.getByRole("alert")).toHaveTextContent("404");
@@ -181,7 +195,7 @@ describe("StageView", function describeStageView(): void {
 
   it("Sample mod has no issues", async function showsNoIssues(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     expect(screen.getByText("No issues.")).toBeInTheDocument();
   });
@@ -193,7 +207,7 @@ describe("StageView", function describeStageView(): void {
     const modPort = readModPort(fakeFrame);
     openPorts.push(modPort);
     const received = collectMessages(modPort);
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     await act(async function askUser(): Promise<void> {
       modPort.postMessage({
@@ -218,7 +232,7 @@ describe("StageView", function describeStageView(): void {
 
   it("No question for the sample mod", async function asksNothingForSample(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByTitle("Book List").tagName).toBe("IFRAME");
@@ -285,7 +299,7 @@ describe("StageView", function describeStageView(): void {
     attachFrame(stage, "sandbox-1", fakeFrame.target);
     const modPort = readModPort(fakeFrame);
     openPorts.push(modPort);
-    render(<StageView stage={stage} />);
+    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
 
     await act(async function reportIssues(): Promise<void> {
       postNotification(modPort, "sandbox.blocked", {
@@ -349,7 +363,9 @@ describe("CheckFrame", function describeCheckFrame(): void {
     const viewerPort = readModPort(fakeFrame);
     openPorts.push(viewerPort);
     const received = collectMessages(viewerPort);
-    const { container } = render(<StageView stage={stage} />);
+    const { container } = render(
+      <StageView stage={stage} playerSites={createTestPlayerSites()} />,
+    );
 
     viewerPort.postMessage({
       jsonrpc: "2.0",
@@ -385,7 +401,9 @@ describe("CheckFrame", function describeCheckFrame(): void {
 
   it("renders a new iframe for a new frame of the same check", async function rendersNewFrame(): Promise<void> {
     const stage = await startTestStage("");
-    const { container } = render(<StageView stage={stage} />);
+    const { container } = render(
+      <StageView stage={stage} playerSites={createTestPlayerSites()} />,
+    );
 
     publishCheckFrame(stage, "check-9-frame-1");
     const firstFrame = container.querySelector("iframe[data-check-id]");

@@ -126,7 +126,12 @@ describe("readSandboxTestReport", function describeReadTestReport(): void {
   });
 
   it("reads a boolean answer to each method that asks the user", function readsBooleanAnswers(): void {
-    for (const method of ["links.open", "files.save", "ui.confirm"]) {
+    for (const method of [
+      "links.open",
+      "files.save",
+      "ui.confirm",
+      "players.open",
+    ]) {
       const report = readSandboxTestReport("sandbox.answerQueued", {
         method,
         value: true,
@@ -153,6 +158,12 @@ describe("readSandboxTestReport", function describeReadTestReport(): void {
     expect(
       readSandboxTestReport("sandbox.answerQueued", {
         method: "ui.confirm",
+        value: "yes",
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "players.open",
         value: "yes",
       }),
     ).toBeNull();

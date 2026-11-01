@@ -29,6 +29,7 @@ export const ACTION_METHODS: Record<AppAction["kind"], AnswerMethod> = {
   link: "links.open",
   save: "files.save",
   confirm: "ui.confirm",
+  player: "players.open",
 };
 
 /** The callbacks of a check frame's session, which the check passes to `connectModSession`. */

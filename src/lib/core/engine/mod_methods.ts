@@ -7,6 +7,7 @@ import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { RunLink } from "./mod_launch.ts";
+import type { TileBodies } from "./mod_tile_bodies.ts";
 import { INVALID_PARAMS, PERMISSION_DENIED } from "./mod_messages.ts";
 
 /** What `mods.check` asks the stage: the resolved mod file and the collection as the request gave it. */
@@ -24,6 +25,8 @@ export interface ModMethodContext {
   defaults: ResolvedDefaultModSettings;
   /** `baseUrl` is the app's address. */
   fetchOptions: FileFetchOptions;
+  /** The bodies of the tiles the mod currently receives, replaced by "Reload tiles". */
+  tileBodies: TileBodies;
   /** The remembered site decisions, read when `mods.inspect` grants a mod's permissions. */
   readSiteDecisions: () => readonly SiteDecision[];
   /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */

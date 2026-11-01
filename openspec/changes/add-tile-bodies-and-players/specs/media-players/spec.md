@@ -47,6 +47,17 @@ The app SHALL know YouTube, Vimeo and SoundCloud. A YouTube page link (`youtube.
 - **WHEN** a mod sends `players.open` with `{ "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }`, which none of its tiles holds
 - **THEN** the response has an error with code `-32002` whose message names `players.open` and says that the address is not a player of the mod's tiles
 
+### Requirement: The question shows the player's title
+The player dialog SHALL show, as plain text, the whole title the tile gives the player, when it gives one: the iframe's `title`, the image's alt text, or the tile's `title` for a page link in its metadata.
+
+#### Scenario: Title of a pasted player
+- **WHEN** a body holds `<iframe src="https://www.youtube.com/embed/aqz-KE-bpKQ" title="Big Buck Bunny"></iframe>` and the user clicks its placeholder
+- **THEN** the player dialog shows `Big Buck Bunny`
+
+#### Scenario: Player without a title
+- **WHEN** a body holds `<iframe src="https://maps.example.net/embed"></iframe>` and the user clicks its placeholder
+- **THEN** the player dialog shows the site's host and no title
+
 ### Requirement: Ask before contacting the site
 Until the user presses Play, the player dialog SHALL request nothing from the player's site. It SHALL name the asking mod by its title and source, show the host of the address the player will load (and the site's name for a known site), and say that this site will see that the user played this. It SHALL have the buttons Play and Cancel, with Cancel focused, and an **Always play from** checkbox naming the host, unchecked.
 

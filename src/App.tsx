@@ -5,6 +5,7 @@ import { AppHeader } from "./main/AppHeader.tsx";
 import { PageView } from "./main/pages/PageView.tsx";
 import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import type { SectionSwitches } from "./main/sections/section_switches.ts";
+import type { PlayerSites } from "./main/settings/player_sites.ts";
 import type { SiteDecisions } from "./main/settings/site_decisions.ts";
 import type { TileMediaSetting } from "./main/settings/tile_media_setting.ts";
 import { Sidebar } from "./main/sidebar/Sidebar.tsx";
@@ -29,6 +30,7 @@ interface AppProps {
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
   siteDecisions: SiteDecisions;
+  playerSites: PlayerSites;
   layout: SidebarLayoutStore;
 }
 
@@ -55,6 +57,7 @@ function App({
   switches,
   tileMedia,
   siteDecisions,
+  playerSites,
   layout,
 }: AppProps): ReactElement {
   const layoutSnapshot = useStoreSnapshot(
@@ -84,9 +87,10 @@ function App({
               switches={switches}
               tileMedia={tileMedia}
               siteDecisions={siteDecisions}
+              playerSites={playerSites}
             />
           </div>
-          <StageView stage={stage} />
+          <StageView stage={stage} playerSites={playerSites} />
         </main>
       </div>
     </TooltipProvider>

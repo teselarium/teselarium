@@ -168,12 +168,19 @@ Every mod frame, including the frames of a check, SHALL define the element `ot-t
 - **THEN** the element shows the message of the `-32602` error with `role="alert"`
 
 ### Requirement: Rendered bodies follow the theme
-The base stylesheet SHALL style the elements of a rendered body as it styles plain HTML, SHALL style `button.ot-player` as a box that shows its title and site, and SHALL give each kind of `aside.ot-alert` a border in its own theme color. A mod that opts out of the theme styles SHALL get the placeholders as plain buttons that still work.
-
-#### Scenario: Placeholder shape
-- **WHEN** a mod that adds no styles shows a player placeholder
-- **THEN** the placeholder's computed `aspect-ratio` is `16 / 9`
+The base stylesheet SHALL style the elements of a rendered body as it styles plain HTML, SHALL style `button.ot-player` as described in "Placeholder box", and SHALL give each kind of `aside.ot-alert` a border in its own theme color. A mod that opts out of the theme styles SHALL get the placeholders as plain buttons that still work.
 
 #### Scenario: Warning color
 - **WHEN** a mod that adds no styles shows a rendered `[!WARNING]` alert
 - **THEN** the alert's computed left border color is the value of `--ot-warning`
+
+### Requirement: Placeholder box
+The base stylesheet SHALL draw `button.ot-player` as a box of the same size whatever its title, with a play mark, two lines for the title, cut with "…" when it is longer, and one line for the site. On hover and keyboard focus, the box SHALL show the whole title over the content below, without moving the page.
+
+#### Scenario: Placeholder shape
+- **WHEN** a mod that adds no styles shows a player placeholder with a short title and one with a title too long for two lines
+- **THEN** both placeholders have the same width and height, and are narrower than the body
+
+#### Scenario: Long title on hover
+- **WHEN** the user hovers the placeholder with the long title
+- **THEN** its box grows to show the whole title, and the placeholder keeps its place and size in the page

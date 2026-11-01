@@ -25,6 +25,8 @@ import { SectionIcon } from "../sidebar/SectionIcon.tsx";
 import type { AppTheme } from "../theme/app_theme.ts";
 import { ThemeControl } from "../theme/ThemeControl.tsx";
 import type { SiteDecisions } from "./site_decisions.ts";
+import type { PlayerSites } from "./player_sites.ts";
+import { PlayerSiteList } from "./PlayerSiteList.tsx";
 import { SiteDecisionList } from "./SiteDecisionList.tsx";
 import {
   readTileMediaSnapshot,
@@ -41,6 +43,7 @@ interface SettingsPageProps {
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
   siteDecisions: SiteDecisions;
+  playerSites: PlayerSites;
 }
 
 interface TileMediaRowProps {
@@ -148,6 +151,7 @@ export function SettingsPage({
   switches,
   tileMedia,
   siteDecisions,
+  playerSites,
 }: SettingsPageProps): ReactElement {
   const snapshot = useStoreSnapshot(
     switches,
@@ -220,11 +224,14 @@ export function SettingsPage({
             see that you used that mod. Sites allowed to exchange data or load
             code can also receive what the mod shows or keeps. Changes apply the
             next time a mod is opened: after you remove an answer, the app asks
-            again. Running mods keep their permissions.
+            again. Running mods keep their permissions. The sites you always
+            play media from are listed for every mod: after you remove one, the
+            app asks before the next player of that site.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <SiteDecisionList siteDecisions={siteDecisions} />
+          <PlayerSiteList playerSites={playerSites} />
         </CardContent>
       </Card>
       <Card>

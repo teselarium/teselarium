@@ -1,24 +1,30 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import type { ReactElement } from "react";
 import { Alert, AlertDescription } from "@/vendor/shadcn/ui/alert.tsx";
 import {
   answerApiMismatch,
   answerSiteConsent,
   answerStageAction,
+  markStageActionPlaying,
   readStageSnapshot,
   subscribeStage,
 } from "../../lib/core/stage/index.ts";
 import type {
+  ActionSnapshot,
   CheckSnapshot,
   SandboxSnapshot,
   SiteConsentAnswer,
   Stage,
   StageSnapshot,
 } from "../../lib/core/stage/index.ts";
+import type { PlayerSites } from "../settings/player_sites.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { ActionDialog } from "./ActionDialog.tsx";
+import type { QuestionSnapshot } from "./ActionDialog.tsx";
 import { ApiMismatchDialog } from "./ApiMismatchDialog.tsx";
 import { CheckFrame } from "./CheckFrame.tsx";
+import { PlayerDialog } from "./PlayerDialog.tsx";
+import type { PlayerSnapshot } from "./PlayerDialog.tsx";
 import { SandboxFrame } from "./SandboxFrame.tsx";
 import { SiteConsentDialog } from "./SiteConsentDialog.tsx";
 import { StageBar } from "./StageBar.tsx";
@@ -26,6 +32,36 @@ import "./stage.css";
 
 interface StageViewProps {
   stage: Stage;
+  /** The sites the user always plays from, which the player dialog reads and remembers. */
+  playerSites: PlayerSites;
+}
+
+/** The shown action for the player dialog, or `null` when it is not a player. */
+function readShownPlayer(shown: ActionSnapshot | null): PlayerSnapshot | null {
+  if (shown === null || shown.action.kind !== "player") {
+    return null;
+  }
+  const player: PlayerSnapshot = {
+    id: shown.id,
+    mod: shown.mod,
+    action: shown.action,
+  };
+  return player;
+}
+
+/** The shown action for the action dialog, or `null` when it is a player. */
+function readShownQuestion(
+  shown: ActionSnapshot | null,
+): QuestionSnapshot | null {
+  if (shown === null || shown.action.kind === "player") {
+    return null;
+  }
+  const question: QuestionSnapshot = {
+    id: shown.id,
+    mod: shown.mod,
+    action: shown.action,
+  };
+  return question;
 }
 
 function renderSandboxContent(
@@ -104,18 +140,28 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
  * never moves in the DOM (moving an iframe reloads it). Only the visible one
  * is shown, under the stage bar. While a page is shown, the whole view is
  * hidden but stays mounted, so no frame reloads. The action dialog shows the action the
- * visible mod asked for, if any, and the API mismatch dialog and then the
+ * visible mod asked for, if any, or the player dialog when it is a player, and the API mismatch dialog and then the
  * site consent dialog ask about the visible sandbox while its mod waits for
  * an answer; a sandbox asks one question at a time. When the visible sandbox
  * changes, the page leaves fullscreen. The frames of running mod checks sit
  * behind the sandboxes, hidden by layout (see CheckFrame).
  */
-export function StageView({ stage }: StageViewProps): ReactElement {
+export function StageView({
+  stage,
+  playerSites,
+}: StageViewProps): ReactElement {
   const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
 
   function handleActionAnswer(id: number, accepted: boolean): void {
     answerStageAction(stage, id, accepted);
   }
+
+  const handlePlay = useCallback(
+    function markPlaying(id: number): void {
+      markStageActionPlaying(stage, id);
+    },
+    [stage],
+  );
 
   function handleApiMismatchAnswer(
     sandboxId: string,
@@ -160,7 +206,16 @@ export function StageView({ stage }: StageViewProps): ReactElement {
         {sandboxes}
         {checkFrames}
       </div>
-      <ActionDialog shown={snapshot.action} onAnswer={handleActionAnswer} />
+      <ActionDialog
+        shown={readShownQuestion(snapshot.action)}
+        onAnswer={handleActionAnswer}
+      />
+      <PlayerDialog
+        shown={readShownPlayer(snapshot.action)}
+        playerSites={playerSites}
+        onPlay={handlePlay}
+        onAnswer={handleActionAnswer}
+      />
       {visibleSandbox?.status === "asking" ? (
         <ApiMismatchDialog
           sandbox={visibleSandbox}
