@@ -7,7 +7,11 @@ import { listCategoryHosts, sortSources } from "./sandbox_policy.ts";
 
 /** What a mod's tiles link: the exact sources the policy adds, and the links left out. */
 export interface TileLinks {
-  /** `origin + pathname` of each allowed link, sorted and without duplicates. */
+  /**
+   * `origin + pathname` of each allowed link, with `,`, `;`, `[`, `]` and `|`
+   * written as `%2C`, `%3B`, `%5B`, `%5D` and `%7C`, sorted and without
+   * duplicates.
+   */
   sources: string[];
   /** One warning per left-out URL and tile, whose source is the tile. */
   issues: ModIssue[];
@@ -25,8 +29,24 @@ const LINK_PROTOCOLS = new Set(["http:", "https:"]);
 /** The characters of a host name in a policy source. */
 const SOURCE_HOST_PATTERN = /^[a-z0-9.-]+$/;
 
-/** The characters of a path in a policy source: RFC 3986 `pchar`s and `/`, without `;` and `,`. */
+/**
+ * The characters of a path in a policy source: RFC 3986 `pchar`s and `/`,
+ * without `;` and `,`. It is checked on the path after `encodeSourcePath`.
+ */
 const SOURCE_PATH_PATTERN = /^[A-Za-z0-9\-._~!$&'()*+=:@%/]+$/;
+
+/**
+ * The path characters the URL parser can leave that a policy source cannot
+ * hold, and how the source writes them. Browsers compare source paths
+ * percent-decoded, so the source still matches the address as written.
+ */
+const SOURCE_PATH_ESCAPES: ReadonlyMap<string, string> = new Map([
+  [",", "%2C"],
+  [";", "%3B"],
+  ["[", "%5B"],
+  ["]", "%5D"],
+  ["|", "%7C"],
+]);
 
 /** What a metadata string adds to the policy: a source, a left-out reason, or nothing. */
 type LinkOutcome =
@@ -62,18 +82,27 @@ function isSourceHost(url: URL): boolean {
   return isValidHost;
 }
 
-function isSourcePath(url: URL): boolean {
-  const isValidPath = SOURCE_PATH_PATTERN.test(url.pathname);
+function isSourcePath(sourcePath: string): boolean {
+  const isValidPath = SOURCE_PATH_PATTERN.test(sourcePath);
   return isValidPath;
 }
 
-/** Whether a policy source can hold the link as `origin + pathname`. */
-function canExpressLink(url: URL): boolean {
+/** A link's path as a policy source writes it: each character of `SOURCE_PATH_ESCAPES` percent-encoded. */
+function encodeSourcePath(pathname: string): string {
+  let sourcePath = "";
+  for (const character of pathname) {
+    sourcePath += SOURCE_PATH_ESCAPES.get(character) ?? character;
+  }
+  return sourcePath;
+}
+
+/** Whether a policy source can hold the link as `origin + sourcePath`. */
+function canExpressLink(url: URL, sourcePath: string): boolean {
   const canExpress =
     !hasCredentials(url) &&
     !isIpv6Host(url) &&
     isSourceHost(url) &&
-    isSourcePath(url);
+    isSourcePath(sourcePath);
   return canExpress;
 }
 
@@ -99,7 +128,8 @@ function judgeTileLink(
   if (coversOrigin(coveringHosts, url.origin)) {
     return SKIPPED_LINK;
   }
-  if (!canExpressLink(url)) {
+  const sourcePath = encodeSourcePath(url.pathname);
+  if (!canExpressLink(url, sourcePath)) {
     const unexpressibleOutcome: LinkOutcome = {
       kind: "left-out",
       reason: UNEXPRESSIBLE_LINK_REASON,
@@ -115,7 +145,7 @@ function judgeTileLink(
   }
   const allowedOutcome: LinkOutcome = {
     kind: "allowed",
-    source: url.origin + url.pathname,
+    source: url.origin + sourcePath,
   };
   return allowedOutcome;
 }
@@ -172,9 +202,11 @@ function collectLinksOfTile(
  * too, or a media address of the tile's body, which `bodyMedia`
  * holds by tile source (`scanTileBody`'s `mediaUrls`). A link to a folder,
  * or one whose origin a content host or a granted `show` host covers, adds
- * nothing. A link the policy cannot express, or one to the user's computer
- * or network from a tile that is not, is left out and reported. The input
- * tiles are not changed.
+ * nothing. Each source is the link's origin and path, with `,`, `;`, `[`,
+ * `]` and `|` percent-encoded, so a link written with `,` and one written
+ * with `%2C` give one source. A link the policy cannot express, or one to
+ * the user's computer or network from a tile that is not, is left out and
+ * reported. The input tiles are not changed.
  */
 export function collectTileLinks(
   tiles: Tile[],

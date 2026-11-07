@@ -49,16 +49,16 @@ When "Load media linked by tiles" is on as the mod starts (see the [Settings pag
 3. Its origin is covered by a content host or a granted `show` host, wildcard hosts included: skipped, because the policy already allows it.
 4. The policy cannot express it: left out and reported (see below).
 5. Its host is on the user's computer or network, and the tile's own host is not: left out and reported (see below).
-6. Otherwise its origin and path, without the query and fragment, which the browser does not match, are added to `img-src` and `media-src` as one exact source, sorted and without duplicates.
+6. Otherwise its origin and path, without the query and fragment, which the browser does not match, are added to `img-src` and `media-src` as one exact source, sorted and without duplicates. A source cannot hold `,`, `;`, `[`, `]` and `|`, so the path has them written as `%2C`, `%3B`, `%5B`, `%5D` and `%7C`. The browser compares source paths percent-decoded, so the source matches the address as written, which is the one the mod requests. A link written with `,` and one written with `%2C` give one source.
 
-For a tile with `image: "https://media.example.net/covers/kallocain.jpg?size=large"`, the policy gets `https://media.example.net/covers/kallocain.jpg`. It allows that file and no other file of `https://media.example.net`. Tile links are never added to `style-src`, `font-src`, `connect-src`, `frame-src` or `script-src`: tiles never let a mod load stylesheets, fonts, data, pages or code, whatever the linked file is.
+For a tile with `image: "https://media.example.net/covers/kallocain.jpg?size=large"`, the policy gets `https://media.example.net/covers/kallocain.jpg`. It allows that file and no other file of `https://media.example.net`. For `image: "https://media.example.net/covers/chronicles,_volume_1.jpg"`, it gets `https://media.example.net/covers/chronicles%2C_volume_1.jpg`, which allows that file and not `https://media.example.net/covers/chronicles.jpg`. Tile links are never added to `style-src`, `font-src`, `connect-src`, `frame-src` or `script-src`: tiles never let a mod load stylesheets, fonts, data, pages or code, whatever the linked file is.
 
 **What the policy cannot express.** A policy source is `scheme://host[:port]/path`. A link that does not fit is left out:
 
 - a user name or password in the URL (browsers block such subresource requests too);
 - an IPv6 address as host, which the source grammar has no form for;
 - a host name with a character other than letters, digits, `-` and `.`, such as `_`;
-- a path character other than letters, digits and `-._~!$&'()*+=:@%/`. The URL parser already percent-encodes spaces, quotes and non-ASCII characters; what is left out in practice is `;` and `,`, which separate directives and policies, and `|`, `[` and `]`.
+- a path character other than letters, digits and `-._~!$&'()*+=:@%/,;[]|`. The URL parser percent-encodes every other character, such as spaces, quotes and non-ASCII characters, so in practice no path is left out.
 
 Each is reported once per tile as a warning whose source is the tile: `Not loading https://user:secret@media.example.net/cover.jpg: the sandbox cannot allow this address.`
 

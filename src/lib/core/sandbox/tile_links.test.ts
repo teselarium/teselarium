@@ -299,6 +299,69 @@ describe("A tile link allows only the linked file", function describeOnlyLinkedF
 
     expect(tileLinks).toEqual({ sources: [], issues: [] });
   });
+
+  it("Comma in the path", function allowsCommaPath(): void {
+    const tileLinks = collectImageLink(
+      "https://media.example.net/covers/chronicles,_volume_1.jpg",
+    );
+
+    expect(tileLinks).toEqual({
+      sources: ["https://media.example.net/covers/chronicles%2C_volume_1.jpg"],
+      issues: [],
+    });
+  });
+
+  it("Brackets and vertical bar in the path", function allowsBracketsAndBarPath(): void {
+    const tileLinks = collectImageLink("https://media.example.net/a[1]|b.jpg");
+
+    expect(tileLinks).toEqual({
+      sources: ["https://media.example.net/a%5B1%5D%7Cb.jpg"],
+      issues: [],
+    });
+  });
+
+  it("gives one source for a comma written as it is and as %2C", function mergesEncodedComma(): void {
+    const tiles = [
+      buildTestTile(TILE_SOURCE, {
+        image: "https://media.example.net/a,b.jpg",
+        thumbnail: "https://media.example.net/a%2Cb.jpg",
+      }),
+    ];
+
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
+
+    expect(tileLinks).toEqual({
+      sources: ["https://media.example.net/a%2Cb.jpg"],
+      issues: [],
+    });
+  });
+
+  it("gives one source for a vertical bar written as it is and as %7C", function mergesEncodedBar(): void {
+    const tiles = [
+      buildTestTile(TILE_SOURCE, {
+        image: "https://media.example.net/a|b.jpg",
+        thumbnail: "https://media.example.net/a%7Cb.jpg",
+      }),
+    ];
+
+    const tileLinks = collectTileLinks(tiles, CONTENT_HOSTS, [], NO_BODY_MEDIA);
+
+    expect(tileLinks).toEqual({
+      sources: ["https://media.example.net/a%7Cb.jpg"],
+      issues: [],
+    });
+  });
+
+  it("allows a body image with a comma in the path", function allowsCommaBodyImage(): void {
+    const tileLinks = collectBodyLinks(
+      "![Still](https://media.example.net/stills/scene,_part_1.jpg)",
+    );
+
+    expect(tileLinks).toEqual({
+      sources: ["https://media.example.net/stills/scene%2C_part_1.jpg"],
+      issues: [],
+    });
+  });
 });
 
 describe("Tile links the sandbox cannot express", function describeUnexpressibleLinks(): void {
@@ -344,31 +407,13 @@ describe("Tile links the sandbox cannot express", function describeUnexpressible
     ]);
   });
 
-  it("Semicolon in the path", function reportsSemicolonPath(): void {
-    const url = "https://media.example.net/a;b.jpg";
-
-    const tileLinks = collectImageLink(url);
+  it("Semicolon in the path", function allowsSemicolonPath(): void {
+    const tileLinks = collectImageLink("https://media.example.net/a;b.jpg");
 
     expect(tileLinks).toEqual({
-      sources: [],
-      issues: [buildUnexpressibleIssue(TILE_SOURCE, url)],
+      sources: ["https://media.example.net/a%3Bb.jpg"],
+      issues: [],
     });
-  });
-
-  it("reports other path characters a source cannot hold", function reportsOtherPathCharacters(): void {
-    const urls = [
-      "https://media.example.net/a,b.jpg",
-      "https://media.example.net/a|b.jpg",
-      "https://media.example.net/a[1].jpg",
-    ];
-
-    const issues: ModIssue[] = [];
-    const expectedIssues: ModIssue[] = [];
-    for (const url of urls) {
-      issues.push(...collectImageLink(url).issues);
-      expectedIssues.push(buildUnexpressibleIssue(TILE_SOURCE, url));
-    }
-    expect(issues).toEqual(expectedIssues);
   });
 
   it("allows the path characters a source can hold", function allowsSourcePathCharacters(): void {

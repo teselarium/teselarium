@@ -582,6 +582,9 @@ test.describe("Report blocked requests with the fix", function describeReports()
 });
 
 const ROUTER_LOGO_URL = "http://192.168.1.1/logo.png";
+/** A linked cover whose path has a comma, as in the sample book list's covers. */
+const COMMA_COVER_URL = `${MEDIA_HOST}/covers/chronicles,_volume_1.jpg`;
+
 const REDIRECT_HINT =
   "If a tile links this file, link its final address: links that redirect to another site are blocked.";
 
@@ -608,6 +611,19 @@ async function answerRedirect(location: string, route: Route): Promise<void> {
 function isBodyImageLoaded(): boolean {
   const image = document.querySelector("ot-tile-body img") as HTMLImageElement;
   return image.complete && image.naturalWidth > 0;
+}
+
+/**
+ * Opens the app's probe, without permissions, with a linked tile whose
+ * `image` is `imageUrl`, and shows that image in the probe. Returns whether
+ * it loaded.
+ */
+async function showLinkedImage(page: Page, imageUrl: string): Promise<boolean> {
+  await serveLinkedTiles(page, [`image: "${imageUrl}"`]);
+  await routeImages(page, `${MEDIA_HOST}/**`);
+  const frame = await openLinkedAppProbe(page);
+  const isLoaded = await frame.evaluate(showImage, imageUrl);
+  return isLoaded;
 }
 
 function reloadTilesButton(page: Page): Locator {
@@ -722,6 +738,36 @@ test.describe("A tile link allows only the linked file", function describeOnlyLi
     expect(seenUrls).toEqual([]);
     await expect(issueList(page)).toContainText(MEDIA_HOST);
   });
+
+  test("Comma in the path", async function loadsCommaPath({
+    page,
+  }): Promise<void> {
+    const isLoaded = await showLinkedImage(page, COMMA_COVER_URL);
+
+    expect(isLoaded).toBe(true);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("Brackets and vertical bar in the path", async function loadsBracketsAndBarPath({
+    page,
+  }): Promise<void> {
+    const isLoaded = await showLinkedImage(page, `${MEDIA_HOST}/a[1]|b.jpg`);
+
+    expect(isLoaded).toBe(true);
+    await expect(stageBar(page)).toContainText("No issues.");
+  });
+
+  test("Other file next to a link with a comma", async function blocksFileNextToComma({
+    page,
+  }): Promise<void> {
+    const otherUrl = `${MEDIA_HOST}/covers/chronicles.jpg`;
+    await serveLinkedTiles(page, [`image: "${COMMA_COVER_URL}"`]);
+    const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+    const frame = await openLinkedAppProbe(page);
+
+    expect(await frame.evaluate(showImage, otherUrl)).toBe(false);
+    expect(seenUrls).toEqual([]);
+  });
 });
 
 test.describe("Tile links allow only images, video and audio", function describeOnlyMedia(): void {
@@ -736,6 +782,17 @@ test.describe("Tile links allow only images, video and audio", function describe
 
     expect(outcome).not.toBe("sent");
     expect(seenUrls).toEqual([]);
+  });
+});
+
+test.describe("Tile links the sandbox cannot express", function describeUnexpressibleLinks(): void {
+  test("Semicolon in the path", async function loadsSemicolonPath({
+    page,
+  }): Promise<void> {
+    const isLoaded = await showLinkedImage(page, `${MEDIA_HOST}/a;b.jpg`);
+
+    expect(isLoaded).toBe(true);
+    await expect(stageBar(page)).toContainText("No issues.");
   });
 });
 
