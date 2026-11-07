@@ -37,6 +37,10 @@ Inline math (`$…$`), display math (`$$…$$`) and fenced blocks labeled `math`
 - **WHEN** a body holds a fenced block labeled `math` with `E = mc^2`
 - **THEN** the rendered HTML has a `<math display="block">` whose annotation holds `E = mc^2`, and no `<pre>` for it
 
+#### Scenario: Formula beside an image
+- **WHEN** a mod sends `tiles.renderBody` for a tile whose body holds `![Cover](./cover.jpg)` and `$\frac{a}{b}$`
+- **THEN** the result's `html` holds the image and a `<math>` with an `<mfrac>`
+
 ### Requirement: Code blocks and emoji
 Fenced code blocks other than `math` SHALL be rendered as `<pre><code>` with the class `language-<name>` of their info string, holding the block's text exactly. When the info string names one of the common languages of highlight.js, the code SHALL also be split into `<span>` elements whose classes start with `hljs-`, leaving its text unchanged. Emoji shortcodes outside code, with GitHub's names, SHALL be rendered as their emoji; unknown names SHALL stay text.
 
@@ -46,7 +50,7 @@ Fenced code blocks other than `math` SHALL be rendered as `<pre><code>` with the
 
 #### Scenario: Labeled JavaScript
 - **WHEN** a body holds a fenced block labeled `js` with `const answer = 42;`
-- **THEN** the rendered `<code class="language-js">` holds `const` in a `span.hljs-keyword` and `42` in a `span.hljs-number`, and its text is `const answer = 42;`
+- **THEN** the rendered `code.language-js` holds `const` in a `span.hljs-keyword` and `42` in a `span.hljs-number`, and its text is `const answer = 42;`
 
 #### Scenario: Unlabeled block
 - **WHEN** a body holds a fenced block with no info string
@@ -78,11 +82,26 @@ The rendered HTML SHALL keep only the HTML GitHub allows in markdown, plus `<vid
 ## ADDED Requirements
 
 ### Requirement: Formulas that fail stay as written
-A formula that cannot be rendered SHALL be rendered as the code of `add-tile-bodies-and-players`, holding the formula exactly as written: `<code class="language-math math-inline">` inline, `<pre><code class="language-math math-display">` for display, with `data-ot-math-error` holding the reason. The rest of the body SHALL be rendered as usual.
+A formula that cannot be rendered SHALL be rendered as the code of `add-tile-bodies-and-players`, holding the formula exactly as written: `<code class="language-math math-inline">` inline, `<pre><code class="language-math math-display">` for display math, and `<pre><code class="language-math">` for a fenced `math` block, with `data-ot-math-error` holding the reason. The rest of the body SHALL be rendered as usual.
 
 #### Scenario: Unclosed brace
 - **WHEN** a body holds `Before $\frac{a}{$ after.`
 - **THEN** the rendered paragraph holds `Before `, a `code.language-math` with `\frac{a}{` and a `data-ot-math-error`, and ` after.`
+
+#### Scenario: Failing math block
+- **WHEN** a body holds a fenced block labeled `math` with `\frac{a}{`
+- **THEN** the rendered HTML has a `pre > code.language-math` holding `\frac{a}{` with a `data-ot-math-error`
+
+### Requirement: Bodies that fail to render
+When a body cannot be rendered, such as when a library it needs cannot be loaded, `tiles.renderBody` SHALL be answered with error code `-32603` and a message starting with `tiles.renderBody`. The failed render SHALL NOT be kept, so a later request renders the body again.
+
+#### Scenario: Library that cannot load
+- **WHEN** a mod sends `tiles.renderBody` for a body with a formula while the math library cannot be loaded
+- **THEN** the response has an error with code `-32603` whose message starts with `tiles.renderBody`
+
+#### Scenario: Next request after a failure
+- **WHEN** the mod sends the same request once the library can be loaded
+- **THEN** the result's `html` holds a `<math>`
 
 ### Requirement: Highlighted code follows the theme
 The base stylesheet SHALL color the `hljs-` classes from the theme tokens, so highlighted code follows the frame's color scheme and changes with it without a reload. A mod that opts out of the theme styles SHALL get the code uncolored.
@@ -92,8 +111,12 @@ The base stylesheet SHALL color the `hljs-` classes from the theme tokens, so hi
 - **THEN** a `span.hljs-keyword`'s computed color is the dark value of `--ot-primary`
 
 ### Requirement: Extras load only when a body needs them
-Rendering a body SHALL load the math, highlighting or emoji support only when the body holds a formula, a labeled code block or a shortcode, and each at most once per page. Bodies without them SHALL be rendered without loading any of them.
+Rendering a body SHALL load the math support only for a formula, the highlighting only for a fenced code block labeled other than `math` or `mermaid`, and the emoji support only for `:name:` outside code, `name` being lowercase letters, digits, `_`, `+` or `-`; each at most once per page. Dollars that stay text SHALL NOT count as formulas. Bodies without them SHALL load none of them.
+
+#### Scenario: Name that is not an emoji
+- **WHEN** a body holds `It starts at 10:30:45.`
+- **THEN** the emoji support is loaded, and the rendered text is `It starts at 10:30:45.`
 
 #### Scenario: Plain body
-- **WHEN** the app runs a mod that shows only bodies without formulas, labeled code or shortcodes
+- **WHEN** the app runs a mod that shows only bodies without formulas, labeled code or shortcodes, one of them holding `It costs $5 and $10.`
 - **THEN** none of the three was downloaded
