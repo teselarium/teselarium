@@ -110,6 +110,13 @@ The base stylesheet SHALL color the `hljs-` classes from the theme tokens, so hi
 - **WHEN** a mod that adds no styles shows highlighted JavaScript in the dark color scheme
 - **THEN** a `span.hljs-keyword`'s computed color is the dark value of `--ot-primary`
 
+### Requirement: Formulas use a math font the system has
+The base stylesheet SHALL give `<math>` elements the font family `"STIX Two Math", "STIX Math", "Cambria Math", "Latin Modern Math", math`, so a browser uses one of these math fonts when the system has it, and the browser's own math font otherwise. A mod that opts out of the theme styles SHALL get the browser's default.
+
+#### Scenario: Math font
+- **WHEN** a mod that adds no styles shows a body with a formula
+- **THEN** the `<math>` element's computed font family is `"STIX Two Math", "STIX Math", "Cambria Math", "Latin Modern Math", math`
+
 ### Requirement: Extras load only when a body needs them
 Rendering a body SHALL load the math support only for a formula, the highlighting only for a fenced code block labeled other than `math` or `mermaid`, and the emoji support only for `:name:` outside code, `name` being lowercase letters, digits, `_`, `+` or `-`; each at most once per page. Dollars that stay text SHALL NOT count as formulas. Bodies without them SHALL load none of them.
 

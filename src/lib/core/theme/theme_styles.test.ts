@@ -212,10 +212,25 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       'aside[data-ot-alert="warning"]',
       'aside[data-ot-alert="caution"]',
       "figure[data-mermaid-source]",
+      'math[display="block"]',
+      'span[class~="hljs-keyword"]',
+      'span[class~="hljs-string"]',
+      'span[class~="hljs-number"]',
+      'span[class~="hljs-title"]',
+      'span[class~="hljs-comment"]',
+      'span[class~="hljs-deletion"]',
     ];
     for (const pattern of patterns) {
       expect(selectors).toContain(pattern);
     }
+  });
+
+  it("gives formulas the common math fonts before the browser's", function setsMathFont(): void {
+    const mathBlock = readBlock(BASE_STYLESHEET, "  math {");
+
+    expect(mathBlock.replace(/\s+/g, " ")).toContain(
+      'font-family: "STIX Two Math", "STIX Math", "Cambria Math", "Latin Modern Math", math;',
+    );
   });
 
   it("styles every variant the spec lists", function coversVariants(): void {

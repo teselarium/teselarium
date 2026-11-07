@@ -795,6 +795,21 @@ describe("Tile bodies at launch", function describeLaunchTileBodies(): void {
     expect(offLaunch.tileBodies.playerAddresses.size).toBe(0);
   });
 
+  it("renders no body at launch", async function rendersNoBody(): Promise<void> {
+    const tile = buildLaunchTile(
+      "formula",
+      { title: "Formula" },
+      "![A](./a.jpg) $\\frac{a}{b}$ :tada:",
+    );
+
+    const launch = await launchWithTiles([tile]);
+
+    expect(launch.tileBodies.renderedBodies.size).toBe(0);
+    expect(launch.tileBodies.mediaByTile.get(tile.source)).toEqual([
+      new URL("./a.jpg", tile.source).href,
+    ]);
+  });
+
   it("skips the collection for bodies without HTML, images or addresses", async function skipsPlainBodies(): Promise<void> {
     const plainTile = buildLaunchTile("plain", { title: "Plain" }, "# Notes");
     const imageTile = buildLaunchTile(
@@ -805,7 +820,7 @@ describe("Tile bodies at launch", function describeLaunchTileBodies(): void {
 
     const launch = await launchWithTiles([plainTile, imageTile]);
 
-    expect([...launch.tileBodies.renderedBodies.keys()]).toEqual([
+    expect([...launch.tileBodies.mediaByTile.keys()]).toEqual([
       imageTile.source,
     ]);
     expect([...launch.tileBodies.tiles.keys()]).toEqual([

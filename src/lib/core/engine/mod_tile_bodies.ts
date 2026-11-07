@@ -4,19 +4,20 @@ import type { Tile } from "../../tile/index.ts";
 import { readPlayer } from "../players/index.ts";
 import { collectTileLinks } from "../sandbox/index.ts";
 import type { TileLinks } from "../sandbox/index.ts";
-import { renderTileBody } from "../tile_bodies/index.ts";
-import type { RenderedBody, TilePlayer } from "../tile_bodies/index.ts";
+import { renderTileBody, scanTileBody } from "../tile_bodies/index.ts";
+import type { TilePlayer } from "../tile_bodies/index.ts";
 
 /**
  * The bodies of the tiles a mod currently receives, and what the engine
- * checks against them. Bodies render on first request and are kept, so the
- * value grows while the mod runs; "Reload tiles" replaces it.
+ * checks against them. The launch scans the bodies; each one renders on its
+ * first request and is kept, so the value grows while the mod runs; "Reload
+ * tiles" replaces it.
  */
 export interface TileBodies {
   /** Each tile by source. */
   tiles: Map<string, Tile>;
-  /** The bodies rendered so far, by tile source. */
-  renderedBodies: Map<string, RenderedBody>;
+  /** The HTML of each body requested so far, by tile source, as it renders. */
+  renderedBodies: Map<string, Promise<string>>;
   /** Each player address of the tiles, normalized, with its player and the title the tile gives it. */
   playerAddresses: Map<string, TilePlayer>;
   /** The media addresses of each collected body, by tile source. */
@@ -67,20 +68,20 @@ function collectMetadataPlayers(tile: Tile, tileBodies: TileBodies): void {
 }
 
 function collectBody(tile: Tile, tileBodies: TileBodies): void {
-  const renderedBody = renderTileBody(tile);
-  tileBodies.renderedBodies.set(tile.source, renderedBody);
-  tileBodies.mediaByTile.set(tile.source, renderedBody.mediaUrls);
-  for (const [address, tilePlayer] of renderedBody.playerAddresses) {
+  const bodyScan = scanTileBody(tile);
+  tileBodies.mediaByTile.set(tile.source, bodyScan.mediaUrls);
+  for (const [address, tilePlayer] of bodyScan.playerAddresses) {
     tileBodies.playerAddresses.set(address, tilePlayer);
   }
-  tileBodies.issues.push(...renderedBody.issues);
+  tileBodies.issues.push(...bodyScan.issues);
 }
 
 /**
  * Builds the `TileBodies` of the tiles a mod receives: the player addresses
- * of their metadata strings that `readPlayer` recognizes, and the rendered
- * body, media and players of each body that holds `<`, `![` or `://`. Other
- * bodies render only when the mod asks for them. The tiles are not changed.
+ * of their metadata strings that `readPlayer` recognizes, and the media,
+ * players and issues of each body that holds `<`, `![` or `://`, from
+ * `scanTileBody`. No body is rendered: each renders when the mod asks for
+ * it. The tiles are not changed.
  */
 export function buildTileBodies(tiles: Tile[]): TileBodies {
   const tileBodies: TileBodies = {
@@ -100,26 +101,46 @@ export function buildTileBodies(tiles: Tile[]): TileBodies {
   return tileBodies;
 }
 
+/** A failed render is forgotten, so a later request renders the body again. */
+function forgetFailedBody(
+  tileBodies: TileBodies,
+  source: string,
+  error: unknown,
+): never {
+  tileBodies.renderedBodies.delete(source);
+  throw error;
+}
+
+/** The HTML of a tile's body, rendered on first request; later requests share its promise. */
+function renderBodyOnce(tileBodies: TileBodies, tile: Tile): Promise<string> {
+  const keptHtml = tileBodies.renderedBodies.get(tile.source);
+  if (keptHtml !== undefined) {
+    return keptHtml;
+  }
+  const html = renderTileBody(tile).catch(
+    forgetFailedBody.bind(undefined, tileBodies, tile.source),
+  );
+  tileBodies.renderedBodies.set(tile.source, html);
+  return html;
+}
+
 /**
  * The rendered HTML of the body of the tile whose source is `source`, or
  * `null` when no tile the mod receives has it. Renders on first request and
- * keeps the result.
+ * keeps the promise, so two requests for one body render it once. Rejects
+ * when the body cannot be rendered, such as when a library it needs cannot
+ * be loaded; the failed render is not kept.
  */
-export function readTileBodyHtml(
+export async function readTileBodyHtml(
   tileBodies: TileBodies,
   source: string,
-): string | null {
-  const renderedBody = tileBodies.renderedBodies.get(source);
-  if (renderedBody !== undefined) {
-    return renderedBody.html;
-  }
+): Promise<string | null> {
   const tile = tileBodies.tiles.get(source);
   if (tile === undefined) {
     return null;
   }
-  const newBody = renderTileBody(tile);
-  tileBodies.renderedBodies.set(source, newBody);
-  return newBody.html;
+  const html = await renderBodyOnce(tileBodies, tile);
+  return html;
 }
 
 /** The player and title of a player address of the tiles, or `null` for any other address. */

@@ -111,6 +111,8 @@ const { html } = await engine.request("tiles.renderBody", {
 container.innerHTML = html;
 ```
 
+A rendered body holds GitHub-flavored markdown and the HTML GitHub allows, with `<video>`, `<audio>` and `<picture>`, alerts (`aside.ot-alert`) and player placeholders (`button.ot-player`). Formulas between dollars and fenced `math` blocks are MathML: each `<math>` keeps the formula's source in its `<annotation encoding="application/x-tex">`, and a formula that cannot be rendered stays as `code.language-math` with `data-ot-math-error`. Code blocks labeled with a common language are highlighted with `hljs-` spans the theme colors, and emoji shortcodes such as `:tada:` are emoji. When a library a body needs cannot be loaded, the request fails with `-32603`, and `ot-tile-body` shows the message (see [Tile bodies](modules/lib/core/tile_bodies/README.md#math) in the tile bodies module).
+
 Either way, the frame loader handles clicks in the rendered body: a link asks the user to open it in a new tab (`links.open`), a link to a heading of the body scrolls to it, and a click on a player placeholder asks the user to play it in the app's player dialog (`players.open`). A mod writes no code for them.
 
 To handle a click yourself, cancel it in your own listener with `preventDefault()`: the frame loader then leaves it alone. Do not only stop its propagation: a link click that is not cancelled navigates the mod's frame, which stops the mod.

@@ -169,8 +169,8 @@ function collectLinksOfTile(
 /**
  * Finds the images, video and audio a mod's tiles link: each `http:` or
  * `https:` URL that is a metadata string, inside lists and nested mappings
- * too, or a media address of the tile's rendered body, which `bodyMedia`
- * holds by tile source (`renderTileBody`'s `mediaUrls`). A link to a folder,
+ * too, or a media address of the tile's body, which `bodyMedia`
+ * holds by tile source (`scanTileBody`'s `mediaUrls`). A link to a folder,
  * or one whose origin a content host or a granted `show` host covers, adds
  * nothing. A link the policy cannot express, or one to the user's computer
  * or network from a tile that is not, is left out and reported. The input

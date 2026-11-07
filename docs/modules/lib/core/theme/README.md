@@ -159,7 +159,20 @@ Any other value leaves the element's plain look, and so does an unprefixed `data
 
 A diagram the `<ot-tile-body>` element drew, `figure[data-mermaid-source]` (see [Diagrams](../tile_bodies/README.md#diagrams)), is centered and never wider than its container: a diagram wider than that scrolls sideways. Its colors come from the theme tokens when it is drawn, not from the stylesheet.
 
-Math kept as code (`code.language-math`) looks like code. The classes are for the mod's own CSS: the stylesheet never uses them.
+Display math, `math[display="block"]` (see [Math](../tile_bodies/README.md#math)), is a block of its own with a vertical margin, and scrolls sideways when the formula is wider than its container, so the page does not widen. Inline math flows with the text. Every `<math>` gets the font family `"STIX Two Math", "STIX Math", "Cambria Math", "Latin Modern Math", math`: browsers stretch brackets and enlarge `∑` and `∫` only with a font that has an OpenType `MATH` table, and Chromium on Linux resolves the generic `math` family to a text font, such as FreeSerif, even when a math font is installed. Naming the common ones first lets each browser use the math font the system has: STIX Two Math on macOS and iOS, Cambria Math on Windows, STIX Math or Latin Modern Math from Linux packages such as `fonts-stix` and `fonts-lmodern`. On a system with none of them, Chromium and WebKit draw formulas with one-line brackets and small operators; Firefox builds them from Unicode parts. The app ships no math font. A formula that failed, kept as code (`code.language-math`), looks like code; the math classes are for the mod's own CSS.
+
+Highlighted code (see [Highlighted code](../tile_bodies/README.md#highlighted-code)) colors its tokens from the theme's roles, so it follows the frame's color scheme and changes with it without a reload:
+
+| Classes | Color |
+|---|---|
+| `hljs-keyword`, `hljs-built_in`, `hljs-literal` | `primary` |
+| `hljs-string`, `hljs-regexp`, `hljs-addition` | `success` |
+| `hljs-number` | `warning` |
+| `hljs-title`, `hljs-function`, `hljs-class` | `secondary` |
+| `hljs-comment`, `hljs-quote` | `muted-foreground`, italic |
+| `hljs-deletion` | `destructive` |
+
+The stylesheet matches these classes by attribute, as in `span[class~="hljs-keyword"]`, so it keeps no class selectors. Every other token keeps the code's color. These roles read at 4.5:1 on `muted`, the code's background (see Contrast above). A mod that opts out of the theme styles gets the code uncolored.
 
 **Undoing a pattern.** When an element means something else in a mod, for example an `<article>` that should not look like a card, one unlayered rule undoes the pattern (see the next section):
 

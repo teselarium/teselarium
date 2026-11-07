@@ -45,6 +45,7 @@ Data that is not a valid request but has a string or number `id` is answered wit
 | `-32001` | A mod file could not be loaded. The message is the load error's message. |
 | `-32002` | Permission denied. The message says which permission is missing. |
 | `-32003` | The requested default mod is switched off. The message names the mod. |
+| `-32603` | An error the method did not expect, such as a tile body whose library cannot be loaded. The message is the method's name, `: ` and the error's message, as in `tiles.renderBody: Failed to fetch dynamically imported module: …`. |
 
 ### Reserved names
 
@@ -64,7 +65,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
-| `tiles.renderBody` | `{ source }`, the `source` of one of the mod's tiles | `{ html }`: the tile's body rendered to safe HTML (see [Tile bodies](#tile-bodies)). Added in mod API `0.1.5`. |
+| `tiles.renderBody` | `{ source }`, the `source` of one of the mod's tiles | `{ html }`: the tile's body rendered to safe HTML (see [Tile bodies](#tile-bodies)). Added in mod API `0.1.5`; formulas as MathML, highlighted code and emoji since `0.1.7`. |
 | `players.open` | `{ url }`, a player address of the mod's tiles | `true` once the player was shown and closed, `false` if the user cancelled (see [Players](#players)). Added in mod API `0.1.5`. |
 | `libs.load` | `{ name, version }`, a library the app ships and its major version, such as `{ name: "mermaid", version: "12" }` | `{ name, version }`, with the full version installed, once the library is ready in the mod's frame (see [Libraries](#libraries)). Added in mod API `0.1.6`. |
 
@@ -92,7 +93,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.6"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.7"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -111,9 +112,9 @@ A collection is optional. Without one, `tiles` and `issues` are empty and no col
 
 ### Tile bodies
 
-A tile's `body` reaches the mod as written. The engine can render it for the mod, so no mod has to bundle a markdown parser or sanitize what tile authors write. What the rendered HTML holds is described in the [tile bodies module](../tile_bodies/README.md): GitHub-flavored markdown and the HTML GitHub allows, `<video>`, `<audio>` and `<picture>`, paths resolved against the tile, alerts, heading ids, math kept as code, and a placeholder for each player.
+A tile's `body` reaches the mod as written. The engine can render it for the mod, so no mod has to bundle a markdown parser or sanitize what tile authors write. What the rendered HTML holds is described in the [tile bodies module](../tile_bodies/README.md): GitHub-flavored markdown and the HTML GitHub allows, `<video>`, `<audio>` and `<picture>`, paths resolved against the tile, alerts, heading ids, formulas rendered as MathML, code labeled with a common language highlighted, emoji shortcodes such as `:tada:` turned into emoji, and a placeholder for each player.
 
-**`tiles.renderBody { source }`** answers `{ html }`, the body of the mod's tile whose `source` is `source`. The tiles are those the mod currently receives, after "Reload tiles" too. An empty body gives `""`. A `source` that is not a string is `-32602` (`tiles.renderBody: "source" must be a string`), and so is one that names no tile of the mod (`tiles.renderBody: the source https://example.org/other.md is not one of the mod's tiles`). A body renders on its first request and is kept.
+**`tiles.renderBody { source }`** answers `{ html }`, the body of the mod's tile whose `source` is `source`. The tiles are those the mod currently receives, after "Reload tiles" too. An empty body gives `""`. A `source` that is not a string is `-32602` (`tiles.renderBody: "source" must be a string`), and so is one that names no tile of the mod (`tiles.renderBody: the source https://example.org/other.md is not one of the mod's tiles`). A body renders on its first request and is kept, and two requests for one body render it once. A body that fails to render, such as when the library a formula, a code block or a shortcode needs cannot be loaded, is `-32603` with a message starting with `tiles.renderBody`; the failure is not kept, so the next request renders the body again.
 
 **`<ot-tile-body>`** is an element the frame loader defines in every mod frame, the frames of a check's tests included. Setting its `tile` property to a tile sends `tiles.renderBody` with the tile's `source`, and shows the result as the element's children, in the light DOM, so the theme and the mod's CSS style it. It then fires `ot-rendered`, which bubbles. When the request fails, the element shows the error's message as text with `role="alert"`. When `tile` is set again before the answer, the newest tile wins. After showing a body, the element draws its mermaid blocks as diagrams in the mod's frame, with the [mermaid library](#libraries), and fires `ot-diagrams-drawn`; `diagrams = "source"` keeps them as code (see [Diagrams](../tile_bodies/README.md#diagrams) in the tile bodies module).
 
@@ -169,7 +170,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.6"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.7"
     }
   ]
 }
@@ -359,7 +360,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.6` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.7` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -450,7 +451,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.6"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.7"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.7` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -493,9 +494,9 @@ const launch = buildModLaunch(inputs.mod, inputs.link, inputs.modTiles, grants, 
 
 Implemented in `mod_tile_bodies.ts`, with the renderer of the [tile bodies module](../tile_bodies/README.md) and the table of the [players module](../players/README.md).
 
-- `buildTileBodies(tiles)`: the `TileBodies` of the tiles a mod receives: `tiles` (each tile by source), `renderedBodies` (the `RenderedBody` of each body rendered so far, by source), `playerAddresses` (each player address, normalized as `URL.href`, with its `TilePlayer`: the `Player` and the title the tile gives it, which is the tile's `title` for a metadata page link), `mediaByTile` (the `mediaUrls` of each collected body, by source) and `issues` (the warnings of iframes the bodies left out). Each metadata string that `readPlayer` recognizes is a player address; each body holding `<`, `![` or `://` is rendered, and its media, players and issues are collected. `buildModLaunch` and the stage's "Reload tiles" call it. The tiles are not changed.
+- `buildTileBodies(tiles)`: the `TileBodies` of the tiles a mod receives: `tiles` (each tile by source), `renderedBodies` (the promise of the HTML of each body requested so far, by source), `playerAddresses` (each player address, normalized as `URL.href`, with its `TilePlayer`: the `Player` and the title the tile gives it, which is the tile's `title` for a metadata page link), `mediaByTile` (the `mediaUrls` of each collected body, by source) and `issues` (the warnings of iframes the bodies left out). Each metadata string that `readPlayer` recognizes is a player address; each body holding `<`, `![` or `://` is scanned with `scanTileBody`, and its media, players and issues are collected. No body is rendered: each renders when the mod asks for it, so the libraries of the extras load only then. `buildModLaunch` and the stage's "Reload tiles" call it. The tiles are not changed.
 - `collectModTileLinks(tiles, tileBodies, contentHosts, granted)`: `collectTileLinks` with the bodies' media, followed by the bodies' issues.
-- `readTileBodyHtml(tileBodies, source)` and `findTilePlayer(tileBodies, url)`, used by the handlers and not exported by `index.ts`: the HTML of a tile's body, rendered on first request and kept, or `null` for a source of no tile; and the `TilePlayer` of a player address, or `null`.
+- `readTileBodyHtml(tileBodies, source)` and `findTilePlayer(tileBodies, url)`, used by the handlers and not exported by `index.ts`: async, the HTML of a tile's body, rendered on first request with its promise kept, or `null` for a source of no tile; a promise that rejects is dropped, so a later request renders again; and the `TilePlayer` of a player address, or `null`.
 
 ### Mod check
 

@@ -700,7 +700,58 @@
     text-align: center;
   }
 
-  /* Math kept as code looks like code: the code rules above already apply. */
+  /*
+   * Formulas: the common math fonts first, then the browser's own. Brackets
+   * stretch and large operators grow only with a font that has an OpenType
+   * MATH table, and Chromium on Linux resolves the generic `math` family to a
+   * text font even when a math font is installed.
+   */
+  math {
+    font-family:
+      "STIX Two Math", "STIX Math", "Cambria Math", "Latin Modern Math", math;
+  }
+
+  /* Display math: a block of its own, scrolling sideways when wider than its container. */
+  math[display="block"] {
+    display: block math;
+    margin: var(--ot-space-3) 0;
+    overflow-x: auto;
+  }
+
+  /* A formula that failed, kept as code, looks like code: the code rules above already apply. */
+
+  /* Highlighted code: tokens in the theme's roles, so they follow the color scheme. Other tokens keep the code's color. Matched by attribute, as the stylesheet has no class selectors. */
+  span[class~="hljs-keyword"],
+  span[class~="hljs-built_in"],
+  span[class~="hljs-literal"] {
+    color: var(--ot-primary);
+  }
+
+  span[class~="hljs-string"],
+  span[class~="hljs-regexp"],
+  span[class~="hljs-addition"] {
+    color: var(--ot-success);
+  }
+
+  span[class~="hljs-number"] {
+    color: var(--ot-warning);
+  }
+
+  span[class~="hljs-title"],
+  span[class~="hljs-function"],
+  span[class~="hljs-class"] {
+    color: var(--ot-secondary);
+  }
+
+  span[class~="hljs-comment"],
+  span[class~="hljs-quote"] {
+    color: var(--ot-muted-foreground);
+    font-style: italic;
+  }
+
+  span[class~="hljs-deletion"] {
+    color: var(--ot-destructive);
+  }
 
   a,
   button,

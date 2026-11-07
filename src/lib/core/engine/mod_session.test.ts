@@ -37,6 +37,25 @@ import type { ModSession, ModSessionOptions } from "./mod_session.ts";
 import type { ResponseError } from "./mod_messages.ts";
 import type { SandboxTestReport } from "../sandbox/index.ts";
 
+/** Whether the math pass's chunk fails to load, as when the app is offline. */
+const mathChunk = vi.hoisted(function buildMathChunkState(): {
+  fails: boolean;
+} {
+  const state = { fails: false };
+  return state;
+});
+
+vi.mock(
+  "../tile_bodies/math_pass.ts",
+  async function mockMathChunk(importOriginal): Promise<object> {
+    if (mathChunk.fails) {
+      throw new Error("Failed to fetch dynamically imported module math_pass");
+    }
+    const mathPassModule = await importOriginal<object>();
+    return mathPassModule;
+  },
+);
+
 const TEST_CODE =
   'export default function register(t) { t.test("lists books", function listsBooks() {}); }';
 
@@ -191,6 +210,39 @@ async function waitForReceived(
     }
     await waitForMessages();
   }
+}
+
+/** Gives the session one tile whose body holds a formula, and answers its source. */
+async function showFormulaTile(played: PlayedSession): Promise<string> {
+  const formulaTile: Tile = {
+    ...played.launch.context.tiles[0],
+    body: "Speed: $\\frac{d}{t}$",
+  };
+  pushTilesChanged(
+    played.session,
+    [formulaTile],
+    [],
+    buildTileBodies([formulaTile]),
+  );
+  await waitForReceived(played, 1);
+  return formulaTile.source;
+}
+
+/**
+ * Requests the body of `source` while the math chunk fails to load, and
+ * answers the response. The page keeps the math pass once it loads, so the
+ * tests of this file load it only after a failure.
+ */
+async function requestBodyWithoutMath(
+  played: PlayedSession,
+  id: number,
+  source: string,
+): Promise<unknown> {
+  mathChunk.fails = true;
+  sendRequest(played, id, "tiles.renderBody", { source });
+  await waitForReceived(played, 2);
+  mathChunk.fails = false;
+  return played.received[1];
 }
 
 describe("connectModSession", function describeConnectModSession(): void {
@@ -413,6 +465,37 @@ describe("connectModSession", function describeConnectModSession(): void {
         },
       },
     ]);
+  });
+
+  it("Library that cannot load", async function answersFailedRender(): Promise<void> {
+    const played = await playSession();
+    const source = await showFormulaTile(played);
+
+    const response = await requestBodyWithoutMath(played, 8, source);
+
+    expect(response).toEqual({
+      jsonrpc: "2.0",
+      id: 8,
+      error: {
+        code: -32603,
+        message: expect.stringMatching(/^tiles\.renderBody: /),
+      },
+    });
+  });
+
+  it("Next request after a failure", async function rendersAfterFailure(): Promise<void> {
+    const played = await playSession();
+    const source = await showFormulaTile(played);
+    await requestBodyWithoutMath(played, 8, source);
+
+    sendRequest(played, 9, "tiles.renderBody", { source });
+    await waitForReceived(played, 3);
+
+    expect(played.received[2]).toEqual({
+      jsonrpc: "2.0",
+      id: 9,
+      result: { html: expect.stringContaining("<math>") },
+    });
   });
 
   it("Reloaded tiles are pushed", async function pushesTilesChanged(): Promise<void> {

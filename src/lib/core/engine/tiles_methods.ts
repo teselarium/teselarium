@@ -20,13 +20,15 @@ function readTileSource(params: YamlMapping): string {
  * `tiles.renderBody { source }`: answers `{ html }`, the rendered body of
  * the tile the mod currently receives whose `source` is `source`. Raises
  * `INVALID_PARAMS` for a source that is not a string or names no such tile.
+ * Rejects with the renderer's error when the body cannot be rendered, which
+ * the session answers with `-32603`.
  */
 async function renderTileBodyForMod(
   context: ModMethodContext,
   params: YamlMapping,
 ): Promise<RenderedBodyResult> {
   const source = readTileSource(params);
-  const html = readTileBodyHtml(context.tileBodies, source);
+  const html = await readTileBodyHtml(context.tileBodies, source);
   if (html === null) {
     throwInvalidParams(
       "tiles.renderBody",

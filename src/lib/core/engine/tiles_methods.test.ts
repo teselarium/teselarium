@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildMethodContext,
   catchMethodError,
@@ -9,10 +9,25 @@ import {
 } from "../../../test/sample_mods.ts";
 import { launchTestMod } from "../../../test/test_launches.ts";
 import type { Tile } from "../../tile/index.ts";
+import { renderTileBody } from "../tile_bodies/index.ts";
+import type { TileBodyRenderer } from "../tile_bodies/index.ts";
 import { INVALID_PARAMS } from "./mod_messages.ts";
 import type { ModMethodContext } from "./mod_methods.ts";
 import { buildTileBodies } from "./mod_tile_bodies.ts";
 import { TILES_METHODS } from "./tiles_methods.ts";
+
+vi.mock(
+  "../tile_bodies/index.ts",
+  async function spyOnRenderer(importOriginal): Promise<object> {
+    const original =
+      await importOriginal<typeof import("../tile_bodies/index.ts")>();
+    const spiedModule = {
+      ...original,
+      renderTileBody: vi.fn<TileBodyRenderer>(original.renderTileBody),
+    };
+    return spiedModule;
+  },
+);
 
 const TILE_SOURCE = "https://tiles.example.net/books/notes.md";
 
@@ -116,6 +131,53 @@ describe("tiles.renderBody", function describeRenderBody(): void {
     const result = await renderBody(context, { source: TILE_SOURCE });
 
     expect(result).toEqual({ html: "<p>New text.</p>" });
+  });
+
+  it("renders a body once for two requests at once", async function rendersOnce(): Promise<void> {
+    const context = buildTilesContext([buildNotesTile("Inline $x^2$.")]);
+    vi.mocked(renderTileBody).mockClear();
+
+    const results = await Promise.all([
+      renderBody(context, { source: TILE_SOURCE }),
+      renderBody(context, { source: TILE_SOURCE }),
+    ]);
+
+    expect(renderTileBody).toHaveBeenCalledTimes(1);
+    expect(results[1]).toEqual(results[0]);
+  });
+
+  it("Formula beside an image", async function rendersFormulaBesideImage(): Promise<void> {
+    const context = buildTilesContext([
+      buildNotesTile("![Cover](./cover.jpg) and $\\frac{a}{b}$"),
+    ]);
+
+    const result = (await renderBody(context, { source: TILE_SOURCE })) as {
+      html: string;
+    };
+
+    expect(result.html).toContain(
+      '<img src="https://tiles.example.net/books/cover.jpg" alt="Cover"',
+    );
+    expect(result.html).toContain("<mfrac><mi>a</mi><mi>b</mi></mfrac>");
+    expect(context.tileBodies.mediaByTile.get(TILE_SOURCE)).toEqual([
+      "https://tiles.example.net/books/cover.jpg",
+    ]);
+  });
+
+  it("forgets a body that fails to render", async function forgetsFailedBody(): Promise<void> {
+    const context = buildTilesContext([buildNotesTile("Text.")]);
+    vi.mocked(renderTileBody).mockRejectedValueOnce(
+      new Error("the math chunk could not be fetched"),
+    );
+
+    const failedRender = renderBody(context, { source: TILE_SOURCE });
+
+    await expect(failedRender).rejects.toThrow(
+      "the math chunk could not be fetched",
+    );
+    expect(context.tileBodies.renderedBodies.size).toBe(0);
+    const result = await renderBody(context, { source: TILE_SOURCE });
+    expect(result).toEqual({ html: "<p>Text.</p>" });
   });
 
   it("keeps a rendered body for later requests", async function keepsRenderedBody(): Promise<void> {

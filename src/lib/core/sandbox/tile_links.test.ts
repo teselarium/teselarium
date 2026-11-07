@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildTestTile } from "../../../test/test_files.ts";
 import type { ModIssue, ModPermission } from "../../mod/index.ts";
 import type { Tile } from "../../tile/index.ts";
-import { renderTileBody } from "../tile_bodies/index.ts";
+import { scanTileBody } from "../tile_bodies/index.ts";
 import { collectTileLinks } from "./tile_links.ts";
 
 const TILE_SOURCE = "https://tiles.example.net/books/kallocain.md";
@@ -50,7 +50,7 @@ function collectBodyLinks(body: string): ReturnType<typeof collectTileLinks> {
     body,
     types: [],
   };
-  const bodyMedia = new Map([[tile.source, renderTileBody(tile).mediaUrls]]);
+  const bodyMedia = new Map([[tile.source, scanTileBody(tile).mediaUrls]]);
   const tileLinks = collectTileLinks([tile], CONTENT_HOSTS, [], bodyMedia);
   return tileLinks;
 }
