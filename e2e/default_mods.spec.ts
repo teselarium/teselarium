@@ -1,80 +1,30 @@
 import { expect, test } from "@playwright/test";
-import type { Frame, FrameLocator, Locator, Page } from "@playwright/test";
+import type { FrameLocator, Locator, Page, Route } from "@playwright/test";
 import type { ModFiles } from "./mod_routes.ts";
 import {
-  APP_MOD_API_VERSION,
   buildMissingEntrypointFiles,
-  buildProbeFiles,
   buildSlowMountFiles,
   buildTestedProbeFiles,
   coverPermissionRow,
-  EXPLORER_CODE,
   FAILING_CASE_TEST_CODE,
   findModFrame,
-  OTHER_API_RANGE,
   readParentDocumentError,
   recordHost,
   routeCovers,
   serveAppOriginMod,
   stageBar,
-  TEST_MOD_API_RANGE,
   visibleSandbox,
 } from "./mod_routes.ts";
 import {
-  MISSING_MOD_REFERENCE,
   readSampleModSource,
   SAMPLE_BOOKS_FOLDER_PATH,
   SAMPLE_COLLECTION_GLOB,
   SAMPLE_MOD_REFERENCE,
 } from "./sample_mod.ts";
-import { listOwnLookDeclarations, readTokenAs } from "./theme_probes.ts";
+import { listOwnLookDeclarations } from "./theme_probes.ts";
 import { openModsSection, pageBody } from "./app_layout.ts";
 
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
-
-/** The explorer with `MISSING_MOD_REFERENCE` in its `mods` list, served on the app's origin. */
-async function openBrokenExplorer(page: Page): Promise<Frame> {
-  await serveAppOriginMod(page, {
-    "explorer/mod_conf.yaml": [
-      "mod:",
-      `  api: "${TEST_MOD_API_RANGE}"`,
-      '  name: "mod_explorer"',
-      '  title: "Broken explorer"',
-      '  version: "0.1.0"',
-      '  entrypoint: "./main.js"',
-      "  config:",
-      '    viewer: "mod_viewer"',
-      "    mods:",
-      `      - "${MISSING_MOD_REFERENCE}"`,
-      "  permissions:",
-      "    open:",
-      '      - host: "*"',
-      '        reason: "Opens the mods you pick"',
-    ].join("\n"),
-    "explorer/main.js": EXPLORER_CODE,
-  });
-  await page.goto("/#/run?mod=./test-mods/explorer/");
-  return findModFrame(page, "Broken explorer");
-}
-
-function readBackgroundColor(element: Element): string {
-  return getComputedStyle(element).backgroundColor;
-}
-
-/** The top border's color: Firefox gives no computed value for the shorthand. */
-function readBorderColor(element: Element): string {
-  return getComputedStyle(element).borderTopColor;
-}
-
-/** The value of a color token in the frame, as `getComputedStyle` gives a color. */
-async function readTokenColor(frame: Frame, token: string): Promise<string> {
-  return frame.evaluate(readTokenAs, [token, "color"]);
-}
-
-/** The description of the "API range" term in the viewer's metadata list. */
-function apiRangeDefinition(viewer: FrameLocator): Locator {
-  return viewer.locator('dt:text-is("API range") + dd');
-}
 
 async function openViewerForSample(page: Page): Promise<void> {
   await page.goto(`/#/run?mod=mod_viewer&target=${SAMPLE_MOD_REFERENCE}`);
@@ -141,20 +91,6 @@ test.describe("Default mods are ordinary mods", function describeOrdinary(): voi
 });
 
 test.describe("Mod explorer", function describeExplorer(): void {
-  test("Vanilla explorer lists the sample", async function listsSample({
-    page,
-  }): Promise<void> {
-    await page.goto(EXPLORER_RUN_LINK);
-    const explorer = page.frameLocator('iframe[title="Mods"]');
-
-    const card = explorer.getByRole("article").filter({
-      has: explorer.getByRole("button", { name: /Book List/ }),
-    });
-    await expect(card).toContainText(
-      "A very simple list of books with their covers.",
-    );
-  });
-
   test("Select a mod", async function selectsMod({ page }): Promise<void> {
     await page.goto(EXPLORER_RUN_LINK);
     const explorer = page.frameLocator('iframe[title="Mods"]');
@@ -170,128 +106,6 @@ test.describe("Mod explorer", function describeExplorer(): void {
     expect(new URL(page.url()).hash).toBe(
       `#/run?mod=mod_viewer&target=${encodeURIComponent(readSampleModSource(page))}`,
     );
-  });
-
-  test("Mod that cannot be inspected", async function listsFailure({
-    page,
-  }): Promise<void> {
-    const explorer = await openBrokenExplorer(page);
-
-    await expect(explorer.getByText(MISSING_MOD_REFERENCE)).toBeVisible();
-    await expect(explorer.getByRole("alert")).toContainText("404");
-  });
-});
-
-test.describe("Mod viewer", function describeViewer(): void {
-  test("View the sample mod", async function viewsSample({
-    page,
-  }): Promise<void> {
-    await openViewerForSample(page);
-    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
-
-    await expect(
-      viewer.getByRole("heading", { name: "Book List" }),
-    ).toBeVisible();
-    await expect(viewer.getByText("1.0.0")).toBeVisible();
-    await expect(
-      viewer.getByText("A very simple list of books with their covers."),
-    ).toBeVisible();
-    await expect(viewer.getByText("show_covers: true")).toBeVisible();
-    const permission = coverPermissionRow(viewer);
-    await expect(permission.getByRole("cell")).toHaveText([
-      "show",
-      "https://upload.wikimedia.org",
-      "Shows the book covers",
-      "granted",
-    ]);
-    const apiRange = apiRangeDefinition(viewer);
-    await expect(apiRange).toContainText(TEST_MOD_API_RANGE);
-    await expect(apiRange).toContainText("matches");
-    await expect(apiRange).not.toContainText("does not match");
-  });
-
-  test("View a mod for another API", async function viewsOtherApiMod({
-    page,
-  }): Promise<void> {
-    await serveAppOriginMod(
-      page,
-      buildProbeFiles("later", ['  title: "Later API"'], OTHER_API_RANGE),
-    );
-
-    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/later/");
-
-    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
-    await expect(
-      viewer.getByRole("heading", { name: "Later API" }),
-    ).toBeVisible();
-    const apiRange = apiRangeDefinition(viewer);
-    await expect(apiRange).toContainText(OTHER_API_RANGE);
-    await expect(apiRange).toContainText("does not match");
-    await expect(apiRange).toContainText(
-      `This app has mod API ${APP_MOD_API_VERSION}.`,
-    );
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-  });
-
-  test("View a mod without a range", async function viewsModWithoutRange({
-    page,
-  }): Promise<void> {
-    await serveAppOriginMod(page, buildProbeFiles("bare", [], null));
-
-    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/bare/");
-
-    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
-    await expect(apiRangeDefinition(viewer)).toHaveText(
-      "The mod declares no API range.",
-    );
-  });
-
-  test("No target", async function saysNoTarget({ page }): Promise<void> {
-    await page.goto("/#/run?mod=mod_viewer");
-
-    await expect(
-      page
-        .frameLocator('iframe[title="Mod Viewer"]')
-        .getByText("No mod was given."),
-    ).toBeVisible();
-  });
-
-  test("Missing target", async function showsTargetError({
-    page,
-  }): Promise<void> {
-    await page.goto(`/#/run?mod=mod_viewer&target=${MISSING_MOD_REFERENCE}`);
-
-    await expect(
-      page.frameLocator('iframe[title="Mod Viewer"]').getByRole("alert"),
-    ).toContainText("404");
-  });
-});
-
-test.describe("Mod viewer reports a missing or failing target", function describeViewerTargetFailures(): void {
-  test("Empty target", async function saysEmptyTarget({ page }): Promise<void> {
-    await page.goto("/#/run?mod=mod_viewer&target=");
-
-    await expect(
-      page
-        .frameLocator('iframe[title="Mod Viewer"]')
-        .getByText("No mod was given."),
-    ).toBeVisible();
-  });
-
-  test("Target with a format error", async function showsFormatError({
-    page,
-  }): Promise<void> {
-    await serveAppOriginMod(
-      page,
-      buildProbeFiles("bad_theme", ['  theme: "dark"']),
-    );
-
-    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/bad_theme/");
-
-    const alert = page
-      .frameLocator('iframe[title="Mod Viewer"]')
-      .getByRole("alert");
-    await expect(alert).toContainText('"theme" must be "default" or "none"');
   });
 });
 
@@ -429,21 +243,6 @@ test.describe("Mod viewer runs the mod", function describeViewerRuns(): void {
     expect(new URL(page.url()).hash).toBe(
       `#/run?mod=${encodeURIComponent(readSampleModSource(page))}`,
     );
-  });
-
-  test("Mod without a sample collection", async function offersNoSampleRun({
-    page,
-  }): Promise<void> {
-    await page.goto("/#/run?mod=mod_viewer&target=mod_explorer");
-    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
-    await expect(viewer.getByRole("heading", { name: "Mods" })).toBeVisible();
-
-    await expect(
-      viewer.getByRole("button", { name: "Run without tiles" }),
-    ).toBeVisible();
-    await expect(
-      viewer.getByRole("button", { name: "Run with sample tiles" }),
-    ).toHaveCount(0);
   });
 });
 
@@ -594,15 +393,11 @@ test.describe("Mod viewer shows the check report", function describeViewerReport
   });
 });
 
-test.describe("Default mods show how to get the app's look", function describeExamples(): void {
+// The default mods' look is tested by their own cases (default_mods/README.md).
+test.describe("The sample mod shows how to get the app's look", function describeExamples(): void {
   test("Own styles are layout only", async function checksOwnStyles({
     page,
   }): Promise<void> {
-    await page.goto(EXPLORER_RUN_LINK);
-    const explorer = await findModFrame(page, "Mods");
-    await expect(
-      explorer.getByRole("button", { name: /Book List/ }),
-    ).toBeVisible();
     await openViewerForSample(page);
     const viewer = await findModFrame(page, "Mod Viewer");
     await routeCovers(page);
@@ -612,65 +407,101 @@ test.describe("Default mods show how to get the app's look", function describeEx
       bookList.getByRole("button", { name: /Kallocain/ }),
     ).toBeVisible();
 
-    expect(await explorer.evaluate(listOwnLookDeclarations)).toEqual([]);
-    expect(await viewer.evaluate(listOwnLookDeclarations)).toEqual([]);
     expect(await bookList.evaluate(listOwnLookDeclarations)).toEqual([]);
   });
+});
 
-  test("Explorer lists mods as cards", async function listsCards({
+/** The cases of the explorer's test file (default_mods/mod_explorer/test/test.ts), in order. */
+const EXPLORER_CASES = [
+  "lists the mods of its config as cards",
+  "lists a mod that cannot be inspected as an alert",
+  "opens the viewer for the selected mod",
+  "keeps its own styles to layout",
+  "draws each mod on the card background",
+];
+
+/** The cases of the viewer's test file (default_mods/mod_viewer/test/test.ts), in order. */
+const VIEWER_CASES = [
+  "shows the metadata of its target",
+  "marks an API range that matches",
+  "marks an API range that does not match",
+  "says when the mod declares no API range",
+  "says no mod was given without a target",
+  "says no mod was given for an empty target",
+  "shows why a missing target cannot be loaded",
+  "shows the format error of its target",
+  "runs with the sample tiles",
+  "runs with the typed collection, sent as typed",
+  "runs nothing with an empty collection field",
+  "runs without tiles",
+  "offers no sample run without a sample collection",
+  "shows permission statuses as badges",
+  "makes running with the sample tiles the primary action",
+  "keeps its own styles to layout",
+];
+
+/** Answers like a site that ships no `samples/`. */
+async function answerNotFound(route: Route): Promise<void> {
+  await route.fulfill({ status: 404, body: "Not Found" });
+}
+
+/**
+ * Checks a default mod in the visible mod viewer, as a user would, and gives
+ * the report once its status heading is shown.
+ */
+async function checkDefaultMod(page: Page, modName: string): Promise<Locator> {
+  await page.goto(`/#/run?mod=mod_viewer&target=${modName}`);
+  // The visible one: a viewer opened before stays behind it, hidden.
+  const viewer = visibleSandbox(page).frameLocator(
+    'iframe[title="Mod Viewer"]',
+  );
+  await viewer.getByRole("button", { name: "Check mod" }).click();
+  const report = checkReport(viewer);
+  await expect(report.getByRole("heading")).toBeVisible();
+  return report;
+}
+
+/** Expects a report that passed with every case passed, the cases listed by name. */
+async function expectEveryCasePassed(
+  report: Locator,
+  caseNames: string[],
+): Promise<void> {
+  const passedCases: string[] = [];
+  for (const caseName of caseNames) {
+    passedCases.push(`pass ${caseName}`);
+  }
+  await expect(report.getByRole("heading")).toHaveText("Check passed pass");
+  await expect(
+    report.getByRole("list", { name: "Tests" }).getByRole("listitem"),
+  ).toHaveText(passedCases);
+  await expect(report.getByText("No findings.")).toBeVisible();
+}
+
+test.describe("Default mods ship their tests", function describeShippedTests(): void {
+  test("Explorer passes its check", async function checksExplorer({
     page,
   }): Promise<void> {
-    await page.goto(EXPLORER_RUN_LINK);
-    const explorer = await findModFrame(page, "Mods");
+    const report = await checkDefaultMod(page, "mod_explorer");
 
-    const card = explorer.getByRole("article").filter({ hasText: "Book List" });
-    await expect(card.getByRole("button", { name: /Book List/ })).toBeVisible();
-    expect(await card.evaluate(readBackgroundColor)).toBe(
-      await readTokenColor(explorer, "--ot-card"),
-    );
+    await expectEveryCasePassed(report, EXPLORER_CASES);
   });
 
-  test("Viewer's main action is primary", async function drawsPrimaryAction({
+  test("Viewer passes its check", async function checksViewer({
     page,
   }): Promise<void> {
-    await openViewerForSample(page);
-    const viewer = await findModFrame(page, "Mod Viewer");
+    const report = await checkDefaultMod(page, "mod_viewer");
 
-    const runWithSample = viewer.getByRole("button", {
-      name: "Run with sample tiles",
-    });
-    const runWithout = viewer.getByRole("button", {
-      name: "Run without tiles",
-    });
-    expect(await runWithSample.evaluate(readBackgroundColor)).toBe(
-      await readTokenColor(viewer, "--ot-primary"),
-    );
-    expect(await runWithout.evaluate(readBackgroundColor)).toBe(
-      await readTokenColor(viewer, "--ot-background"),
-    );
+    await expectEveryCasePassed(report, VIEWER_CASES);
   });
 
-  test("Viewer shows permission statuses as badges", async function drawsBadges({
+  test("Cases without the samples", async function checksWithoutSamples({
     page,
   }): Promise<void> {
-    await openViewerForSample(page);
-    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+    await page.route("**/samples/**", answerNotFound);
 
-    const badge = coverPermissionRow(viewer).locator("span[data-ot-variant]");
-    await expect(badge).toHaveText("granted");
-    await expect(badge).toHaveAttribute("data-ot-variant", "success");
-  });
-
-  test("Explorer shows a failure as an alert", async function showsAlert({
-    page,
-  }): Promise<void> {
-    const explorer = await openBrokenExplorer(page);
-
-    const alert = explorer.getByRole("alert");
-    await expect(alert).toContainText(MISSING_MOD_REFERENCE);
-    await expect(alert).toContainText("404");
-    expect(await alert.evaluate(readBorderColor)).toBe(
-      await readTokenColor(explorer, "--ot-destructive"),
-    );
+    const viewerReport = await checkDefaultMod(page, "mod_viewer");
+    await expectEveryCasePassed(viewerReport, VIEWER_CASES);
+    const explorerReport = await checkDefaultMod(page, "mod_explorer");
+    await expectEveryCasePassed(explorerReport, EXPLORER_CASES);
   });
 });

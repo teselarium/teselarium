@@ -1,0 +1,17 @@
+# A fixture mod for the viewer's tests (test/viewer_cases.ts), which only inspect it: it has no code and no collection.
+mod:
+  name: "listed_mod"
+  title: "Listed Mod"
+  version: "1.0.0"
+  api: "^0.1.0"
+  description: "A fixture mod that the viewer's tests show."
+  entrypoint: "./main.js"
+  sample_collection: "./collection.yaml"
+  config:
+    show_covers: true
+    shelves:
+      - "fiction"
+  permissions:
+    show:
+      - host: "https://covers.example.org"
+        reason: "Shows the covers"

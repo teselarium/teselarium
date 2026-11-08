@@ -1,0 +1,4 @@
+mod:
+  name: "plain_mod"
+  version: "0.1.0"
+  entrypoint: "./main.js"

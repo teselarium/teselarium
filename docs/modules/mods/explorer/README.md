@@ -1,6 +1,6 @@
 # Mod Explorer
 
-The mod explorer is the Explore component for mods. It ships as the default mod `mod_explorer` in `public/default_mods/mod_explorer/`, and the vanilla app's Mods section opens it. An instantiation can also make it the Home mod, shown at `#/`, by giving the Home section its link (see the [section registry](../../main/README.md#home-a-page-or-a-mod)).
+The mod explorer is the Explore component for mods. It ships as the default mod `mod_explorer` in `default_mods/mod_explorer/` (see the [default mods folder](../../../../default_mods/README.md)), and the vanilla app's Mods section opens it. An instantiation can also make it the Home mod, shown at `#/`, by giving the Home section its link (see the [section registry](../../main/README.md#home-a-page-or-a-mod)).
 
 It is an ordinary sandboxed mod. It uses only the engine API: `mods.inspect` to read each mod's metadata and `mods.open` to open the viewer. An instantiation can switch it off or replace it by putting another mod in its folder.
 
@@ -12,11 +12,11 @@ It is an ordinary sandboxed mod. It uses only the engine API: `mods.inspect` to 
 
 ## An example of the app's look
 
-Its source, `public/default_mods/mod_explorer/main.js`, is a short example of how a mod gets the app's look from semantic HTML, with no classes and no styling library. Each mod is an `<article>`, which the theme's base stylesheet draws as a card, a failure is a `role="alert"` element, drawn as the app's destructive alert, and the loading list is `aria-busy`. Errors from opening the viewer go to a `role="status"` live region, which draws nothing while it is empty. The mod's own CSS sets layout only: the card grid and the button's place in the card. See "Write HTML, get the app's look" in the [theme module](../../lib/core/theme/README.md).
+Its TypeScript source, in `default_mods/mod_explorer/src/`, is a short example of how a mod gets the app's look from semantic HTML, with no classes and no styling library. Each mod is an `<article>`, which the theme's base stylesheet draws as a card, a failure is a `role="alert"` element, drawn as the app's destructive alert, and the loading list is `aria-busy`. Errors from opening the viewer go to a `role="status"` live region, which draws nothing while it is empty. The mod's own CSS sets layout only: the card grid and the button's place in the card. See "Write HTML, get the app's look" in the [theme module](../../lib/core/theme/README.md).
 
 ## Config
 
-`public/default_mods/mod_explorer/mod_conf.yaml`:
+`default_mods/mod_explorer/mod_conf.yaml`:
 
 ```yaml
 mod:
@@ -26,6 +26,7 @@ mod:
   api: "^0.1.0"
   description: "Lists mods and opens them in the mod viewer."
   entrypoint: "./main.js"
+  test_path: "./test.js"
   config:
     viewer: "mod_viewer"
     mods:
@@ -39,6 +40,10 @@ mod:
 - `viewer`: the mod reference opened for a selected mod. `mod_viewer` is the default mod name of the viewer.
 - `mods`: the mod references to list. Relative references are resolved against the app's address.
 - `open` for `"*"`: the explorer inspects and opens mods from any site. It is granted because the explorer is served from the app's origin.
+
+## Tests
+
+Its tests ship with it: `default_mods/mod_explorer/test/`, built into `test.js` and declared with `test_path`, so checking `mod_explorer` in the mod viewer runs them (see [Tests](../../../../default_mods/README.md#tests) in the default mods folder). They mount the explorer with the fixture mods of `default_mods/mod_explorer/fixtures/` and check what it draws, the requests it sends and its look. `e2e/default_mods.spec.ts` tests what a case cannot see: the sandbox, the stage and the links it opens.
 
 ## Links
 

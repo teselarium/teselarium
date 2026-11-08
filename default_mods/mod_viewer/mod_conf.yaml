@@ -5,6 +5,7 @@ mod:
   api: "^0.1.0"
   description: "Shows a mod's metadata and runs it with or without tiles."
   entrypoint: "./main.js"
+  test_path: "./test.js"
   permissions:
     open:
       - host: "*"

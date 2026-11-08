@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { expect } from "@playwright/test";
 import type {
   Frame,
@@ -13,12 +13,23 @@ import {
   SAMPLE_ENTRYPOINT_GLOB,
   SAMPLE_TYPE_PATH,
 } from "./sample_mod.ts";
+import { bundleDefaultMod } from "../build/default_mod_build.ts";
 
-/** The code of the default mod explorer, to serve a copy with another config. */
-export const EXPLORER_CODE = readFileSync(
-  new URL("../public/default_mods/mod_explorer/main.js", import.meta.url),
-  "utf8",
-);
+/** The built code of the default mod explorer (build/default_mod_build.ts), to serve a copy with another config. */
+export const EXPLORER_CODE = await readExplorerCode();
+
+async function readExplorerCode(): Promise<string> {
+  const explorerFiles = await bundleDefaultMod(
+    fileURLToPath(new URL("../default_mods/mod_explorer/", import.meta.url)),
+  );
+  for (const explorerFile of explorerFiles) {
+    if (explorerFile.path === "main.js") {
+      const explorerCode = new TextDecoder().decode(explorerFile.content);
+      return explorerCode;
+    }
+  }
+  throw new Error("The build of default_mods/mod_explorer/ has no main.js.");
+}
 
 /** The host of the sample book covers. Tests answer it locally, so no test needs the network. */
 export const COVER_HOST = "https://upload.wikimedia.org";

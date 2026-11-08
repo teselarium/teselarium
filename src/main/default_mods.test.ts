@@ -21,7 +21,7 @@ describe("default mods", function describeDefaultMods(): void {
     });
   });
 
-  it("loads the mod explorer from public/", async function loadsExplorer(): Promise<void> {
+  it("loads the mod explorer from default_mods/", async function loadsExplorer(): Promise<void> {
     const explorer = await loadMod("mod_explorer", {
       baseUrl: APP_BASE_URL,
       defaultModsFolder: DEFAULTS.folder,
@@ -38,10 +38,10 @@ describe("default mods", function describeDefaultMods(): void {
     expect(explorer.permissions).toEqual([
       expect.objectContaining(OPEN_ANY_SITE),
     ]);
-    expect(explorer.code).toContain("export default async function mount");
+    expect(explorer.code).toContain("async function mount(");
   });
 
-  it("loads the mod viewer from public/", async function loadsViewer(): Promise<void> {
+  it("loads the mod viewer from default_mods/", async function loadsViewer(): Promise<void> {
     const viewer = await loadMod("mod_viewer", {
       baseUrl: APP_BASE_URL,
       defaultModsFolder: DEFAULTS.folder,
@@ -57,7 +57,7 @@ describe("default mods", function describeDefaultMods(): void {
     expect(viewer.permissions).toEqual([
       expect.objectContaining(OPEN_ANY_SITE),
     ]);
-    expect(viewer.code).toContain("export default async function mount");
+    expect(viewer.code).toContain("async function mount(");
   });
 
   it("Explorer from the default folder", async function launchesExplorer(): Promise<void> {

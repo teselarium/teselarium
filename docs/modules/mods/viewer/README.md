@@ -1,6 +1,6 @@
 # Mod Viewer
 
-The mod viewer is the Viewer component for mods. It ships as the default mod `mod_viewer` in `public/default_mods/mod_viewer/`. It shows a mod's metadata without running it, runs it with or without tiles, and checks it.
+The mod viewer is the Viewer component for mods. It ships as the default mod `mod_viewer` in `default_mods/mod_viewer/` (see the [default mods folder](../../../../default_mods/README.md)). It shows a mod's metadata without running it, runs it with or without tiles, and checks it.
 
 It is an ordinary sandboxed mod. It uses only the engine API: `mods.inspect` to read the mod's metadata, `mods.open` to run it and `mods.check` to check it. It needs no collection and has no tile type. An instantiation can switch it off or replace it by putting another mod in its folder.
 
@@ -19,7 +19,7 @@ The mod opens in a new sandbox, and the viewer stays open behind it, so back ret
 
 ## An example of the app's look
 
-Its source, `public/default_mods/mod_viewer/main.js`, is a short example of how a mod gets the app's look from semantic HTML, with no classes and no styling library:
+Its TypeScript source, in `default_mods/mod_viewer/src/`, is a short example of how a mod gets the app's look from semantic HTML, with no classes and no styling library:
 
 - the metadata is an `<article>`, drawn as a card, and the permissions a plain `<table>`;
 - the version, the API range's match, the permission statuses, the check status, the test cases' statuses and the findings' levels are badges: `<span>`s with `data-ot-variant` (`secondary`, `success`, `warning`, `destructive`, `outline`);
@@ -30,7 +30,7 @@ The mod's own CSS sets layout only. The frame has no `allow-forms`, so its forms
 
 ## Config
 
-`public/default_mods/mod_viewer/mod_conf.yaml`:
+`default_mods/mod_viewer/mod_conf.yaml`:
 
 ```yaml
 mod:
@@ -40,6 +40,7 @@ mod:
   api: "^0.1.0"
   description: "Shows a mod's metadata and runs it with or without tiles."
   entrypoint: "./main.js"
+  test_path: "./test.js"
   permissions:
     open:
       - host: "*"
@@ -47,6 +48,10 @@ mod:
 ```
 
 `open` for `"*"` lets the viewer inspect and run mods from any site. It is granted because the viewer is served from the app's origin.
+
+## Tests
+
+Its tests ship with it: `default_mods/mod_viewer/test/`, built into `test.js` and declared with `test_path`, so checking `mod_viewer` in the mod viewer runs them (see [Tests](../../../../default_mods/README.md#tests) in the default mods folder). They mount the viewer with the fixture mods of `default_mods/mod_viewer/fixtures/` and check what it draws, the requests it sends and its look. `e2e/default_mods.spec.ts` tests what a case cannot see: the sandbox, the stage and the links it opens.
 
 ## Links
 

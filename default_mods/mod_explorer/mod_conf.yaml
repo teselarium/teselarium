@@ -5,6 +5,7 @@ mod:
   api: "^0.1.0"
   description: "Lists mods and opens them in the mod viewer."
   entrypoint: "./main.js"
+  test_path: "./test.js"
   config:
     viewer: "mod_viewer"
     mods:

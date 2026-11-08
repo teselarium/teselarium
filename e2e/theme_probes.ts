@@ -194,17 +194,37 @@ export function hasThemeEvents(count: number): boolean {
   return events.length >= count;
 }
 
+/** The default export of a bundled default mod (build/default_mod_build.ts), naming its `mount`. */
+const BUNDLED_DEFAULT_EXPORT = /export \{ ([\w$]+) as default \};/;
+
+/** A default mod's code without its default export, and the name of its `mount` in that code. */
+interface UnexportedMod {
+  code: string;
+  mountName: string;
+}
+
+function removeDefaultExport(code: string): UnexportedMod {
+  const bundledExport = BUNDLED_DEFAULT_EXPORT.exec(code);
+  if (bundledExport !== null) {
+    const bundledMod: UnexportedMod = {
+      code: code.replace(bundledExport[0], ""),
+      mountName: bundledExport[1],
+    };
+    return bundledMod;
+  }
+  throw new Error(
+    "Cannot wrap the default mod's mount: its code has no default export of a bundle (build/default_mod_build.ts).",
+  );
+}
+
 /**
  * Wraps a default mod's `mount` so it records each `theme.changed` like the
  * theme probe, then mounts the mod as usual.
  */
 function wrapDefaultModCode(code: string): string {
-  const renamedCode = code.replace(
-    "export default async function mount(",
-    "async function mountDefaultMod(",
-  );
-  const wrappedCode = `${renamedCode}
-export default function mount(engine, context) {
+  const unexportedMod = removeDefaultExport(code);
+  const wrappedCode = `${unexportedMod.code}
+export default function mountRecordingThemes(engine, context) {
   globalThis.probe = { context, themeEvents: [] };
   engine.on("theme.changed", function recordTheme(theme) {
     globalThis.probe.themeEvents.push({
@@ -212,7 +232,7 @@ export default function mount(engine, context) {
       attribute: document.documentElement.dataset.otColorScheme,
     });
   });
-  return mountDefaultMod(engine, context);
+  return ${unexportedMod.mountName}(engine, context);
 }
 `;
   return wrappedCode;

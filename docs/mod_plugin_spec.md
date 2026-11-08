@@ -171,6 +171,28 @@ export default async function mount(engine, context) {
 - Load the library only when the mod needs it: it is about 5.5 MB, and each frame that loads it pays its install, a few tenths of a second.
 - A second `libs.load` resolves at once with the same result, so a mod can ask before each use.
 
+## Bundling a mod
+
+A mod can be written in TypeScript, split into modules, or use npm packages, as long as what it ships follows one rule: **each entry point is one self-contained ES module.** The frame loader fetches the entrypoint as text and imports it from a `blob:` URL, and a relative `import` cannot be resolved from a `blob:` URL. So a bundler must give the mod one file for `entrypoint`, and one for `test_path` if the mod has tests:
+
+- **One ESM file per entry point.** Output format `esm`, for the browser, with the entry's default export kept as the file's default export.
+- **Dependencies inlined.** Every module the entry imports, the mod's own and npm packages alike, goes into that file. Nothing is left external.
+- **No code splitting.** Dynamic `import()` calls are inlined too, so the bundle never loads a second chunk. With Rolldown, that is `output.codeSplitting: false`; with Rollup or Vite, `inlineDynamicImports: true`; with esbuild, `bundle: true` without `splitting`.
+- **Libraries through bundling, `libs.load` or `ot-tile-body`.** A small library is bundled like any dependency. A large one the app ships, such as mermaid, comes from `libs.load` (see [Libraries](#libraries)), and a tile's markdown from `ot-tile-body` (see [Showing a tile's body](#showing-a-tiles-body)), so the mod bundles neither. Loading code from another site needs a `code` permission and the user's consent: a bundle avoids both.
+- **Test files bundled the same way.** The test file is fetched and imported like the entrypoint, so it is one self-contained ES module too. It may import the mod's helpers, which the bundle inlines, but it does not import the entrypoint: each case mounts the mod through its context (see [Mod tests](#mod-tests)).
+- **HTTP caching.** The app fetches `mod_conf.yaml`, the entrypoint and the test file with the browser's ordinary HTTP cache. Serve them so a new version is seen: either with revalidation (`Cache-Control: no-cache` and an `ETag`), or with bundles named after their content, such as `main.3f9a2c.js`, cached for long and named by a `mod_conf.yaml` that is always revalidated.
+
+Ship only what the bundler outputs, `mod_conf.yaml` and the mod's data files. The sources, the bundler's config and the `node_modules/` stay in your repository.
+
+The app's own default mods are the worked example (see the [default mods folder](../default_mods/README.md)). Each is written in TypeScript, as `src/main.ts` and the modules it imports, with its tests in `test/test.ts`. The app's build bundles each entry point with Rolldown, in `build/default_mod_build.ts`: `src/main.ts` becomes `main.js` and `test/test.ts` becomes `test.js`, with ESM output, the browser as platform, dynamic imports inlined, no code splitting and no minifying, so the shipped code stays readable. A bundle that still holds an `import` statement or an `import(` call fails the build, and so does an import that leaves the mod's folder. The mods are typed with `default_mods/mod_api.d.ts`, imported with `import type` so it adds nothing to the bundle. Their `mod_conf.yaml` names the outputs, as any mod's does:
+
+```yaml
+mod:
+  name: "mod_viewer"
+  entrypoint: "./main.js"
+  test_path: "./test.js"
+```
+
 ## Checking a mod
 
 A mod can be checked before anyone runs it, with no code from its author. Open the mod in the mod viewer (`#/run?mod=mod_viewer&target=<mod reference>`) and press "Check mod". The viewer sends `mods.check` with the mod's source, and with the collection field's address when it holds one; otherwise the mod's sample collection is used. Any visible mod with an `open` permission for the mod's site can send `mods.check` the same way.

@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import type { Alias, Plugin, Rollup } from "vite";
 import { defineConfig } from "vitest/config";
 import type { ViteUserConfig } from "vitest/config";
+import { defaultModsPlugin } from "./build/default_mods_plugin.ts";
 
 /** Resolves a path of the repository. */
 function resolveRepoPath(path: string): string {
@@ -132,7 +133,7 @@ function buildAliases(mode: string): Alias[] {
 // https://vite.dev/config/
 export default defineConfig(function buildConfig({ mode }): ViteUserConfig {
   const config: ViteUserConfig = {
-    plugins: [tailwindcss(), react(), warnLargeChunks()],
+    plugins: [tailwindcss(), react(), warnLargeChunks(), defaultModsPlugin()],
     resolve: { alias: buildAliases(mode) },
     define: {
       __APP_VERSION__: JSON.stringify(readAppVersion()),
@@ -147,6 +148,14 @@ export default defineConfig(function buildConfig({ mode }): ViteUserConfig {
       // The theme imports its base stylesheet as text, which Vitest empties unless CSS is processed.
       css: { include: [/base_stylesheet\.css/] },
       projects: [
+        {
+          extends: true,
+          test: {
+            name: "build",
+            include: ["build/**/*.test.ts"],
+            environment: "node",
+          },
+        },
         {
           extends: true,
           test: {

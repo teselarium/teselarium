@@ -9,6 +9,7 @@
 - Oxlint
 - Prettier
 - Vite
+- Rolldown (Vite's bundler, also used directly to build the default mods, see `default_mods/README.md`)
 - Vitest
 - Playwright
 - react-i18next
