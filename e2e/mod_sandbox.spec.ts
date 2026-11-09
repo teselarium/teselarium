@@ -13,6 +13,9 @@ import {
   buildProbeFiles,
   COVER_HOST,
   embedObject,
+  expectMessageCount,
+  expectMessages,
+  expectNoIssues,
   fetchFromFrame,
   findModFrame,
   FOREIGN_HOST,
@@ -20,7 +23,6 @@ import {
   importFromFrame,
   isPageFullscreen,
   isPopupBlocked,
-  issueList,
   LINKED_APP_PROBE_LINK,
   LINKED_COLLECTION_PARAM,
   LINKED_COLLECTION_URL,
@@ -29,6 +31,7 @@ import {
   MEDIA_HOST,
   navigateFrame,
   navigateTop,
+  openMessages,
   readFrameOrigin,
   readFullscreenOutcome,
   readLoadedCovers,
@@ -263,8 +266,9 @@ test.describe("The mod entrypoint is mounted", function describeMount(): void {
 
     await page.goto("/#/run?mod=./test-mods/broken/");
 
-    await expect(issueList(page)).toContainText("error");
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Errors",
       "the entrypoint has no default export function",
     );
   });
@@ -281,8 +285,10 @@ test.describe("The mod entrypoint is mounted", function describeMount(): void {
 
     await page.goto("/#/run?mod=./test-mods/broken/");
 
-    await expect(issueList(page)).toContainText("map failed");
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Errors",
+      "map failed",
       "/test-mods/broken/mod_conf.yaml",
     );
   });
@@ -309,7 +315,7 @@ test.describe("Default content policy", function describeDefaultPolicy(): void {
     expect(await frame.evaluate(showImage, `${IMAGES_HOST}/cover.jpg`)).toBe(
       false,
     );
-    await expect(issueList(page)).toContainText(IMAGES_HOST);
+    await expectMessages(page, "Warnings", IMAGES_HOST);
     expect(seenUrls).toEqual([]);
   });
 
@@ -342,7 +348,7 @@ test.describe("Default content policy", function describeDefaultPolicy(): void {
 
     expect(outcome).not.toBe("imported");
     expect(seenUrls).toEqual([]);
-    await expect(issueList(page)).toContainText("permissions.code");
+    await expectMessages(page, "Warnings", "permissions.code");
   });
 });
 
@@ -457,8 +463,9 @@ test.describe("Mods from other origins get the permissions the user allows", fun
     const coverUrls = await routeCovers(page);
     const { frame } = await openForeignProbe(page, SHOW_COVERS_LINES);
 
-    await expect(issueList(page)).toContainText("warning");
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       `Permission not granted: show content from ${COVER_HOST} ("Shows the book covers"). Mods from other sites get only the permissions you allow.`,
     );
     expect(await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`)).toBe(
@@ -477,7 +484,7 @@ test.describe("Mods from other origins get the permissions the user allows", fun
       true,
     );
     expect(coverUrls).toEqual([`${COVER_HOST}/cover.jpg`]);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("Foreign mod with an allowed open permission", async function grantsForeignOpen({
@@ -509,7 +516,7 @@ test.describe("Mods from other origins get the permissions the user allows", fun
   }): Promise<void> {
     await openForeignProbe(page);
 
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 });
 
@@ -522,7 +529,9 @@ test.describe("Report blocked requests with the fix", function describeReports()
 
     await frame.evaluate(showImage, `${IMAGES_HOST}/cover.jpg`);
 
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       `Blocked image request to ${IMAGES_HOST}. Add it to permissions.show in mod_conf.yaml.`,
     );
   });
@@ -535,7 +544,9 @@ test.describe("Report blocked requests with the fix", function describeReports()
 
     await frame.evaluate(fetchFromFrame, `${API_HOST}/data`);
 
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       `Blocked connection request to ${API_HOST}. Add it to permissions.connect in mod_conf.yaml.`,
     );
   });
@@ -548,7 +559,9 @@ test.describe("Report blocked requests with the fix", function describeReports()
 
     await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`);
 
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       `Blocked image request to ${COVER_HOST}: the mod declares it in permissions.show, but the permission was not granted.`,
     );
   });
@@ -561,7 +574,9 @@ test.describe("Report blocked requests with the fix", function describeReports()
 
     await frame.evaluate(embedObject, "https://example.org/file.pdf");
 
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       "Blocked by the sandbox policy (object-src).",
     );
   });
@@ -575,9 +590,9 @@ test.describe("Report blocked requests with the fix", function describeReports()
     await frame.evaluate(showImage, `${IMAGES_HOST}/a.jpg`);
     await frame.evaluate(showImage, `${IMAGES_HOST}/b.jpg`);
     await frame.evaluate(showImage, `${IMAGES_HOST}/c.jpg`);
-    await expect(issueList(page)).toContainText(IMAGES_HOST);
+    await expectMessages(page, "Warnings", IMAGES_HOST);
 
-    await expect(issueList(page).getByRole("listitem")).toHaveCount(1);
+    await expectMessageCount(page, "Warnings", 1);
   });
 });
 
@@ -640,7 +655,7 @@ test.describe("Media linked by tiles", function describeLinkedMedia(): void {
 
     expect(await frame.evaluate(showImage, LINKED_COVER_URL)).toBe(true);
     expect(seenUrls).toEqual([LINKED_COVER_URL]);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("Audio linked by a tile", async function sendsLinkedAudio({
@@ -658,7 +673,7 @@ test.describe("Media linked by tiles", function describeLinkedMedia(): void {
         return seenUrls;
       })
       .toContain(audioUrl);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("Image in the body", async function loadsBodyImage({
@@ -673,7 +688,7 @@ test.describe("Media linked by tiles", function describeLinkedMedia(): void {
 
     await expect.poll(frame.evaluate.bind(frame, isBodyImageLoaded)).toBe(true);
     expect(mediaUrls).toEqual([imageUrl]);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("Video and poster in the body", async function sendsBodyVideo({
@@ -695,7 +710,7 @@ test.describe("Media linked by tiles", function describeLinkedMedia(): void {
         return [...mediaUrls].sort();
       })
       .toEqual([posterUrl, videoUrl]);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("URL in the body", async function blocksBodyText({
@@ -736,7 +751,7 @@ test.describe("A tile link allows only the linked file", function describeOnlyLi
 
     expect(await frame.evaluate(showImage, otherUrl)).toBe(false);
     expect(seenUrls).toEqual([]);
-    await expect(issueList(page)).toContainText(MEDIA_HOST);
+    await expectMessages(page, "Warnings", MEDIA_HOST);
   });
 
   test("Comma in the path", async function loadsCommaPath({
@@ -745,7 +760,7 @@ test.describe("A tile link allows only the linked file", function describeOnlyLi
     const isLoaded = await showLinkedImage(page, COMMA_COVER_URL);
 
     expect(isLoaded).toBe(true);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("Brackets and vertical bar in the path", async function loadsBracketsAndBarPath({
@@ -754,7 +769,7 @@ test.describe("A tile link allows only the linked file", function describeOnlyLi
     const isLoaded = await showLinkedImage(page, `${MEDIA_HOST}/a[1]|b.jpg`);
 
     expect(isLoaded).toBe(true);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("Other file next to a link with a comma", async function blocksFileNextToComma({
@@ -792,7 +807,7 @@ test.describe("Tile links the sandbox cannot express", function describeUnexpres
     const isLoaded = await showLinkedImage(page, `${MEDIA_HOST}/a;b.jpg`);
 
     expect(isLoaded).toBe(true);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 });
 
@@ -805,10 +820,12 @@ test.describe("Private network guard", function describePrivateNetworkGuard(): v
     const frame = await openLinkedAppProbe(page);
 
     expect(await frame.evaluate(showImage, ROUTER_LOGO_URL)).toBe(false);
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       `Not loading ${ROUTER_LOGO_URL}: tiles from other sites cannot link addresses on your computer or network.`,
+      LINKED_TILE_URL,
     );
-    await expect(issueList(page)).toContainText(LINKED_TILE_URL);
     expect(seenUrls).toEqual([]);
   });
 });
@@ -834,10 +851,12 @@ test.describe("Redirect hint for tile authors", function describeRedirectHint():
     const frame = await openLinkedAppProbe(page);
 
     expect(await frame.evaluate(showImage, coverUrl)).toBe(false);
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       "Add it to permissions.show in mod_conf.yaml.",
+      REDIRECT_HINT,
     );
-    await expect(issueList(page)).toContainText(REDIRECT_HINT);
     expect(seenUrls).toEqual([]);
   });
 });
@@ -856,10 +875,12 @@ test.describe("Tile links are fixed when the mod starts", function describeFixed
 
     await reloadTilesButton(page).click();
 
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       "The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.",
+      LINKED_COLLECTION_URL,
     );
-    await expect(issueList(page)).toContainText(LINKED_COLLECTION_URL);
     expect(await frame.evaluate(showImage, newUrl)).toBe(false);
     expect(seenUrls).toEqual([]);
   });
@@ -903,7 +924,9 @@ test.describe("Wildcard hosts cover subdomains", function describeWildcardHosts(
     expect(
       await frame.evaluate(showImage, `${WILDCARD_COVERS_OWN_HOST}/cover.jpg`),
     ).toBe(false);
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       `Blocked image request to ${WILDCARD_COVERS_OWN_HOST}. Add it to permissions.show in mod_conf.yaml.`,
     );
     expect(seenUrls).toEqual([]);
@@ -930,7 +953,9 @@ test.describe("Wildcard hosts cover subdomains", function describeWildcardHosts(
 
     await frame.evaluate(showImage, `${WILDCARD_COVERS_SUBDOMAIN}/cover.jpg`);
 
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       `Blocked image request to ${WILDCARD_COVERS_SUBDOMAIN}: the mod declares it in permissions.show, but the permission was not granted.`,
     );
   });
@@ -948,10 +973,11 @@ test.describe("Stop a mod that navigates its frame", function describeNavigating
       .catch(ignoreError);
 
     await expect(visibleSandbox(page).locator("iframe")).toHaveCount(0);
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Errors",
       "The mod left its page and was stopped.",
     );
-    await expect(issueList(page)).toContainText("error");
   });
 });
 
@@ -998,11 +1024,10 @@ test.describe("Blocked browser dialogs are reported", function describeBlockedDi
     const answer = await frame.evaluate(callConfirm);
 
     expect(answer).toBe(false);
-    await expect(issueList(page)).toContainText(
+    await expectMessages(
+      page,
+      "Warnings",
       'confirm() is not available in mods and always returns false. Use a <dialog> element, or request "ui.confirm" for a confirmation shown by the app.',
-    );
-    await expect(issueList(page)).toContainText("warning");
-    await expect(issueList(page)).toContainText(
       "/test-mods/probe/mod_conf.yaml",
     );
     expect(dialogs).toEqual([]);
@@ -1015,8 +1040,8 @@ test.describe("Blocked browser dialogs are reported", function describeBlockedDi
 
     await frame.evaluate(callAlertThreeTimes);
 
-    await expect(issueList(page)).toContainText("alert()");
-    await expect(issueList(page).getByRole("listitem")).toHaveCount(1);
+    await expectMessages(page, "Warnings", "alert()");
+    await expectMessageCount(page, "Warnings", 1);
   });
 
   test("Each function is named", async function namesEachFunction({
@@ -1028,8 +1053,8 @@ test.describe("Blocked browser dialogs are reported", function describeBlockedDi
     const answer = await frame.evaluate(callPromptAndPrint);
 
     expect(answer).toBeNull();
-    const items = issueList(page).getByRole("listitem");
-    await expect(items).toHaveCount(2);
+    await expectMessageCount(page, "Warnings", 2);
+    const items = (await openMessages(page, "Warnings")).getByRole("listitem");
     await expect(items.filter({ hasText: "prompt()" })).toHaveCount(1);
     await expect(items.filter({ hasText: "print()" })).toHaveCount(1);
     expect(dialogs).toEqual([]);
@@ -1105,7 +1130,7 @@ test.describe("Assets next to the mod", function describeAssets(): void {
       loaded: true,
     });
     expect(seenUrls).toContain(`${appOrigin}/test-mods/probe/icon.svg`);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("Asset of a mod from another origin", async function loadsForeignAsset({
@@ -1126,6 +1151,6 @@ test.describe("Assets next to the mod", function describeAssets(): void {
       loaded: true,
     });
     expect(seenUrls).toContain(`${FOREIGN_HOST}/probe/icon.svg`);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 });

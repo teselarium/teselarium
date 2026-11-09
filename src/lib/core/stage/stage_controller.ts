@@ -1,5 +1,5 @@
 import type { FileFetchOptions } from "../../files/index.ts";
-import type { ModIssue, ModPermission } from "../../mod/index.ts";
+import type { ModPermission } from "../../mod/index.ts";
 import { MOD_API_VERSION, resolveDefaultModSettings } from "../engine/index.ts";
 import type {
   AppAction,
@@ -54,10 +54,19 @@ import {
   buildConsentLineKey,
   launchSandbox,
   pushSandboxTheme,
-  readSandboxIssues,
+  clearSandboxNotifications,
+  dismissSandboxMessage,
+  markSandboxMessagesRead,
+  readSandboxMessages,
   reloadSandboxTiles,
   stopSandbox,
 } from "./stage_sandboxes.ts";
+import { buildNoDroppedMessages } from "./stage_messages.ts";
+import type {
+  DroppedMessageCounts,
+  MessageLevel,
+  MessageProducer,
+} from "./stage_messages.ts";
 import type {
   SandboxRuntime,
   SandboxServices,
@@ -115,6 +124,18 @@ export interface SiteConsentLine extends ModPermission {
   key: string;
 }
 
+/** What the page renders of one message of a sandbox. Frozen. */
+export interface MessageSnapshot {
+  /** Passed back to `dismissMessage`. Higher for a newer message of the same sandbox. */
+  id: number;
+  level: MessageLevel;
+  producer: MessageProducer;
+  source: string;
+  /** Plain text. */
+  text: string;
+  isRead: boolean;
+}
+
 /** What the page renders of one sandbox. Frozen. */
 export interface SandboxSnapshot {
   id: string;
@@ -128,7 +149,18 @@ export interface SandboxSnapshot {
   /** The frame's `srcdoc`, only while the mod is running. */
   sandboxDocument: string | null;
   canReloadTiles: boolean;
-  issues: readonly ModIssue[];
+  /**
+   * Every message, in the order they were found: mod file issues, collection
+   * issues, tile link issues, then the others as they arrived. The page
+   * derives the counts from it.
+   */
+  messages: readonly MessageSnapshot[];
+  /** How many older messages from the mod were dropped, per level. */
+  droppedModMessages: Readonly<DroppedMessageCounts>;
+  /** The link's mod reference, resolved against the app's address. */
+  modReference: string;
+  /** The link's collection, resolved against the app's address, or `null` without one. */
+  collection: string | null;
   errorMessage: string | null;
   /** The mod's `api` range and the app's mod API version, only while the sandbox asks the mod API question. */
   apiMismatch: { range: string; apiVersion: string } | null;
@@ -261,8 +293,8 @@ function buildCheckServices(stage: Stage): CheckServices {
 function buildModSummary(
   runtime: SandboxRuntime | undefined,
 ): SandboxSnapshot["mod"] {
-  const mod = runtime?.launch?.mod ?? runtime?.pending?.mod;
-  if (mod === undefined) {
+  const mod = runtime?.loadedMod ?? null;
+  if (mod === null) {
     return null;
   }
   const summary = {
@@ -273,12 +305,32 @@ function buildModSummary(
   return Object.freeze(summary);
 }
 
-function freezeIssues(issues: ModIssue[]): readonly ModIssue[] {
-  const frozenIssues: ModIssue[] = [];
-  for (const issue of issues) {
-    frozenIssues.push(Object.freeze({ ...issue }));
+function buildMessageSnapshots(
+  runtime: SandboxRuntime | undefined,
+): readonly MessageSnapshot[] {
+  const snapshots: MessageSnapshot[] = [];
+  if (runtime === undefined) {
+    return Object.freeze(snapshots);
   }
-  return Object.freeze(frozenIssues);
+  for (const message of readSandboxMessages(runtime)) {
+    const snapshot: MessageSnapshot = {
+      id: message.id,
+      level: message.level,
+      producer: message.producer,
+      source: message.source,
+      text: message.text,
+      isRead: runtime.readMessageIds.has(message.id),
+    };
+    snapshots.push(Object.freeze(snapshot));
+  }
+  return Object.freeze(snapshots);
+}
+
+function buildDroppedModMessages(
+  runtime: SandboxRuntime | undefined,
+): Readonly<DroppedMessageCounts> {
+  const counts = runtime?.droppedModMessages ?? buildNoDroppedMessages();
+  return Object.freeze({ ...counts });
 }
 
 function buildApiMismatch(
@@ -332,9 +384,13 @@ function buildSandboxSnapshot(
     mod: buildModSummary(runtime),
     sandboxDocument: isRunning ? launch.sandboxDocument : null,
     canReloadTiles: isRunning && launch.collectionSource !== null,
-    issues: freezeIssues(
-      runtime === undefined ? [] : readSandboxIssues(runtime),
-    ),
+    messages: buildMessageSnapshots(runtime),
+    droppedModMessages: buildDroppedModMessages(runtime),
+    modReference: runtime?.modReference ?? sandbox.link.mod,
+    collection:
+      runtime === undefined
+        ? sandbox.link.collection
+        : runtime.collectionLocation,
     errorMessage: runtime?.errorMessage ?? null,
     apiMismatch: buildApiMismatch(runtime),
     siteConsent: buildSiteConsent(runtime),
@@ -696,6 +752,49 @@ export async function reloadTiles(stage: Stage, id: string): Promise<void> {
     return;
   }
   await reloadSandboxTiles(runtime, buildSandboxServices(stage));
+}
+
+/**
+ * Marks every message of `level` of a sandbox read, as when the user opens
+ * that level's popover. Does nothing for an unknown sandbox.
+ */
+export function markMessagesRead(
+  stage: Stage,
+  sandboxId: string,
+  level: MessageLevel,
+): void {
+  const runtime = stage.runtimes.get(sandboxId);
+  if (runtime === undefined) {
+    return;
+  }
+  markSandboxMessagesRead(runtime, level);
+  publishStage(stage);
+}
+
+/**
+ * Dismisses a notification of a sandbox. Errors and warnings cannot be
+ * dismissed. Does nothing for an unknown sandbox or message.
+ */
+export function dismissMessage(
+  stage: Stage,
+  sandboxId: string,
+  messageId: number,
+): void {
+  const runtime = stage.runtimes.get(sandboxId);
+  if (runtime === undefined || !dismissSandboxMessage(runtime, messageId)) {
+    return;
+  }
+  publishStage(stage);
+}
+
+/** Dismisses every notification of a sandbox, as "Clear all" does. Does nothing for an unknown sandbox. */
+export function clearNotifications(stage: Stage, sandboxId: string): void {
+  const runtime = stage.runtimes.get(sandboxId);
+  if (runtime === undefined) {
+    return;
+  }
+  clearSandboxNotifications(runtime);
+  publishStage(stage);
 }
 
 /** The title and source of a running sandbox's mod, or `null` when it is not running. */

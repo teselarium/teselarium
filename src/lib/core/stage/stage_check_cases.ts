@@ -39,6 +39,7 @@ export type CheckFrameHooks = Pick<
   | "onOpenLink"
   | "onRequestAction"
   | "onCheckMod"
+  | "onNotify"
   | "onErrorResponse"
   | "onTestReport"
 >;
@@ -101,6 +102,10 @@ function ignoreFrameIssue(): void {
   // A list frame only lists: the mod is not mounted, so it has nothing to record.
 }
 
+function ignoreNotification(): void {
+  // A frame of the tests shows nothing: a case reads the request from `requests`.
+}
+
 function ignoreErrorResponse(): void {
   // A list frame sends no requests: its test file has no engine API object.
 }
@@ -129,6 +134,7 @@ export function buildListFrameHooks(
     onOpenLink: refuseCheckOpen,
     onRequestAction: cancelCheckAction,
     onCheckMod: refuseCheckRequest,
+    onNotify: ignoreNotification,
     onErrorResponse: ignoreErrorResponse,
     onTestReport: readListing.bind(undefined, onListing),
   };
@@ -248,6 +254,7 @@ export function buildCaseFrameHooks(
     onOpenLink: answerCaseOpen.bind(undefined, checkCase),
     onRequestAction: answerCaseAction.bind(undefined, checkCase),
     onCheckMod: refuseCheckRequest,
+    onNotify: ignoreNotification,
     onErrorResponse: recordCaseErrorResponse.bind(undefined, checkCase),
     onTestReport: readCaseReport.bind(undefined, checkCase, onFinished),
   };

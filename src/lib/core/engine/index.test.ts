@@ -19,6 +19,8 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "describeMissingApiRange",
       "findSwitchedOffMod",
       "inspectMod",
+      "loadLaunchMod",
+      "loadLaunchTiles",
       "loadModLaunchInputs",
       "loadModTiles",
       "matchModApiRange",

@@ -239,8 +239,8 @@ export async function serveLinkedTiles(
  */
 export const TEST_MOD_API_RANGE = "^0.1.0";
 
-/** `0.1.7`: the app's mod API version, as mods read it in `context.api.version`. */
-export const APP_MOD_API_VERSION = "0.1.7";
+/** `0.1.8`: the app's mod API version, as mods read it in `context.api.version`. */
+export const APP_MOD_API_VERSION = "0.1.8";
 
 /** `^0.2.0`: an `api` range for a later mod API, which the app's version does not match. */
 export const OTHER_API_RANGE = "^0.2.0";
@@ -331,8 +331,146 @@ export function stageBar(page: Page): Locator {
   return page.getByRole("region", { name: "Stage bar" });
 }
 
-export function issueList(page: Page): Locator {
-  return stageBar(page).getByRole("list", { name: "Issues" });
+/** A level of the stage bar's messages, by its button's and popover's name. */
+export type MessageLevelName = "Errors" | "Warnings" | "Notifications";
+
+/** One item of a level's popover. */
+export interface StageMessage {
+  /** `App` or `Mod`. */
+  producer: string;
+  source: string;
+  text: string;
+}
+
+/** The stage bar's button of a level, whose accessible name starts with the level. */
+export function messageButton(page: Page, level: MessageLevelName): Locator {
+  return stageBar(page).getByRole("button", {
+    name: new RegExp(`^${level}: `),
+  });
+}
+
+/** A level's popover, while it is open. */
+export function messagePopover(page: Page, level: MessageLevelName): Locator {
+  return page
+    .locator("[data-slot=popover-content]")
+    .filter({ has: page.getByRole("heading", { name: level, exact: true }) });
+}
+
+/** Opens a level's popover, unless it is open, and returns it. */
+export async function openMessages(
+  page: Page,
+  level: MessageLevelName,
+): Promise<Locator> {
+  const popover = messagePopover(page, level);
+  if (!(await popover.isVisible())) {
+    await messageButton(page, level).click();
+  }
+  await expect(popover).toBeVisible();
+  return popover;
+}
+
+function blurActiveElement(): void {
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
+}
+
+/**
+ * Closes the open popover with Escape, and takes the focus off its button,
+ * so the button's tooltip does not stay open.
+ */
+export async function closeMessages(page: Page): Promise<void> {
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-slot=popover-content]")).toHaveCount(0);
+  await page.evaluate(blurActiveElement);
+}
+
+/**
+ * Waits until a level's popover lists each of `texts`, in any of its items,
+ * then closes it. Opening the popover marks the level read.
+ */
+export async function expectMessages(
+  page: Page,
+  level: MessageLevelName,
+  ...texts: (string | RegExp)[]
+): Promise<void> {
+  const list = (await openMessages(page, level)).getByRole("list");
+  for (const text of texts) {
+    await expect(list).toContainText(text);
+  }
+  await closeMessages(page);
+}
+
+/** Waits until a level's button counts `count` messages. */
+export async function expectMessageCount(
+  page: Page,
+  level: MessageLevelName,
+  count: number,
+): Promise<void> {
+  await expect(messageButton(page, level)).toHaveAccessibleName(
+    new RegExp(`^${level}: ${count},`),
+  );
+}
+
+/** The accessible names of the three message buttons, which give every count. */
+export async function readMessageCounts(page: Page): Promise<string[]> {
+  const names: string[] = [];
+  for (const level of ["Errors", "Warnings", "Notifications"] as const) {
+    names.push(
+      (await messageButton(page, level).getAttribute("aria-label")) ?? "",
+    );
+  }
+  return names;
+}
+
+/** The capsule of a level's button, with `data-capsule` `unread` or `read`. */
+export function messageCapsule(page: Page, level: MessageLevelName): Locator {
+  return messageButton(page, level).locator("[data-capsule]");
+}
+
+/** The stage bar shows no errors and no warnings. */
+export async function expectNoIssues(page: Page): Promise<void> {
+  await expectMessageCount(page, "Errors", 0);
+  await expectMessageCount(page, "Warnings", 0);
+}
+
+/**
+ * Opens the information popover, waits until it shows each of `texts`, and
+ * closes it.
+ */
+export async function expectModInfo(
+  page: Page,
+  ...texts: string[]
+): Promise<void> {
+  await stageBar(page).getByRole("button", { name: "Mod information" }).click();
+  const popover = page.locator("[data-slot=popover-content]");
+  for (const text of texts) {
+    await expect(popover).toContainText(text);
+  }
+  await closeMessages(page);
+}
+
+async function readMessage(item: Locator): Promise<StageMessage> {
+  const message: StageMessage = {
+    producer: (await item.locator("[data-producer]").textContent()) ?? "",
+    source: (await item.locator("code").textContent()) ?? "",
+    text: (await item.locator("div > span").textContent()) ?? "",
+  };
+  return message;
+}
+
+/** Opens a level's popover, reads its items in order, and closes it. */
+export async function readMessages(
+  page: Page,
+  level: MessageLevelName,
+): Promise<StageMessage[]> {
+  const popover = await openMessages(page, level);
+  const messages: StageMessage[] = [];
+  for (const item of await popover.getByRole("listitem").all()) {
+    messages.push(await readMessage(item));
+  }
+  await closeMessages(page);
+  return messages;
 }
 
 /**

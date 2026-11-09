@@ -350,18 +350,41 @@ export function buildModTestDocument(launch: ModLaunch): string {
 }
 
 /**
- * Loads what a mod's launch is built from: refuses a switched-off default mod
- * before any request, loads the mod and, when the link names one, its
- * collection. Every error propagates. The launch itself is built later with
- * `buildModLaunch`, once the grants are known.
+ * Loads the mod of a launch: refuses a switched-off default mod before any
+ * request, then loads the mod. Every error propagates.
+ */
+export async function loadLaunchMod(
+  request: ModLaunchRequest,
+  options: FileFetchOptions,
+): Promise<LoadedMod> {
+  const source = resolveLaunchSource(request, options);
+  return loadMod(source, options);
+}
+
+/**
+ * Loads the rest of what a loaded mod's launch is built from: the link's
+ * collection, when it names one. Every error propagates.
+ */
+export async function loadLaunchTiles(
+  mod: LoadedMod,
+  link: RunLink,
+  options: FileFetchOptions,
+): Promise<ModLaunchInputs> {
+  const modTiles = await loadLinkTiles(mod, link, options);
+  const inputs: ModLaunchInputs = { mod, link, modTiles };
+  return inputs;
+}
+
+/**
+ * Loads what a mod's launch is built from: the mod (`loadLaunchMod`) and,
+ * when the link names one, its collection (`loadLaunchTiles`). Every error
+ * propagates. The launch itself is built later with `buildModLaunch`, once
+ * the grants are known.
  */
 export async function loadModLaunchInputs(
   request: ModLaunchRequest,
   options: FileFetchOptions,
 ): Promise<ModLaunchInputs> {
-  const source = resolveLaunchSource(request, options);
-  const mod = await loadMod(source, options);
-  const modTiles = await loadLinkTiles(mod, request.link, options);
-  const inputs: ModLaunchInputs = { mod, link: request.link, modTiles };
-  return inputs;
+  const mod = await loadLaunchMod(request, options);
+  return loadLaunchTiles(mod, request.link, options);
 }

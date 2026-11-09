@@ -55,6 +55,7 @@ import type {
   ModCheckRequest,
   ModMethodContext,
   ModMethodTable,
+  UserNotification,
 } from "./mod_methods.ts";
 import type { TileBodies } from "./mod_tile_bodies.ts";
 import { MODS_METHODS } from "./mods_methods.ts";
@@ -82,6 +83,8 @@ export interface ModSessionOptions {
   onRequestAction: (action: AppAction) => Promise<boolean> | null;
   /** Asks the stage to check a mod. `null` when the sandbox is not the visible one. */
   onCheckMod: (request: ModCheckRequest) => Promise<ModCheckReport> | null;
+  /** Gives the stage each message the mod sends the user with `ui.notify`. Not deduped. */
+  onNotify: (notification: UserNotification) => void;
   /** The theme the mod mounts with: the one current when the frame connects. */
   theme: Theme;
   /**
@@ -386,6 +389,7 @@ export function connectModSession(
       onOpenLink: options.onOpenLink,
       onRequestAction: options.onRequestAction,
       onCheckMod: options.onCheckMod,
+      onNotify: options.onNotify,
     },
     onIssue: options.onIssue,
     reportedIssueKeys: new Set(),

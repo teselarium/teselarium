@@ -239,6 +239,32 @@ describe("What a case records", function describeCaseRecords(): void {
     expect(report.findings[0].message).toContain("Unknown method");
   });
 
+  it("Expected error notification", async function recordsNoNotification(): Promise<void> {
+    const { caseFrame, reporting, checkStage } = await startCaseCheck([
+      "warns without books",
+    ]);
+    const before = readStageSnapshot(checkStage.stage).sandboxes[0].messages;
+
+    sendRequest(caseFrame, 1, "ui.notify", {
+      message: "No books found",
+      level: "error",
+    });
+    await waitForReceived(caseFrame, 1);
+    await finishPlayedCase(caseFrame, null);
+    const report = await reporting;
+
+    expect(caseFrame.received[0]).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      result: null,
+    });
+    expect(report.status).toBe("pass");
+    expect(report.findings).toEqual([]);
+    expect(readStageSnapshot(checkStage.stage).sandboxes[0].messages).toEqual(
+      before,
+    );
+  });
+
   it("Blocked image in a case", async function recordsBlockedImage(): Promise<void> {
     const { caseFrame, reporting } = await startCaseCheck(["shows covers"]);
 

@@ -5,18 +5,45 @@ import {
   readRequiredText,
   throwInvalidParams,
 } from "./mod_methods.ts";
-import type { ModMethodContext, ModMethodTable } from "./mod_methods.ts";
+import type {
+  ModMethodContext,
+  ModMethodTable,
+  UserNotification,
+  UserNotificationLevel,
+} from "./mod_methods.ts";
 
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_LABEL_LENGTH = 40;
 
-function checkLength(text: string, fieldName: string, maxLength: number): void {
+const NOTIFICATION_LEVELS: readonly UserNotificationLevel[] = [
+  "info",
+  "warning",
+  "error",
+];
+
+function checkLength(
+  method: string,
+  text: string,
+  fieldName: string,
+  maxLength: number,
+): void {
   if (text.length > maxLength) {
     throwInvalidParams(
-      "ui.confirm",
+      method,
       `"${fieldName}" must be at most ${maxLength} characters long`,
     );
   }
+}
+
+/** Reads a param that must be a non-empty string of at most `MAX_MESSAGE_LENGTH` characters. */
+function readMessageText(
+  params: YamlMapping,
+  fieldName: string,
+  method: string,
+): string {
+  const text = readRequiredText(params, fieldName, method);
+  checkLength(method, text, fieldName, MAX_MESSAGE_LENGTH);
+  return text;
 }
 
 function readLabel(
@@ -28,7 +55,7 @@ function readLabel(
     return defaultLabel;
   }
   const label = readRequiredText(params, fieldName, "ui.confirm");
-  checkLength(label, fieldName, MAX_LABEL_LENGTH);
+  checkLength("ui.confirm", label, fieldName, MAX_LABEL_LENGTH);
   return label;
 }
 
@@ -38,8 +65,7 @@ function readLabel(
  * `INVALID_PARAMS`.
  */
 export function readConfirm(params: YamlMapping): ConfirmAction {
-  const message = readRequiredText(params, "message", "ui.confirm");
-  checkLength(message, "message", MAX_MESSAGE_LENGTH);
+  const message = readMessageText(params, "message", "ui.confirm");
   const action: ConfirmAction = {
     kind: "confirm",
     message,
@@ -60,7 +86,59 @@ async function confirmWithUser(
   return askUser(context, "ui.confirm", readConfirm(params));
 }
 
-/** The `ui.*` requests: questions the app asks the user. */
+function isNotificationLevel(value: unknown): value is UserNotificationLevel {
+  return NOTIFICATION_LEVELS.includes(value as UserNotificationLevel);
+}
+
+function readNotificationLevel(params: YamlMapping): UserNotificationLevel {
+  const level = params.level;
+  if (level === undefined) {
+    return "info";
+  }
+  if (!isNotificationLevel(level)) {
+    throwInvalidParams(
+      "ui.notify",
+      '"level" must be "info", "warning" or "error"',
+    );
+  }
+  return level;
+}
+
+/**
+ * Reads the params of `ui.notify { message, level?, source? }` into a
+ * notification. `level` defaults to `info`, and `source` to `modSource`.
+ * Raises `INVALID_PARAMS`.
+ */
+export function readNotification(
+  params: YamlMapping,
+  modSource: string,
+): UserNotification {
+  const text = readMessageText(params, "message", "ui.notify");
+  const level = readNotificationLevel(params);
+  const source =
+    params.source === undefined
+      ? modSource
+      : readMessageText(params, "source", "ui.notify");
+  const notification: UserNotification = { level, source, text };
+  return notification;
+}
+
+/**
+ * `ui.notify { message, level?, source? }`: adds a message from the mod to
+ * its sandbox's stage bar, without a dialog and without any permission, from
+ * visible and hidden mods alike. Each request is a new message: nothing is
+ * deduped. Answers `null`.
+ */
+async function notifyUser(
+  context: ModMethodContext,
+  params: YamlMapping,
+): Promise<null> {
+  context.onNotify(readNotification(params, context.mod.source));
+  return null;
+}
+
+/** The `ui.*` requests: the app's UI for the mod, its dialogs and its stage bar. */
 export const UI_METHODS: ModMethodTable = {
   "ui.confirm": confirmWithUser,
+  "ui.notify": notifyUser,
 };

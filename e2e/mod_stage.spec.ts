@@ -4,14 +4,19 @@ import {
   answerSiteConsent,
   buildProbeFiles,
   COVER_HOST,
+  expectMessageCount,
+  expectMessages,
+  expectModInfo,
+  expectNoIssues,
   findModFrame,
   findSandboxFrame,
   followLink,
   FOREIGN_HOST,
   isFrameMarked,
-  issueList,
   markFrame,
+  messageCapsule,
   readLoadedCovers,
+  readMessages,
   routeCovers,
   serveAppOriginMod,
   serveForeignMod,
@@ -106,7 +111,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
     await followLink(page, `#/run?mod=${encodeURIComponent(source)}`);
 
     await expect(stageBar(page)).toContainText("Book List");
-    await expect(stageBar(page)).toContainText(source);
+    await expectModInfo(page, source);
   });
 });
 
@@ -396,7 +401,7 @@ test.describe("Show the mod issues", function describeIssues(): void {
     await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
 
     await expect(stageBar(page)).toContainText("Book List");
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
   });
 
   test("Foreign mod permission issue is listed", async function listsForeignIssue({
@@ -417,10 +422,11 @@ test.describe("Show the mod issues", function describeIssues(): void {
     );
     await answerSiteConsent(page, "Show without them");
 
-    const issue = issueList(page).getByRole("listitem").first();
-    await expect(issue).toContainText("warning");
-    await expect(issue).toContainText(`${FOREIGN_HOST}/probe/mod_conf.yaml`);
-    await expect(issue).toContainText(`show content from ${COVER_HOST}`);
+    await expectMessageCount(page, "Warnings", 1);
+    const warnings = await readMessages(page, "Warnings");
+    expect(warnings[0].producer).toBe("App");
+    expect(warnings[0].source).toBe(`${FOREIGN_HOST}/probe/mod_conf.yaml`);
+    expect(warnings[0].text).toContain(`show content from ${COVER_HOST}`);
   });
 
   test("Blocked request is listed while the mod runs", async function listsBlock({
@@ -430,12 +436,16 @@ test.describe("Show the mod issues", function describeIssues(): void {
     await page.goto("/#/run?mod=./test-mods/probe/");
     const frame = await findModFrame(page, "probe");
     await waitForProbe(frame);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
 
     await frame.evaluate(showImage, "https://images.example.net/cover.jpg");
 
-    await expect(issueList(page)).toContainText("https://images.example.net");
-    await expect(issueList(page)).toContainText("permissions.show");
+    await expectMessages(
+      page,
+      "Warnings",
+      "https://images.example.net",
+      "permissions.show",
+    );
   });
 
   test("Issues stay with their sandbox", async function keepsIssues({
@@ -446,15 +456,15 @@ test.describe("Show the mod issues", function describeIssues(): void {
     const frame = await findModFrame(page, "probe");
     await waitForProbe(frame);
     await frame.evaluate(showImage, "https://images.example.net/cover.jpg");
-    await expect(issueList(page)).toContainText("https://images.example.net");
+    await expectMessages(page, "Warnings", "https://images.example.net");
 
     await followLink(page, SAMPLE_RUN_HASH);
     await expect(stageBar(page)).toContainText("Book List");
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
     await page.goBack();
 
     await expect(stageBar(page)).toContainText("probe");
-    await expect(issueList(page)).toContainText("https://images.example.net");
+    await expectMessages(page, "Warnings", "https://images.example.net");
   });
 });
 
@@ -484,6 +494,21 @@ test.describe("Show load failures", function describeLoadFailures(): void {
     await expect(page.getByRole("alert")).toContainText(missingCollection);
     await expect(page.locator("iframe")).toHaveCount(0);
   });
+
+  test("Load failure in the errors popover", async function listsLoadFailure({
+    page,
+  }): Promise<void> {
+    await page.goto(`/#/run?mod=${MISSING_MOD_REFERENCE}`);
+    const missingSource = new URL(MISSING_MOD_FILE_PATH, page.url()).href;
+    await expectMessageCount(page, "Errors", 1);
+
+    const errors = await readMessages(page, "Errors");
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].producer).toBe("App");
+    expect(errors[0].source).toBe(missingSource);
+    expect(errors[0].text).toContain("404");
+  });
 });
 
 /** Answers the sample collection with two books once `twoBooks.isOn` is set. */
@@ -505,6 +530,41 @@ async function answerCollection(
       '    - path: "./books/kallocain.md"',
       '    - path: "./books/fictions.md"',
     ].join("\n"),
+  });
+}
+
+/**
+ * Answers the sample collection with Kallocain and `UNTYPED_TILE_PATH`, a
+ * tile without the book type's fields, once `mismatched.isOn` is set.
+ */
+async function answerMismatchedCollection(
+  mismatched: { isOn: boolean },
+  route: Route,
+): Promise<void> {
+  if (!mismatched.isOn) {
+    await route.fallback();
+    return;
+  }
+  await route.fulfill({
+    status: 200,
+    contentType: "text/yaml",
+    body: [
+      "collection:",
+      '  name: "One untyped tile"',
+      "  tiles:",
+      '    - path: "./books/kallocain.md"',
+      `    - path: "./books/${UNTYPED_TILE_NAME}"`,
+    ].join("\n"),
+  });
+}
+
+const UNTYPED_TILE_NAME = "untyped.md";
+
+async function answerUntypedTile(route: Route): Promise<void> {
+  await route.fulfill({
+    status: 200,
+    contentType: "text/markdown",
+    body: '---\ntitle: "Untyped"\n---\n',
   });
 }
 
@@ -530,6 +590,36 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
     await expect(frameLocator.getByRole("listitem")).toHaveCount(2);
     await expect(frameLocator.getByText("Fahrenheit 451")).toHaveCount(0);
     expect(await isFrameMarked(frame)).toBe(true);
+  });
+
+  test("Reloaded issues are unread", async function marksReloadedUnread({
+    page,
+  }): Promise<void> {
+    const mismatched = { isOn: false };
+    await routeCovers(page);
+    await page.route(
+      SAMPLE_COLLECTION_GLOB,
+      answerMismatchedCollection.bind(undefined, mismatched),
+    );
+    await page.route(`**/books/${UNTYPED_TILE_NAME}`, answerUntypedTile);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+    await expectSampleBooks(page, "sandbox-1");
+    mismatched.isOn = true;
+    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+    await expectMessageCount(page, "Warnings", 1);
+    await expectMessages(page, "Warnings", "is not of tile type");
+    await expect(messageCapsule(page, "Warnings")).toHaveAttribute(
+      "data-capsule",
+      "read",
+    );
+
+    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+
+    await expect(messageCapsule(page, "Warnings")).toHaveAttribute(
+      "data-capsule",
+      "unread",
+    );
+    await expectMessages(page, "Warnings", "is not of tile type");
   });
 
   test("No collection, no reload", async function hidesReload({

@@ -24,6 +24,24 @@ The main module is the app's own interface around the stage: the header, the sid
 - **Sidebar**: one item per section, built from the section registry (below). The `main` group is at the top and the `footer` group at the bottom. The sidebar is expanded (resizable, 200–400px), collapsed to an icon rail, or hidden. While its edge is dragged, the sidebar collapses as soon as it is narrower than 160px and expands again at 160px or wider, from the expanded sidebar or from the rail; the release keeps that state. On viewports narrower than 768px it starts collapsed and expands over the content as a drawer. `Ctrl+B` (`Cmd+B` on macOS) toggles expanded and collapsed. The layout is kept in the app's storage under `opentesela.sidebar`.
 - **Main area**: what the current history entry shows. A page section's page is rendered by the app ([pages](homepage/README.md)); the stage, with every open sandbox, stays mounted beside it and is hidden while a page shows, so no frame reloads.
 
+### The stage bar
+
+While a sandbox is visible, the stage bar (`stage/StageBar.tsx`) is one row above its frame, and nothing is listed under it:
+
+```
++--------------------------------------------------------------------+
+| Book List (1.0.0) [i] [reload]                [E] [W] [N]  |  [x]  |
++--------------------------------------------------------------------+
+```
+
+- **Left**: the mod's name and its version in an outline Badge. Before the mod file is loaded, "Loading mod…" takes their place, and "Mod not loaded" when the sandbox failed or stopped first; once the mod file is loaded, the name and version stay, even when the sandbox fails later. Then the information button (`Mod information`) and, for a sandbox opened with a collection, the "Reload tiles" icon button.
+- **Right**: the errors, warnings and notifications buttons (`MessageButton`), a vertical Separator and the close button (×), the last two only for a sandbox that has a close button.
+- **Buttons**: every button is shadcn's `icon-sm` ghost Button (`StageBarIconButton`), whose accessible name is also its tooltip. A message button's name gives the level, the exact count and the unread count, such as `Warnings: 2, 1 unread`.
+- **Counts**: a message button shows its level's count in a capsule over the icon's bottom-right corner, `99+` above 99. The capsule is absolutely placed with a minimum width and `tabular-nums`, so no count changes a button's box or moves another item, and the gap after each message button leaves room for a `99+` capsule. A level without messages has no capsule and a dimmed icon, but its button stays focusable.
+- **Unread marks**: the capsule is filled in the level's color (`destructive` for errors, `warning` for warnings, `primary` for notifications) while the level has unread messages, and muted (`muted`) once all were read. Opening a level's popover calls `markMessagesRead` for that level. Read state is the stage's, per sandbox (see the [stage module](../lib/core/stage/README.md#messages-and-load-failures)).
+- **Popovers**: each message button opens a shadcn Popover, rendered in a portal on the app's page, outside every mod frame, with that level's messages in order (`MessagePopover`), or "No errors.", "No warnings." or "No notifications.". Each item (`MessageItem`) shows its producer, "App" as an outline Badge or "Mod" as a secondary Badge with the mods' icon, then the source and the text as plain text. Notifications have a dismiss button each (`Dismiss: <text>`), and "Clear all" with two or more; errors and warnings have neither. A level's list ends with how many older messages from the mod were dropped, if any. The information popover (`ModInfoPopover`) shows the mod's source, or the resolved mod reference when the mod file did not load, the collection's location when there is one, and the run link, with "Copy link", which copies `origin + pathname + search` and the run link's hash and says "Copied" for 2 seconds ("Cannot copy" when the clipboard refuses). One popover is open at a time, and it closes when the visible sandbox changes.
+- **Attention**: the bar remembers, per level, the newest message id it has seen of the visible sandbox (`message_attention.ts`). When a newer one arrives, that level's icon flashes once, with a `motion-safe:` animation (`stage-bar-flash` in `stage.css`), so a user who asked for reduced motion sees only the filled capsule. A new error is also written to a visually hidden `aria-live="polite"` region. When another sandbox is shown, or the bar mounts again after a page, it starts from what the sandbox has, so messages that arrived while it was hidden do not flash.
+
 The theme tokens give everything its colors, fonts and spacing (see the [theme module](../lib/core/theme/README.md)), so the app, the pages and the mods look alike.
 
 ## Section navigation

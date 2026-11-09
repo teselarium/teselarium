@@ -87,6 +87,10 @@ function failOnCheckMod(request: ModCheckRequest): never {
   );
 }
 
+function ignoreNotification(): void {
+  // Handler tests that read notifications set their own `onNotify`.
+}
+
 /**
  * A method context for a mod on the app's origin with the given granted
  * permissions, a `Map`-backed storage, `fetchTestFile` and no remembered
@@ -106,6 +110,7 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
     onOpenLink: acceptOpenLink,
     onRequestAction: acceptAction,
     onCheckMod: failOnCheckMod,
+    onNotify: ignoreNotification,
   };
   return context;
 }

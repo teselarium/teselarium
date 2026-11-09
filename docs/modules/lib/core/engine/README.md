@@ -65,6 +65,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
+| `ui.notify` | `{ message, level?, source? }` | `null`, once the message is in the mod's stage bar (see [Telling the user something](#telling-the-user-something)). Added in mod API `0.1.8`. |
 | `tiles.renderBody` | `{ source }`, the `source` of one of the mod's tiles | `{ html }`: the tile's body rendered to safe HTML (see [Tile bodies](#tile-bodies)). Added in mod API `0.1.5`; formulas as MathML, highlighted code and emoji since `0.1.7`. |
 | `players.open` | `{ url }`, a player address of the mod's tiles | `true` once the player was shown and closed, `false` if the user cancelled (see [Players](#players)). Added in mod API `0.1.5`. |
 | `libs.load` | `{ name, version }`, a library the app ships and its major version, such as `{ name: "mermaid", version: "12" }` | `{ name, version }`, with the full version installed, once the library is ready in the mod's frame (see [Libraries](#libraries)). Added in mod API `0.1.6`. |
@@ -93,7 +94,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.7"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.8"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -170,7 +171,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.7"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.8"
     }
   ]
 }
@@ -219,6 +220,32 @@ await engine.request("links.open", { url: tile.data.url });
 ```
 
 The request stays pending while the dialog is open, for as long as the user needs, so a mod must not rely on a quick answer.
+
+### Telling the user something
+
+`ui.notify { message, level?, source? }` adds a message from the mod to its sandbox's stage bar, without a dialog, and answers `null`. The user finds it under the errors, warnings or notifications button, with the mod's other messages and the app's (see the [stage module](../stage/README.md#messages-and-load-failures)).
+
+- `message`: the text, a non-empty string of at most 1000 characters, shown as plain text.
+- `level`: `"info"` (the default), `"warning"` or `"error"`.
+- `source`: what the message is about, such as a tile's `source`, a non-empty string of at most 1000 characters. By default, the mod's source.
+
+A problem with the params is `-32602` with a message naming `ui.notify` and the field, such as `ui.notify: "level" must be "info", "warning" or "error"`, and adds no message.
+
+No permission is needed, and hidden mods can notify too: a hidden sandbox keeps the message and shows it when it is visible again. Each request is a new message, even with the same text, so a mod that repeats itself should say so once. A sandbox keeps at most 100 messages from its mod: past that, the oldest one is dropped, and its level's list ends with how many were dropped. The app's own messages are never dropped.
+
+Each message in the stage bar is labeled "App" or "Mod", and the mod cannot change the label: its title, `source` and `message` are shown after it. So a mod's error never reads as the app's own.
+
+A notification is not an issue: it is never in the mount context's `issues` or in `tiles.changed`, which keep the collection's issues only. In a check, an error or warning notification is a `mount` finding, and `info` is none (see [Mod checks](../stage/README.md#mod-checks)).
+
+```js
+await engine.request("ui.notify", { message: "Saved" });
+
+await engine.request("ui.notify", {
+  message: "Cannot read the rating",
+  level: "warning",
+  source: tile.source,
+});
+```
 
 ### Players
 
@@ -360,7 +387,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.7` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.8` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -451,8 +478,8 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.7"`, the app's mod API version.
-- `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.7` but not `0.2.0`.
+- `MOD_API_VERSION`: `"0.1.8"`, the app's mod API version.
+- `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.8` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
 - `describeApiRangeMismatch(range)`: the message of the bundle check's warning for a range that does not match, naming the range and `MOD_API_VERSION`. Used inside the engine, not exported by `index.ts`.
@@ -462,6 +489,7 @@ Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `a
 ### Launch
 
 - `loadModLaunchInputs(request, options)`: loads what a mod's launch is built from. `request` is a `ModLaunchRequest` (`link`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `params`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` before any request, loads the mod and its entrypoint, and loads the collection when `link.collection` is not `null`. Returns `ModLaunchInputs` (`mod`, `link`, `modTiles`), with `modTiles` `null` without a collection. Every error propagates, and each names its source. The stage keeps the inputs while it asks the user (see the [stage module](../stage/README.md)), and builds the launch once the grants are known.
+- `loadLaunchMod(request, options)` and `loadLaunchTiles(mod, link, options)`: the two steps of `loadModLaunchInputs`. The first refuses a switched-off mod and loads the mod, and the second loads the collection and returns the `ModLaunchInputs`. The stage calls them one after the other, so it knows the mod when the collection fails.
 - `buildModLaunch(mod, link, modTiles, grants, loadsTileLinkedMedia)`: builds the `ModLaunch` of a loaded mod, its `ModTiles` (or `null`) and its `grants`, the `ModGrants` of `grantModPermissions` (see the [permissions module](../permissions/README.md)), without requesting anything: collects the content hosts and the tile links (when `loadsTileLinkedMedia` is `true`), builds the policy, the frame document, the mount context and the issues. Opening a mod and checking it both call it, so a checked mod gets the frame it would get if it were opened with the same grants.
   Returns a `ModLaunch` (`mod`, `collectionSource`, `context`, `contentHosts`, `tileLinks`, `tileBodies`, `policy`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects, and whose `permissions` are `grants`. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. `tileBodies` is the `TileBodies` of the tiles the mod receives (`buildTileBodies`, below), which the session keeps. `tileLinks` is the `TileLinks` of the tiles the mod receives and their body media (`collectModTileLinks`, below, see [Media linked by tiles](../sandbox/README.md#media-linked-by-tiles)): `sources`, the files the policy allows as images, video and audio, and `issues`, the left-out links and the iframes the bodies left out, kept apart from `issues` so the stage can replace them after "Reload tiles". It is `{ sources: [], issues: [] }` without a collection, and `null` when `loadsTileLinkedMedia` is `false`: then nothing is collected or reported, and blocked image reports get no redirect hint. The mount context does not list the tile links, so the mod API does not change.
 - `buildModTestDocument(launch)`: the `srcdoc` HTML of a frame of the mod's tests: the launch's `policy` (the frame's Content-Security-Policy) and the mod's theme setting, as in `sandboxDocument`, with the assertions and the test runner after the frame loader (see the [sandbox module](../sandbox/README.md#frames-of-a-checks-tests)). So a case runs the mod with the content policy it gets when it is opened.
@@ -558,7 +586,7 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
 
 Lifecycle:
 
-1. The stage loads the mod with `loadModLaunchInputs`, asks the user what it needs to, builds the launch with `buildModLaunch` and renders its frame with `launch.sandboxDocument`.
+1. The stage loads the mod with `loadLaunchMod` and `loadLaunchTiles`, asks the user what it needs to, builds the launch with `buildModLaunch` and renders its frame with `launch.sandboxDocument`.
 2. On the frame's first `load`, the stage calls `connectModSession` with the frame's window.
 3. The session answers each request once with the same `id`. `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked` from the frame loader become issues through `onIssue`, each reported once. `sandbox.mounted` and `sandbox.mountFailed` call `onMounted`, and the test runner's notifications `onTestReport`, when given.
 4. "Reload tiles" calls `loadModTiles`, `buildTileBodies` and `pushTilesChanged`. A color scheme change calls `pushThemeChanged` for every running session.

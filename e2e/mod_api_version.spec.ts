@@ -4,12 +4,14 @@ import {
   APP_MOD_API_VERSION,
   buildModConf,
   buildProbeFiles,
+  expectMessageCount,
+  expectNoIssues,
   EXPLORER_CODE,
   findModFrame,
   followLink,
-  issueList,
   OTHER_API_RANGE,
   PROBE_MOD_CODE,
+  readMessages,
   readProbeContext,
   routeCovers,
   serveAppOriginMod,
@@ -134,6 +136,13 @@ async function expectCancelError(page: Page): Promise<void> {
   await expect(
     stageBar(page).getByRole("button", { name: "Close" }),
   ).toBeVisible();
+  await expect(stageBar(page)).toContainText(LATER_API_TITLE);
+  await expect(stageBar(page)).toContainText("0.1.0");
+  await expectMessageCount(page, "Errors", 1);
+  const errors = await readMessages(page, "Errors");
+  expect(errors[0].producer).toBe("App");
+  expect(errors[0].text).toContain(OTHER_API_RANGE);
+  expect(errors[0].text).toContain(APP_MOD_API_VERSION);
 }
 
 test.describe("Matching mods start without asking", function describeMatching(): void {
@@ -143,7 +152,7 @@ test.describe("Matching mods start without asking", function describeMatching():
     await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
 
     await expect(stageBar(page)).toContainText("Book List");
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });
@@ -155,18 +164,18 @@ test.describe("Sample and default mods declare the API range", function describe
     await routeCovers(page);
     await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
     await expect(stageBar(page)).toContainText("Book List");
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
 
     await followLink(page, "#/run?mod=mod_explorer");
     await expect(stageBar(page)).toContainText("Mods");
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
     await followLink(
       page,
       `#/run?mod=mod_viewer&target=${SAMPLE_MOD_REFERENCE}`,
     );
     await expect(stageBar(page)).toContainText("Mod Viewer");
 
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });
@@ -181,11 +190,12 @@ test.describe("Mods without a range start with a warning", function describeNoRa
     await waitForProbe(await findModFrame(page, "bare"));
 
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    const issue = issueList(page).getByRole("listitem").first();
-    await expect(issue).toContainText("warning");
-    await expect(issue).toContainText(readTestModSource(page, "bare"));
-    await expect(issue).toContainText('"api"');
-    await expect(issue).toContainText(APP_MOD_API_VERSION);
+    await expectMessageCount(page, "Warnings", 1);
+    const warnings = await readMessages(page, "Warnings");
+    expect(warnings[0].producer).toBe("App");
+    expect(warnings[0].source).toBe(readTestModSource(page, "bare"));
+    expect(warnings[0].text).toContain('"api"');
+    expect(warnings[0].text).toContain(APP_MOD_API_VERSION);
   });
 });
 
@@ -317,13 +327,10 @@ test.describe("Show the mod issues", function describeIssues(): void {
       "/#/run?mod=./test-mods/bare_books/&collection=./test-mods/mixed.yaml",
     );
 
-    const items = issueList(page).getByRole("listitem");
-    await expect(items).toHaveCount(2);
-    await expect(items.nth(0)).toContainText("warning");
-    await expect(items.nth(0)).toContainText(
-      readTestModSource(page, "bare_books"),
-    );
-    await expect(items.nth(0)).toContainText('"api"');
-    await expect(items.nth(1)).toContainText("/test-mods/no_country.md");
+    await expectMessageCount(page, "Warnings", 2);
+    const warnings = await readMessages(page, "Warnings");
+    expect(warnings[0].source).toBe(readTestModSource(page, "bare_books"));
+    expect(warnings[0].text).toContain('"api"');
+    expect(warnings[1].source).toContain("/test-mods/no_country.md");
   });
 });

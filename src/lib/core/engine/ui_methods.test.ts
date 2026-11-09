@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
 import {
   buildAskingContext,
   catchMethodError,
+  REQUESTING_MOD_SOURCE,
 } from "../../../test/method_contexts.ts";
 import type { ConfirmAction } from "./app_actions.ts";
 import { INVALID_PARAMS, PERMISSION_DENIED } from "./mod_messages.ts";
-import type { ModMethodContext } from "./mod_methods.ts";
+import type { ModMethodContext, UserNotification } from "./mod_methods.ts";
 import { readConfirm, UI_METHODS } from "./ui_methods.ts";
 
 function confirm(context: ModMethodContext, params: object): Promise<unknown> {
@@ -151,5 +153,149 @@ describe("ui.confirm", function describeUiConfirm(): void {
     );
 
     expect(requestSpy).not.toHaveBeenCalled();
+  });
+});
+
+const KALLOCAIN_SOURCE = "https://example.org/books/kallocain.md";
+
+/** A hidden mod's context (it cannot ask the user) whose `onNotify` is a spy. */
+function buildNotifyingContext(): {
+  context: ModMethodContext;
+  notifySpy: Mock<(notification: UserNotification) => void>;
+} {
+  const { context } = buildAskingContext(null);
+  const notifySpy = vi.fn<(notification: UserNotification) => void>();
+  context.onNotify = notifySpy;
+  const notifyingContext = { context, notifySpy };
+  return notifyingContext;
+}
+
+function notify(context: ModMethodContext, params: object): Promise<unknown> {
+  return UI_METHODS["ui.notify"](context, params as never);
+}
+
+describe("ui.notify", function describeNotify(): void {
+  it("Notification with the defaults", async function notifiesWithDefaults(): Promise<void> {
+    const { context, requestSpy } = buildAskingContext(true);
+    const notifySpy = vi.fn<(notification: UserNotification) => void>();
+    context.onNotify = notifySpy;
+
+    const result = await notify(context, { message: "Saved" });
+
+    expect(result).toBeNull();
+    expect(requestSpy).not.toHaveBeenCalled();
+    expect(notifySpy).toHaveBeenCalledExactlyOnceWith({
+      level: "info",
+      source: REQUESTING_MOD_SOURCE,
+      text: "Saved",
+    });
+  });
+
+  it("Error about a tile", async function notifiesTileError(): Promise<void> {
+    const { context, notifySpy } = buildNotifyingContext();
+
+    await notify(context, {
+      message: "Cannot read the rating",
+      level: "error",
+      source: KALLOCAIN_SOURCE,
+    });
+
+    expect(notifySpy).toHaveBeenCalledExactlyOnceWith({
+      level: "error",
+      source: KALLOCAIN_SOURCE,
+      text: "Cannot read the rating",
+    });
+  });
+
+  it("Hidden mod", async function acceptsHiddenMod(): Promise<void> {
+    const { context, notifySpy } = buildNotifyingContext();
+
+    const result = await notify(context, { message: "Done", level: "warning" });
+
+    expect(result).toBeNull();
+    expect(notifySpy).toHaveBeenCalledOnce();
+  });
+
+  it("Same message twice", async function notifiesTwice(): Promise<void> {
+    const { context, notifySpy } = buildNotifyingContext();
+
+    await notify(context, { message: "Saved" });
+    await notify(context, { message: "Saved" });
+
+    expect(notifySpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("accepts a message and a source of 1000 characters", async function acceptsLimits(): Promise<void> {
+    const { context, notifySpy } = buildNotifyingContext();
+
+    await notify(context, {
+      message: "a".repeat(1000),
+      source: "b".repeat(1000),
+    });
+
+    expect(notifySpy).toHaveBeenCalledOnce();
+  });
+
+  it("Message too long", async function rejectsLongMessage(): Promise<void> {
+    const { context, notifySpy } = buildNotifyingContext();
+
+    const error = await catchMethodError(
+      notify.bind(undefined, context, { message: "a".repeat(1001) }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'ui.notify: "message" must be at most 1000 characters long',
+    );
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  it("Unknown level", async function rejectsUnknownLevel(): Promise<void> {
+    const { context, notifySpy } = buildNotifyingContext();
+
+    const error = await catchMethodError(
+      notify.bind(undefined, context, { message: "Saved", level: "success" }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'ui.notify: "level" must be "info", "warning" or "error"',
+    );
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  it("Missing message", async function rejectsMissingMessage(): Promise<void> {
+    const { context, notifySpy } = buildNotifyingContext();
+
+    const error = await catchMethodError(notify.bind(undefined, context, {}));
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'ui.notify: "message" must be a non-empty string',
+    );
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects a source of 1001 characters or an empty one", async function rejectsBadSource(): Promise<void> {
+    const { context, notifySpy } = buildNotifyingContext();
+
+    const longError = await catchMethodError(
+      notify.bind(undefined, context, {
+        message: "Saved",
+        source: "a".repeat(1001),
+      }),
+    );
+    const emptyError = await catchMethodError(
+      notify.bind(undefined, context, { message: "Saved", source: "" }),
+    );
+
+    expect(longError.code).toBe(INVALID_PARAMS);
+    expect(longError.message).toBe(
+      'ui.notify: "source" must be at most 1000 characters long',
+    );
+    expect(emptyError.message).toBe(
+      'ui.notify: "source" must be a non-empty string',
+    );
+    expect(notifySpy).not.toHaveBeenCalled();
   });
 });

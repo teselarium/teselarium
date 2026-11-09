@@ -16,8 +16,8 @@ import {
   checkFromChecker,
   checkPastLimit,
   findModFrame,
-  issueList,
   openChecker,
+  readMessageCounts,
   readReportedValue,
   readTestModSource,
   routeCovers,
@@ -263,7 +263,7 @@ test.describe("A check leaves the stage unchanged", function describeStageUnchan
   }): Promise<void> {
     await openChecker(page, buildThrowingFiles());
     const addressBefore = page.url();
-    const issuesBefore = await issueList(page).allTextContents();
+    const countsBefore = await readMessageCounts(page);
 
     const report = await checkFromChecker(
       page,
@@ -276,6 +276,6 @@ test.describe("A check leaves the stage unchanged", function describeStageUnchan
       visibleSandbox(page).locator(`iframe[title="${CHECKER_TITLE}"]`),
     ).toBeVisible();
     await expect(page.locator("[data-sandbox-id]")).toHaveCount(1);
-    expect(await issueList(page).allTextContents()).toEqual(issuesBefore);
+    expect(await readMessageCounts(page)).toEqual(countsBefore);
   });
 });

@@ -1,4 +1,6 @@
+import { resolveLocation } from "../../files/index.ts";
 import type { FileFetchOptions } from "../../files/index.ts";
+import { resolveModReference } from "../../mod/index.ts";
 import type { LoadedMod, ModIssue, ModPermission } from "../../mod/index.ts";
 import { describeNewTileLinks } from "../sandbox/index.ts";
 import type { TileIssue } from "../../tile/index.ts";
@@ -8,7 +10,8 @@ import {
   collectModTileLinks,
   connectModSession,
   describeCancelledApiMismatch,
-  loadModLaunchInputs,
+  loadLaunchMod,
+  loadLaunchTiles,
   loadModTiles,
   matchModApiRange,
   pushThemeChanged,
@@ -26,11 +29,34 @@ import type {
   ResolvedDefaultModSettings,
   RunLink,
   TileBodies,
+  UserNotification,
 } from "../engine/index.ts";
 import { grantModPermissions, listConsentLines } from "../permissions/index.ts";
 import type { SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
+import {
+  addModMessage,
+  buildAppIssueContent,
+  buildAppNotification,
+  buildNoDroppedMessages,
+  buildSandboxMessage,
+  buildSandboxMessages,
+  dismissNotification,
+  markLevelRead,
+  removeNotifications,
+} from "./stage_messages.ts";
+import type {
+  DroppedMessageCounts,
+  MessageContent,
+  MessageLevel,
+  SandboxMessage,
+} from "./stage_messages.ts";
+import {
+  describeLoadedCollection,
+  describeReloadedTiles,
+  describeSiteConsentAnswer,
+} from "./stage_notifications.ts";
 import type { StageSandbox } from "./stage_state.ts";
 
 /** What the runtimes need from the stage. */
@@ -84,6 +110,8 @@ export interface SiteConsentAnswer {
 export interface SandboxRuntime {
   id: string;
   status: SandboxStatus;
+  /** The mod once its mod file is loaded, kept when the sandbox fails later. */
+  loadedMod: LoadedMod | null;
   /** The loaded mod while the runtime asks, before its launch is built. */
   pending: ModLaunchInputs | null;
   /** The question of an `asking` runtime, `null` otherwise. */
@@ -93,17 +121,35 @@ export interface SandboxRuntime {
   /** Set when the mod starts. */
   launch: ModLaunch | null;
   session: ModSession | null;
+  /**
+   * The link's mod reference resolved against the app's address, or the
+   * reference as written when it cannot be resolved.
+   */
+  modReference: string;
+  /** The link's collection resolved against the app's address, as written when it cannot be resolved, or `null` without one. */
+  collectionLocation: string | null;
   /** The issues of the mod file itself, such as a missing `api` range. */
-  fileIssues: ModIssue[];
-  /** The issues of the collection, replaced when the tiles are reloaded. */
-  collectionIssues: TileIssue[];
+  fileIssues: SandboxMessage[];
+  /** The issues of the collection, replaced with new ids when the tiles are reloaded. */
+  collectionIssues: SandboxMessage[];
   /**
    * The tile links left out of the policy and, after "Reload tiles", the
-   * notice of links the frame does not allow yet. Replaced when the tiles are reloaded.
+   * notice of links the frame does not allow yet. Replaced with new ids when
+   * the tiles are reloaded.
    */
-  tileLinkIssues: ModIssue[];
-  /** Permission issues, then the issues found while the mod runs, in order. */
-  issues: ModIssue[];
+  tileLinkIssues: SandboxMessage[];
+  /**
+   * The arrival list: permission issues, then the messages that arrive while
+   * the sandbox lives (issues, failures, the app's notifications and the
+   * mod's messages), in order.
+   */
+  messages: SandboxMessage[];
+  /** The id the next message gets. */
+  nextMessageId: number;
+  /** The ids of the messages the user has read. */
+  readMessageIds: Set<number>;
+  /** How many messages from the mod the cap dropped, per level. */
+  droppedModMessages: DroppedMessageCounts;
   /** The load error's message of a `failed` runtime. */
   errorMessage: string | null;
   /** Settles when the launch settled. */
@@ -117,24 +163,106 @@ function describeError(error: unknown): string {
   return String(error);
 }
 
+/** Messages for `contents`, with the runtime's next ids. */
+function takeRuntimeMessages(
+  runtime: SandboxRuntime,
+  contents: readonly MessageContent[],
+): SandboxMessage[] {
+  const messages = buildSandboxMessages(runtime.nextMessageId, contents);
+  runtime.nextMessageId += messages.length;
+  return messages;
+}
+
+function buildIssueContents(issues: readonly ModIssue[]): MessageContent[] {
+  const contents: MessageContent[] = [];
+  for (const issue of issues) {
+    contents.push(buildAppIssueContent(issue));
+  }
+  return contents;
+}
+
+/** Messages from the app for `issues`, with the runtime's next ids. */
+function takeIssueMessages(
+  runtime: SandboxRuntime,
+  issues: readonly ModIssue[],
+): SandboxMessage[] {
+  return takeRuntimeMessages(runtime, buildIssueContents(issues));
+}
+
+/** Adds a message at the end of the arrival list. */
+function appendRuntimeMessage(
+  runtime: SandboxRuntime,
+  content: MessageContent,
+): void {
+  runtime.messages.push(...takeRuntimeMessages(runtime, [content]));
+}
+
+/** The notification of a mod started with a collection, or `null` without one. */
+function buildLoadedCollectionNotification(
+  launch: ModLaunch,
+): MessageContent | null {
+  if (launch.collectionSource === null) {
+    return null;
+  }
+  return buildAppNotification(
+    launch.collectionSource,
+    describeLoadedCollection(launch.context.tiles.length),
+  );
+}
+
+/**
+ * Starts a launch. The arrival list starts with the launch's issues, then
+ * the notification of the site consent answer, if any, then the
+ * notification of the loaded collection, if any.
+ */
 function startRuntime(
   runtime: SandboxRuntime,
   services: SandboxServices,
   launch: ModLaunch,
+  consentNotification: MessageContent | null,
 ): void {
   if (runtime.status === "stopped") {
     return;
   }
   runtime.status = "running";
   runtime.launch = launch;
-  runtime.fileIssues = [...launch.fileIssues];
-  runtime.collectionIssues = launch.context.issues;
+  runtime.fileIssues = takeIssueMessages(runtime, launch.fileIssues);
+  runtime.collectionIssues = takeIssueMessages(runtime, launch.context.issues);
   runtime.tileLinkIssues =
-    launch.tileLinks === null ? [] : [...launch.tileLinks.issues];
-  runtime.issues = [...launch.issues];
+    launch.tileLinks === null
+      ? []
+      : takeIssueMessages(runtime, launch.tileLinks.issues);
+  runtime.messages = takeIssueMessages(runtime, launch.issues);
+  if (consentNotification !== null) {
+    appendRuntimeMessage(runtime, consentNotification);
+  }
+  const collectionNotification = buildLoadedCollectionNotification(launch);
+  if (collectionNotification !== null) {
+    appendRuntimeMessage(runtime, collectionNotification);
+  }
   services.onChange();
 }
 
+function hasSource(error: unknown): error is Error & { source: string } {
+  return (
+    error instanceof Error &&
+    "source" in error &&
+    typeof error.source === "string"
+  );
+}
+
+/**
+ * What a failure is about: the file that failed for the errors that name one,
+ * and otherwise the loaded mod's source or the resolved mod reference.
+ */
+function readFailureSource(runtime: SandboxRuntime, error: unknown): string {
+  if (hasSource(error)) {
+    return error.source;
+  }
+  return runtime.loadedMod?.source ?? runtime.modReference;
+}
+
+/** Fails the runtime with the error, which is also an error from the app in its messages. */
 function failRuntime(
   runtime: SandboxRuntime,
   services: SandboxServices,
@@ -145,6 +273,12 @@ function failRuntime(
   }
   runtime.status = "failed";
   runtime.errorMessage = describeError(error);
+  appendRuntimeMessage(runtime, {
+    level: "error",
+    producer: "app",
+    source: readFailureSource(runtime, error),
+    text: runtime.errorMessage,
+  });
   services.onChange();
 }
 
@@ -165,6 +299,7 @@ function startPendingRuntime(
   services: SandboxServices,
   inputs: ModLaunchInputs,
   answers: SiteDecision[],
+  consentNotification: MessageContent | null,
 ): void {
   const decisions = [...services.readSiteDecisions(), ...answers];
   const grants = grantModPermissions(inputs.mod, services.appOrigin, decisions);
@@ -178,7 +313,7 @@ function startPendingRuntime(
   runtime.pending = null;
   runtime.question = null;
   runtime.consentLines = [];
-  startRuntime(runtime, services, launch);
+  startRuntime(runtime, services, launch, consentNotification);
 }
 
 /** The second question: asks about the sites of the pending mod, or starts it when there is nothing to ask. */
@@ -193,7 +328,7 @@ function askSitesOrStart(
     services.readSiteDecisions(),
   );
   if (lines.length === 0) {
-    startPendingRuntime(runtime, services, inputs, []);
+    startPendingRuntime(runtime, services, inputs, [], null);
     return;
   }
   runtime.consentLines = lines;
@@ -213,6 +348,7 @@ function settleLaunchInputs(
   if (runtime.status === "stopped") {
     return;
   }
+  runtime.loadedMod = inputs.mod;
   runtime.pending = inputs;
   if (matchModApiRange(inputs.mod.api) === false) {
     askRuntime(runtime, services, "api");
@@ -314,10 +450,15 @@ export function answerSandboxSiteConsent(
     runtime.consentLines,
     answer,
   );
-  if (answer !== null && answer.remember) {
+  const isRemembered = answer !== null && answer.remember;
+  if (isRemembered) {
     services.rememberSiteDecisions(decisions);
   }
-  startPendingRuntime(runtime, services, inputs, decisions);
+  const notification = buildAppNotification(
+    inputs.mod.source,
+    describeSiteConsentAnswer(decisions, isRemembered),
+  );
+  startPendingRuntime(runtime, services, inputs, decisions, notification);
 }
 
 /**
@@ -325,6 +466,51 @@ export function answerSandboxSiteConsent(
  * `failed`, or `asking` when the mod was written for another mod API or
  * needs the user's consent for sites.
  */
+/** The link's mod reference resolved as a launch resolves it, or as written when it cannot be resolved. */
+function resolveLinkModReference(
+  sandbox: StageSandbox,
+  services: SandboxServices,
+): string {
+  try {
+    return resolveModReference(sandbox.link.mod, {
+      baseUrl: services.fetchOptions.baseUrl,
+      defaultModsFolder: services.defaults.folder,
+    });
+  } catch {
+    return sandbox.link.mod;
+  }
+}
+
+/** The link's collection resolved against the app's address, or as written when it cannot be resolved. */
+function resolveLinkCollection(
+  sandbox: StageSandbox,
+  services: SandboxServices,
+): string | null {
+  const collection = sandbox.link.collection;
+  if (collection === null) {
+    return null;
+  }
+  try {
+    return resolveLocation(collection, services.fetchOptions.baseUrl).href;
+  } catch {
+    return collection;
+  }
+}
+
+/** Loads the mod, keeps it on the runtime, then loads the link's tiles. */
+async function loadRuntimeInputs(
+  runtime: SandboxRuntime,
+  sandbox: StageSandbox,
+  services: SandboxServices,
+): Promise<ModLaunchInputs> {
+  const mod = await loadLaunchMod(
+    { link: sandbox.link, defaults: services.defaults },
+    services.fetchOptions,
+  );
+  runtime.loadedMod = mod;
+  return loadLaunchTiles(mod, sandbox.link, services.fetchOptions);
+}
+
 export function launchSandbox(
   sandbox: StageSandbox,
   services: SandboxServices,
@@ -332,37 +518,74 @@ export function launchSandbox(
   const runtime: SandboxRuntime = {
     id: sandbox.id,
     status: "loading",
+    loadedMod: null,
     pending: null,
     question: null,
     consentLines: [],
     launch: null,
     session: null,
+    modReference: resolveLinkModReference(sandbox, services),
+    collectionLocation: resolveLinkCollection(sandbox, services),
     fileIssues: [],
     collectionIssues: [],
     tileLinkIssues: [],
-    issues: [],
+    messages: [],
+    nextMessageId: 1,
+    readMessageIds: new Set(),
+    droppedModMessages: buildNoDroppedMessages(),
     errorMessage: null,
     settled: Promise.resolve(),
   };
-  runtime.settled = loadModLaunchInputs(
-    { link: sandbox.link, defaults: services.defaults },
-    services.fetchOptions,
-  ).then(
+  runtime.settled = loadRuntimeInputs(runtime, sandbox, services).then(
     settleLaunchInputs.bind(undefined, runtime, services),
     failRuntime.bind(undefined, runtime, services),
   );
   return runtime;
 }
 
-/** Every issue of a sandbox, in the order they were found: mod file, collection, tile links, then the others. */
-export function readSandboxIssues(runtime: SandboxRuntime): ModIssue[] {
-  const issues: ModIssue[] = [
+/**
+ * Every message of a sandbox, in the order they were found: mod file,
+ * collection, tile links, then the arrival list.
+ */
+export function readSandboxMessages(runtime: SandboxRuntime): SandboxMessage[] {
+  const messages: SandboxMessage[] = [
     ...runtime.fileIssues,
     ...runtime.collectionIssues,
     ...runtime.tileLinkIssues,
-    ...runtime.issues,
+    ...runtime.messages,
   ];
-  return issues;
+  return messages;
+}
+
+/** Marks every message of `level` read. */
+export function markSandboxMessagesRead(
+  runtime: SandboxRuntime,
+  level: MessageLevel,
+): void {
+  runtime.readMessageIds = markLevelRead(
+    readSandboxMessages(runtime),
+    runtime.readMessageIds,
+    level,
+  );
+}
+
+/**
+ * Removes the notification `messageId`, and returns whether it was removed.
+ * Errors, warnings and unknown ids are ignored.
+ */
+export function dismissSandboxMessage(
+  runtime: SandboxRuntime,
+  messageId: number,
+): boolean {
+  const keptMessages = dismissNotification(runtime.messages, messageId);
+  const isDismissed = keptMessages.length < runtime.messages.length;
+  runtime.messages = keptMessages;
+  return isDismissed;
+}
+
+/** Removes every notification, and leaves the errors and warnings. */
+export function clearSandboxNotifications(runtime: SandboxRuntime): void {
+  runtime.messages = removeNotifications(runtime.messages);
 }
 
 function addRuntimeIssue(
@@ -370,7 +593,35 @@ function addRuntimeIssue(
   services: SandboxServices,
   issue: ModIssue,
 ): void {
-  runtime.issues.push(issue);
+  appendRuntimeMessage(runtime, buildAppIssueContent(issue));
+  services.onChange();
+}
+
+/**
+ * Adds a message from the mod to the arrival list, under the cap of
+ * messages from the mod, whether the sandbox is visible or hidden.
+ */
+function addRuntimeNotification(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  notification: UserNotification,
+): void {
+  const message = buildSandboxMessage(runtime.nextMessageId, {
+    level: notification.level,
+    producer: "mod",
+    source: notification.source,
+    text: notification.text,
+  });
+  runtime.nextMessageId += 1;
+  const arrived = addModMessage(
+    {
+      messages: runtime.messages,
+      droppedModMessages: runtime.droppedModMessages,
+    },
+    message,
+  );
+  runtime.messages = arrived.messages;
+  runtime.droppedModMessages = arrived.droppedModMessages;
   services.onChange();
 }
 
@@ -397,6 +648,7 @@ export function attachSandboxFrame(
     onOpenLink: services.onOpenLink.bind(undefined, runtime.id),
     onRequestAction: services.onRequestAction.bind(undefined, runtime.id),
     onCheckMod: services.onCheckMod.bind(undefined, runtime.id),
+    onNotify: addRuntimeNotification.bind(undefined, runtime, services),
     theme: services.readTheme(),
   });
 }
@@ -422,12 +674,14 @@ export function stopSandbox(
   }
   runtime.status = "stopped";
   if (issue !== null) {
-    runtime.issues.push(issue);
+    appendRuntimeMessage(runtime, buildAppIssueContent(issue));
   }
 }
 
 /** The issues a reload replaces. */
 interface ReloadedIssues {
+  /** The number of tiles the mod received, or `null` when the collection did not load. */
+  tileCount: number | null;
   collectionIssues: TileIssue[];
   /** `null` keeps the current tile link issues: tile links are off, or the collection did not load. */
   tileLinkIssues: ModIssue[] | null;
@@ -498,6 +752,7 @@ async function readReloadedIssues(
       );
     }
     const reloadedIssues: ReloadedIssues = {
+      tileCount: modTiles.tiles.length,
       collectionIssues: modTiles.issues,
       tileLinkIssues: readReloadedTileLinkIssues(
         launch,
@@ -514,6 +769,7 @@ async function readReloadedIssues(
       message: describeError(error),
     };
     const failedIssues: ReloadedIssues = {
+      tileCount: null,
       collectionIssues: [reloadIssue],
       tileLinkIssues: null,
     };
@@ -527,7 +783,8 @@ async function readReloadedIssues(
  * it also replaces the tile link issues with those of the reloaded tiles,
  * led by a notice when they link files the frame does not allow yet. A
  * collection that cannot be loaded becomes the only collection issue, and
- * the tile link issues stay as they were.
+ * the tile link issues stay as they were. A reload whose collection loaded
+ * adds a notification with the tile count and the collection issue count.
  */
 export async function reloadSandboxTiles(
   runtime: SandboxRuntime,
@@ -546,9 +803,21 @@ export async function reloadSandboxTiles(
   if (runtime.status === "stopped") {
     return;
   }
-  runtime.collectionIssues = issues.collectionIssues;
+  runtime.collectionIssues = takeIssueMessages(
+    runtime,
+    issues.collectionIssues,
+  );
   if (issues.tileLinkIssues !== null) {
-    runtime.tileLinkIssues = issues.tileLinkIssues;
+    runtime.tileLinkIssues = takeIssueMessages(runtime, issues.tileLinkIssues);
+  }
+  if (issues.tileCount !== null) {
+    appendRuntimeMessage(
+      runtime,
+      buildAppNotification(
+        launch.collectionSource,
+        describeReloadedTiles(issues.tileCount, issues.collectionIssues.length),
+      ),
+    );
   }
   services.onChange();
 }

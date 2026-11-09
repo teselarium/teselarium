@@ -22,6 +22,7 @@ import type {
   ResolvedDefaultModSettings,
   ResponseError,
   RunLink,
+  UserNotification,
 } from "../engine/index.ts";
 import { grantModPermissions } from "../permissions/index.ts";
 import type { SiteDecision } from "../permissions/index.ts";
@@ -287,6 +288,26 @@ function recordCheckIssue(check: StageCheck, issue: ModIssue): void {
     level: issue.level,
     source: issue.source,
     message: issue.message,
+  });
+}
+
+/**
+ * A notification from the checked mod: an error or a warning is a `mount`
+ * finding at its level, with its source and text, and `info` is no finding.
+ * The check shows nothing, so nothing reaches a stage bar.
+ */
+function recordCheckNotification(
+  check: StageCheck,
+  notification: UserNotification,
+): void {
+  if (notification.level === "info") {
+    return;
+  }
+  check.findings.push({
+    step: "mount",
+    level: notification.level,
+    source: notification.source,
+    message: notification.text,
   });
 }
 
@@ -567,6 +588,7 @@ function attachMountFrame(
     onOpenLink: refuseCheckedOpen.bind(undefined, check),
     onRequestAction: cancelCheckedAction.bind(undefined, check),
     onCheckMod: refuseCheckedCheck.bind(undefined, check),
+    onNotify: recordCheckNotification.bind(undefined, check),
     onMounted: startSettleTime.bind(undefined, checks, services, check, frame),
     onErrorResponse: recordErrorResponse.bind(undefined, check),
   });

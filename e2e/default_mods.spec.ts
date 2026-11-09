@@ -6,6 +6,8 @@ import {
   buildSlowMountFiles,
   buildTestedProbeFiles,
   coverPermissionRow,
+  expectModInfo,
+  expectNoIssues,
   FAILING_CASE_TEST_CODE,
   findModFrame,
   readParentDocumentError,
@@ -44,8 +46,8 @@ test.describe("Default mods folder", function describeFolder(): void {
       "/default_mods/mod_explorer/mod_conf.yaml",
       page.url(),
     ).href;
-    await expect(stageBar(page)).toContainText(explorerSource);
-    await expect(stageBar(page)).toContainText("No issues.");
+    await expectNoIssues(page);
+    await expectModInfo(page, explorerSource);
   });
 });
 

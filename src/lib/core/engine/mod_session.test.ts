@@ -25,7 +25,7 @@ import { readNoSiteDecisions } from "../../../test/method_contexts.ts";
 import { launchTestMod } from "../../../test/test_launches.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModContext, ModLaunch, RunLink } from "./mod_launch.ts";
-import type { ModCheckRequest } from "./mod_methods.ts";
+import type { ModCheckRequest, UserNotification } from "./mod_methods.ts";
 import { buildTileBodies } from "./mod_tile_bodies.ts";
 import {
   connectModSession,
@@ -141,6 +141,7 @@ async function playSession(
     onRequestAction,
     onCheckMod:
       vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
+    onNotify: vi.fn<(notification: UserNotification) => void>(),
     theme,
     ...hooks,
   });
@@ -171,6 +172,7 @@ function buildPlainOptions(): ModSessionOptions {
     onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
     onCheckMod:
       vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
+    onNotify: vi.fn<(notification: UserNotification) => void>(),
     theme: buildTheme("light"),
   };
   return options;
@@ -261,6 +263,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       onCheckMod:
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
+      onNotify: vi.fn<(notification: UserNotification) => void>(),
       theme: buildTheme("light"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
@@ -291,6 +294,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       onCheckMod:
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
+      onNotify: vi.fn<(notification: UserNotification) => void>(),
       theme: buildTheme("dark"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));
@@ -315,6 +319,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       onCheckMod:
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
+      onNotify: vi.fn<(notification: UserNotification) => void>(),
       theme: buildTheme("dark"),
     });
     openPorts.push(session.port, readModPort(fakeFrame));

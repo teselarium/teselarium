@@ -1,5 +1,6 @@
 import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
 import type { LoadedMod } from "../../mod/index.ts";
+import type { IssueLevel } from "../../tile/index.ts";
 import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { AppAction } from "./app_actions.ts";
@@ -14,6 +15,17 @@ import { INVALID_PARAMS, PERMISSION_DENIED } from "./mod_messages.ts";
 export interface ModCheckRequest {
   source: string;
   collection: string | null;
+}
+
+/** The level of a message a mod sends the user: the issue levels, and `info`. */
+export type UserNotificationLevel = IssueLevel | "info";
+
+/** What a mod tells the user with `ui.notify`: plain text, and what it is about. */
+export interface UserNotification {
+  level: UserNotificationLevel;
+  /** The request's `source`, or the mod's source. */
+  source: string;
+  text: string;
 }
 
 /** What a request handler knows about the mod that sent the request and the app. */
@@ -41,6 +53,8 @@ export interface ModMethodContext {
    * when the sandbox is not the visible one.
    */
   onCheckMod: (request: ModCheckRequest) => Promise<ModCheckReport> | null;
+  /** Gives the stage a message from the mod for the user, from visible and hidden mods alike. */
+  onNotify: (notification: UserNotification) => void;
 }
 
 /**

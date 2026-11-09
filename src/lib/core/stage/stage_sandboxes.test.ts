@@ -26,6 +26,8 @@ import {
   PROBE_CONNECT_PERMISSION,
   PROBE_MOD_SOURCE,
   SAMPLE_COVERS_PERMISSION,
+  SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_COLLECTION_SOURCE,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   serveCoverBook,
@@ -44,6 +46,7 @@ import {
 } from "../../../test/test_files.ts";
 import {
   describeMissingApiRange,
+  MOD_API_VERSION,
   resolveDefaultModSettings,
 } from "../engine/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
@@ -61,10 +64,12 @@ import {
   answerSandboxSiteConsent,
   attachSandboxFrame,
   launchSandbox,
-  readSandboxIssues,
+  markSandboxMessagesRead,
+  readSandboxMessages,
   reloadSandboxTiles,
   stopSandbox,
 } from "./stage_sandboxes.ts";
+import type { SandboxMessage } from "./stage_messages.ts";
 import type { SandboxRuntime, SandboxServices } from "./stage_sandboxes.ts";
 
 const OPENER_MOD_SOURCE = `${APP_BASE_URL}test-mods/opener/mod_conf.yaml`;
@@ -98,6 +103,56 @@ function buildRouterIssue(): ModIssue {
   };
   return issue;
 }
+
+/** The sandbox's errors and warnings in the order of its messages, as issues. */
+function readIssues(runtime: SandboxRuntime): ModIssue[] {
+  const issues: ModIssue[] = [];
+  for (const message of readSandboxMessages(runtime)) {
+    if (message.level !== "info") {
+      issues.push({
+        level: message.level,
+        source: message.source,
+        message: message.text,
+      });
+    }
+  }
+  return issues;
+}
+
+function isError(message: SandboxMessage): boolean {
+  return message.level === "error";
+}
+
+function isWarning(message: SandboxMessage): boolean {
+  return message.level === "warning";
+}
+
+function readLevels(items: readonly { level: string }[]): string[] {
+  const levels: string[] = [];
+  for (const item of items) {
+    levels.push(item.level);
+  }
+  return levels;
+}
+
+function isFromMod(message: SandboxMessage): boolean {
+  return message.producer === "mod";
+}
+
+/** Posts a `ui.notify` request from the mod. */
+function sendNotify(modPort: MessagePort, id: number, params: object): void {
+  modPort.postMessage({ jsonrpc: "2.0", id, method: "ui.notify", params });
+}
+
+function isInfo(message: SandboxMessage): boolean {
+  return message.level === "info";
+}
+
+function readNotifications(runtime: SandboxRuntime): SandboxMessage[] {
+  return readSandboxMessages(runtime).filter(isInfo);
+}
+
+const MISSING_COLLECTION_SOURCE = `${FIXTURES_BASE_URL}tiles/missing.yaml`;
 
 const openPorts: MessagePort[] = [];
 
@@ -216,10 +271,8 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     await runtime.settled;
     expect(runtime.status).toBe("running");
     expect(runtime.launch?.mod.source).toBe(SAMPLE_MOD_SOURCE);
-    expect(readSandboxIssues(runtime)).toHaveLength(1);
-    expect(readSandboxIssues(runtime)[0].message).toContain(
-      "Permission not granted",
-    );
+    expect(readIssues(runtime)).toHaveLength(1);
+    expect(readIssues(runtime)[0].message).toContain("Permission not granted");
     expect(spied.onChange).toHaveBeenCalledOnce();
   });
 
@@ -236,10 +289,69 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     );
     await runtime.settled;
 
-    const issues = readSandboxIssues(runtime);
+    const issues = readIssues(runtime);
     expect(issues).toHaveLength(2);
     expect(issues[0].message).toContain("is not of tile type");
     expect(issues[1].message).toContain("Permission not granted");
+    const messages = readSandboxMessages(runtime);
+    expect(messages[0]).toMatchObject({ level: "warning", producer: "app" });
+    expect(messages[1]).toMatchObject({ producer: "app" });
+    expect(messages[1].id).toBeGreaterThan(messages[0].id);
+  });
+
+  it("Sample collection", async function notifiesLoadedCollection(): Promise<void> {
+    const spied = buildServices();
+
+    const { runtime } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, SAMPLE_COLLECTION_REFERENCE),
+      spied,
+    );
+
+    const notifications = readNotifications(runtime);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      producer: "app",
+      source: SAMPLE_COLLECTION_SOURCE,
+      text: "Loaded the collection: the mod received 3 tiles.",
+    });
+    expect(runtime.launch?.context.issues).toEqual([]);
+    expect(runtime.collectionLocation).toBe(SAMPLE_COLLECTION_SOURCE);
+  });
+
+  it("No collection", async function notifiesNothingWithoutCollection(): Promise<void> {
+    const spied = buildServices();
+
+    const { runtime } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, null),
+      spied,
+    );
+
+    expect(readNotifications(runtime)).toEqual([]);
+    expect(runtime.collectionLocation).toBeNull();
+  });
+
+  it("sends no info in the mount context's issues", async function keepsInfoFromMount(): Promise<void> {
+    serveFourBooks();
+    const spied = buildServices();
+    const runtime = launchSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, FOUR_BOOKS_SOURCE),
+      spied.services,
+    );
+    await runtime.settled;
+    const fakeFrame = createFakeFrame();
+
+    attachSandboxFrame(runtime, fakeFrame.target, spied.services);
+    openPorts.push(readModPort(fakeFrame));
+    if (runtime.session !== null) {
+      openPorts.push(runtime.session.port);
+    }
+
+    const connect = fakeFrame.posted[0].message as {
+      params: { context: { issues: { level: string }[] } };
+    };
+    expect(connect.params.context.issues).toHaveLength(1);
+    expect(readLevels(connect.params.context.issues)).not.toContain("info");
+    expect(readNotifications(runtime)).toHaveLength(1);
   });
 
   it("Missing range comes first", async function listsMissingRangeFirst(): Promise<void> {
@@ -252,7 +364,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
       spied,
     );
 
-    const issues = readSandboxIssues(runtime);
+    const issues = readIssues(runtime);
     expect(issues).toHaveLength(2);
     expect(issues[0]).toEqual({
       level: "warning",
@@ -273,7 +385,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
 
     await reloadSandboxTiles(runtime, spied.services);
 
-    const issues = readSandboxIssues(runtime);
+    const issues = readIssues(runtime);
     expect(issues).toHaveLength(2);
     expect(issues[0].message).toBe(describeMissingApiRange());
     expect(issues[1].source).toBe(NO_COUNTRY_TILE_SOURCE);
@@ -293,6 +405,39 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     expect(runtime.errorMessage).toContain(MISSING_MOD_SOURCE);
     expect(runtime.errorMessage).toContain("404");
     expect(spied.onChange).toHaveBeenCalledOnce();
+    expect(runtime.loadedMod).toBeNull();
+    const messages = readSandboxMessages(runtime);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      level: "error",
+      producer: "app",
+      source: MISSING_MOD_SOURCE,
+      text: runtime.errorMessage,
+    });
+    expect(messages[0].text).toContain("404");
+  });
+
+  it("Missing collection", async function failsMissingCollection(): Promise<void> {
+    const spied = buildServices();
+
+    const runtime = launchSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, MISSING_COLLECTION_SOURCE),
+      spied.services,
+    );
+    await runtime.settled;
+
+    expect(runtime.status).toBe("failed");
+    expect(runtime.loadedMod?.title).toBe("Book List");
+    expect(runtime.collectionLocation).toBe(MISSING_COLLECTION_SOURCE);
+    expect(readSandboxMessages(runtime)).toEqual([
+      {
+        id: 1,
+        level: "error",
+        producer: "app",
+        source: MISSING_COLLECTION_SOURCE,
+        text: runtime.errorMessage,
+      },
+    ]);
   });
 
   it("Link to a switched-off viewer", async function failsSwitchedOff(): Promise<void> {
@@ -319,6 +464,16 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     );
     expect(runtime.launch).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(runtime.loadedMod).toBeNull();
+    expect(readSandboxMessages(runtime)).toEqual([
+      {
+        id: 1,
+        level: "error",
+        producer: "app",
+        source: `${APP_BASE_URL}default_mods/mod_viewer/mod_conf.yaml`,
+        text: 'The default mod "mod_viewer" is switched off.',
+      },
+    ]);
   });
 
   it("ignores a launch that settles after the runtime was stopped", async function ignoresLateLaunch(): Promise<void> {
@@ -445,6 +600,16 @@ describe("Site consent question", function describeSiteConsentQuestion(): void {
     expect(runtime.question).toBeNull();
     expect(runtime.launch).toBeNull();
     expect(spied.siteDecisions.decisions).toEqual([]);
+    expect(runtime.loadedMod?.title).toBe("Probe");
+    const messages = readSandboxMessages(runtime);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      level: "error",
+      producer: "app",
+      source: PROBE_MOD_SOURCE,
+    });
+    expect(messages[0].text).toContain(OTHER_API_RANGE);
+    expect(messages[0].text).toContain(MOD_API_VERSION);
   });
 
   it("Allow with one line unchecked", async function allowsCheckedLines(): Promise<void> {
@@ -468,8 +633,8 @@ describe("Site consent question", function describeSiteConsentQuestion(): void {
     });
     expect(runtime.launch?.policy).toContain("https://upload.wikimedia.org");
     expect(runtime.launch?.policy).not.toContain("https://api.example.net");
-    expect(readSandboxIssues(runtime)).toHaveLength(1);
-    expect(readSandboxIssues(runtime)[0].message).toContain(
+    expect(readIssues(runtime)).toHaveLength(1);
+    expect(readIssues(runtime)[0].message).toContain(
       "exchange data with https://api.example.net",
     );
     expect(spied.siteDecisions.decisions).toEqual([]);
@@ -494,6 +659,49 @@ describe("Site consent question", function describeSiteConsentQuestion(): void {
       buildProbeDecision(SAMPLE_COVERS_PERMISSION, false),
       buildProbeDecision(PROBE_CONNECT_PERMISSION, false),
     ]);
+  });
+
+  it("Allowed and remembered", async function notifiesAllowed(): Promise<void> {
+    serveProbeMod();
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [COVERS_KEY],
+      remember: true,
+    });
+
+    const notifications = readNotifications(runtime);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      producer: "app",
+      source: PROBE_MOD_SOURCE,
+      text: "Allowed the mod to show content from https://upload.wikimedia.org. The answer is remembered.",
+    });
+  });
+
+  it("notifies the answer after the launch's issues", async function ordersConsentNotification(): Promise<void> {
+    serveProbeMod(true);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [COVERS_KEY],
+      remember: false,
+    });
+
+    const messages = readSandboxMessages(runtime);
+    expect(messages).toHaveLength(2);
+    expect(messages[0].text).toContain("Permission not granted");
+    expect(messages[1].text).toBe(
+      "Allowed the mod to show content from https://upload.wikimedia.org. Refused to let the mod exchange data with https://api.example.net. The answer is not remembered.",
+    );
   });
 
   it("Remembered allow", async function remembersAllow(): Promise<void> {
@@ -535,6 +743,23 @@ describe("Site consent question", function describeSiteConsentQuestion(): void {
       denied: [SAMPLE_COVERS_PERMISSION],
     });
     expect(spied.siteDecisions.decisions).toEqual([]);
+  });
+
+  it("Escape", async function notifiesEscape(): Promise<void> {
+    serveProbeMod(true);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSandbox(PROBE_MOD_SOURCE, null),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, null);
+
+    const notifications = readNotifications(runtime);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].text).toBe(
+      "Refused to let the mod show content from https://upload.wikimedia.org, exchange data with https://api.example.net. The answer is not remembered.",
+    );
   });
 
   it("ignores an answer to a question the runtime does not ask", async function ignoresOtherQuestion(): Promise<void> {
@@ -588,7 +813,7 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
     await waitForMessages();
 
     expect(runtime.session).not.toBeNull();
-    expect(readSandboxIssues(runtime)).toEqual([
+    expect(readIssues(runtime)).toEqual([
       {
         level: "error",
         source: SAMPLE_MOD_SOURCE,
@@ -620,6 +845,53 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
       cancelLabel: "Cancel",
     });
     expect(received).toEqual([{ jsonrpc: "2.0", id: 1, result: true }]);
+  });
+
+  it("Default source", async function notifiesWithModSource(): Promise<void> {
+    const spied = buildServices();
+    const { runtime, modPort, received } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, null),
+      spied,
+    );
+    spied.onChange.mockClear();
+
+    sendNotify(modPort, 1, { message: "Saved" });
+    await waitForMessages();
+
+    expect(received).toEqual([{ jsonrpc: "2.0", id: 1, result: null }]);
+    expect(readSandboxMessages(runtime).at(-1)).toMatchObject({
+      level: "info",
+      producer: "mod",
+      source: SAMPLE_MOD_SOURCE,
+      text: "Saved",
+    });
+    expect(spied.onChange).toHaveBeenCalledOnce();
+    expect(spied.onRequestAction).not.toHaveBeenCalled();
+  });
+
+  it("Mod sends too many", async function capsModMessages(): Promise<void> {
+    serveFourBooks();
+    const spied = buildServices();
+    const { runtime, modPort } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, FOUR_BOOKS_SOURCE),
+      spied,
+    );
+
+    for (let id = 1; id <= 105; id += 1) {
+      sendNotify(modPort, id, { message: `Note ${id}` });
+    }
+    await waitForMessages();
+
+    const fromMod = readSandboxMessages(runtime).filter(isFromMod);
+    expect(fromMod).toHaveLength(100);
+    expect(fromMod[0].text).toBe("Note 6");
+    expect(runtime.droppedModMessages).toEqual({
+      error: 0,
+      warning: 0,
+      info: 5,
+    });
+    expect(readIssues(runtime)).toHaveLength(1);
+    expect(readNotifications(runtime)[0].producer).toBe("app");
   });
 
   it("passes mods.open to onOpenLink with the runtime's id", async function opensWithId(): Promise<void> {
@@ -686,7 +958,7 @@ describe("stopSandbox", function describeStopSandbox(): void {
 
     expect(runtime.status).toBe("stopped");
     expect(runtime.session?.stopped).toBe(true);
-    expect(readSandboxIssues(runtime)).toEqual([
+    expect(readIssues(runtime)).toEqual([
       {
         level: "error",
         source: SAMPLE_MOD_SOURCE,
@@ -705,7 +977,7 @@ describe("stopSandbox", function describeStopSandbox(): void {
     stopSandbox(runtime, null);
 
     expect(runtime.status).toBe("stopped");
-    expect(readSandboxIssues(runtime)).toEqual([]);
+    expect(readIssues(runtime)).toEqual([]);
   });
 });
 
@@ -717,7 +989,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
       buildSandbox(SAMPLE_MOD_REFERENCE, FOUR_BOOKS_SOURCE),
       spied,
     );
-    expect(readSandboxIssues(runtime)).toHaveLength(1);
+    expect(readIssues(runtime)).toHaveLength(1);
     testTexts.set(
       FOUR_BOOKS_SOURCE,
       'collection:\n  name: "Two books"\n  tiles:\n    - path: "./books/kallocain.md"\n    - path: "./books/fictions.md"',
@@ -726,7 +998,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     await reloadSandboxTiles(runtime, spied.services);
     await waitForMessages();
 
-    expect(readSandboxIssues(runtime)).toEqual([]);
+    expect(readIssues(runtime)).toEqual([]);
     expect(received).toHaveLength(1);
     expect(received[0]).toMatchObject({
       jsonrpc: "2.0",
@@ -735,6 +1007,69 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     });
     const params = (received[0] as { params: { tiles: unknown[] } }).params;
     expect(params.tiles).toHaveLength(2);
+  });
+
+  it("Reload done", async function notifiesReload(): Promise<void> {
+    serveFourBooks();
+    const spied = buildServices();
+    const { runtime, received } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, FOUR_BOOKS_SOURCE),
+      spied,
+    );
+    testTexts.set(
+      FOUR_BOOKS_SOURCE,
+      'collection:\n  name: "Two books"\n  tiles:\n    - path: "./books/kallocain.md"\n    - path: "./books/fictions.md"',
+    );
+
+    await reloadSandboxTiles(runtime, spied.services);
+    await waitForMessages();
+
+    const notifications = readNotifications(runtime);
+    expect(notifications).toHaveLength(2);
+    expect(notifications[1]).toMatchObject({
+      producer: "app",
+      source: FOUR_BOOKS_SOURCE,
+      text: "Reloaded the tiles: the mod received 2 tiles, with 0 collection issues.",
+    });
+    const changed = received[0] as { params: { issues: { level: string }[] } };
+    expect(readLevels(changed.params.issues)).not.toContain("info");
+  });
+
+  it("Reload failed", async function notifiesNothingOnFailure(): Promise<void> {
+    serveFourBooks();
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, FOUR_BOOKS_SOURCE),
+      spied,
+    );
+    testTexts.delete(FOUR_BOOKS_SOURCE);
+
+    await reloadSandboxTiles(runtime, spied.services);
+
+    expect(readNotifications(runtime)).toHaveLength(1);
+    const errors = readSandboxMessages(runtime).filter(isError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].source).toBe(FOUR_BOOKS_SOURCE);
+  });
+
+  it("Reloaded issues are unread", async function marksReloadedUnread(): Promise<void> {
+    serveFourBooks();
+    const spied = buildServices();
+    const { runtime } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, FOUR_BOOKS_SOURCE),
+      spied,
+    );
+    markSandboxMessagesRead(runtime, "warning");
+    const readIds = [...runtime.readMessageIds];
+    expect(readIds).toHaveLength(1);
+
+    await reloadSandboxTiles(runtime, spied.services);
+
+    const reloadedWarnings = readSandboxMessages(runtime).filter(isWarning);
+    expect(reloadedWarnings).toHaveLength(1);
+    expect(reloadedWarnings[0].text).toContain("is not of tile type");
+    expect(readIds).not.toContain(reloadedWarnings[0].id);
+    expect(runtime.readMessageIds.has(reloadedWarnings[0].id)).toBe(false);
   });
 
   it("Reloaded tiles have their relative paths resolved", async function resolvesReloadedTiles(): Promise<void> {
@@ -766,7 +1101,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
 
     await reloadSandboxTiles(runtime, spied.services);
 
-    expect(readSandboxIssues(runtime)).toEqual([
+    expect(readIssues(runtime)).toEqual([
       {
         level: "error",
         source: FOUR_BOOKS_SOURCE,
@@ -808,7 +1143,7 @@ describe("Tile link issues", function describeTileLinkIssues(): void {
     stopSandbox(runtime, stopIssue);
 
     const sources: string[] = [];
-    for (const issue of readSandboxIssues(runtime)) {
+    for (const issue of readIssues(runtime)) {
       sources.push(issue.source);
     }
     expect(sources).toEqual([
@@ -817,8 +1152,8 @@ describe("Tile link issues", function describeTileLinkIssues(): void {
       LINKED_TILE_SOURCE,
       UNTYPED_MOD_SOURCE,
     ]);
-    expect(readSandboxIssues(runtime)[2]).toEqual(buildRouterIssue());
-    expect(readSandboxIssues(runtime)[3]).toEqual(stopIssue);
+    expect(readIssues(runtime)[2]).toEqual(buildRouterIssue());
+    expect(readIssues(runtime)[3]).toEqual(stopIssue);
   });
 
   it("New link after reloading the tiles", async function reportsNewLink(): Promise<void> {
@@ -838,7 +1173,7 @@ describe("Tile link issues", function describeTileLinkIssues(): void {
 
     await reloadSandboxTiles(runtime, spied.services);
 
-    expect(readSandboxIssues(runtime)).toEqual([
+    expect(readIssues(runtime)).toEqual([
       {
         level: "warning",
         source: LINKED_COLLECTION_SOURCE,
@@ -869,7 +1204,7 @@ describe("Tile link issues", function describeTileLinkIssues(): void {
     await reloadSandboxTiles(runtime, spied.services);
     await reloadSandboxTiles(runtime, spied.services);
 
-    expect(readSandboxIssues(runtime)).toEqual([
+    expect(readIssues(runtime)).toEqual([
       {
         level: "warning",
         source: LINKED_COLLECTION_SOURCE,
@@ -890,7 +1225,7 @@ describe("Tile link issues", function describeTileLinkIssues(): void {
 
     await reloadSandboxTiles(runtime, spied.services);
 
-    expect(readSandboxIssues(runtime)).toEqual([]);
+    expect(readIssues(runtime)).toEqual([]);
   });
 
   it("Left-out link removed", async function removesLeftOutLink(): Promise<void> {
@@ -901,12 +1236,12 @@ describe("Tile link issues", function describeTileLinkIssues(): void {
       buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
       spied,
     );
-    expect(readSandboxIssues(runtime)).toEqual([buildRouterIssue()]);
+    expect(readIssues(runtime)).toEqual([buildRouterIssue()]);
     serveLinkedTile(['title: "No logo"']);
 
     await reloadSandboxTiles(runtime, spied.services);
 
-    expect(readSandboxIssues(runtime)).toEqual([]);
+    expect(readIssues(runtime)).toEqual([]);
   });
 
   it("keeps the tile link issues when the reload fails", async function keepsIssuesOnFailure(): Promise<void> {
@@ -921,7 +1256,7 @@ describe("Tile link issues", function describeTileLinkIssues(): void {
 
     await reloadSandboxTiles(runtime, spied.services);
 
-    expect(readSandboxIssues(runtime)).toEqual([
+    expect(readIssues(runtime)).toEqual([
       {
         level: "error",
         source: LINKED_COLLECTION_SOURCE,
@@ -940,12 +1275,12 @@ describe("Tile link issues", function describeTileLinkIssues(): void {
       buildSandbox(UNTYPED_MOD_SOURCE, LINKED_COLLECTION_SOURCE),
       spied,
     );
-    expect(readSandboxIssues(runtime)).toEqual([]);
+    expect(readIssues(runtime)).toEqual([]);
     serveLinkedTile(['image: "https://media.example.net/new.jpg"']);
 
     await reloadSandboxTiles(runtime, spied.services);
 
     expect(runtime.launch?.tileLinks).toBeNull();
-    expect(readSandboxIssues(runtime)).toEqual([]);
+    expect(readIssues(runtime)).toEqual([]);
   });
 });

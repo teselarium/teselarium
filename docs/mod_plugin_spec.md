@@ -132,6 +132,26 @@ document.addEventListener("click", openInViewer);
 
 A body placed this way shows its mermaid blocks as code: to draw them, load the library as the next section shows.
 
+## Telling the user something
+
+A mod draws what it wants in its frame, but the frame is the mod's own page: the user cannot tell an error the app found from one the mod made up. To tell the user something outside its frame, a mod sends `ui.notify`, and the app adds the message to the mod's stage bar, under the errors, warnings or notifications button, labeled "Mod" (see [Telling the user something](modules/lib/core/engine/README.md#telling-the-user-something) in the engine's README):
+
+```js
+export default async function mount(engine, context) {
+  if (context.tiles.length === 0) {
+    await engine.request("ui.notify", {
+      message: "No books found",
+      level: "error",
+    });
+    return;
+  }
+  showBooks(context.tiles);
+  await engine.request("ui.notify", { message: "Loaded" });
+}
+```
+
+`level` is `"info"` (the default), `"warning"` or `"error"`, and `source`, by default the mod's source, says what the message is about, such as a tile's `source`. The message is plain text of at most 1000 characters. It needs no permission and no dialog, and hidden mods can send it too. The app keeps the last 100 messages of each mod's sandbox and says how many older ones it dropped. A check records the mod's errors and warnings as findings, and a test case reads the request from `requests` (see [Checking a mod](#checking-a-mod) and [What a case records](#what-a-case-records)).
+
 ## Libraries
 
 The app ships some large libraries that a mod can use without bundling them or loading code from another site: `libs.load` installs one in the mod's frame, from the app's own copy (see [Libraries](modules/lib/core/engine/README.md#libraries) in the engine's README). Today there is one, `mermaid` at major version `12`, ready as `globalThis.mermaid`. A mod asks for a major version, and the result gives the full version installed.
@@ -200,7 +220,7 @@ A mod can be checked before anyone runs it, with no code from its author. Open t
 The check has three steps:
 
 - **Bundle check**: the mod file, the entrypoint, the tile type and the collection must load, and the collection's tiles are validated against the tile type. A file that cannot be loaded or has the wrong format is an error naming that file. A tile that does not match the type is a warning naming the tile. A missing `api` range, or one that does not match the app's mod API version, is a warning: the check asks nothing.
-- **Mount check**: when the bundle check found no error, the mod is mounted in a hidden frame, with the permissions it would get if it were opened, the tiles of its type and an empty storage slot that is thrown away afterwards; the mod's real slot is never read nor written. The check records a `mount` that throws or rejects, a mod that left its page, blocked requests and blocked browser dialogs, every request answered with `-32600`, `-32601` or `-32602` (a message that is not a request, an unknown method, bad params), and the requests that would need the user (`links.open`, `files.save`, `ui.confirm` and `players.open` answer `false`, `mods.open` and `mods.check` are refused), without showing any dialog. A `mount` that has not finished after 10 seconds is an error. Only the start of the mod is watched: the mount check ends 1 second after `mount` finished, so timers and requests that start later are not recorded.
+- **Mount check**: when the bundle check found no error, the mod is mounted in a hidden frame, with the permissions it would get if it were opened, the tiles of its type and an empty storage slot that is thrown away afterwards; the mod's real slot is never read nor written. The check records a `mount` that throws or rejects, a mod that left its page, blocked requests and blocked browser dialogs, every request answered with `-32600`, `-32601` or `-32602` (a message that is not a request, an unknown method, bad params), and the requests that would need the user (`links.open`, `files.save`, `ui.confirm` and `players.open` answer `false`, `mods.open` and `mods.check` are refused), without showing any dialog. `ui.notify` answers `null`, and each notification with level `"error"` or `"warning"` is a finding at that level, with the notification's source and message; an `"info"` one is none. A `mount` that has not finished after 10 seconds is an error. Only the start of the mod is watched: the mount check ends 1 second after `mount` finished, so timers and requests that start later are not recorded.
 - **Tests**: when the mod declares `test_path` and neither step found an error, the mod's own tests run, one case after another (see [Mod tests](#mod-tests)).
 
 The report's status is `pass` when there are no findings, `warn` when there are only warnings and `fail` when a finding is an error. Each finding names its step (`bundle`, `mount` or `test`), its level, the file or mod it is about and a message. `tests` lists each case with its status (`pass` or `fail`) and, for a failed case, the message, and `testsChecked` says whether the cases ran. The check leaves the app as it was: no new sandbox, history entry or stage bar item.
@@ -298,6 +318,6 @@ async function deletesAfterConfirming(context) {
 
 ### What a case records
 
-While a case runs, the check records what the mount check would, as `test` findings whose message starts with `In the test "<name>": `: blocked requests and blocked browser dialogs as warnings, and each request answered with `-32600`, `-32601` or `-32602` as an error. A `mount` that throws or rejects is not a finding: it rejects the case's `mount` call, so a case can expect it.
+While a case runs, the check records what the mount check would, as `test` findings whose message starts with `In the test "<name>": `: blocked requests and blocked browser dialogs as warnings, and each request answered with `-32600`, `-32601` or `-32602` as an error. A `mount` that throws or rejects is not a finding: it rejects the case's `mount` call, so a case can expect it. A `ui.notify` answers `null` and is not a finding, whatever its level, so a case can expect a mod's error notification: read it from `requests`, which lists `ui.notify` with its params and result `null`.
 
 A case passes when its function finishes without throwing. It fails when its function throws or rejects, when its frame leaves its page, or when it has not finished 10 seconds after its frame started. A failed case is listed in the report's `tests` with its message, and it is also a `test` error, `The test "<name>" failed: <message>`, naming the test file, so the report fails. A failing case does not stop the others. The cases run one after another, each with up to 10 seconds, so keep them short.

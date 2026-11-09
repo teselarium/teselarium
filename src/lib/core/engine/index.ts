@@ -36,6 +36,8 @@ export type { ModInspection } from "./mod_inspection.ts";
 export {
   buildModLaunch,
   buildModTestDocument,
+  loadLaunchMod,
+  loadLaunchTiles,
   loadModLaunchInputs,
   loadModTiles,
   selectModTiles,
@@ -55,6 +57,8 @@ export type {
   ModMethod,
   ModMethodContext,
   ModMethodTable,
+  UserNotification,
+  UserNotificationLevel,
 } from "./mod_methods.ts";
 export { buildTileBodies, collectModTileLinks } from "./mod_tile_bodies.ts";
 export type { TileBodies } from "./mod_tile_bodies.ts";

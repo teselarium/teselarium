@@ -33,3 +33,16 @@
   overflow-y: auto;
   white-space: pre-wrap;
 }
+
+/* One flash of a message button's icon when a message arrives (see MessageButton). */
+@keyframes stage-bar-flash {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 0.4;
+    transform: scale(1.35);
+  }
+}

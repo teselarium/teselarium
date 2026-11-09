@@ -41,6 +41,7 @@ import {
 import type { AppAction } from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme } from "../theme/index.ts";
+import type { MessageLevel } from "./stage_messages.ts";
 import type { StageRouting } from "./stage_routes.ts";
 import {
   answerApiMismatch,
@@ -49,17 +50,38 @@ import {
   attachFrame,
   changeStageColorScheme,
   changeStageTileLinkedMedia,
+  clearNotifications,
   closeSandbox,
   createStage,
+  dismissMessage,
   followHistory,
   frameLoadedAgain,
+  markMessagesRead,
   openStageLink,
   openStageSection,
   readStageSnapshot,
+  reloadTiles,
   requestStageAction,
   subscribeStage,
 } from "./stage_controller.ts";
 import type { SandboxSnapshot, Stage } from "./stage_controller.ts";
+
+/** A sandbox's errors and warnings, in the order of its messages, as issues. */
+function readIssues(
+  sandbox: SandboxSnapshot,
+): { level: string; source: string; message: string }[] {
+  const issues: { level: string; source: string; message: string }[] = [];
+  for (const message of sandbox.messages) {
+    if (message.level !== "info") {
+      issues.push({
+        level: message.level,
+        source: message.source,
+        message: message.text,
+      });
+    }
+  }
+  return issues;
+}
 
 /** The sample mod with its collection: no section has this link. */
 const COLLECTION_HASH = SAMPLE_COLLECTION_RUN_HASH;
@@ -778,7 +800,7 @@ describe("frameLoadedAgain", function describeFrameLoadedAgain(): void {
     const visible = readVisible(stage);
     expect(visible.status).toBe("stopped");
     expect(visible.sandboxDocument).toBeNull();
-    expect(visible.issues).toEqual([
+    expect(readIssues(visible)).toEqual([
       {
         level: "error",
         source: SAMPLE_MOD_SOURCE,
@@ -1011,7 +1033,9 @@ describe("answerApiMismatch", function describeAnswerApiMismatch(): void {
       sandboxDocument: null,
       canReloadTiles: false,
       apiMismatch: { range: OTHER_API_RANGE, apiVersion: MOD_API_VERSION },
-      issues: [],
+      messages: [],
+      modReference: OTHER_API_MOD_SOURCE,
+      collection: null,
     });
   });
 
@@ -1208,8 +1232,8 @@ describe("answerSiteConsent", function describeAnswerSiteConsent(): void {
     expect(visible.sandboxDocument).not.toContain(
       "https://upload.wikimedia.org",
     );
-    expect(visible.issues).toHaveLength(1);
-    expect(visible.issues[0].message).toBe(
+    expect(readIssues(visible)).toHaveLength(1);
+    expect(readIssues(visible)[0].message).toBe(
       'Permission not granted: show content from https://upload.wikimedia.org ("Shows the book covers"). Mods from other sites get only the permissions you allow.',
     );
   });
@@ -1358,7 +1382,7 @@ describe("subscribeStage", function describeSubscribeStage(): void {
     expect(Object.isFrozen(runningSnapshot)).toBe(true);
     expect(Object.isFrozen(runningSnapshot.sandboxes)).toBe(true);
     expect(Object.isFrozen(runningSnapshot.sandboxes[0])).toBe(true);
-    expect(Object.isFrozen(runningSnapshot.sandboxes[0].issues)).toBe(true);
+    expect(Object.isFrozen(runningSnapshot.sandboxes[0].messages)).toBe(true);
     expect(readStageSnapshot(stage)).toBe(readStageSnapshot(stage));
   });
 
@@ -1381,8 +1405,8 @@ describe("subscribeStage", function describeSubscribeStage(): void {
     });
     await waitForMessages();
 
-    expect(readVisible(stage).issues).toHaveLength(1);
-    expect(readVisible(stage).issues[0].message).toContain(
+    expect(readIssues(readVisible(stage))).toHaveLength(1);
+    expect(readIssues(readVisible(stage))[0].message).toContain(
       "https://images.example.net",
     );
   });
@@ -1526,4 +1550,192 @@ function postRequest(
   params: object,
 ): void {
   port.postMessage({ jsonrpc: "2.0", id, method, params });
+}
+
+function isInfo(message: { level: MessageLevel }): boolean {
+  return message.level === "info";
+}
+
+/** Attaches a frame to the sandbox and has it report a blocked image, which adds a warning. */
+async function reportBlockedImage(stage: Stage, id: string): Promise<void> {
+  const { modPort } = attachCollectingFrame(stage, id);
+  modPort.postMessage({
+    jsonrpc: "2.0",
+    method: "sandbox.blocked",
+    params: {
+      blockedUrl: "https://images.example.net/a.jpg",
+      directive: "img-src",
+    },
+  });
+  await waitForMessages();
+}
+
+/**
+ * Opens the sample mod with its collection as `sandbox-2`, which notifies
+ * the loaded collection, and reloads its tiles until it has `count`
+ * notifications.
+ */
+async function openWithNotifications(
+  history: FakeHistory,
+  count: number,
+): Promise<Stage> {
+  const stage = buildStage(history);
+  await follow(stage, history.readNavigation());
+  await follow(stage, history.followLink(COLLECTION_HASH));
+  for (let reloads = 1; reloads < count; reloads += 1) {
+    await reloadTiles(stage, "sandbox-2");
+  }
+  return stage;
+}
+
+function countLevel(sandbox: SandboxSnapshot, level: MessageLevel): number {
+  let count = 0;
+  for (const message of sandbox.messages) {
+    if (message.level === level) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function listUnreadLevels(sandbox: SandboxSnapshot): MessageLevel[] {
+  const levels: MessageLevel[] = [];
+  for (const message of sandbox.messages) {
+    if (!message.isRead) {
+      levels.push(message.level);
+    }
+  }
+  return levels;
+}
+
+describe("Message read state", function describeMessageReadState(): void {
+  it("starts unread and is read once the level is marked", async function marksLevelRead(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    await reportBlockedImage(stage, "sandbox-1");
+    expect(listUnreadLevels(readVisible(stage))).toContain("warning");
+    const listener = vi.fn<() => void>();
+    subscribeStage(stage, listener);
+
+    markMessagesRead(stage, "sandbox-1", "warning");
+
+    expect(listUnreadLevels(readVisible(stage))).not.toContain("warning");
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it("Read state stays with its sandbox", async function keepsReadState(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    await reportBlockedImage(stage, "sandbox-1");
+    markMessagesRead(stage, "sandbox-1", "warning");
+
+    await follow(stage, history.followLink(COLLECTION_HASH));
+    await reportBlockedImage(stage, "sandbox-2");
+    expect(listUnreadLevels(readVisible(stage))).toContain("warning");
+    await follow(stage, history.goBack());
+
+    const visible = readVisible(stage);
+    expect(visible.id).toBe("sandbox-1");
+    expect(countLevel(visible, "warning")).toBe(1);
+    expect(listUnreadLevels(visible)).not.toContain("warning");
+  });
+});
+
+describe("Dismissing notifications", function describeDismissing(): void {
+  it("dismissing lowers the info count", async function dismissesOne(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openWithNotifications(history, 2);
+    const notifications = readVisible(stage).messages.filter(isInfo);
+    expect(notifications).toHaveLength(2);
+
+    dismissMessage(stage, "sandbox-2", notifications[0].id);
+
+    const kept = readVisible(stage).messages.filter(isInfo);
+    expect(kept).toHaveLength(1);
+    expect(kept[0].id).toBe(notifications[1].id);
+  });
+
+  it("Clear all leaves the warnings", async function clearsAll(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openWithNotifications(history, 3);
+    await reportBlockedImage(stage, "sandbox-2");
+    expect(countLevel(readVisible(stage), "info")).toBe(3);
+
+    clearNotifications(stage, "sandbox-2");
+
+    const visible = readVisible(stage);
+    expect(countLevel(visible, "info")).toBe(0);
+    expect(countLevel(visible, "warning")).toBe(1);
+  });
+
+  it("does not dismiss a warning", async function keepsWarning(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    await reportBlockedImage(stage, "sandbox-1");
+    const warningId = readVisible(stage).messages[0].id;
+
+    dismissMessage(stage, "sandbox-1", warningId);
+
+    expect(countLevel(readVisible(stage), "warning")).toBe(1);
+  });
+
+  it("an unknown sandbox or message id does nothing", async function ignoresUnknown(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openWithNotifications(history, 1);
+    const before = readVisible(stage).messages;
+    expect(before).toHaveLength(1);
+    const listener = vi.fn<() => void>();
+    subscribeStage(stage, listener);
+
+    dismissMessage(stage, "sandbox-9", before[0].id);
+    dismissMessage(stage, "sandbox-2", 999);
+    clearNotifications(stage, "sandbox-9");
+    markMessagesRead(stage, "sandbox-9", "info");
+
+    expect(readVisible(stage).messages).toEqual(before);
+    expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe("Messages from the mod", function describeModMessages(): void {
+  it("Hidden mod notifies", async function keepsHiddenMessage(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const { modPort, received } = attachCollectingFrame(stage, "sandbox-1");
+    await follow(stage, history.followLink(COLLECTION_HASH));
+
+    modPort.postMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ui.notify",
+      params: { message: "Done" },
+    });
+    await waitForMessages();
+
+    expect(received.at(-1)).toEqual({ jsonrpc: "2.0", id: 1, result: null });
+    expect(readVisible(stage).id).toBe("sandbox-2");
+    expect(readTextsOf(readVisible(stage))).not.toContain("Done");
+    await follow(stage, history.goBack());
+    const visible = readVisible(stage);
+    expect(visible.id).toBe("sandbox-1");
+    expect(visible.messages.at(-1)).toMatchObject({
+      level: "info",
+      producer: "mod",
+      source: SAMPLE_MOD_SOURCE,
+      text: "Done",
+      isRead: false,
+    });
+  });
+});
+
+function readTextsOf(sandbox: SandboxSnapshot): string[] {
+  const texts: string[] = [];
+  for (const message of sandbox.messages) {
+    texts.push(message.text);
+  }
+  return texts;
 }

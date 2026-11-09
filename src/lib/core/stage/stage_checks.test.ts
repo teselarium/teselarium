@@ -420,6 +420,111 @@ describe("What the mount check records", function describeMountRecords(): void {
     expect(report.findings[0].message).toContain("Unknown method");
   });
 
+  it("Mod notifies an error while mounting", async function recordsErrorNotification(): Promise<void> {
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: SAMPLE_MOD_SOURCE,
+      collection: null,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    sendRequest(checkFrame, 1, "ui.notify", {
+      message: "No books found",
+      level: "error",
+    });
+    await waitForReceived(checkFrame, 1);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(checkFrame.received[0]).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      result: null,
+    });
+    expect(report.status).toBe("fail");
+    expect(report.findings).toEqual([
+      {
+        step: "mount",
+        level: "error",
+        source: SAMPLE_MOD_SOURCE,
+        message: "No books found",
+      },
+    ]);
+  });
+
+  it("records a warning notification at its level and source", async function recordsWarningNotification(): Promise<void> {
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: SAMPLE_MOD_SOURCE,
+      collection: null,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    sendRequest(checkFrame, 1, "ui.notify", {
+      message: "Cannot read the rating",
+      level: "warning",
+      source: SAMPLE_TILE_SOURCES[0],
+    });
+    await waitForReceived(checkFrame, 1);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(report.status).toBe("warn");
+    expect(report.findings).toEqual([
+      {
+        step: "mount",
+        level: "warning",
+        source: SAMPLE_TILE_SOURCES[0],
+        message: "Cannot read the rating",
+      },
+    ]);
+  });
+
+  it("Info notification is not a finding", async function ignoresInfoNotification(): Promise<void> {
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: SAMPLE_MOD_SOURCE,
+      collection: null,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    sendRequest(checkFrame, 1, "ui.notify", { message: "Loaded" });
+    await waitForReceived(checkFrame, 1);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(checkFrame.received[0]).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      result: null,
+    });
+    expect(report.status).toBe("pass");
+    expect(listFindingMessages(report)).not.toContain("Loaded");
+  });
+
+  it("The check adds nothing to the stage bar", async function keepsStageBar(): Promise<void> {
+    const checkStage = await startCheckStage();
+    const before = readStageSnapshot(checkStage.stage).sandboxes[0].messages;
+
+    const reporting = startCheck(checkStage, {
+      source: SAMPLE_MOD_SOURCE,
+      collection: null,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    sendRequest(checkFrame, 1, "ui.notify", { message: "Loaded" });
+    sendRequest(checkFrame, 2, "ui.notify", {
+      message: "No books found",
+      level: "error",
+    });
+    await waitForReceived(checkFrame, 2);
+    await finishMount(checkFrame);
+    await reporting;
+
+    const viewer = readStageSnapshot(checkStage.stage).sandboxes[0];
+    expect(readStageSnapshot(checkStage.stage).sandboxes).toHaveLength(1);
+    expect(viewer.messages).toEqual(before);
+  });
+
   it("records bad params and a message that is not a request", async function recordsBadRequests(): Promise<void> {
     const checkStage = await startCheckStage();
 

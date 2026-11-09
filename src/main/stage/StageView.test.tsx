@@ -1,10 +1,14 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import type { RenderResult } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { TooltipProvider } from "@/vendor/shadcn/ui/tooltip.tsx";
 import {
   attachFrame,
   checkFrameLoadedAgain,
+  followHistory,
   openStageLink,
   readStageSnapshot,
+  reloadTiles,
 } from "../../lib/core/stage/index.ts";
 import type { CheckSnapshot, Stage } from "../../lib/core/stage/index.ts";
 import {
@@ -24,7 +28,10 @@ import {
   serveOtherApiMod,
 } from "../../test/sample_mods.ts";
 import { testTexts } from "../../test/test_files.ts";
+import { FakeHistory } from "../../test/fake_history.ts";
 import {
+  buildTestStage,
+  MOD_HOME_ROUTING,
   PAGE_HOME_ROUTING,
   settleStage,
   startTestStage,
@@ -38,6 +45,15 @@ import { StageView } from "./StageView.tsx";
 function createTestPlayerSites(): PlayerSites {
   const playerSites = createPlayerSites({ storage: createMemoryStorage() });
   return playerSites;
+}
+
+/** Renders the stage view inside the tooltip provider the app gives it. */
+function renderStageView(stage: Stage): RenderResult {
+  return render(
+    <TooltipProvider>
+      <StageView stage={stage} playerSites={createTestPlayerSites()} />
+    </TooltipProvider>,
+  );
 }
 
 const OTHER_API_HASH = `#/run?mod=${encodeURIComponent(OTHER_API_MOD_SOURCE)}`;
@@ -72,9 +88,7 @@ function listWrappers(container: HTMLElement): HTMLElement[] {
 async function renderAskingStage(): Promise<HTMLElement> {
   serveOtherApiMod();
   const stage = await startTestStage(OTHER_API_HASH);
-  const { container } = render(
-    <StageView stage={stage} playerSites={createTestPlayerSites()} />,
-  );
+  const { container } = renderStageView(stage);
   return container;
 }
 
@@ -108,9 +122,7 @@ async function waitForCheck(stage: Stage): Promise<CheckSnapshot> {
 describe("StageView", function describeStageView(): void {
   it("renders one wrapper per sandbox, only the visible one shown", async function rendersWrappers(): Promise<void> {
     const stage = await startTestStage("");
-    const { container } = render(
-      <StageView stage={stage} playerSites={createTestPlayerSites()} />,
-    );
+    const { container } = renderStageView(stage);
 
     await openFromVisible(stage, "sandbox-1");
 
@@ -127,7 +139,7 @@ describe("StageView", function describeStageView(): void {
 
   it("renders the running mod's frame with its sandbox and document", async function rendersFrame(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
     const frame = screen.getByTitle("Book List");
 
@@ -140,7 +152,7 @@ describe("StageView", function describeStageView(): void {
 
   it("Home mod has no close button", async function hidesHomeClose(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
     expect(screen.getByText("Book List")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
@@ -148,14 +160,14 @@ describe("StageView", function describeStageView(): void {
 
   it("shows the close button for a mod opened from a link", async function showsClose(): Promise<void> {
     const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
   it("No collection, no reload", async function hidesReload(): Promise<void> {
     const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
     expect(screen.queryByRole("button", { name: "Reload tiles" })).toBeNull();
   });
@@ -164,7 +176,7 @@ describe("StageView", function describeStageView(): void {
     const stage = await startTestStage(
       `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
     );
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
     expect(
       screen.getByRole("button", { name: "Reload tiles" }),
@@ -173,7 +185,7 @@ describe("StageView", function describeStageView(): void {
 
   it("shows the title and the version of the visible mod", async function showsTitle(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
 
@@ -183,9 +195,7 @@ describe("StageView", function describeStageView(): void {
 
   it("Missing mod file", async function showsLoadFailure(): Promise<void> {
     const stage = await startTestStage(`#/run?mod=${MISSING_MOD_REFERENCE}`);
-    const { container } = render(
-      <StageView stage={stage} playerSites={createTestPlayerSites()} />,
-    );
+    const { container } = renderStageView(stage);
 
     expect(screen.getByRole("alert")).toHaveTextContent(MISSING_MOD_SOURCE);
     expect(screen.getByRole("alert")).toHaveTextContent("404");
@@ -195,9 +205,13 @@ describe("StageView", function describeStageView(): void {
 
   it("Sample mod has no issues", async function showsNoIssues(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
-    expect(screen.getByText("No issues.")).toBeInTheDocument();
+    const errors = findLevelButton("Errors");
+    expect(errors).toHaveAttribute("data-empty");
+    expect(findLevelButton("Warnings")).toHaveAttribute("data-empty");
+    await openLevel("Errors");
+    expect(screen.getByText("No errors.")).toBeInTheDocument();
   });
 
   it("shows the visible mod's ui.confirm and sends the answer", async function answersConfirm(): Promise<void> {
@@ -207,7 +221,7 @@ describe("StageView", function describeStageView(): void {
     const modPort = readModPort(fakeFrame);
     openPorts.push(modPort);
     const received = collectMessages(modPort);
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
     await act(async function askUser(): Promise<void> {
       modPort.postMessage({
@@ -232,7 +246,7 @@ describe("StageView", function describeStageView(): void {
 
   it("No question for the sample mod", async function asksNothingForSample(): Promise<void> {
     const stage = await startTestStage("");
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    renderStageView(stage);
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByTitle("Book List").tagName).toBe("IFRAME");
@@ -293,36 +307,222 @@ describe("StageView", function describeStageView(): void {
     expect(screen.getByRole("alert")).toHaveTextContent(OTHER_API_RANGE);
   });
 
-  it("lists the issues in order with level, source and message", async function listsIssues(): Promise<void> {
+  it("lists the messages of a level in order with producer, source and text", async function listsMessages(): Promise<void> {
     const stage = await startTestStage("");
-    const fakeFrame = createFakeFrame();
-    attachFrame(stage, "sandbox-1", fakeFrame.target);
-    const modPort = readModPort(fakeFrame);
-    openPorts.push(modPort);
-    render(<StageView stage={stage} playerSites={createTestPlayerSites()} />);
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
 
-    await act(async function reportIssues(): Promise<void> {
-      postNotification(modPort, "sandbox.blocked", {
-        blockedUrl: "https://images.example.net/a.jpg",
-        directive: "img-src",
-      });
-      postNotification(modPort, "sandbox.mountFailed", {
-        message: "map failed",
-      });
-      await waitForMessages();
-    });
+    await reportBlockedImageAndFailure(modPort);
+    await openLevel("Warnings");
 
     const items = within(
-      screen.getByRole("list", { name: "Issues" }),
+      screen.getByRole("list", { name: "Warnings" }),
     ).getAllByRole("listitem");
-    expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent("warning");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent("App");
     expect(items[0]).toHaveTextContent(SAMPLE_MOD_SOURCE);
     expect(items[0]).toHaveTextContent("https://images.example.net");
-    expect(items[1]).toHaveTextContent("error");
-    expect(items[1]).toHaveTextContent("map failed");
+  });
+
+  it("Read after opening", async function marksRead(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    await reportBlockedImageAndFailure(modPort);
+    expect(readCapsuleState("Warnings")).toBe("unread");
+
+    await openLevel("Warnings");
+
+    expect(readCapsuleState("Warnings")).toBe("read");
+    expect(readCapsuleState("Errors")).toBe("unread");
+  });
+
+  it("lists the stage bar's items in order", async function ordersItems(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    renderStageView(stage);
+
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    const names: string[] = [];
+    for (const button of within(stageBar).getAllByRole("button")) {
+      names.push(button.getAttribute("aria-label") ?? "");
+    }
+    expect(names).toEqual([
+      "Mod information",
+      "Reload tiles",
+      "Errors: 0, 0 unread",
+      "Warnings: 0, 0 unread",
+      "Notifications: 1, 1 unread",
+      "Close",
+    ]);
+    const title = within(stageBar).getByText("Book List");
+    expect(
+      title.compareDocumentPosition(within(stageBar).getByText("1.0.0")),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(
+      within(stageBar)
+        .getByText("1.0.0")
+        .compareDocumentPosition(
+          within(stageBar).getByRole("button", { name: "Mod information" }),
+        ),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(stageBar.querySelector("[data-slot=separator]")).not.toBeNull();
+    expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("Mod not loaded", async function showsModNotLoaded(): Promise<void> {
+    const stage = await startTestStage(`#/run?mod=${MISSING_MOD_REFERENCE}`);
+    renderStageView(stage);
+
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    expect(within(stageBar).getByText("Mod not loaded")).toBeInTheDocument();
+    expect(findLevelButton("Errors")).toHaveAccessibleName(
+      "Errors: 1, 1 unread",
+    );
+    await openLevel("Errors");
+    const item = screen.getByRole("listitem");
+    expect(item).toHaveTextContent("App");
+    expect(item).toHaveTextContent(MISSING_MOD_SOURCE);
+    expect(item).toHaveTextContent("404");
+  });
+
+  it("Loading mod…", function showsLoading(): void {
+    const history = new FakeHistory(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
+    const stage = buildTestStage(history, MOD_HOME_ROUTING);
+    followHistory(stage, history.hash, history.state);
+
+    renderStageView(stage);
+
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    expect(within(stageBar).getByText("Loading mod…")).toBeInTheDocument();
+    expect(within(stageBar).queryByText("1.0.0")).toBeNull();
+  });
+
+  it("flashes the level of a message that arrives while the sandbox is shown", async function flashesNewMessage(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    expect(findFlashing()).toEqual([]);
+
+    await reportBlockedImageAndFailure(modPort);
+
+    expect(findFlashing()).toEqual(["error", "warning"]);
+  });
+
+  it("does not flash after switching sandboxes", async function staysStillAfterSwitch(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildTestStage(history, MOD_HOME_ROUTING);
+    followHistory(stage, history.hash, history.state);
+    await settleStage(stage);
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    await openFromVisible(stage, "sandbox-1");
+
+    await reportBlockedImageAndFailure(modPort);
+    await act(async function goBack(): Promise<void> {
+      const navigation = history.goBack();
+      followHistory(stage, navigation.hash, navigation.state);
+      await settleStage(stage);
+    });
+
+    expect(findLevelButton("Warnings")).toHaveAccessibleName(
+      "Warnings: 1, 1 unread",
+    );
+    expect(findFlashing()).toEqual([]);
+    const liveRegion = document.querySelector("[aria-live=polite]");
+    expect(liveRegion).toHaveTextContent("");
+  });
+
+  it("announces a new error in the live region", async function announcesError(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    const liveRegion = stageBar.querySelector("[aria-live=polite]");
+    expect(liveRegion).toHaveTextContent("");
+
+    await reportBlockedImageAndFailure(modPort);
+
+    expect(liveRegion).toHaveTextContent("New error from App:");
+    expect(liveRegion).toHaveTextContent("map failed");
+  });
+
+  it("dismisses a notification and clears them all", async function dismisses(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    renderStageView(stage);
+    await act(async function reload(): Promise<void> {
+      await reloadTiles(stage, "sandbox-1");
+    });
+    await openLevel("Notifications");
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /^Dismiss: / })[0]);
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    await act(async function reloadAgain(): Promise<void> {
+      await reloadTiles(stage, "sandbox-1");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+
+    expect(screen.getByText("No notifications.")).toBeInTheDocument();
+    expect(findLevelButton("Notifications")).toHaveAttribute("data-empty");
   });
 });
+
+function attachTestFrame(stage: Stage, id: string): MessagePort {
+  const fakeFrame = createFakeFrame();
+  attachFrame(stage, id, fakeFrame.target);
+  const modPort = readModPort(fakeFrame);
+  openPorts.push(modPort);
+  return modPort;
+}
+
+/** Has the mod report a blocked image, a warning, then a failed mount, an error. */
+async function reportBlockedImageAndFailure(
+  modPort: MessagePort,
+): Promise<void> {
+  await act(async function reportIssues(): Promise<void> {
+    postNotification(modPort, "sandbox.blocked", {
+      blockedUrl: "https://images.example.net/a.jpg",
+      directive: "img-src",
+    });
+    postNotification(modPort, "sandbox.mountFailed", {
+      message: "map failed",
+    });
+    await waitForMessages();
+  });
+}
+
+/** The stage bar's button of a level, by the start of its accessible name. */
+function findLevelButton(label: string): HTMLElement {
+  return screen.getByRole("button", { name: new RegExp(`^${label}: `) });
+}
+
+async function openLevel(label: string): Promise<void> {
+  await act(async function clickLevel(): Promise<void> {
+    fireEvent.click(findLevelButton(label));
+    await Promise.resolve();
+  });
+}
+
+function readCapsuleState(label: string): string | null {
+  const capsule =
+    findLevelButton(label).querySelector<HTMLElement>("[data-capsule]");
+  return capsule?.dataset.capsule ?? null;
+}
+
+/** The levels whose button flashes. */
+function findFlashing(): string[] {
+  const levels: string[] = [];
+  for (const button of document.querySelectorAll<HTMLElement>("[data-level]")) {
+    if (button.querySelector("[data-flash]") !== null) {
+      levels.push(button.dataset.level ?? "");
+    }
+  }
+  return levels;
+}
 
 function postNotification(
   port: MessagePort,
@@ -363,9 +563,7 @@ describe("CheckFrame", function describeCheckFrame(): void {
     const viewerPort = readModPort(fakeFrame);
     openPorts.push(viewerPort);
     const received = collectMessages(viewerPort);
-    const { container } = render(
-      <StageView stage={stage} playerSites={createTestPlayerSites()} />,
-    );
+    const { container } = renderStageView(stage);
 
     viewerPort.postMessage({
       jsonrpc: "2.0",
@@ -401,9 +599,7 @@ describe("CheckFrame", function describeCheckFrame(): void {
 
   it("renders a new iframe for a new frame of the same check", async function rendersNewFrame(): Promise<void> {
     const stage = await startTestStage("");
-    const { container } = render(
-      <StageView stage={stage} playerSites={createTestPlayerSites()} />,
-    );
+    const { container } = renderStageView(stage);
 
     publishCheckFrame(stage, "check-9-frame-1");
     const firstFrame = container.querySelector("iframe[data-check-id]");
