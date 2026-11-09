@@ -10,7 +10,7 @@ How the code works today:
 - `ModSession.onIssue` dedupes issues by level, source and message, so a blocked request repeated in a loop is reported once.
 - Load failures, a switched-off mod and a cancelled API question all go through `failRuntime`, which only sets `errorMessage`. The file errors (`FileFetchError`, `MarkdownParseError`, `YamlParseError`) carry the address of the file that failed in `source`.
 - The engine's request handlers get a `ModMethodContext` with hooks into the stage (`onOpenLink`, `onRequestAction`, `onCheckMod`). The mount check, the case frames and the list frames each pass their own hooks (`stage_checks.ts`, `stage_check_cases.ts`).
-- `src/vendor/shadcn/` has Tooltip but no Popover. The theme has `destructive`, `warning`, `primary` and `muted` tokens, and no info token.
+- `src/vendor/shadcn/` has Tooltip but no Popover and no DropdownMenu. The theme has `destructive`, `warning`, `primary` and `muted` tokens, and no info token.
 
 ## Goals / Non-Goals
 
@@ -51,7 +51,8 @@ In `src/lib/core/stage/`, a new module `stage_messages.ts` defines:
 Messages get their id when they are added:
 - A reload builds new collection and tile link messages with new ids, so they are unread, as the `mod-stage` delta requires.
 - A dismissed notification is removed from `messages`. Only messages with level `info` can be dismissed, and they only ever live in `messages`.
-- The mod's cap counts the `producer: "mod"` items in `messages`. Past 100, the oldest one is removed and its level's dropped count goes up by one. App messages are never removed.
+- The mod's cap counts the `producer: "mod"` items of each level in `messages`. Past 100 in a level, the oldest one of that level is removed and that level's dropped count goes up by one. App messages are never removed.
+  - *Alternative:* one cap for the mod's messages of every level. A mod sending many notifications would then push out its own errors and warnings, which matter more.
 - Read state is a set of ids, not a "read up to" mark per level. Collection messages come before the arrival list but are replaced with new ids, so a single mark could not express their state.
 
 New stage functions, exported from the stage's index for the page:
@@ -92,12 +93,13 @@ The app's notifications:
 
 ### D6. The UI: project components over shadcn Popover, Tooltip and Button
 
-shadcn's Popover is added to the vendored zone (`npx shadcn@4.22.1 add popover`). It renders in a portal in the app's page, so it is outside every mod frame. Under `src/main/stage/`:
+shadcn's Popover and DropdownMenu are added to the vendored zone (`npx shadcn@4.22.1 add popover` and `npx shadcn@4.22.1 add dropdown-menu`). Both render in a portal in the app's page, so they are outside every mod frame. The Share button uses DropdownMenu rather than a Popover of buttons, for the menu's role, arrow keys and focus on the first item, and so later ways to share are new items. Under `src/main/stage/`:
 - `StageBar` lays out the row.
 - `MessageButton` is the icon button with its capsule, flash and tooltip, one per level.
 - `MessagePopover` lists one level, with the dismiss and "Clear all" buttons for `info` and the dropped-messages note.
-- `MessageItem` shows the producer label, source and text.
-- `ModInfoPopover` shows the source, collection and run link, with "Copy link".
+- `MessageItem` shows the producer label, source and text, and the unread mark.
+- `ModInfoPopover` shows the source, collection and run link, as selectable text.
+- `ShareMenu` is the Share button and its menu, with "Copy link".
 
 `IssueList` is removed.
 
@@ -114,7 +116,15 @@ Rules for the buttons:
 **Flash and announcement.** `StageBar` keeps, in a ref, the highest message id it has seen per level for the visible sandbox id. When the snapshot of the same sandbox brings a higher id, that level's button gets a one-shot animation class, under Tailwind's `motion-safe:` variant, so reduced motion gets no flash. A new error is written to a visually hidden `aria-live="polite"` region. When the visible sandbox id changes, the ref is reset without flashing, because messages that arrived while a sandbox was hidden don't flash.
 - *Alternative:* the stage flags new messages. Whether something flashes depends on what the user saw, which is view state, so it stays in the page.
 
-**Popovers and read state.** Opening a level's popover calls `markMessagesRead` for that level. Popovers close when the visible sandbox changes. "Copy link" writes the app's address (`origin + pathname + search`) followed by `sandbox.hash` with `navigator.clipboard.writeText`, then shows "Copied" for 2 seconds.
+**Popovers and read state.** Opening a level's popover calls `markMessagesRead` for that level, and closing it calls it again, for the messages that arrived while it was open. While it is open, such a message keeps the capsule filled. Popovers and the Share menu close when the visible sandbox changes.
+
+**Unread marks.** The snapshot's `isRead` turns true right after the popover opens, so it cannot drive the marks. When a level's popover opens, `StageBar` keeps the ids of that level that were unread and the highest id of that level seen then. An item is marked when its id is in that set or above that id, and the record is dropped when the popover closes. A marked item has a light background in its level's color and a dot with visually hidden text "Unread".
+- *Alternative:* keep the marks in the stage. What the user saw in an open popover is view state, as the flash is, so it stays in the page.
+
+**Closing on a click in a mod's frame.** Radix closes a popover or menu on a pointer-down in the app's document, which a click inside a frame never reaches. Clicking in a frame moves the focus to it, so `StageBar` listens for the window's `blur` and, when `document.activeElement` is an `iframe`, closes the open popover or menu. The click itself goes to the mod as usual.
+- *Alternative:* a transparent layer over the frame while a popover is open. It would catch the click, so the mod would not receive it.
+
+**Share.** "Copy link" writes the app's address (`origin + pathname + search`) followed by `sandbox.hash` with `navigator.clipboard.writeText`. The menu closes, and the Share button's tooltip is held open for 2 seconds with "Link copied", or "Cannot copy the link" when the write is refused. The same text is written to the bar's polite live region. This reuses the Tooltip, so no toast component is added.
 
 **Name.** The left side picks the name from `status` and `mod`:
 - `mod` known: the name and the version capsule.
@@ -129,10 +139,11 @@ Rules for the buttons:
 
 - **A mod can put an error in a bar that reads as the app's own.** → Fixed, distinct App/Mod labels the mod can't change. Plain text only. A source the mod chooses is shown only after the "Mod" label.
 - **New runtime problems can be missed behind a count.** → Unread state that lasts, a one-time flash and a polite announcement for errors.
-- **A mod sending notifications in a loop.** → At most 100 kept from the mod, a dropped-messages note, and app messages never dropped. Each notification triggers a snapshot and a re-render, which is no worse than today's unbounded issue reports. A mod that floods requests is already a cost the engine accepts for every method.
+- **A mod sending notifications in a loop.** → At most 100 kept from the mod per level, so 300 at most, a dropped-messages note, and app messages never dropped. Each notification triggers a snapshot and a re-render, which is no worse than today's unbounded issue reports. A mod that floods requests is already a cost the engine accepts for every method.
 - **Many e2e tests read "No issues." or the `Issues` list.** → Change the shared helpers in `e2e/mod_routes.ts` (`stageBar`, the issue list locator) once, to open a level's popover and read its items. Keep the accessible name "Reload tiles" so those tests keep working.
 - **The read state is lost on page reload.** → Accepted, since messages themselves are rebuilt on reload. Recorded in the proposal's out of scope.
-- **A popover rendered in a portal could end up under a mod frame.** → The portal attaches to the app's body, and frames never cover the app's layers. An e2e test opens a popover over a running mod and clicks an item.
+- **A popover rendered in a portal could end up under a mod frame.** → The portal attaches to the app's body, and frames never cover the app's layers. An e2e test opens a popover over a running mod and clicks an item, and another clicks in the frame to close it.
+- **A browser might not move the focus to a frame on a click.** → The popover would then stay open. The e2e test of the click in the frame runs in Chromium, Firefox and WebKit. If one fails, the fallback is the transparent layer over the frame, which costs the mod that click, and is decided with the user before it is built.
 
 ## Migration Plan
 

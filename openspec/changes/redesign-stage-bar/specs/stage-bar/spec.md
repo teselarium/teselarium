@@ -7,11 +7,11 @@ Shows the visible sandbox's mod and its messages in one row above the mod's fram
 ## ADDED Requirements
 
 ### Requirement: One-row stage bar
-While a sandbox is visible, the stage bar SHALL be one row above its frame. Its left side SHALL hold, in order, the mod's name, its version in a capsule, an information button and, for a sandbox opened with a collection, the "Reload tiles" button. Its right side SHALL hold, in order, the errors, warnings and notifications buttons, a separator and, when the sandbox has one, the close button. No list of messages SHALL be shown under the bar.
+While a sandbox is visible, the stage bar SHALL be one row above its frame. Its left side SHALL hold, in order, the mod's name, its version in a capsule, an information button, a Share button and, for a sandbox opened with a collection, the "Reload tiles" button. Its right side SHALL hold, in order, the errors, warnings and notifications buttons, a separator and, when the sandbox has one, the close button. No list of messages SHALL be shown under the bar.
 
 #### Scenario: Sample mod with its collection
 - **WHEN** the sample book list mod runs with the sample collection
-- **THEN** the stage bar shows, from left to right, `Book List`, `1.0.0` in a capsule, the information button, the "Reload tiles" button, the errors, warnings and notifications buttons and the close button
+- **THEN** the stage bar shows, from left to right, `Book List`, `1.0.0` in a capsule, the information button, the Share button, the "Reload tiles" button, the errors, warnings and notifications buttons and the close button
 - **AND** the stage bar is a single row
 
 #### Scenario: No collection
@@ -119,19 +119,46 @@ Pressing a message button SHALL open a popover, drawn by the app outside every m
 - **THEN** the item shows the text `<b>Saved</b>` with no bold text
 
 ### Requirement: Unread messages
-A level's capsule SHALL be filled in the level's color while that level has unread messages, and muted once all of them were read. Opening a level's popover SHALL mark every message of that level read. Messages SHALL start unread, including the ones the sandbox had when it was first shown, and each sandbox SHALL keep its own read state.
+A level's capsule SHALL be filled in the level's color while that level has unread messages, and muted once all of them were read. Opening a level's popover SHALL mark every message of that level read, and closing it SHALL mark read the messages that arrived while it was open. Messages SHALL start unread, including the ones the sandbox had when it was first shown, and each sandbox SHALL keep its own read state.
 
 #### Scenario: Read after opening
 - **WHEN** the visible sandbox has one unread warning and the user opens the warnings popover
 - **THEN** the warnings capsule becomes muted
 
 #### Scenario: New message after reading
-- **WHEN** the user opened the warnings popover and then a new warning arrives
+- **WHEN** the user opened and closed the warnings popover, and then a new warning arrives
 - **THEN** the warnings capsule is filled again
 
 #### Scenario: Read state stays with its sandbox
 - **WHEN** the user read the warnings of a first mod, opened a second mod with unread warnings, and goes back
 - **THEN** the first mod's warnings capsule is muted
+
+### Requirement: Unread items stand out
+In a message popover, each message that was unread when the popover opened, and each message that arrives while it is open, SHALL be marked with a light background in its level's color and a dot whose accessible text is "Unread", so color is not the only cue. The other items SHALL be plain. The marks SHALL stay until the popover closes.
+
+#### Scenario: Unread items stand out
+- **WHEN** the user read one warning, a second warning arrives, and the user opens the warnings popover
+- **THEN** the second warning is marked "Unread" and the first is plain
+
+#### Scenario: Items read on the last opening are plain
+- **WHEN** the user opened and closed the warnings popover and opens it again
+- **THEN** no item of the popover is marked "Unread"
+
+#### Scenario: Message arriving while the popover is open
+- **WHEN** a new warning arrives while the warnings popover is open
+- **THEN** the popover lists it marked "Unread"
+- **AND** once the popover closes, the warnings capsule is muted
+
+### Requirement: Popovers and menus close on a click outside
+An open popover or menu of the stage bar SHALL close when the user clicks outside it, including inside the visible mod's frame. A click inside the mod's frame SHALL still reach the mod.
+
+#### Scenario: Click in the mod's frame
+- **WHEN** the notifications popover is open over a running mod and the user clicks inside the mod's frame
+- **THEN** the popover closes and the mod receives the click
+
+#### Scenario: Share menu
+- **WHEN** the Share menu is open and the user clicks inside the mod's frame
+- **THEN** the menu closes and the mod receives the click
 
 ### Requirement: New messages draw attention
 When a message arrives while its sandbox is visible, its level's button SHALL flash once. With reduced motion requested by the user's system, it SHALL NOT flash, and the filled capsule alone SHALL mark it. A new error SHALL also be announced politely to assistive technologies.
@@ -160,7 +187,7 @@ Each item in the notifications popover SHALL have a dismiss button whose accessi
 - **THEN** its items have no dismiss button
 
 ### Requirement: Messages from a mod are limited
-A sandbox SHALL keep at most 100 messages from its mod. When a new one arrives past that limit, the oldest message from the mod SHALL be dropped, and the popover of its level SHALL end with a note that says how many older messages from the mod were dropped. Messages from the app SHALL never be dropped.
+A sandbox SHALL keep at most 100 messages from its mod for each level. When a new message from the mod arrives past the limit of its level, the oldest message from the mod of that level SHALL be dropped, and the popover of that level SHALL end with a note that says how many older messages from the mod were dropped. Messages from the app SHALL never be dropped.
 
 #### Scenario: Mod sends too many
 - **WHEN** a mod sends `ui.notify` 105 times with `level` `info`
@@ -170,20 +197,35 @@ A sandbox SHALL keep at most 100 messages from its mod. When a new one arrives p
 - **WHEN** a mod with a tile issue sends `ui.notify` 200 times with `level` `warning`
 - **THEN** the warnings popover still lists the tile's issue
 
+#### Scenario: Notifications drop no error or warning
+- **WHEN** a mod sends `ui.notify` once with `level` `error`, once with `level` `warning`, and then 105 times with `level` `info`
+- **THEN** the errors and warnings popovers still list the mod's error and warning, with no note about dropped messages
+
 ### Requirement: Information popover
-The information button SHALL open a popover with the mod's source, the collection's location when the sandbox was opened with one, and the sandbox's run link with a "Copy link" button. "Copy link" SHALL copy the full address of the app with the run link's hash, and SHALL say "Copied" for a moment.
+The information button SHALL open a popover with the mod's source, the collection's location when the sandbox was opened with one, and the sandbox's run link, as text the user can select. The popover SHALL have no copy button: the Share menu copies the link.
 
 #### Scenario: Sample mod with its collection
 - **WHEN** the sample book list mod runs with the sample collection and the user presses the information button
-- **THEN** the popover shows the mod file's source, the collection's location and the run link
-
-#### Scenario: Copy the link
-- **WHEN** the user presses "Copy link" in the information popover of the app at `https://example.org/`
-- **THEN** the clipboard holds `https://example.org/` followed by the sandbox's run link hash, and the button says "Copied"
+- **THEN** the popover shows the mod file's source, the collection's location and the run link, and no "Copy link" button
 
 #### Scenario: Mod that did not load
 - **WHEN** the app is opened at `#/run?mod=./samples/mods/missing` and the user presses the information button
 - **THEN** the popover shows the run link's mod reference resolved against the app's address, and the run link
+
+### Requirement: Share menu
+The Share button SHALL open a menu of the ways to share the visible sandbox, which for now has one item, "Copy link". "Copy link" SHALL copy the full address of the app with the sandbox's run link as its hash, close the menu, and show "Link copied" at the Share button for a moment, also announced to assistive technologies. When the clipboard refuses, it SHALL show "Cannot copy the link" instead.
+
+#### Scenario: Copy the link
+- **WHEN** the user opens the Share menu of the app at `https://example.org/` and chooses "Copy link"
+- **THEN** the clipboard holds `https://example.org/` followed by the sandbox's run link hash, the menu closes, and "Link copied" shows at the Share button
+
+#### Scenario: Copy refused
+- **WHEN** the user chooses "Copy link" and the clipboard refuses the text
+- **THEN** "Cannot copy the link" shows at the Share button
+
+#### Scenario: Keyboard
+- **WHEN** the user moves the focus to the Share button and presses Enter
+- **THEN** the menu opens with "Copy link" focused
 
 ### Requirement: Notification of reloaded tiles
 When "Reload tiles" loads the collection again, the sandbox SHALL get an `info` message from the app whose source is the collection's location and whose text gives the number of tiles the mod received and the number of collection issues. A reload whose collection cannot be loaded SHALL give its error and no notification.
