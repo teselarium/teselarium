@@ -174,3 +174,10 @@ The sample mod `book_list` SHALL declare `test_path: "./test.js"`. Its test file
 #### Scenario: Sample tests
 - **WHEN** the sample book list mod is checked
 - **THEN** the report's tests are `lists the sample books` and `highlights the remembered book`, both with status `"pass"`
+
+### Requirement: Notifications in a case
+A `ui.notify` sent while a case runs SHALL resolve with `null` and SHALL NOT be a finding, whatever its level; the case reads it from `requests`.
+
+#### Scenario: Expected error notification
+- **WHEN** a case mounts a mod with no tiles, and the mod sends `ui.notify` with `{ "message": "No books found", "level": "error" }`
+- **THEN** the request resolves with `null`, the report has no finding whose message includes `No books found`, and `requests` lists `ui.notify` with those params and result `null`

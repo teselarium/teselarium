@@ -8,7 +8,7 @@ The mount check SHALL record as `mount` findings:
 - blocked requests and blocked browser dialogs, as warnings;
 - each request answered with `-32600`, `-32601` or `-32602`, as an error naming the method and the error's message;
 - a `mount` that has not finished 10 seconds after the frame started, as an error that says so;
-- each `ui.notify` with level `"error"` or `"warning"`, at that level, with the notification's source and text. `ui.notify` SHALL resolve with `null`, and a notification with level `"info"` SHALL NOT be a finding.
+- each `ui.notify` with level `"error"` or `"warning"`, at that level, with its source and text.
 
 #### Scenario: Mount throws
 - **WHEN** a mod whose `mount` throws `new Error("map failed")` is checked
@@ -29,6 +29,11 @@ The mount check SHALL record as `mount` findings:
 #### Scenario: Mod notifies an error while mounting
 - **WHEN** a mod that sends `ui.notify` with `{ "message": "No books found", "level": "error" }` while mounting is checked
 - **THEN** the request resolves with `null`, and the report has status `"fail"` and a `mount` error whose source is the mod's source and whose message is `No books found`
+
+## ADDED Requirements
+
+### Requirement: Notifications while checking
+While the mount check runs, `ui.notify` SHALL resolve with `null` and SHALL NOT add a message to any stage bar. A notification with level `"info"` SHALL NOT be a finding.
 
 #### Scenario: Info notification is not a finding
 - **WHEN** a mod that sends `ui.notify` with `{ "message": "Loaded" }` while mounting is checked

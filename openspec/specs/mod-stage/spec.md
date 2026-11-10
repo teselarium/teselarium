@@ -88,31 +88,8 @@ The stage bar SHALL have a close button (×) for the visible sandbox, except for
 - **WHEN** the user opened Mods in the vanilla app
 - **THEN** the stage bar has a close button, and pressing it removes the explorer's frame and shows the Home page
 
-### Requirement: Show the mod issues
-The stage bar SHALL list every issue of the visible sandbox found while starting and running its mod, in the order they were found: mod file issues (a missing `api` range), tile collection issues, permission issues, blocked requests, mount failures and a stopped mod. Each item SHALL show the level, the source and the message. With no issues, it SHALL say so. Each sandbox SHALL keep its own issues.
-
-#### Scenario: Sample mod has no issues
-- **WHEN** the sample book list mod runs with the sample collection
-- **THEN** the stage bar says that there are no issues
-
-#### Scenario: Missing range comes first
-- **WHEN** a mod file without `api` is opened with a collection that has a tile that does not match the mod's type
-- **THEN** the issue list's first item is the warning about the missing `api` range, followed by the tile's issue
-
-#### Scenario: Foreign mod permission issue is listed
-- **WHEN** a mod from another origin that declares a `show` permission is opened
-- **THEN** the issue list has a warning whose source is the mod's source and whose message names the permission
-
-#### Scenario: Blocked request is listed while the mod runs
-- **WHEN** a running mod requests an image from an undeclared host
-- **THEN** the issue list gains a warning that names the host and `permissions.show`
-
-#### Scenario: Issues stay with their sandbox
-- **WHEN** a mod with a blocked request is hidden by opening the sample book list mod
-- **THEN** the stage bar says that there are no issues, and going back shows the blocked request again
-
 ### Requirement: Show load failures
-When the mod file, its entrypoint, its tile type file or the collection file cannot be loaded, the sandbox SHALL show an error naming the file that failed and the reason, and SHALL NOT start a mod frame. The sandbox SHALL keep its history entry and its close button.
+When the mod file, its entrypoint, its tile type file or the collection file cannot be loaded, the sandbox SHALL show an error naming the file that failed and the reason, and SHALL NOT start a mod frame. The same failure SHALL also be an error from the app in the stage bar, whose source is the address of the file that failed and whose text is the reason. The sandbox SHALL keep its history entry and its close button.
 
 #### Scenario: Missing mod file
 - **WHEN** the app is opened at `#/run?mod=./samples/mods/missing`
@@ -124,16 +101,21 @@ When the mod file, its entrypoint, its tile type file or the collection file can
 - **THEN** the stage shows an error that names the collection's resolved address
 - **AND** no mod frame is shown
 
+#### Scenario: Load failure in the errors popover
+- **WHEN** the app is opened at `#/run?mod=./samples/mods/missing` and the user opens the errors popover
+- **THEN** it lists one error labeled "App" whose source is the mod file's resolved address and whose text names `404`
+
 ### Requirement: Switched-off default mods are not opened
-When a link names a default mod that is switched off, by name or by any other reference, the sandbox SHALL show an error saying that the mod is switched off, SHALL NOT request its files and SHALL NOT start a mod frame.
+When a link names a default mod that is switched off, by name or by any other reference, the sandbox SHALL show an error saying that the mod is switched off, SHALL NOT request its files and SHALL NOT start a mod frame. The same error SHALL also be an error from the app in the stage bar, whose source is the mod reference resolved against the app's address.
 
 #### Scenario: Link to a switched-off viewer
 - **WHEN** `mod_viewer` is switched off and the app is opened at `#/run?mod=./default_mods/mod_viewer/`
 - **THEN** the stage shows an error that names `mod_viewer` and says that it is switched off
 - **AND** no file under `./default_mods/mod_viewer/` is requested
+- **AND** the stage bar shows "Mod not loaded" and its errors popover lists the same error, labeled "App"
 
 ### Requirement: Reload the tiles
-For a sandbox opened with a collection, the stage bar SHALL have a "Reload tiles" button that loads and validates the collection again and pushes the result to the running mod as a `tiles.changed` event, without restarting the mod. New collection issues SHALL replace the previous collection issues in the list. A sandbox opened without a collection SHALL have no "Reload tiles" button.
+For a sandbox opened with a collection, the stage bar SHALL have a "Reload tiles" icon button, with "Reload tiles" as its accessible name and tooltip, that loads and validates the collection again and pushes the result to the running mod as a `tiles.changed` event, without restarting the mod. New collection issues SHALL replace the previous collection issues in the sandbox's messages, and SHALL be unread. A sandbox opened without a collection SHALL have no "Reload tiles" button.
 
 #### Scenario: Reload after the collection changed
 - **WHEN** the sample mod is running with the sample collection, the collection file now lists two books, and the user presses "Reload tiles"
@@ -142,6 +124,10 @@ For a sandbox opened with a collection, the stage bar SHALL have a "Reload tiles
 #### Scenario: No collection, no reload
 - **WHEN** the sample book list mod runs without a collection
 - **THEN** the stage bar has no "Reload tiles" button
+
+#### Scenario: Reloaded issues are unread
+- **WHEN** the user read the warnings of a sandbox, the collection file now has a tile that does not match the mod's type, and the user presses "Reload tiles"
+- **THEN** the warnings popover lists the tile's issue and the warnings capsule is filled
 
 ### Requirement: Sample book list mod
 The sample mod `book_list` SHALL list the tiles it receives with each book's title, authors and cover image, and SHALL declare the sample books as its sample collection. Selecting a book SHALL highlight it and store its source in the mod's storage slot, and the selection SHALL be highlighted again when the mod is opened later.

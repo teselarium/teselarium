@@ -7,11 +7,11 @@ Gives the mod API a version of its own and lets each mod declare the range it wa
 ## Requirements
 
 ### Requirement: Mod API version
-The app SHALL have one mod API version, a semver version that covers the engine methods and events, the mount context, the mod file format and the test API. It SHALL be separate from the app's own version. The mod API version SHALL be `0.1.7`.
+The app SHALL have one mod API version, a semver version that covers the engine methods and events, the mount context, the mod file format and the test API. It SHALL be separate from the app's own version. The mod API version SHALL be `0.1.8`.
 
 #### Scenario: Version of this API
 - **WHEN** any mod is mounted
-- **THEN** the API version it receives is `0.1.7`, whatever the app's own version is
+- **THEN** the API version it receives is `0.1.8`, whatever the app's own version is
 
 #### Scenario: Mods for 0.1.0 still match
 - **WHEN** a mod with `api: "^0.1.0"` is opened
@@ -52,7 +52,7 @@ A mod whose `api` range matches the app's mod API version SHALL start with no di
 
 #### Scenario: Sample mod
 - **WHEN** the app is opened at `#/run?mod=./samples/mods/book_list`
-- **THEN** no dialog is shown, the sample book list mod runs and the stage bar says that there are no issues
+- **THEN** no dialog is shown, the sample book list mod runs, and the stage bar shows no errors and no warnings
 
 ### Requirement: Mods without a range start with a warning
 A mod without `api` SHALL start with no dialog. Its sandbox SHALL have a warning issue whose source is the mod file's source and whose message says that the mod declares no `api` range and names the app's mod API version.
