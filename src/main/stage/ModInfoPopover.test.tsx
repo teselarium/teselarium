@@ -1,6 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Mock } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import type { SandboxSnapshot } from "../../lib/core/stage/index.ts";
 import { ModInfoPopover } from "./ModInfoPopover.tsx";
 
@@ -8,20 +7,6 @@ const MOD_SOURCE = "https://example.org/mods/book_list/mod_conf.yaml";
 const COLLECTION = "https://example.org/books/collection.yaml";
 const RUN_HASH =
   "#/run?mod=./mods/book_list&collection=./books/collection.yaml";
-
-let writeText: Mock<(text: string) => Promise<void>>;
-
-beforeEach(function stubClipboard(): void {
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-  writeText = vi.fn<(text: string) => Promise<void>>();
-  writeText.mockResolvedValue(undefined);
-  vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
-});
-
-afterEach(function restore(): void {
-  vi.useRealTimers();
-  vi.unstubAllGlobals();
-});
 
 function buildSandbox(changes: Partial<SandboxSnapshot>): SandboxSnapshot {
   const sandbox: SandboxSnapshot = {
@@ -45,13 +30,6 @@ function buildSandbox(changes: Partial<SandboxSnapshot>): SandboxSnapshot {
   return sandbox;
 }
 
-async function pressCopy(): Promise<void> {
-  await act(async function clickCopy(): Promise<void> {
-    fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
-    await Promise.resolve();
-  });
-}
-
 describe("ModInfoPopover", function describeModInfoPopover(): void {
   it("Sample mod with its collection", function showsDetails(): void {
     render(<ModInfoPopover sandbox={buildSandbox({})} />);
@@ -59,6 +37,8 @@ describe("ModInfoPopover", function describeModInfoPopover(): void {
     expect(screen.getByText(MOD_SOURCE)).toBeInTheDocument();
     expect(screen.getByText(COLLECTION)).toBeInTheDocument();
     expect(screen.getByText(RUN_HASH)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByText("Copy link")).toBeNull();
   });
 
   it("shows no collection without one", function hidesCollection(): void {
@@ -83,45 +63,5 @@ describe("ModInfoPopover", function describeModInfoPopover(): void {
 
     expect(screen.getByText(reference)).toBeInTheDocument();
     expect(screen.getByText("#/run?mod=./mods/missing")).toBeInTheDocument();
-  });
-
-  it("Copy the link", async function copiesLink(): Promise<void> {
-    render(<ModInfoPopover sandbox={buildSandbox({})} />);
-
-    await pressCopy();
-
-    const { origin, pathname, search } = window.location;
-    expect(writeText).toHaveBeenCalledExactlyOnceWith(
-      `${origin}${pathname}${search}${RUN_HASH}`,
-    );
-    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
-  });
-
-  it("says Copied for 2 seconds", async function resetsLabel(): Promise<void> {
-    render(<ModInfoPopover sandbox={buildSandbox({})} />);
-    await pressCopy();
-
-    await act(async function waitAlmost(): Promise<void> {
-      await vi.advanceTimersByTimeAsync(1999);
-    });
-    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
-    await act(async function waitRest(): Promise<void> {
-      await vi.advanceTimersByTimeAsync(1);
-    });
-
-    expect(
-      screen.getByRole("button", { name: "Copy link" }),
-    ).toBeInTheDocument();
-  });
-
-  it("says Cannot copy when the clipboard refuses", async function showsFailure(): Promise<void> {
-    writeText.mockRejectedValue(new Error("Not allowed"));
-    render(<ModInfoPopover sandbox={buildSandbox({})} />);
-
-    await pressCopy();
-
-    expect(
-      screen.getByRole("button", { name: "Cannot copy" }),
-    ).toBeInTheDocument();
   });
 });

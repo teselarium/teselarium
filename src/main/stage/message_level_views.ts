@@ -17,6 +17,10 @@ export interface MessageLevelView {
   iconClassName: string;
   /** The capsule's colors while the level has unread messages. */
   unreadCapsuleClassName: string;
+  /** The light background of an item marked unread in the level's popover. */
+  unreadItemClassName: string;
+  /** The color of the dot of an item marked unread. */
+  unreadDotClassName: string;
 }
 
 /** The levels in the order of the stage bar's buttons. There is no info color in the theme, so info uses `primary`. */
@@ -28,6 +32,8 @@ export const MESSAGE_LEVEL_VIEWS: readonly MessageLevelView[] = Object.freeze([
     icon: CircleAlert,
     iconClassName: "text-destructive",
     unreadCapsuleClassName: "bg-destructive text-destructive-foreground",
+    unreadItemClassName: "bg-destructive/10",
+    unreadDotClassName: "bg-destructive",
   },
   {
     level: "warning",
@@ -36,6 +42,8 @@ export const MESSAGE_LEVEL_VIEWS: readonly MessageLevelView[] = Object.freeze([
     icon: TriangleAlert,
     iconClassName: "text-warning",
     unreadCapsuleClassName: "bg-warning text-background",
+    unreadItemClassName: "bg-warning/10",
+    unreadDotClassName: "bg-warning",
   },
   {
     level: "info",
@@ -44,6 +52,8 @@ export const MESSAGE_LEVEL_VIEWS: readonly MessageLevelView[] = Object.freeze([
     icon: Bell,
     iconClassName: "text-primary",
     unreadCapsuleClassName: "bg-primary text-primary-foreground",
+    unreadItemClassName: "bg-primary/10",
+    unreadDotClassName: "bg-primary",
   },
 ]);
 
@@ -65,6 +75,25 @@ export function listLevelMessages(
     }
   }
   return levelMessages;
+}
+
+function compareNewestFirst(
+  first: MessageSnapshot,
+  second: MessageSnapshot,
+): number {
+  return second.id - first.id;
+}
+
+/**
+ * The messages newest first, as a popover lists them. Ids grow as messages
+ * are added to the sandbox, and a reload gives its issues new ids, so the
+ * highest id is the newest message. The stage keeps the order they were found in.
+ */
+export function listNewestFirst(
+  messages: readonly MessageSnapshot[],
+): MessageSnapshot[] {
+  const newestFirst = [...messages].sort(compareNewestFirst);
+  return newestFirst;
 }
 
 export function countUnreadMessages(

@@ -35,7 +35,7 @@ export interface ArrivedMessages {
   droppedModMessages: DroppedMessageCounts;
 }
 
-/** A sandbox keeps at most this many messages from its mod. */
+/** A sandbox keeps at most this many messages from its mod for each level. */
 export const MAX_MOD_MESSAGES = 100;
 
 /** The levels in the order of the stage bar's buttons. */
@@ -143,21 +143,25 @@ export function removeNotifications(
   return keptMessages;
 }
 
-function countModMessages(messages: readonly SandboxMessage[]): number {
+function countModMessagesOfLevel(
+  messages: readonly SandboxMessage[],
+  level: MessageLevel,
+): number {
   let count = 0;
   for (const message of messages) {
-    if (message.producer === "mod") {
+    if (message.producer === "mod" && message.level === level) {
       count += 1;
     }
   }
   return count;
 }
 
-function findOldestModMessage(
+function findOldestModMessageOfLevel(
   messages: readonly SandboxMessage[],
+  level: MessageLevel,
 ): SandboxMessage | null {
   for (const message of messages) {
-    if (message.producer === "mod") {
+    if (message.producer === "mod" && message.level === level) {
       return message;
     }
   }
@@ -166,8 +170,10 @@ function findOldestModMessage(
 
 /**
  * Adds a message from the mod at the end of the arrival list. Past
- * `MAX_MOD_MESSAGES` messages from the mod, the oldest one is removed and
- * counted in its level's dropped count. Messages from the app are never removed.
+ * `MAX_MOD_MESSAGES` messages from the mod of the new message's level, the
+ * oldest one of that level is removed and counted in that level's dropped
+ * count. Messages of the other levels and messages from the app are never
+ * removed.
  */
 export function addModMessage(
   arrived: ArrivedMessages,
@@ -176,12 +182,12 @@ export function addModMessage(
   const messages = [...arrived.messages, message];
   const droppedModMessages = { ...arrived.droppedModMessages };
   const oldest =
-    countModMessages(messages) > MAX_MOD_MESSAGES
-      ? findOldestModMessage(messages)
+    countModMessagesOfLevel(messages, message.level) > MAX_MOD_MESSAGES
+      ? findOldestModMessageOfLevel(messages, message.level)
       : null;
   if (oldest !== null) {
     messages.splice(messages.indexOf(oldest), 1);
-    droppedModMessages[oldest.level] += 1;
+    droppedModMessages[message.level] += 1;
   }
   const newArrived: ArrivedMessages = { messages, droppedModMessages };
   return newArrived;

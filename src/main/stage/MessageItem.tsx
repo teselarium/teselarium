@@ -6,9 +6,14 @@ import type {
   MessageProducer,
   MessageSnapshot,
 } from "../../lib/core/stage/index.ts";
+import type { MessageLevelView } from "./message_level_views.ts";
 
 interface MessageItemProps {
+  /** The view of the message's level, for the colors of the unread mark. */
+  view: MessageLevelView;
   message: MessageSnapshot;
+  /** Marks the item unread: a light background in the level's color and a dot. */
+  isUnread: boolean;
   /** Dismisses the message. `null` for messages that cannot be dismissed. */
   onDismiss: ((messageId: number) => void) | null;
 }
@@ -34,11 +39,35 @@ function renderProducer(producer: MessageProducer): ReactElement {
 }
 
 /**
+ * The place of the unread dot, kept on every item so an item does not move
+ * when its mark comes or goes. A marked item fills it with a dot in its
+ * level's color, with "Unread" for assistive technologies, so color is not
+ * the only cue.
+ */
+function renderUnreadDot(
+  view: MessageLevelView,
+  isUnread: boolean,
+): ReactElement {
+  return (
+    <span className="flex shrink-0 pt-2" data-unread-dot="">
+      <span
+        aria-hidden="true"
+        className={`size-2 rounded-full ${isUnread ? view.unreadDotClassName : ""}`}
+      />
+      {isUnread ? <span className="sr-only">Unread</span> : null}
+    </span>
+  );
+}
+
+/**
  * One message in a popover: the producer's label, which a mod cannot change,
- * then the source and the text as plain text.
+ * then the source and the text as plain text. An item marked unread has a
+ * light background in its level's color and a dot.
  */
 export function MessageItem({
+  view,
   message,
+  isUnread,
   onDismiss,
 }: MessageItemProps): ReactElement {
   function handleDismissClick(): void {
@@ -46,7 +75,11 @@ export function MessageItem({
   }
 
   return (
-    <li className="flex items-start gap-2 py-1.5 text-sm">
+    <li
+      data-unread={isUnread ? "" : undefined}
+      className={`flex items-start gap-2 px-1.5 py-1.5 text-sm ${isUnread ? view.unreadItemClassName : ""}`}
+    >
+      {renderUnreadDot(view, isUnread)}
       <span className="shrink-0 pt-0.5">
         {renderProducer(message.producer)}
       </span>

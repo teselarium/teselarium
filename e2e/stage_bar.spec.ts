@@ -15,24 +15,30 @@ import {
   messageCapsule,
   messagePopover,
   openMessages,
+  openShareMenu,
   readMessages,
   requestFromProbe,
   routeCovers,
   serveAppOriginMod,
   serveForeignMod,
+  shareButton,
+  shareMenu,
   showImage,
   siteConsentDialog,
   stageBar,
+  unreadItems,
   waitForProbe,
 } from "./mod_routes.ts";
-import type { MessageLevelName, ProbeAnswer } from "./mod_routes.ts";
+import type { MessageLevelName, ModFiles, ProbeAnswer } from "./mod_routes.ts";
 import {
   MISSING_MOD_FILE_PATH,
   MISSING_MOD_REFERENCE,
   SAMPLE_COLLECTION_GLOB,
   SAMPLE_COLLECTION_PATH,
   SAMPLE_COLLECTION_RUN_HASH,
+  SAMPLE_BOOKS_FOLDER_PATH,
   SAMPLE_RUN_HASH,
+  SAMPLE_TYPE_PATH,
 } from "./sample_mod.ts";
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
@@ -54,6 +60,51 @@ async function openProbe(
   await serveAppOriginMod(page, buildProbeFiles("probe", extraLines));
   await page.goto(PROBE_LINK);
   const frame = await findModFrame(page, title);
+  await waitForProbe(frame);
+  return frame;
+}
+
+/** A probe whose tile type is the sample's `book`, so a collection can be opened with it. */
+function buildTypedProbeFiles(): ModFiles {
+  return buildProbeFiles("probe", [`  type_path: "../..${SAMPLE_TYPE_PATH}"`]);
+}
+
+/** A collection of the sample book Kallocain, followed by `extraPaths`, relative to `/test-mods/`. */
+function buildCollection(extraPaths: string[]): string {
+  const lines = [
+    "collection:",
+    '  name: "Probe books"',
+    "  tiles:",
+    `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/kallocain.md"`,
+  ];
+  for (const path of extraPaths) {
+    lines.push(`    - path: "${path}"`);
+  }
+  const collection = lines.join("\n");
+  return collection;
+}
+
+/** A tile without `country`, so it is not a book: a collection warning. */
+const NO_COUNTRY_TILE = [
+  "---",
+  'title: "No country"',
+  'date: "2001-01-01"',
+  "authors:",
+  '  - "Anonymous"',
+  "genres:",
+  '  - "Mystery"',
+  "---",
+  "",
+].join("\n");
+
+/**
+ * Serves `files`, which a test can change before a reload, and opens the
+ * typed probe with `collection.yaml`. Waits for its mount.
+ */
+async function openTypedProbe(page: Page, files: ModFiles): Promise<Frame> {
+  await serveAppOriginMod(page, files);
+  await page.goto(`${PROBE_LINK}&collection=./test-mods/collection.yaml`);
+  const frame = await findModFrame(page, "probe");
   await waitForProbe(frame);
   return frame;
 }
@@ -212,6 +263,119 @@ function readClipboard(): Promise<string> {
   return navigator.clipboard.readText();
 }
 
+/** Replaces `navigator.clipboard.writeText` with one that refuses every text. */
+const CLIPBOARD_REFUSER = `
+Object.defineProperty(navigator, "clipboard", {
+  configurable: true,
+  value: {
+    writeText() {
+      return Promise.reject(new DOMException("Refused", "NotAllowedError"));
+    },
+  },
+});
+`;
+
+/** Run in a mod's frame: counts the clicks its document receives in `globalThis.frameClicks`. */
+const CLICK_RECORDER = `
+globalThis.frameClicks = 0;
+document.addEventListener("click", function countClick() {
+  globalThis.frameClicks += 1;
+});
+`;
+
+/** Run in a mod's frame: counts the keys its document receives in `globalThis.frameKeys`. */
+const KEY_RECORDER = `
+globalThis.frameKeys = 0;
+document.addEventListener("keydown", function countKey() {
+  globalThis.frameKeys += 1;
+});
+`;
+
+function readFrameKeys(): number {
+  return (globalThis as { frameKeys?: number }).frameKeys ?? -1;
+}
+
+async function countFrameKeys(frame: Frame): Promise<number> {
+  return frame.evaluate(readFrameKeys);
+}
+
+function readActiveElementTag(): string {
+  return document.activeElement?.tagName ?? "";
+}
+
+/** The tag of the element that has the focus in the app's page: `IFRAME` while a frame has it. */
+async function readActiveTag(page: Page): Promise<string> {
+  return page.evaluate(readActiveElementTag);
+}
+
+function readFrameClicks(): number {
+  return (globalThis as { frameClicks?: number }).frameClicks ?? -1;
+}
+
+/** The clicks a mod's frame received since `CLICK_RECORDER` ran in it. */
+async function countFrameClicks(frame: Frame): Promise<number> {
+  return frame.evaluate(readFrameClicks);
+}
+
+/** Clicks near the bottom-left corner of a mod's frame, away from the stage bar's popovers and menus. */
+async function clickInFrame(page: Page, title: string): Promise<void> {
+  await page.evaluate(BLUR_RECORDER);
+  const frameBox = await readBox(page.locator(`iframe[title="${title}"]`));
+  await page.mouse.click(frameBox.x + 20, frameBox.y + frameBox.height - 20);
+  await page.evaluate(fireMissingBlur);
+}
+
+/** Run in the app's page: records whether the window got a blur since, in `globalThis.windowBlurred`. */
+const BLUR_RECORDER = `
+globalThis.windowBlurred = false;
+window.addEventListener("blur", function recordBlur() {
+  globalThis.windowBlurred = true;
+}, { once: true });
+`;
+
+/**
+ * Run in the app's page after a click in a frame. Playwright's Firefox moves
+ * the focus into the frame without the window's blur that Firefox fires
+ * (checked by hand in desktop Firefox), so the blur is fired here when the
+ * frame has the focus and none came. Chromium and WebKit fire their own.
+ */
+function fireMissingBlur(): void {
+  const hasBlurred = (globalThis as { windowBlurred?: boolean }).windowBlurred;
+  if (!hasBlurred && document.activeElement instanceof HTMLIFrameElement) {
+    window.dispatchEvent(new Event("blur"));
+  }
+}
+
+/** Run in the page: resolves once the element's animations, its opening zoom included, are over. */
+async function finishAnimations(element: Element): Promise<void> {
+  const endings: Promise<Animation>[] = [];
+  for (const animation of element.getAnimations({ subtree: true })) {
+    endings.push(animation.finished);
+  }
+  await Promise.all(endings);
+}
+
+/**
+ * How far an item's producer label is from the item's left edge. Every item
+ * keeps the place of the unread dot, so the offset is the same with or
+ * without the mark.
+ */
+async function readLabelOffset(item: Locator): Promise<number> {
+  const itemBox = await readBox(item);
+  const labelBox = await readBox(item.locator("[data-producer]"));
+  return labelBox.x - itemBox.x;
+}
+
+/** The texts of a popover's items marked unread. */
+async function readUnreadTexts(popover: Locator): Promise<string[]> {
+  const texts: string[] = [];
+  for (const item of await unreadItems(popover).all()) {
+    await expect(item).toContainText("Unread");
+    texts.push((await item.locator("div > span").textContent()) ?? "");
+  }
+  return texts;
+}
+
 test.describe("One-row stage bar", function describeLayout(): void {
   test("Sample mod with its collection", async function ordersItems({
     page,
@@ -225,6 +389,7 @@ test.describe("One-row stage bar", function describeLayout(): void {
       bar.getByText("Book List", { exact: true }),
       bar.getByText("1.0.0", { exact: true }),
       bar.getByRole("button", { name: "Mod information" }),
+      shareButton(page),
       bar.getByRole("button", { name: "Reload tiles" }),
       messageButton(page, "Errors"),
       messageButton(page, "Warnings"),
@@ -262,6 +427,7 @@ test.describe("One-row stage bar", function describeLayout(): void {
     }
     expect(names).toEqual([
       "Mod information",
+      "Share",
       "Errors: 0, 0 unread",
       "Warnings: 0, 0 unread",
       "Notifications: 0, 0 unread",
@@ -326,13 +492,13 @@ test.describe("Each message names its producer", function describeProducers(): v
 
     await expectMessageCount(page, "Warnings", 2);
     const warnings = await readMessages(page, "Warnings");
-    expect(warnings[0].producer).toBe("App");
-    expect(warnings[0].text).toContain('"api"');
-    expect(warnings[1]).toEqual({
+    expect(warnings[0]).toEqual({
       producer: "Mod",
       source: new URL("/test-mods/probe/mod_conf.yaml", page.url()).href,
       text: "Saved",
     });
+    expect(warnings[1].producer).toBe("App");
+    expect(warnings[1].text).toContain('"api"');
   });
 
   test("Mod titled like the app", async function keepsModLabel({
@@ -453,6 +619,129 @@ test.describe("Unread messages", function describeUnread(): void {
   });
 });
 
+test.describe("Message popovers", function describePopoverOrder(): void {
+  test("Errors popover", async function listsNewestErrorFirst({
+    page,
+  }): Promise<void> {
+    const files = buildTypedProbeFiles();
+    files["collection.yaml"] = buildCollection(["./missing.md"]);
+    const frame = await openTypedProbe(page, files);
+
+    await notify(frame, { message: "Broken", level: "error" });
+
+    await expectMessageCount(page, "Errors", 2);
+    const errors = await readMessages(page, "Errors");
+    expect(errors[0]).toMatchObject({ producer: "Mod", text: "Broken" });
+    expect(errors[1].producer).toBe("App");
+    expect(errors[1].source).toContain("/test-mods/missing.md");
+    expect(await readMessages(page, "Warnings")).toEqual([]);
+  });
+
+  test("New message on top", async function listsArrivalFirst({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
+    await notify(frame, { message: "First", level: "warning" });
+    const popover = await openMessages(page, "Warnings");
+
+    await notify(frame, { message: "Second", level: "warning" });
+
+    await expect(popover.getByRole("listitem")).toHaveCount(2);
+    await expect(popover.getByRole("listitem").first()).toContainText("Second");
+  });
+
+  test("Reloaded issue on top", async function listsReloadedIssueFirst({
+    page,
+  }): Promise<void> {
+    const files = buildTypedProbeFiles();
+    files["collection.yaml"] = buildCollection([]);
+    files["no_country.md"] = NO_COUNTRY_TILE;
+    const frame = await openTypedProbe(page, files);
+    await notify(frame, { message: "Slow", level: "warning" });
+    await expectMessageCount(page, "Warnings", 1);
+    files["collection.yaml"] = buildCollection(["./no_country.md"]);
+
+    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+
+    await expectMessageCount(page, "Warnings", 2);
+    const warnings = await readMessages(page, "Warnings");
+    expect(warnings[0].producer).toBe("App");
+    expect(warnings[0].source).toContain("/test-mods/no_country.md");
+    expect(warnings[1]).toMatchObject({ producer: "Mod", text: "Slow" });
+  });
+});
+
+test.describe("Unread items stand out", function describeUnreadItems(): void {
+  test("Unread items stand out", async function marksNewItem({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
+    await notify(frame, { message: "First", level: "warning" });
+    await expectMessages(page, "Warnings", "First");
+    await notify(frame, { message: "Second", level: "warning" });
+
+    const popover = await openMessages(page, "Warnings");
+
+    await expect(popover.getByRole("listitem")).toHaveCount(2);
+    expect(await readUnreadTexts(popover)).toEqual(["Second"]);
+    await expect(popover.getByRole("listitem").first()).toContainText("Second");
+    await expect(popover.getByRole("listitem").last()).not.toContainText(
+      "Unread",
+    );
+  });
+
+  test("Marks do not move items", async function keepsItemsInPlace({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
+    await notify(frame, { message: "First", level: "warning" });
+    await expectMessages(page, "Warnings", "First");
+    await notify(frame, { message: "Second", level: "warning" });
+
+    const popover = await openMessages(page, "Warnings");
+
+    await expect(unreadItems(popover)).toHaveCount(1);
+    await popover.evaluate(finishAnimations);
+    const items = popover.getByRole("listitem");
+    expect(await readLabelOffset(items.nth(0))).toBe(
+      await readLabelOffset(items.nth(1)),
+    );
+  });
+
+  test("Items read on the last opening are plain", async function marksNothing({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
+    await notify(frame, { message: "First", level: "warning" });
+    await expectMessages(page, "Warnings", "First");
+
+    const popover = await openMessages(page, "Warnings");
+
+    await expect(popover.getByRole("listitem")).toHaveCount(1);
+    await expect(unreadItems(popover)).toHaveCount(0);
+  });
+
+  test("Message arriving while the popover is open", async function marksArrival({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
+    await notify(frame, { message: "First", level: "warning" });
+    await expectMessages(page, "Warnings", "First");
+    const popover = await openMessages(page, "Warnings");
+
+    await notify(frame, { message: "Second", level: "warning" });
+
+    await expect(popover.getByRole("listitem")).toHaveCount(2);
+    await expect(popover.getByRole("listitem").first()).toContainText("Second");
+    expect(await readUnreadTexts(popover)).toEqual(["Second"]);
+    await closeMessages(page);
+    await expect(messageCapsule(page, "Warnings")).toHaveAttribute(
+      "data-capsule",
+      "read",
+    );
+  });
+});
+
 test.describe("New messages draw attention", function describeAttention(): void {
   test("Blocked request flashes", async function flashes({
     page,
@@ -547,10 +836,32 @@ test.describe("Messages from a mod are limited", function describeLimit(): void 
 
     await expectMessageCount(page, "Notifications", 100);
     const popover = await openMessages(page, "Notifications");
-    await expect(popover.getByRole("listitem").first()).toContainText("Note 6");
+    await expect(popover.getByRole("listitem").first()).toContainText(
+      "Note 105",
+    );
+    await expect(popover.getByRole("listitem").last()).toContainText("Note 6");
     await expect(popover.locator("p").last()).toHaveText(
       "5 older messages from the mod were dropped.",
     );
+  });
+
+  test("Notifications drop no error or warning", async function keepsIssues({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
+    await notify(frame, { message: "Broken", level: "error" });
+    await notify(frame, { message: "Slow", level: "warning" });
+
+    await notifyMany(frame, 105, "info");
+
+    await expectMessageCount(page, "Notifications", 100);
+    const errors = await openMessages(page, "Errors");
+    await expect(errors.getByRole("listitem")).toHaveText([/Broken/]);
+    await expect(errors).not.toContainText("dropped");
+    await closeMessages(page);
+    const warnings = await openMessages(page, "Warnings");
+    await expect(warnings.getByRole("listitem")).toHaveText([/Slow/]);
+    await expect(warnings).not.toContainText("dropped");
   });
 });
 
@@ -573,37 +884,9 @@ test.describe("Information popover", function describeInfo(): void {
       new URL(SAMPLE_COLLECTION_PATH, page.url()).href,
     );
     await expect(popover).toContainText(SAMPLE_COLLECTION_RUN_HASH);
-  });
-
-  test("Copy the link", async function copiesLink({
-    page,
-    context,
-    browserName,
-  }): Promise<void> {
-    const canGrantClipboard = browserName === "chromium";
-    if (canGrantClipboard) {
-      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    } else {
-      await page.addInitScript({ content: CLIPBOARD_RECORDER });
-    }
-    await routeCovers(page);
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    await stageBar(page)
-      .getByRole("button", { name: "Mod information" })
-      .click();
-    const popover = page.locator("[data-slot=popover-content]");
-
-    await popover.getByRole("button", { name: "Copy link" }).click();
-
-    await expect(popover.getByRole("button", { name: "Copied" })).toBeVisible();
-    const copied = await page.evaluate(
-      canGrantClipboard ? readClipboard : readRecordedClipboard,
-    );
-    const { origin, pathname, search } = new URL(page.url());
-    expect(copied).toBe(
-      `${origin}${pathname}${search}${new URL(page.url()).hash}`,
-    );
-    expect(copied).toContain("#/run?mod=");
+    await expect(
+      popover.getByRole("button", { name: "Copy link" }),
+    ).toHaveCount(0);
   });
 
   test("Mod that did not load", async function showsModReference({
@@ -621,6 +904,118 @@ test.describe("Information popover", function describeInfo(): void {
       new URL(MISSING_MOD_FILE_PATH, page.url()).href,
     );
     await expect(popover).toContainText(`#/run?mod=${MISSING_MOD_REFERENCE}`);
+  });
+});
+
+test.describe("Share menu", function describeShare(): void {
+  test("Copy the link", async function copiesLink({
+    page,
+    context,
+    browserName,
+  }): Promise<void> {
+    const canGrantClipboard = browserName === "chromium";
+    if (canGrantClipboard) {
+      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    } else {
+      await page.addInitScript({ content: CLIPBOARD_RECORDER });
+    }
+    await routeCovers(page);
+    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+    const menu = await openShareMenu(page);
+
+    await menu.getByRole("menuitem", { name: "Copy link" }).click();
+
+    await expect(shareMenu(page)).toHaveCount(0);
+    await expect(page.getByRole("tooltip")).toContainText("Link copied");
+    await expect(shareButton(page)).toHaveAccessibleName("Share");
+    await expect(stageBar(page).locator("[aria-live=polite]")).toContainText(
+      "Link copied",
+    );
+    const copied = await page.evaluate(
+      canGrantClipboard ? readClipboard : readRecordedClipboard,
+    );
+    const { origin, pathname, search } = new URL(page.url());
+    expect(copied).toBe(
+      `${origin}${pathname}${search}${new URL(page.url()).hash}`,
+    );
+    expect(copied).toContain("#/run?mod=");
+  });
+
+  test("Copy refused", async function showsRefusal({ page }): Promise<void> {
+    await page.addInitScript({ content: CLIPBOARD_REFUSER });
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
+    const menu = await openShareMenu(page);
+
+    await menu.getByRole("menuitem", { name: "Copy link" }).click();
+
+    await expect(page.getByRole("tooltip")).toContainText(
+      "Cannot copy the link",
+    );
+    await expect(stageBar(page).locator("[aria-live=polite]")).toContainText(
+      "Cannot copy the link",
+    );
+  });
+
+  test("Keyboard", async function opensWithKeyboard({ page }): Promise<void> {
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
+    await expect(stageBar(page)).toContainText("Book List");
+    await shareButton(page).focus();
+
+    await page.keyboard.press("Enter");
+
+    const menu = shareMenu(page);
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole("menuitem")).toHaveCount(1);
+    await expect(
+      menu.getByRole("menuitem", { name: "Copy link" }),
+    ).toBeFocused();
+  });
+});
+
+test.describe("Popovers and menus close on a click outside", function describeClickOutside(): void {
+  test("Click in the mod's frame", async function closesPopover({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
+    await frame.evaluate(CLICK_RECORDER);
+    await notify(frame, { message: "Saved" });
+    await openMessages(page, "Notifications");
+
+    await clickInFrame(page, "probe");
+
+    await expect(page.locator("[data-slot=popover-content]")).toHaveCount(0);
+    await expect.poll(countFrameClicks.bind(undefined, frame)).toBe(1);
+    await expect(messageCapsule(page, "Notifications")).toHaveAttribute(
+      "data-capsule",
+      "read",
+    );
+  });
+
+  test("The mod keeps the keyboard", async function keepsFocusInFrame({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
+    await frame.evaluate(KEY_RECORDER);
+    await notify(frame, { message: "Saved" });
+    await openMessages(page, "Notifications");
+
+    await clickInFrame(page, "probe");
+    await expect(page.locator("[data-slot=popover-content]")).toHaveCount(0);
+    await page.keyboard.press("a");
+
+    await expect.poll(readActiveTag.bind(undefined, page)).toBe("IFRAME");
+    await expect.poll(countFrameKeys.bind(undefined, frame)).toBe(1);
+  });
+
+  test("Share menu", async function closesShareMenu({ page }): Promise<void> {
+    const frame = await openProbe(page);
+    await frame.evaluate(CLICK_RECORDER);
+    await openShareMenu(page);
+
+    await clickInFrame(page, "probe");
+
+    await expect(shareMenu(page)).toHaveCount(0);
+    await expect.poll(countFrameClicks.bind(undefined, frame)).toBe(1);
   });
 });
 
@@ -668,9 +1063,9 @@ test.describe("The app's notifications", function describeAppNotifications(): vo
 
     await expectMessageCount(page, "Notifications", 2);
     const notifications = await readMessages(page, "Notifications");
-    expect(notifications[1].producer).toBe("App");
-    expect(notifications[1].text).toContain("2 tiles");
-    expect(notifications[1].text).toContain("0 collection issues");
+    expect(notifications[0].producer).toBe("App");
+    expect(notifications[0].text).toContain("2 tiles");
+    expect(notifications[0].text).toContain("0 collection issues");
     state.isMissing = true;
     await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
     await expectMessageCount(page, "Errors", 1);
@@ -731,7 +1126,7 @@ test.describe("Messages from the mod in the stage bar", function describeModMess
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expectMessageCount(page, "Notifications", 2);
     const notifications = await readMessages(page, "Notifications");
-    expect(notifications[1]).toEqual({
+    expect(notifications[0]).toEqual({
       producer: "Mod",
       source: new URL("/samples/mods/book_list/mod_conf.yaml", page.url()).href,
       text: "Saved",

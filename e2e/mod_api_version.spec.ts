@@ -315,7 +315,7 @@ test.describe("Cancelled mods do not start", function describeCancel(): void {
 });
 
 test.describe("Show the mod issues", function describeIssues(): void {
-  test("Missing range comes first", async function listsMissingRangeFirst({
+  test("Missing range found first", async function listsMissingRangeLast({
     page,
   }): Promise<void> {
     await serveAppOriginMod(page, {
@@ -329,8 +329,8 @@ test.describe("Show the mod issues", function describeIssues(): void {
 
     await expectMessageCount(page, "Warnings", 2);
     const warnings = await readMessages(page, "Warnings");
-    expect(warnings[0].source).toBe(readTestModSource(page, "bare_books"));
-    expect(warnings[0].text).toContain('"api"');
-    expect(warnings[1].source).toContain("/test-mods/no_country.md");
+    expect(warnings[0].source).toContain("/test-mods/no_country.md");
+    expect(warnings[1].source).toBe(readTestModSource(page, "bare_books"));
+    expect(warnings[1].text).toContain('"api"');
   });
 });

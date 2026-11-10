@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { RenderResult } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/vendor/shadcn/ui/tooltip.tsx";
 import {
   attachFrame,
@@ -59,13 +59,19 @@ function renderStageView(stage: Stage): RenderResult {
 const OTHER_API_HASH = `#/run?mod=${encodeURIComponent(OTHER_API_MOD_SOURCE)}`;
 
 const openPorts: MessagePort[] = [];
+const appendedFrames: HTMLIFrameElement[] = [];
 
 afterEach(function cleanUp(): void {
+  vi.unstubAllGlobals();
   testTexts.clear();
   for (const port of openPorts) {
     port.close();
   }
   openPorts.length = 0;
+  for (const frame of appendedFrames) {
+    frame.remove();
+  }
+  appendedFrames.length = 0;
 });
 
 const SAMPLE_LINK = {
@@ -350,6 +356,7 @@ describe("StageView", function describeStageView(): void {
     }
     expect(names).toEqual([
       "Mod information",
+      "Share",
       "Reload tiles",
       "Errors: 0, 0 unread",
       "Warnings: 0, 0 unread",
@@ -369,6 +376,30 @@ describe("StageView", function describeStageView(): void {
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(stageBar.querySelector("[data-slot=separator]")).not.toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("announces Link copied in the live region", async function announcesCopy(): Promise<void> {
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText: vi.fn<(text: string) => Promise<void>>() },
+    });
+    const stage = await startTestStage("");
+    renderStageView(stage);
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Share" }), {
+      key: "Enter",
+    });
+    await act(async function chooseCopy(): Promise<void> {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Copy link" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(stageBar.querySelector("[aria-live=polite]")).toHaveTextContent(
+      "Link copied",
+    );
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
   it("Mod not loaded", async function showsModNotLoaded(): Promise<void> {
@@ -448,6 +479,104 @@ describe("StageView", function describeStageView(): void {
     expect(liveRegion).toHaveTextContent("map failed");
   });
 
+  it("Unread items stand out", async function marksNewWarning(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    await reportBlockedImage(modPort, "https://first.example.net");
+    await openLevel("Warnings");
+    await closeLevel("Warnings");
+
+    await reportBlockedImage(modPort, "https://second.example.net");
+    await openLevel("Warnings");
+
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("second.example.net");
+    expect(within(items[0]).getByText("Unread")).toBeInTheDocument();
+    expect(items[1]).toHaveTextContent("first.example.net");
+    expect(within(items[1]).queryByText("Unread")).toBeNull();
+  });
+
+  it("Items read on the last opening are plain", async function marksNothingAgain(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    await reportBlockedImage(modPort, "https://first.example.net");
+    await openLevel("Warnings");
+    expect(screen.getByText("Unread")).toBeInTheDocument();
+    await closeLevel("Warnings");
+
+    await openLevel("Warnings");
+
+    expect(screen.getByRole("listitem")).toBeInTheDocument();
+    expect(screen.queryByText("Unread")).toBeNull();
+  });
+
+  it("Message arriving while the popover is open, on top", async function marksArrival(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    await reportBlockedImage(modPort, "https://first.example.net");
+    await openLevel("Warnings");
+    await closeLevel("Warnings");
+    await openLevel("Warnings");
+
+    await reportBlockedImage(modPort, "https://second.example.net");
+
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("second.example.net");
+    expect(within(items[0]).getByText("Unread")).toBeInTheDocument();
+    expect(within(items[1]).queryByText("Unread")).toBeNull();
+    expect(readCapsuleState("Warnings")).toBe("unread");
+    await closeLevel("Warnings");
+    expect(readCapsuleState("Warnings")).toBe("read");
+  });
+
+  it("closes the open popover when the focus moves into a frame", async function closesOnFrameFocus(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    await openLevel("Warnings");
+    await reportBlockedImage(modPort, "https://first.example.net");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const frame = appendFrame();
+
+    await moveFocusToFrame(frame);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(readCapsuleState("Warnings")).toBe("read");
+    expect(document.activeElement).toBe(frame);
+  });
+
+  it("closes the Share menu when the focus moves into a frame", async function closesShareOnFrameFocus(): Promise<void> {
+    const stage = await startTestStage("");
+    renderStageView(stage);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Share" }), {
+      key: "Enter",
+    });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    const frame = appendFrame();
+
+    await moveFocusToFrame(frame);
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(frame);
+  });
+
+  it("keeps the popover open when the window loses the focus elsewhere", async function staysOpenOnOtherBlur(): Promise<void> {
+    const stage = await startTestStage("");
+    renderStageView(stage);
+    await openLevel("Warnings");
+
+    await act(async function blurWindow(): Promise<void> {
+      fireEvent.blur(window);
+      await waitForMessages();
+    });
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("dismisses a notification and clears them all", async function dismisses(): Promise<void> {
     const stage = await startTestStage(
       `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
@@ -493,6 +622,49 @@ async function reportBlockedImageAndFailure(
     });
     await waitForMessages();
   });
+}
+
+/** An empty frame in the page, removed after the test, which takes the focus as a mod's frame does. */
+function appendFrame(): HTMLIFrameElement {
+  const frame = document.createElement("iframe");
+  document.body.append(frame);
+  appendedFrames.push(frame);
+  return frame;
+}
+
+/**
+ * Moves the focus to `frame` as a click in it does in Firefox: the window's
+ * blur comes first, while the focus is still in the app, and the frame gets
+ * the focus afterwards. Then waits for the stage bar's check and for Radix's
+ * focus on close.
+ */
+async function moveFocusToFrame(frame: HTMLIFrameElement): Promise<void> {
+  await act(async function focusFrame(): Promise<void> {
+    fireEvent.blur(window);
+    frame.focus();
+    await waitForMessages();
+    await waitForMessages();
+  });
+}
+
+/** Has the mod report an image blocked at `host`, a warning. */
+async function reportBlockedImage(
+  modPort: MessagePort,
+  host: string,
+): Promise<void> {
+  await act(async function reportIssue(): Promise<void> {
+    postNotification(modPort, "sandbox.blocked", {
+      blockedUrl: `${host}/a.jpg`,
+      directive: "img-src",
+    });
+    await waitForMessages();
+  });
+}
+
+/** Closes the open popover of a level by pressing its button again, and checks it closed. */
+async function closeLevel(label: string): Promise<void> {
+  await openLevel(label);
+  expect(screen.queryByRole("dialog")).toBeNull();
 }
 
 /** The stage bar's button of a level, by the start of its accessible name. */

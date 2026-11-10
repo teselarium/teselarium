@@ -38,15 +38,15 @@ Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place
 - **THEN** the stage bar shows the mod's name and version
 
 ### Requirement: Sandbox messages
-Each sandbox SHALL keep its own messages, each with a level (`error`, `warning` or `info`), a producer (the app or the mod), a source and a text. Messages SHALL be listed in the order they were found: mod file issues, collection issues, tile link issues, then the other messages as they arrive, such as permission issues, blocked requests, mount failures, a stopped mod, load failures, the app's notifications and the mod's own messages.
+Each sandbox SHALL keep its own messages, each with a level (`error`, `warning` or `info`), a producer (the app or the mod), a source and a text. Messages SHALL be kept in the order they were found: mod file issues, collection issues, tile link issues, then the other messages as they arrive, such as permission issues, blocked requests, mount failures, a stopped mod, load failures, the app's notifications and the mod's own messages.
 
 #### Scenario: Issues stay with their sandbox
 - **WHEN** a mod with a blocked request is hidden by opening the sample book list mod
 - **THEN** the stage bar shows no warnings, and going back shows the warning about the blocked request again
 
-#### Scenario: Missing range comes first
+#### Scenario: Missing range found first
 - **WHEN** a mod file without `api` is opened with a collection that has a tile that does not match the mod's type
-- **THEN** the warnings popover's first item is the warning about the missing `api` range, followed by the tile's warning
+- **THEN** the warnings popover lists the tile's warning, followed by the warning about the missing `api` range, which was found first
 
 #### Scenario: Blocked request while the mod runs
 - **WHEN** a running mod requests an image from an undeclared host
@@ -108,11 +108,19 @@ A message button whose level has no messages SHALL be dimmed, with no capsule, a
 - **THEN** the warnings button receives the focus
 
 ### Requirement: Message popovers
-Pressing a message button SHALL open a popover, drawn by the app outside every mod frame, that lists the visible sandbox's messages of that level in the order they were found. Each item SHALL show its producer, source and text, with the text as plain text.
+Pressing a message button SHALL open a popover, drawn by the app outside every mod frame, that lists the visible sandbox's messages of that level newest first, so a new message arrives at the top. A message is as new as when it was added to the sandbox: an issue that "Reload tiles" found again is new. Each item SHALL show its producer, source and text, with the text as plain text.
 
 #### Scenario: Errors popover
-- **WHEN** a mod whose collection has a tile that does not match its type, and that sends `ui.notify` with `{ "message": "Broken", "level": "error" }`, runs, and the user presses the errors button
-- **THEN** the popover lists the tile's issue and then `Broken`, and lists no warning or notification
+- **WHEN** a mod whose collection lists a tile file that answers HTTP 404, and that sends `ui.notify` with `{ "message": "Broken", "level": "error" }`, runs, and the user presses the errors button
+- **THEN** the popover lists `Broken` and then the tile's error, and lists no warning or notification
+
+#### Scenario: New message on top
+- **WHEN** the warnings popover is open and a new warning arrives
+- **THEN** the new warning is the popover's first item
+
+#### Scenario: Reloaded issue on top
+- **WHEN** a mod sent a warning, the collection file now has a tile that does not match the mod's type, and the user presses "Reload tiles"
+- **THEN** the warnings popover lists the tile's warning first, then the mod's warning
 
 #### Scenario: Plain text
 - **WHEN** a mod sends `ui.notify` with `{ "message": "<b>Saved</b>" }` and the user opens the notifications popover
@@ -134,7 +142,7 @@ A level's capsule SHALL be filled in the level's color while that level has unre
 - **THEN** the first mod's warnings capsule is muted
 
 ### Requirement: Unread items stand out
-In a message popover, each message that was unread when the popover opened, and each message that arrives while it is open, SHALL be marked with a light background in its level's color and a dot whose accessible text is "Unread", so color is not the only cue. The other items SHALL be plain. The marks SHALL stay until the popover closes.
+In a message popover, each message that was unread when the popover opened, and each message that arrives while it is open, SHALL be marked with a light background in its level's color and a dot whose accessible text is "Unread", so color is not the only cue. The other items SHALL be plain. The marks SHALL stay until the popover closes. Each item SHALL keep the place of the dot, so an item does not move when its mark comes or goes.
 
 #### Scenario: Unread items stand out
 - **WHEN** the user read one warning, a second warning arrives, and the user opens the warnings popover
@@ -149,8 +157,12 @@ In a message popover, each message that was unread when the popover opened, and 
 - **THEN** the popover lists it marked "Unread"
 - **AND** once the popover closes, the warnings capsule is muted
 
+#### Scenario: Marks do not move items
+- **WHEN** the warnings popover lists one item marked "Unread" and one plain item
+- **THEN** the producer labels of both items line up
+
 ### Requirement: Popovers and menus close on a click outside
-An open popover or menu of the stage bar SHALL close when the user clicks outside it, including inside the visible mod's frame. A click inside the mod's frame SHALL still reach the mod.
+An open popover or menu of the stage bar SHALL close when the user clicks outside it, including inside the visible mod's frame. A click inside the mod's frame SHALL still reach the mod. When it closes because of a click in the mod's frame, the focus SHALL stay in the frame.
 
 #### Scenario: Click in the mod's frame
 - **WHEN** the notifications popover is open over a running mod and the user clicks inside the mod's frame
@@ -159,6 +171,10 @@ An open popover or menu of the stage bar SHALL close when the user clicks outsid
 #### Scenario: Share menu
 - **WHEN** the Share menu is open and the user clicks inside the mod's frame
 - **THEN** the menu closes and the mod receives the click
+
+#### Scenario: The mod keeps the keyboard
+- **WHEN** the notifications popover is open over a running mod and the user clicks inside the mod's frame
+- **THEN** the popover closes and the focus stays in the mod's frame
 
 ### Requirement: New messages draw attention
 When a message arrives while its sandbox is visible, its level's button SHALL flash once. With reduced motion requested by the user's system, it SHALL NOT flash, and the filled capsule alone SHALL mark it. A new error SHALL also be announced politely to assistive technologies.

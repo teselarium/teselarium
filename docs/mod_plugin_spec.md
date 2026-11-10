@@ -150,7 +150,7 @@ export default async function mount(engine, context) {
 }
 ```
 
-`level` is `"info"` (the default), `"warning"` or `"error"`, and `source`, by default the mod's source, says what the message is about, such as a tile's `source`. The message is plain text of at most 1000 characters. It needs no permission and no dialog, and hidden mods can send it too. The app keeps the last 100 messages of each mod's sandbox and says how many older ones it dropped. A check records the mod's errors and warnings as findings, and a test case reads the request from `requests` (see [Checking a mod](#checking-a-mod) and [What a case records](#what-a-case-records)).
+`level` is `"info"` (the default), `"warning"` or `"error"`, and `source`, by default the mod's source, says what the message is about, such as a tile's `source`. The message is plain text of at most 1000 characters. It needs no permission and no dialog, and hidden mods can send it too. The app keeps the last 100 messages of each level from the mod in its sandbox and says how many older ones it dropped, so notifications never push out the mod's errors or warnings. A check records the mod's errors and warnings as findings, and a test case reads the request from `requests` (see [Checking a mod](#checking-a-mod) and [What a case records](#what-a-case-records)).
 
 ## Libraries
 

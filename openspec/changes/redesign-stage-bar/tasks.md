@@ -163,18 +163,18 @@
 
 These tasks revise parts of tasks 1.1, 6.3 and 6.4, which record what was built first.
 
-- [ ] 10.1 In `stage_messages.ts`, make `addModMessage` apply the cap of 100 to the mod's messages of each level, dropping the oldest mod message of the new message's level and counting it in that level (design.md, D3). In `stage_messages.test.ts`, add "Notifications drop no error or warning", and check that the 101st notification drops a notification and no error, warning or app message. Update the cap's text in the stage README's "Messages and load failures", the "Telling the user something" section of the engine README, and `docs/mod_plugin_spec.md`. Verify `npx vitest run src/lib/core/stage` passes.
-- [ ] 10.2 Add shadcn's DropdownMenu with `npx shadcn@4.22.1 add dropdown-menu`, review the diff, and add its row to the components table of `src/vendor/shadcn/README.md` ("stage bar"). Verify `npm run lint` passes and the file is unchanged from the CLI's output.
-- [ ] 10.3 Add `ShareMenu` in `src/main/stage/`, placed after the information button:
+- [x] 10.1 In `stage_messages.ts`, make `addModMessage` apply the cap of 100 to the mod's messages of each level, dropping the oldest mod message of the new message's level and counting it in that level (design.md, D3). In `stage_messages.test.ts`, add "Notifications drop no error or warning", and check that the 101st notification drops a notification and no error, warning or app message. Update the cap's text in the stage README's "Messages and load failures", the "Telling the user something" section of the engine README, and `docs/mod_plugin_spec.md`. Verify `npx vitest run src/lib/core/stage` passes.
+- [x] 10.2 Add shadcn's DropdownMenu with `npx shadcn@4.22.1 add dropdown-menu`, review the diff, and add its row to the components table of `src/vendor/shadcn/README.md` ("stage bar"). Verify `npm run lint` passes and the file is unchanged from the CLI's output.
+- [x] 10.3 Add `ShareMenu` in `src/main/stage/`, placed after the information button:
   - a Share button with a share icon, whose accessible name and tooltip are "Share";
   - a menu with one item, "Copy link", which writes `origin + pathname + search + hash`;
   - after choosing it, the menu closes and the button's tooltip says "Link copied" for 2 seconds, or "Cannot copy the link" when the write is refused;
   - the same text in the stage bar's polite live region.
 
   Remove "Copy link" from `ModInfoPopover`, keeping the source, collection and run link as selectable text. Cover them in `ShareMenu.test.tsx`, with a stubbed clipboard that accepts and one that refuses, and in `ModInfoPopover.test.tsx` (no "Copy link"). Update the order case in `StageView.test.tsx`. Verify `npx vitest run src/main` passes.
-- [ ] 10.4 Mark unread items, following design.md, D6, "Unread marks": `StageBar` keeps the unread ids and the highest id of the open level, `MessageItem` shows the light level-colored background and the dot with hidden "Unread", and closing the popover calls `markMessagesRead` again. Cover "Unread items stand out", "Items read on the last opening are plain" and "Message arriving while the popover is open" in `MessagePopover.test.tsx` and `StageView.test.tsx`. Verify `npx vitest run src/main` passes.
-- [ ] 10.5 Close the open popover or the Share menu when the window loses the focus to an `iframe` (design.md, D6, "Closing on a click in a mod's frame"). Add a case to `StageView.test.tsx` that focuses an `iframe` and checks the popover closed. Verify `npx vitest run src/main` passes.
-- [ ] 10.6 In `e2e/stage_bar.spec.ts` and the helpers of `e2e/mod_routes.ts`, cover:
+- [x] 10.4 Mark unread items, following design.md, D6, "Unread marks": `StageBar` keeps the unread ids and the highest id of the open level, `MessageItem` shows the light level-colored background and the dot with hidden "Unread", and closing the popover calls `markMessagesRead` again. Cover "Unread items stand out", "Items read on the last opening are plain" and "Message arriving while the popover is open" in `MessagePopover.test.tsx` and `StageView.test.tsx`. Verify `npx vitest run src/main` passes.
+- [x] 10.5 Close the open popover or the Share menu when the window loses the focus to an `iframe` (design.md, D6, "Closing on a click in a mod's frame"). Add a case to `StageView.test.tsx` that focuses an `iframe` and checks the popover closed. Verify `npx vitest run src/main` passes.
+- [x] 10.6 In `e2e/stage_bar.spec.ts` and the helpers of `e2e/mod_routes.ts`, cover:
   - the order with the Share button;
   - "Copy link" through the Share menu, replacing the information popover's copy case, and "Cannot copy the link";
   - the Share menu with the keyboard;
@@ -183,6 +183,28 @@ These tasks revise parts of tasks 1.1, 6.3 and 6.4, which record what was built 
   - "Notifications drop no error or warning".
 
   Verify `npx playwright test e2e/stage_bar.spec.ts` passes in the three browsers. If the click in the frame does not close the popover in one of them, stop and ask before building the fallback of design.md's risks.
-- [ ] 10.7 Update "The stage bar" in `docs/modules/main/README.md` (the Share menu, the unread marks, closing on a click in the frame), the stage README (marking read on close) and the shadcn README. Verify each statement matches `StageBar.tsx`, `ShareMenu.tsx` and `stage_messages.ts`.
-- [ ] 10.8 Run `npm test`, `npm run build`, `npm run lint`, `npm run format:check`, `npm run test:e2e` and `openspec validate redesign-stage-bar --strict`, and verify all pass. Repeat the check by eye of 8.2 in Chromium, Firefox and WebKit, light and dark, for the Share menu, the "Link copied" tooltip and the unread marks, and write each browser's result under this task. For a problem found, write a draft issue and give it to the user; do not open it.
-- [ ] 10.9 Change the summary of `.changeset/redesign-stage-bar.md` to: "The stage bar fits in one row, with counts for errors, warnings and notifications that open their lists, a Share menu, and mods can now send notifications." Verify the file matches the format of the other files in `.changeset/`.
+- [x] 10.7 Update "The stage bar" in `docs/modules/main/README.md` (the Share menu, the unread marks, closing on a click in the frame), the stage README (marking read on close) and the shadcn README. Verify each statement matches `StageBar.tsx`, `ShareMenu.tsx` and `stage_messages.ts`.
+- [x] 10.8 Run `npm test`, `npm run build`, `npm run lint`, `npm run format:check`, `npm run test:e2e` and `openspec validate redesign-stage-bar --strict`, and verify all pass. Repeat the check by eye of 8.2 in Chromium, Firefox and WebKit, light and dark, for the Share menu, the "Link copied" tooltip and the unread marks, and write each browser's result under this task. For a problem found, write a draft issue and give it to the user; do not open it.
+
+  Checks: `npm test` (1533 tests), `npm run build`, `npm run lint`, `npm run format:check`, `npm run test:e2e` (1259 passed, 1 skipped by the existing condition in `mod_sandbox.spec.ts`) and `openspec validate redesign-stage-bar --strict` pass.
+
+  Results, from Playwright screenshots of the built app at 1100×700, with the sample mod and its collection and the mod's engine exposed to send `ui.notify` (a warning and an error, each level opened and closed, then a second warning, a second error and a notification), in light and dark:
+
+  - Chromium: passes. The Share menu opens under the Share button with "Copy link" and its link icon. After choosing it, the menu closes and the tooltip "Link copied" shows above the button, which keeps its focus ring. In each level's popover, the second item has the dot in the level's color and a light background, and the first item is plain.
+  - Firefox: passes, the same as Chromium.
+  - WebKit: passes, the same as Chromium.
+  - Note, not a problem: the warnings' unread background (`bg-warning/10`) is faint, close to neutral in dark, while the errors' and notifications' read clearly as their colors. The dot in the warning color and the hidden "Unread" still mark the item. Compared with `bg-warning/15` in light and dark, `/10` is kept, by the user's choice.
+
+  The click in the mod's frame was also checked by hand in desktop Firefox. Firefox fires the window's `blur` while the focus is still on the body when an element of the app had the focus, so the stage bar checks the focus once the blur has finished (`frame_focus.ts`), and the popover and the Share menu close there. Playwright's Firefox fires no `blur` on such a click, so the e2e cases fire it when it is missing.
+- [x] 10.9 Change the summary of `.changeset/redesign-stage-bar.md` to: "The stage bar fits in one row, with counts for errors, warnings and notifications that open their lists, a Share menu, and mods can now send notifications." Verify the file matches the format of the other files in `.changeset/`.
+
+## 11. Newest first and follow-ups
+
+These tasks record the follow-ups found while checking 10.5 and 10.8 in the browsers, and change the popovers' order to newest first.
+
+- [x] 11.1 Keep the place of the unread dot on every item in `MessageItem`, so an item does not move when its mark comes or goes. Cover it in `MessagePopover.test.tsx` (every item has the dot's place) and in the e2e "Unread items stand out" (the producer labels have the same offset in a marked and a plain item, once the popover's animation is over).
+- [x] 11.2 Close the open popover or the Share menu once the window's blur has finished, when the focus is then on an `iframe`, and keep the focus in the frame by preventing `onCloseAutoFocus` (`frame_focus.ts`, design.md, D6). Cover it in `StageView.test.tsx` in Firefox's order (blur first, then the focus moves into the frame), checking that the focus stays in the frame. In the e2e click cases, fire the window's blur when Playwright's Firefox gives none. Checked by hand in desktop Firefox.
+- [x] 11.3 List each level's popover newest first: sort the level's messages by id, descending, in `src/main/stage/`, and leave the stage's order unchanged (design.md, D6). Update `MessagePopover.test.tsx` and `StageView.test.tsx` for the new order, and add "New message on top" and "Reloaded issue on top". Verify `npx vitest run src/main` passes.
+- [x] 11.4 In the e2e specs, update the cases that read the popovers' order: "Missing range found first", "Mod sends too many" (the first item is `Note 105`, and the note stays last), and every other check that reads a popover's items by index. Add "Errors popover" (with a tile that answers HTTP 404), "New message on top", "Reloaded issue on top", "Marks do not move items" and "The mod keeps the keyboard". Verify the changed specs pass in the three browsers.
+- [x] 11.5 Update "The stage bar" in `docs/modules/main/README.md` (newest first, the note at the end) and any statement of the popovers' order in the stage README. Verify each statement matches `StageBar.tsx`, `MessagePopover.tsx` and `message_level_views.ts`.
+- [x] 11.6 Run `npm test`, `npm run build`, `npm run lint`, `npm run format:check`, `npm run test:e2e` and `openspec validate redesign-stage-bar --strict`, and verify all pass.

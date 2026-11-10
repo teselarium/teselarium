@@ -231,7 +231,7 @@ The request stays pending while the dialog is open, for as long as the user need
 
 A problem with the params is `-32602` with a message naming `ui.notify` and the field, such as `ui.notify: "level" must be "info", "warning" or "error"`, and adds no message.
 
-No permission is needed, and hidden mods can notify too: a hidden sandbox keeps the message and shows it when it is visible again. Each request is a new message, even with the same text, so a mod that repeats itself should say so once. A sandbox keeps at most 100 messages from its mod: past that, the oldest one is dropped, and its level's list ends with how many were dropped. The app's own messages are never dropped.
+No permission is needed, and hidden mods can notify too: a hidden sandbox keeps the message and shows it when it is visible again. Each request is a new message, even with the same text, so a mod that repeats itself should say so once. A sandbox keeps at most 100 messages from its mod for each level: past that, the oldest one of that level is dropped, and that level's list ends with how many were dropped. Notifications never push out the mod's errors or warnings. The app's own messages are never dropped.
 
 Each message in the stage bar is labeled "App" or "Mod", and the mod cannot change the label: its title, `source` and `message` are shown after it. So a mod's error never reads as the app's own.
 

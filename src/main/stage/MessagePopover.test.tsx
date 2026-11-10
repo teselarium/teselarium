@@ -8,6 +8,8 @@ import type {
 import { MESSAGE_LEVEL_VIEWS } from "./message_level_views.ts";
 import type { MessageLevelView } from "./message_level_views.ts";
 import { MessagePopover } from "./MessagePopover.tsx";
+import { recordUnreadMarks } from "./unread_marks.ts";
+import type { UnreadMarks } from "./unread_marks.ts";
 
 const MOD_SOURCE = "https://example.org/mods/book_list/mod_conf.yaml";
 
@@ -46,6 +48,7 @@ function renderPopover(
   level: MessageLevel,
   messages: MessageSnapshot[],
   droppedCount: number = 0,
+  unreadMarks: UnreadMarks | null = null,
 ): RenderedPopover {
   const onDismiss = vi.fn<(messageId: number) => void>();
   const onClearAll = vi.fn<() => void>();
@@ -54,6 +57,7 @@ function renderPopover(
       view={findView(level)}
       messages={messages}
       droppedCount={droppedCount}
+      unreadMarks={unreadMarks}
       onDismiss={onDismiss}
       onClearAll={onClearAll}
     />,
@@ -74,6 +78,7 @@ describe("MessagePopover", function describeMessagePopover(): void {
           view={findView(level)}
           messages={[]}
           droppedCount={0}
+          unreadMarks={null}
           onDismiss={vi.fn<(messageId: number) => void>()}
           onClearAll={vi.fn<() => void>()}
         />,
@@ -85,7 +90,7 @@ describe("MessagePopover", function describeMessagePopover(): void {
     }
   });
 
-  it("lists the messages in order with producer, source and text", function listsMessages(): void {
+  it("lists the messages newest first with producer, source and text", function listsMessages(): void {
     renderPopover("error", [
       buildMessage(1, "error", "app", "Tile is not of tile type book"),
       buildMessage(2, "error", "mod", "Broken"),
@@ -95,11 +100,23 @@ describe("MessagePopover", function describeMessagePopover(): void {
       screen.getByRole("list", { name: "Errors" }),
     ).getAllByRole("listitem");
     expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent("App");
-    expect(items[0]).toHaveTextContent(MOD_SOURCE);
+    expect(items[0]).toHaveTextContent("Mod");
+    expect(items[0]).toHaveTextContent("Broken");
+    expect(items[1]).toHaveTextContent("App");
+    expect(items[1]).toHaveTextContent(MOD_SOURCE);
+    expect(items[1]).toHaveTextContent("Tile is not of tile type book");
+  });
+
+  it("Reloaded issue on top", function listsReloadedIssueFirst(): void {
+    // A reload gives the tile's issue a new id, higher than the mod's warning, though it comes first in the stage's order.
+    renderPopover("warning", [
+      buildMessage(5, "warning", "app", "Tile is not of tile type book"),
+      buildMessage(3, "warning", "mod", "Slow"),
+    ]);
+
+    const items = screen.getAllByRole("listitem");
     expect(items[0]).toHaveTextContent("Tile is not of tile type book");
-    expect(items[1]).toHaveTextContent("Mod");
-    expect(items[1]).toHaveTextContent("Broken");
+    expect(items[1]).toHaveTextContent("Slow");
   });
 
   it("labels the producers with badges that look different", function labelsProducers(): void {
@@ -192,5 +209,54 @@ describe("MessagePopover", function describeMessagePopover(): void {
     expect(
       screen.getByText("1 older message from the mod was dropped."),
     ).toBeInTheDocument();
+  });
+
+  it("Unread items stand out", function marksUnread(): void {
+    const readWarning = {
+      ...buildMessage(1, "warning", "app", "First"),
+      isRead: true,
+    };
+    const unreadWarning = buildMessage(2, "warning", "app", "Second");
+    const messages = [readWarning, unreadWarning];
+    renderPopover("warning", messages, 0, recordUnreadMarks(messages));
+
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveAttribute("data-unread");
+    expect(items[0]).toHaveTextContent("Second");
+    expect(items[0]).toHaveClass("bg-warning/10");
+    expect(within(items[0]).getByText("Unread")).toHaveClass("sr-only");
+    expect(items[1]).not.toHaveAttribute("data-unread");
+    expect(within(items[1]).queryByText("Unread")).toBeNull();
+    for (const item of items) {
+      expect(item.querySelector("[data-unread-dot]")).not.toBeNull();
+    }
+  });
+
+  it("Items read on the last opening are plain", function marksNothing(): void {
+    const messages = [
+      { ...buildMessage(1, "warning", "app", "First"), isRead: true },
+      { ...buildMessage(2, "warning", "app", "Second"), isRead: true },
+    ];
+    renderPopover("warning", messages, 0, recordUnreadMarks(messages));
+
+    expect(screen.queryByText("Unread")).toBeNull();
+  });
+
+  it("Message arriving while the popover is open", function marksArrival(): void {
+    const first = {
+      ...buildMessage(1, "warning", "app", "First"),
+      isRead: true,
+    };
+    const marks = recordUnreadMarks([first]);
+    const arrived = {
+      ...buildMessage(2, "warning", "app", "Second"),
+      isRead: true,
+    };
+    renderPopover("warning", [first, arrived], 0, marks);
+
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Second");
+    expect(within(items[0]).getByText("Unread")).toBeInTheDocument();
+    expect(items[1]).not.toHaveAttribute("data-unread");
   });
 });

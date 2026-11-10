@@ -216,20 +216,82 @@ describe("addModMessage", function describeAddModMessage(): void {
     });
   });
 
-  it("counts a dropped message at its own level", function countsDroppedLevel(): void {
-    const firstWarning = addModMessage(
+  it("Notifications drop no error or warning", function keepsOtherLevels(): void {
+    const withError = addModMessage(
+      {
+        messages: [buildTileIssue(1)],
+        droppedModMessages: buildNoDroppedMessages(),
+      },
+      buildSandboxMessage(2, buildModContent("error", "Broken")),
+    );
+    const withWarning = addModMessage(
+      withError,
+      buildSandboxMessage(3, buildModContent("warning", "Slow")),
+    );
+
+    const newArrived = addModNotifications(withWarning, 4, 105);
+
+    const texts = readTexts(newArrived.messages);
+    expect(texts).toContain("Tile is not of tile type book");
+    expect(texts).toContain("Broken");
+    expect(texts).toContain("Slow");
+    expect(texts).not.toContain("Note 5");
+    expect(texts).toContain("Note 6");
+    expect(newArrived.messages).toHaveLength(3 + MAX_MOD_MESSAGES);
+    expect(newArrived.droppedModMessages).toEqual({
+      error: 0,
+      warning: 0,
+      info: 5,
+    });
+  });
+
+  it("the 101st notification drops a notification and no error, warning or app message", function dropsNotificationOnly(): void {
+    const withError = addModMessage(
+      {
+        messages: [buildTileIssue(1)],
+        droppedModMessages: buildNoDroppedMessages(),
+      },
+      buildSandboxMessage(2, buildModContent("error", "Broken")),
+    );
+    const withWarning = addModMessage(
+      withError,
+      buildSandboxMessage(3, buildModContent("warning", "Slow")),
+    );
+
+    const newArrived = addModNotifications(
+      withWarning,
+      4,
+      MAX_MOD_MESSAGES + 1,
+    );
+
+    expect(readTexts(newArrived.messages).slice(0, 4)).toEqual([
+      "Tile is not of tile type book",
+      "Broken",
+      "Slow",
+      "Note 2",
+    ]);
+    expect(newArrived.droppedModMessages).toEqual({
+      error: 0,
+      warning: 0,
+      info: 1,
+    });
+  });
+
+  it("caps each level on its own", function capsEachLevel(): void {
+    const withWarnings = addModMessage(
       { messages: [], droppedModMessages: buildNoDroppedMessages() },
       buildSandboxMessage(1, buildModContent("warning", "Slow")),
     );
+    const withNotes = addModNotifications(withWarnings, 2, MAX_MOD_MESSAGES);
 
-    const newArrived = addModNotifications(firstWarning, 2, MAX_MOD_MESSAGES);
+    const newArrived = addModMessage(
+      withNotes,
+      buildSandboxMessage(200, buildModContent("warning", "Slower")),
+    );
 
-    expect(readTexts(newArrived.messages)).not.toContain("Slow");
-    expect(newArrived.droppedModMessages).toEqual({
-      error: 0,
-      warning: 1,
-      info: 0,
-    });
+    expect(readTexts(newArrived.messages)).toContain("Slow");
+    expect(newArrived.messages).toHaveLength(MAX_MOD_MESSAGES + 2);
+    expect(newArrived.droppedModMessages).toEqual(buildNoDroppedMessages());
   });
 
   it("Mod sends too many", function dropsFive(): void {

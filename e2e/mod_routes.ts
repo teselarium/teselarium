@@ -450,6 +450,29 @@ export async function expectModInfo(
   await closeMessages(page);
 }
 
+/** The stage bar's Share button. */
+export function shareButton(page: Page): Locator {
+  return stageBar(page).getByRole("button", { name: "Share" });
+}
+
+/** The Share menu, while it is open. */
+export function shareMenu(page: Page): Locator {
+  return page.getByRole("menu");
+}
+
+/** Opens the Share menu with a click and returns it. */
+export async function openShareMenu(page: Page): Promise<Locator> {
+  await shareButton(page).click();
+  const menu = shareMenu(page);
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+/** The items of an open popover marked unread, each with a dot whose accessible text is "Unread". */
+export function unreadItems(popover: Locator): Locator {
+  return popover.locator("li[data-unread]");
+}
+
 async function readMessage(item: Locator): Promise<StageMessage> {
   const message: StageMessage = {
     producer: (await item.locator("[data-producer]").textContent()) ?? "",
