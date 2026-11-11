@@ -1121,6 +1121,36 @@ export interface CheckTestResult {
   message: string | null;
 }
 
+/** The cases of the sample mod's test file, in the order it registers them. */
+export const SAMPLE_CASE_NAMES = [
+  "lists the sample books",
+  "shows a placeholder without an image",
+  "shows placeholders when covers are off",
+  "names each book by title and authors",
+  "uses the config's books per row",
+  "ignores an unknown books per row",
+  "remembers the books per row",
+  "ignores an unknown stored books per row",
+  "has no select without books",
+  "opens the card of a clicked book",
+  "leaves out missing metadata",
+  "shows no small book without a cover",
+  "highlights the remembered book",
+  "marks no book for an unknown remembered source",
+  "does not reopen the remembered book's card",
+];
+
+function buildPassedResults(names: string[]): CheckTestResult[] {
+  const results: CheckTestResult[] = [];
+  for (const name of names) {
+    results.push({ name, status: "pass", message: null });
+  }
+  return results;
+}
+
+/** The report's `tests` when every case of the sample mod passes. */
+export const SAMPLE_TEST_RESULTS = buildPassedResults(SAMPLE_CASE_NAMES);
+
 export interface CheckReport {
   source: string;
   status: string;
@@ -1359,21 +1389,35 @@ export const SAMPLE_CONTEXT_TEST_CODE = buildTestCode(
     "async function highlightsTheRememberedBook(context) {",
     '  await context.storage.set("selected", context.tiles[1].source);',
     "  await context.mount();",
-    "  const pressed = context.root.querySelector('button[aria-pressed=\"true\"]');",
-    '  context.expect(pressed.textContent).toContain("Kallocain");',
+    "  const current = context.root.querySelector('button[aria-current=\"true\"]');",
+    '  context.expect(current.getAttribute("aria-label")).toContain("Kallocain");',
     "}",
     "",
-    "function hasTwoSettledRequests(context) {",
-    "  const requests = context.requests;",
-    '  return requests.length === 2 && Object.hasOwn(requests[1], "result");',
+    "function listStorageRequests(context) {",
+    "  const storageRequests = [];",
+    "  for (const request of context.requests) {",
+    '    if (request.method.startsWith("storage.")) {',
+    "      storageRequests.push(request);",
+    "    }",
+    "  }",
+    "  return storageRequests;",
+    "}",
+    "",
+    "function hasSettledSelection(context) {",
+    "  const storageRequests = listStorageRequests(context);",
+    "  return (",
+    "    storageRequests.length === 3 &&",
+    '    Object.hasOwn(storageRequests[2], "result")',
+    "  );",
     "}",
     "",
     "async function recordsTheRequests(context) {",
     "  await context.mount();",
-    '  context.root.querySelector("button").click();',
-    "  await context.waitFor(hasTwoSettledRequests.bind(undefined, context));",
-    "  context.expect(context.requests).toEqual([",
+    '  context.root.querySelector("li > button").click();',
+    "  await context.waitFor(hasSettledSelection.bind(undefined, context));",
+    "  context.expect(listStorageRequests(context)).toEqual([",
     '    { method: "storage.get", params: { key: "selected" }, result: null },',
+    '    { method: "storage.get", params: { key: "columns" }, result: null },',
     "    {",
     '      method: "storage.set",',
     '      params: { key: "selected", value: context.tiles[0].source },',

@@ -26,6 +26,7 @@ import {
   readTestFileSource,
   requestFromProbe,
   SAMPLE_CONTEXT_TEST_CODE,
+  SAMPLE_TEST_RESULTS,
   SYNTAX_ERROR_TEST_CODE,
   UNDECLARED_IMAGE_HOST,
   waitForProbe,
@@ -126,11 +127,6 @@ function buildPlayerAnswerFiles(): ModFiles {
   };
   return files;
 }
-
-const SAMPLE_TEST_RESULTS: CheckTestResult[] = [
-  { name: "lists the sample books", status: "pass", message: null },
-  { name: "highlights the remembered book", status: "pass", message: null },
-];
 
 test.describe("Tests run in the check", function describeTestsInCheck(): void {
   test("Sample mod tests pass", async function passesSampleTests({

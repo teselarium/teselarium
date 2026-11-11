@@ -19,6 +19,7 @@ import {
   chooseTheme,
   DARK_COLORS,
   hasThemeEvents,
+  hasVisibleFocus,
   LIGHT_COLORS,
   readAttributeAtMount,
   readBodyColors,
@@ -27,6 +28,7 @@ import {
   readElementColors,
   readElementLook,
   readOutlineColor,
+  readOutlineStyle,
   readPaintLog,
   readRootTokenValue,
   readThemeEvents,
@@ -115,6 +117,49 @@ test.describe("Base stylesheet by default", function describeBaseStylesheet(): v
 
     expect(
       await frame.evaluate(readOutlineColor, 'button[aria-pressed="true"]'),
+    ).toBe(LIGHT_COLORS.primary.computed);
+  });
+
+  test("Current item", async function outlinesCurrentItems({
+    page,
+  }): Promise<void> {
+    const frame = await openThemeProbe(page, "light");
+
+    await frame.evaluate(
+      addModHtml,
+      '<button type="button" aria-current="true">Current</button>' +
+        '<a href="#here" aria-current="page">Here</a>' +
+        '<button type="button" aria-current="false">Not current</button>',
+    );
+
+    expect(
+      await frame.evaluate(readOutlineColor, 'button[aria-current="true"]'),
+    ).toBe(LIGHT_COLORS.primary.computed);
+    expect(
+      await frame.evaluate(readOutlineColor, 'a[aria-current="page"]'),
+    ).toBe(LIGHT_COLORS.primary.computed);
+    expect(
+      await frame.evaluate(readOutlineStyle, 'button[aria-current="false"]'),
+    ).toBe("none");
+  });
+
+  test("Current item keeps its outline when focused", async function outlinesFocusedCurrentItem({
+    page,
+  }): Promise<void> {
+    const frame = await openThemeProbe(page, "light");
+    await frame.evaluate(
+      addModHtml,
+      '<button type="button">Before</button>' +
+        '<button type="button" aria-current="true">Current</button>',
+    );
+    await frame.getByRole("button", { name: "Before" }).focus();
+
+    await page.keyboard.press("Tab");
+
+    await expect(frame.getByRole("button", { name: "Current" })).toBeFocused();
+    expect(await frame.evaluate(hasVisibleFocus)).toBe(true);
+    expect(
+      await frame.evaluate(readOutlineColor, 'button[aria-current="true"]'),
     ).toBe(LIGHT_COLORS.primary.computed);
   });
 
@@ -350,10 +395,14 @@ test.describe("Sample and default mods follow the theme", function describeShipp
     const kallocain = frame.getByRole("button", { name: /Kallocain/ });
 
     await kallocain.click();
+    await frame
+      .getByRole("dialog", { name: "Kallocain" })
+      .getByRole("button", { name: "Close" })
+      .click();
 
-    await expect(kallocain).toHaveAttribute("aria-pressed", "true");
+    await expect(kallocain).toHaveAttribute("aria-current", "true");
     expect(
-      await frame.evaluate(readOutlineColor, 'button[aria-pressed="true"]'),
+      await frame.evaluate(readOutlineColor, 'button[aria-current="true"]'),
     ).toBe(LIGHT_COLORS.primary.computed);
   });
 

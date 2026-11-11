@@ -73,7 +73,7 @@ describe("shipped sample mod", function describeShippedSampleMod(): void {
       fetch: fetchAppFile,
     });
 
-    expect(sampleMod.api).toBe("^0.1.0");
+    expect(sampleMod.api).toBe("^0.1.5");
   });
 
   it("declares its test file", async function declaresTestFile(): Promise<void> {

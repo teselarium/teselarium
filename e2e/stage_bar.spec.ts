@@ -387,7 +387,7 @@ test.describe("One-row stage bar", function describeLayout(): void {
 
     const items = [
       bar.getByText("Book List", { exact: true }),
-      bar.getByText("1.0.0", { exact: true }),
+      bar.getByText("1.1.0", { exact: true }),
       bar.getByRole("button", { name: "Mod information" }),
       shareButton(page),
       bar.getByRole("button", { name: "Reload tiles" }),
@@ -458,7 +458,7 @@ test.describe("Name while loading or after a failure", function describeName(): 
     await page.goto(`/#/run?mod=${MISSING_MOD_REFERENCE}`);
 
     await expect(stageBar(page)).toContainText("Mod not loaded");
-    await expect(stageBar(page)).not.toContainText("1.0.0");
+    await expect(stageBar(page)).not.toContainText("1.1.0");
   });
 
   test("Missing collection", async function keepsModName({
@@ -469,7 +469,7 @@ test.describe("Name while loading or after a failure", function describeName(): 
 
     await expect(page.getByRole("alert")).toContainText("404");
     await expect(stageBar(page)).toContainText("Book List");
-    await expect(stageBar(page)).toContainText("1.0.0");
+    await expect(stageBar(page)).toContainText("1.1.0");
   });
 });
 

@@ -319,47 +319,84 @@ A short version of the sample mod (`public/samples/mods/book_list/main.js`):
 
 ```js
 const SELECTED_KEY = "selected";
+const COLUMNS_KEY = "columns";
 
 function renderBookList(view) {
-  // Builds a heading from view.title and one button per tile, with the
-  // cover when view.config.show_covers is true, and aria-pressed="true"
-  // on the selected book.
+  // Replaces the children of view.main only: a header with a heading from
+  // view.title and the "Books per row" select, then one button per tile,
+  // with the cover when view.config.show_covers is true, and
+  // aria-current="true" on the last opened book.
 }
 
-function addBookListStyle() {
-  // Adds a <style> element: inline styles are allowed by the policy.
+function fillBookCard(view, tile) {
+  // Fills view.card, the <dialog>, with the book's details, then an
+  // <ot-tile-body> whose tile is the book's tile.
 }
 
-async function selectBook(view, source) {
+async function openBookCard(view, source) {
+  const tile = findTile(view, source);
+  if (tile === null || view.card.open) {
+    return;
+  }
+  fillBookCard(view, tile);
+  view.card.showModal();
+  view.openSource = source;
   view.selected = source;
-  renderBookList(view);
   await view.engine.request("storage.set", {
     key: SELECTED_KEY,
     value: source,
   });
 }
 
+function showClosedCard(view) {
+  // On the dialog's close event: re-renders view.main, so aria-current
+  // moves to the opened book, and focuses that book's button.
+}
+
+// Sets the list's data-columns without drawing the list again, then stores it.
+async function chooseBooksPerRow(view, event) {
+  view.booksPerRow = readBooksPerRow(Number(event.currentTarget.value));
+  const bookList = view.main.querySelector("ul");
+  bookList.dataset.columns = String(view.booksPerRow);
+  await view.engine.request("storage.set", {
+    key: COLUMNS_KEY,
+    value: view.booksPerRow,
+  });
+}
+
 function showChangedTiles(view, params) {
   view.tiles = params.tiles;
   renderBookList(view);
+  // An open card is rebuilt from its book's new tile, or closed when the
+  // book is gone.
+  updateOpenCard(view);
 }
 
 export default async function mount(engine, context) {
   const view = {
     engine,
-    root: document.body,
+    main: document.createElement("main"),
+    card: null,
     title: context.mod.title,
     config: context.config,
     tiles: context.tiles,
     selected: null,
+    booksPerRow: DEFAULT_BOOKS_PER_ROW,
+    openSource: null,
   };
+  view.card = buildBookCard(view);
   engine.on("tiles.changed", showChangedTiles.bind(undefined, view));
   addBookListStyle();
+  document.body.replaceChildren(view.main, view.card);
   const selected = await engine.request("storage.get", { key: SELECTED_KEY });
   view.selected = typeof selected === "string" ? selected : null;
+  const columns = await engine.request("storage.get", { key: COLUMNS_KEY });
+  view.booksPerRow = readStartBooksPerRow(columns, context.config.columns);
   renderBookList(view);
 }
 ```
+
+The page has two parts: `<main>`, which is drawn again when the tiles change or the card closes, and one `<dialog>`, the book's card, which is built once, so a `tiles.changed` never destroys an open card. The body in the card is an `<ot-tile-body>` (see [Tile bodies](#tile-bodies)), so its links and players work with no code in the mod. The storage keeps the last opened book under `selected` and the books per row under `columns`.
 
 The mod registers its event handlers before its first `await`, so it misses no event, and keeps its state in its own frame's memory: back and forward show the frame as it was left.
 

@@ -105,13 +105,15 @@ At mount, the mod builds `<body>` once with two parts:
 
 `openBookCard(view, source)` does the following:
 1. Finds the tile.
-2. Fills the dialog with a `<header>`: a small book (the same cover or placeholder markup, at a fixed width of about 6rem), a `<div>` with the `<h2 id="book-card-title">`, a `<p><small>` with the authors, a `<dl>`, and a `<p>` of genre badges.
+2. Fills the dialog with a `<header>`: a small book (the cover `<img>`, at a fixed width of about 6rem) when the book has a cover, a `<div>` with the `<h2 id="book-card-title">`, a `<p><small>` with the authors, a `<dl>`, and a `<p>` of genre badges.
 3. Adds an `<hr>`, then an `<ot-tile-body>` whose `tile` is set to the tile.
 4. Calls `showModal()`, sets `view.openSource`, and stores `selected` as today.
 
 The `<dl>` holds date, country, language and pages. It uses labels "Published", "Country", "Language" and "Pages", and leaves out each key that is missing or not a string or number. The dialog has `aria-labelledby="book-card-title"`. A ghost close button sits at the top of the dialog (`<button type="button" data-ot-variant="ghost" aria-label="Close">×</button>`).
 
 When the body is empty, no `<hr>` is added and `<ot-tile-body>` renders nothing.
+
+When the book has no cover (no string `image`, `show_covers` not `true`, or a card cover that fails to load), the card leaves out the small book, and a card cover that fails to load is removed. The `<h2>` already shows the title, and a placeholder there would have no surface: in the grid the placeholder sits on the book `<button>`, but the theme gives the card's `<div>` no background and no border.
 
 On `tiles.changed`:
 - If `openSource` is among the new tiles, the card is rebuilt from the new tile.
@@ -127,6 +129,7 @@ The dialog closes in three ways:
 - **Escape**: the native `cancel` behavior of a modal dialog.
 - **The close button**: calls `card.close()`.
 - **A backdrop click**: a `click` listener on the dialog compares the click's coordinates with `card.getBoundingClientRect()`, and closes the card when the click is outside the rectangle. A click on the backdrop targets the `<dialog>` element itself, but so does a click on the dialog's padding, so the target alone cannot tell them apart.
+  - The grid behind a modal card is inert, so a click where another book is shown lands on the backdrop: it closes the card and opens no other.
   - *Alternative:* the `closedby="any"` attribute. It is not supported by every browser the app targets yet.
 
 A `close` listener does the following:

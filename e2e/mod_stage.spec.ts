@@ -81,7 +81,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
     await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
 
     await expect(stageBar(page)).toContainText("Book List");
-    await expect(stageBar(page)).toContainText("1.0.0");
+    await expect(stageBar(page)).toContainText("1.1.0");
     await expectSampleBooks(page, "sandbox-1");
   });
 
@@ -665,7 +665,11 @@ test.describe("Sample book list mod", function describeSampleMod(): void {
     const frameLocator = page.frameLocator('iframe[title="Book List"]');
     const kallocain = frameLocator.getByRole("button", { name: /Kallocain/ });
     await kallocain.click();
-    await expect(kallocain).toHaveAttribute("aria-pressed", "true");
+    await frameLocator
+      .getByRole("dialog", { name: "Kallocain" })
+      .getByRole("button", { name: "Close" })
+      .click();
+    await expect(kallocain).toHaveAttribute("aria-current", "true");
 
     await page.reload();
 
@@ -673,11 +677,11 @@ test.describe("Sample book list mod", function describeSampleMod(): void {
       page
         .frameLocator('iframe[title="Book List"]')
         .getByRole("button", { name: /Kallocain/ }),
-    ).toHaveAttribute("aria-pressed", "true");
+    ).toHaveAttribute("aria-current", "true");
     await expect(
       page
         .frameLocator('iframe[title="Book List"]')
         .getByRole("button", { name: /Fahrenheit 451/ }),
-    ).toHaveAttribute("aria-pressed", "false");
+    ).not.toHaveAttribute("aria-current");
   });
 });

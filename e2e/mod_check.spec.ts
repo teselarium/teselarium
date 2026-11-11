@@ -21,6 +21,7 @@ import {
   readReportedValue,
   readTestModSource,
   routeCovers,
+  SAMPLE_TEST_RESULTS,
   serveAppOriginMod,
   serveSelectionReportingSample,
   UNDECLARED_IMAGE_HOST,
@@ -47,14 +48,7 @@ test.describe("Check a mod", function describeCheckMod(): void {
       status: "pass",
       mountChecked: true,
       testsChecked: true,
-      tests: [
-        { name: "lists the sample books", status: "pass", message: null },
-        {
-          name: "highlights the remembered book",
-          status: "pass",
-          message: null,
-        },
-      ],
+      tests: SAMPLE_TEST_RESULTS,
       findings: [],
     });
   });
@@ -235,7 +229,12 @@ test.describe("Throwaway storage slot", function describeThrowawaySlot(): void {
       .frameLocator('iframe[title="Book List"]')
       .getByRole("button", { name: /Kallocain/ });
     await kallocain.click();
-    await expect(kallocain).toHaveAttribute("aria-pressed", "true");
+    await page
+      .frameLocator('iframe[title="Book List"]')
+      .getByRole("dialog", { name: "Kallocain" })
+      .getByRole("button", { name: "Close" })
+      .click();
+    await expect(kallocain).toHaveAttribute("aria-current", "true");
     const seenUrls = await serveAppOriginMod(page, buildCheckerFiles());
     await serveSelectionReportingSample(page);
     await page.goto(`/${CHECKER_HASH}`);
@@ -253,7 +252,7 @@ test.describe("Throwaway storage slot", function describeThrowawaySlot(): void {
       page
         .frameLocator('iframe[title="Book List"]')
         .getByRole("button", { name: /Kallocain/ }),
-    ).toHaveAttribute("aria-pressed", "true");
+    ).toHaveAttribute("aria-current", "true");
   });
 });
 

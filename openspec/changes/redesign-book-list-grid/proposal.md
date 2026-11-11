@@ -9,7 +9,7 @@ The sample book list mod shows each book as a full-width row with a 48×72 thumb
 - **A grid of books**: each book is a book-shaped button showing its cover. Covers fill their column with a 2:3 ratio, so every book in the grid has the same size. The left corners are square and the right corners are rounded with the theme's radius. The title and the authors show as text under each cover, the title cut at two lines; the authors are left out at 8 and 10 books per row.
 - **Books per row**: a "Books per row" select next to the heading offers 4, 6, 8 and 10, 6 by default. The mod remembers the choice. A new `columns` config key sets the default; a value outside those four is ignored. A cover is never narrower than about 4.5rem: in a narrow frame the grid shows fewer books per row than chosen.
 - **A placeholder book**: a book without an `image`, a cover that fails to load, and every book when `show_covers` is `false`, show the book shape with the title written on it.
-- **A card for each book**: clicking a book opens a modal `<dialog>` with the book's metadata at the top (a small cover, the title, the authors, the date, country, language and pages, and the genres as badges) and the body below, rendered with `<ot-tile-body>`. Escape, a close button and a click on the backdrop close it, and focus goes back to the book. The card stays open when the books per row or the tiles change, and closes when its book is no longer among the tiles.
+- **A card for each book**: clicking a book opens a modal `<dialog>` with the book's metadata at the top (a small cover when the book has one, the title, the authors, the date, country, language and pages, and the genres as badges) and the body below, rendered with `<ot-tile-body>`. Escape, a close button and a click on the backdrop close it, and focus goes back to the book. The card stays open when the books per row or the tiles change, and closes when its book is no longer among the tiles.
 - **The last opened book**: the mod marks it with `aria-current="true"` instead of `aria-pressed="true"`, remembers it as before, and does not reopen its card when the mod starts again. What looked for the sample's pressed button (its own tests, the e2e tests and the mod plugin guide) moves to `aria-current`. This is a change of the sample only, not of the mod API.
 - **The mod file**: version `1.1.0`, `api` `^0.1.5` (the first mod API with `<ot-tile-body>`), the new `columns: 6` config, and a description that no longer says "a very simple list".
 - **Own styles stay without colors**: the mod's CSS sets layout and the book's corner shape, from `--ot-radius`. Its colors, borders, fonts and the current book's outline still come from the theme.
@@ -23,6 +23,10 @@ The sample book list mod shows each book as a full-width row with a 48×72 thumb
 ### Modified Capabilities
 
 - `mod-theme`: "Base stylesheet by default" also names current items (`aria-current`), which the base stylesheet already outlines in `--ot-primary`, and gains a scenario for them. In "Sample and default mods follow the theme", the sample mod may also set the corner shape of its books, from `--ot-radius`; the default mods stay layout only. The sample's scenario "Selection uses the accent" now checks the last opened book.
+- `mod-api-version`: "Sample and default mods declare the API range" lets the sample declare `^0.1.5`; the default mods keep `^0.1.0`.
+- `default-mods`: the explorer's and the viewer's scenarios show the sample's new description, version `1.1.0` and range `^0.1.5`.
+- `stage-bar`: the scenarios that show the sample's version show `1.1.0`.
+- `mod-stage`: "Open a mod from a run link" shows `1.1.0`, and "Sample book list mod" marks the last opened book instead of a selected one.
 
 ## Impact
 
@@ -32,7 +36,8 @@ The sample book list mod shows each book as a full-width row with a 48×72 thumb
   - e2e: `mod_check.spec.ts` (the real slot keeps the last opened book), `mod_app_actions.spec.ts` (the frame behind the action dialog), and the sample's test code in `mod_routes.ts` move from `aria-pressed` to `aria-current`.
   - The probe `listOwnLookDeclarations` in `e2e/theme_probes.ts` no longer counts corner radii as look.
   - New e2e checks for the `aria-current` outline and the sample's last opened book.
-- **Docs**: the engine README's short version of the sample mod, the mod plugin spec's excerpt of `test.js`, and the theme README's description of what the sample's own CSS sets.
+  - The checks that read the sample's version, description, API range or case names: `mod_stage.spec.ts`, `stage_bar.spec.ts`, `default_mods.spec.ts`, `mod_tests.spec.ts`, `mod_check.spec.ts` and `src/lib/mod/sample_mod.test.ts`. `mod_app_actions.spec.ts` looks for an open `<dialog>` in the frame, since the sample now always has one.
+- **Docs**: the engine README's short version of the sample mod, the mod plugin spec's excerpt of `test.js`, the theme README's description of what the sample's own CSS sets, and the mod module README's copy of the sample's `mod_conf.yaml`.
 - **Mod API version**: none. `mod-theme` only names behavior the base stylesheet already has, and the mount context, the events and the mod file format do not change: `columns` is a key of the sample's own `config`.
 - **App version**: patch. The shipped sample mod changes, and nothing breaks for people who use or instantiate the app.
 - **Out of scope**:

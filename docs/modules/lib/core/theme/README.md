@@ -84,7 +84,7 @@ It sets no layout beyond spacing. Checkboxes, radio buttons and range inputs tak
 
 ### Write HTML, get the app's look
 
-Mods don't get Tailwind or shadcn/ui, and need no classes. Well-written, accessible HTML already looks like OpenTesela: the base stylesheet styles elements by their meaning. The [default mods](../../../mods/README.md) are short examples of it.
+Mods don't get Tailwind or shadcn/ui, and need no classes. Well-written, accessible HTML already looks like OpenTesela: the base stylesheet styles elements by their meaning. The [default mods](../../../mods/README.md) are short examples of it, and so is the sample book list mod (`public/samples/mods/book_list/main.js`): its grid of books, its select, its card in a `<dialog>` and its badges all take the theme's look, and its own CSS sets layout and the books' corner shape, from `--ot-radius`.
 
 **Plain elements**
 

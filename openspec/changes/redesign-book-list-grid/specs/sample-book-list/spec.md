@@ -114,10 +114,10 @@ Clicking a book SHALL open a modal dialog, labeled by the book's title, that sho
 
 #### Scenario: Grid behind the card
 - **WHEN** Kallocain's card is open and the user clicks where Fahrenheit 451 is shown
-- **THEN** Kallocain's card stays open and Fahrenheit 451's card is not opened
+- **THEN** Fahrenheit 451's card is not opened, and no dialog is open, since the click lands on the backdrop
 
 ### Requirement: Card metadata
-The top of the card SHALL show the book's cover or placeholder, its title, its authors, its `date`, `country`, `language` and `pages` as labeled values, and each of its `genres` as a badge. A key that the tile lacks, or whose value has the wrong type, SHALL be left out without an empty label. The card SHALL NOT show the `image` address as text.
+The top of the card SHALL show the book's cover when it has one, then its title, its authors, its `date`, `country`, `language` and `pages` as labeled values, and each of its `genres` as a badge. A key that the tile lacks, or whose value has the wrong type, SHALL be left out without an empty label. The card SHALL NOT show the `image` address as text.
 
 #### Scenario: Kallocain's metadata
 - **WHEN** the user opens Kallocain's card
@@ -127,6 +127,13 @@ The top of the card SHALL show the book's cover or placeholder, its title, its a
 #### Scenario: Missing keys
 - **WHEN** the user opens the card of a tile whose metadata has only `title`
 - **THEN** the card shows the title and the body, and no labeled values and no badges
+
+### Requirement: No cover in the card
+When the book has no cover (no string `image`, a cover that fails to load, or `show_covers` not `true`), the card SHALL show neither a cover nor a placeholder.
+
+#### Scenario: Covers switched off in the card
+- **WHEN** the mod is mounted with the config `show_covers: false` and the user opens Kallocain's card
+- **THEN** the card shows no image and no placeholder, and its heading is "Kallocain"
 
 ### Requirement: Card body
 Below the metadata, the card SHALL show the book's body as the engine renders it (see `tile-bodies`), so its links, media and players behave as in any rendered body. An empty body SHALL show nothing below the metadata.

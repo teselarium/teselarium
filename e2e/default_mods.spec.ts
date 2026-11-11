@@ -13,6 +13,7 @@ import {
   readParentDocumentError,
   recordHost,
   routeCovers,
+  SAMPLE_CASE_NAMES,
   serveAppOriginMod,
   stageBar,
   visibleSandbox,
@@ -307,6 +308,15 @@ test.describe("Mod viewer checks the mod", function describeViewerChecks(): void
   });
 });
 
+/** The text of each passed case in the viewer's report: its status badge, then its name. */
+function listPassedCaseTexts(names: string[]): string[] {
+  const texts: string[] = [];
+  for (const name of names) {
+    texts.push(`pass ${name}`);
+  }
+  return texts;
+}
+
 test.describe("Mod viewer shows the check report", function describeViewerReport(): void {
   test("Sample mod passes", async function showsPassingReport({
     page,
@@ -327,10 +337,7 @@ test.describe("Mod viewer shows the check report", function describeViewerReport
     const cases = report
       .getByRole("list", { name: "Tests" })
       .getByRole("listitem");
-    await expect(cases).toHaveText([
-      "pass lists the sample books",
-      "pass highlights the remembered book",
-    ]);
+    await expect(cases).toHaveText(listPassedCaseTexts(SAMPLE_CASE_NAMES));
     for (const caseItem of await cases.all()) {
       await expect(caseItem.locator("span[data-ot-variant]")).toHaveAttribute(
         "data-ot-variant",

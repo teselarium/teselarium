@@ -240,7 +240,7 @@ mod:
   test_path: "./test.js"
 ```
 
-The test file is an ES module whose default export is a function. The app calls it with `t`, and `t.test(name, fn)` registers a case: a non-empty name that no other case has, and a plain or async function that receives the case context. The test file cannot import the entrypoint: each case mounts the mod through its context. The sample book list mod's `public/samples/mods/book_list/test.js`:
+The test file is an ES module whose default export is a function. The app calls it with `t`, and `t.test(name, fn)` registers a case: a non-empty name that no other case has, and a plain or async function that receives the case context. The test file cannot import the entrypoint: each case mounts the mod through its context. An excerpt of the sample book list mod's `public/samples/mods/book_list/test.js`:
 
 ```js
 /**
@@ -249,21 +249,37 @@ The test file is an ES module whose default export is a function. The app calls 
  * mounts the mod itself through its context.
  */
 
+function readBooksPerRowChoice(context) {
+  const select = context.root.querySelector("select");
+  return select.value;
+}
+
 async function listsTheSampleBooks(context) {
   await context.mount();
   context.expect(context.root.querySelectorAll("li").length).toBe(3);
 }
 
+async function remembersTheBooksPerRow(context) {
+  await context.storage.set("columns", 10);
+  await context.mount({ config: { columns: 4 } });
+  context.expect(readBooksPerRowChoice(context)).toBe("10");
+}
+
 async function highlightsTheRememberedBook(context) {
   await context.storage.set("selected", context.tiles[1].source);
   await context.mount();
-  const pressed = context.root.querySelector('button[aria-pressed="true"]');
-  context.expect(pressed.textContent).toContain("Kallocain");
+  const current = context.root.querySelectorAll('button[aria-current="true"]');
+  context.expect(current.length).toBe(1);
+  context.expect(current[0].getAttribute("aria-label")).toContain("Kallocain");
 }
 
 export default function registerBookListTests(t) {
   t.test("lists the sample books", listsTheSampleBooks);
+  // …
+  t.test("remembers the books per row", remembersTheBooksPerRow);
+  // …
   t.test("highlights the remembered book", highlightsTheRememberedBook);
+  // …
 }
 ```
 
