@@ -318,14 +318,13 @@ A mod is one ES module. Its entrypoint default-exports a `mount` function, which
 A short version of the sample mod (`public/samples/mods/book_list/main.js`):
 
 ```js
-const SELECTED_KEY = "selected";
 const COLUMNS_KEY = "columns";
 
 function renderBookList(view) {
   // Replaces the children of view.main only: a header with a heading from
   // view.title and the "Books per row" select, then one button per tile,
   // with the cover when view.config.show_covers is true, and
-  // aria-current="true" on the last opened book.
+  // aria-expanded="true" on the book whose card is open.
 }
 
 function fillBookCard(view, tile) {
@@ -333,7 +332,7 @@ function fillBookCard(view, tile) {
   // <ot-tile-body> whose tile is the book's tile.
 }
 
-async function openBookCard(view, source) {
+function openBookCard(view, source) {
   const tile = findTile(view, source);
   if (tile === null || view.card.open) {
     return;
@@ -341,16 +340,19 @@ async function openBookCard(view, source) {
   fillBookCard(view, tile);
   view.card.showModal();
   view.openSource = source;
-  view.selected = source;
-  await view.engine.request("storage.set", {
-    key: SELECTED_KEY,
-    value: source,
-  });
+  const button = findBookButton(view, source);
+  button.setAttribute("aria-expanded", "true");
 }
 
+// On the dialog's close event: the focus ring only after a keyboard close.
 function showClosedCard(view) {
-  // On the dialog's close event: re-renders view.main, so aria-current
-  // moves to the opened book, and focuses that book's button.
+  const button = findBookButton(view, view.openSource);
+  view.openSource = null;
+  if (button !== null) {
+    button.setAttribute("aria-expanded", "false");
+    button.blur();
+    button.focus({ focusVisible: view.closedByKeyboard });
+  }
 }
 
 // Sets the list's data-columns without drawing the list again, then stores it.
@@ -380,23 +382,21 @@ export default async function mount(engine, context) {
     title: context.mod.title,
     config: context.config,
     tiles: context.tiles,
-    selected: null,
     booksPerRow: DEFAULT_BOOKS_PER_ROW,
     openSource: null,
+    closedByKeyboard: false,
   };
   view.card = buildBookCard(view);
   engine.on("tiles.changed", showChangedTiles.bind(undefined, view));
   addBookListStyle();
   document.body.replaceChildren(view.main, view.card);
-  const selected = await engine.request("storage.get", { key: SELECTED_KEY });
-  view.selected = typeof selected === "string" ? selected : null;
   const columns = await engine.request("storage.get", { key: COLUMNS_KEY });
   view.booksPerRow = readStartBooksPerRow(columns, context.config.columns);
   renderBookList(view);
 }
 ```
 
-The page has two parts: `<main>`, which is drawn again when the tiles change or the card closes, and one `<dialog>`, the book's card, which is built once, so a `tiles.changed` never destroys an open card. The body in the card is an `<ot-tile-body>` (see [Tile bodies](#tile-bodies)), so its links and players work with no code in the mod. The storage keeps the last opened book under `selected` and the books per row under `columns`.
+The page has two parts: `<main>`, which is drawn again when the tiles change, and one `<dialog>`, the book's card, which is built once, so a `tiles.changed` never destroys an open card. Opening and closing the card only change the book's `aria-expanded`, which also raises the book with the theme's shadow, so the covers are not drawn again. The body in the card is an `<ot-tile-body>` (see [Tile bodies](#tile-bodies)), so its links and players work with no code in the mod. The storage keeps the books per row under `columns`.
 
 The mod registers its event handlers before its first `await`, so it misses no event, and keeps its state in its own frame's memory: back and forward show the frame as it was left.
 

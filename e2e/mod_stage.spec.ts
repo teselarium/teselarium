@@ -662,26 +662,22 @@ test.describe("Sample book list mod", function describeSampleMod(): void {
   }): Promise<void> {
     await routeCovers(page);
     await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    const frameLocator = page.frameLocator('iframe[title="Book List"]');
-    const kallocain = frameLocator.getByRole("button", { name: /Kallocain/ });
-    await kallocain.click();
-    await frameLocator
-      .getByRole("dialog", { name: "Kallocain" })
-      .getByRole("button", { name: "Close" })
-      .click();
-    await expect(kallocain).toHaveAttribute("aria-current", "true");
+    const booksPerRow = page
+      .frameLocator('iframe[title="Book List"]')
+      .getByLabel("Books per row");
+    await booksPerRow.selectOption("10");
+    await expect(
+      page
+        .frameLocator('iframe[title="Book List"]')
+        .locator('ul[data-columns="10"]'),
+    ).toHaveCount(1);
 
     await page.reload();
 
     await expect(
       page
         .frameLocator('iframe[title="Book List"]')
-        .getByRole("button", { name: /Kallocain/ }),
-    ).toHaveAttribute("aria-current", "true");
-    await expect(
-      page
-        .frameLocator('iframe[title="Book List"]')
-        .getByRole("button", { name: /Fahrenheit 451/ }),
-    ).not.toHaveAttribute("aria-current");
+        .getByLabel("Books per row"),
+    ).toHaveValue("10");
   });
 });

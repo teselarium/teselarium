@@ -84,6 +84,6 @@ describe("shipped sample mod", function describeShippedSampleMod(): void {
     expect(sampleMod.testSource).toBe(`${SHIPPED_SAMPLE_MOD}test.js`);
     const testCode = await loadModTestCode(sampleMod, { fetch: fetchAppFile });
     expect(testCode).toContain('"lists the sample books"');
-    expect(testCode).toContain('"highlights the remembered book"');
+    expect(testCode).toContain('"remembers the books per row"');
   });
 });

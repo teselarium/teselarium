@@ -184,7 +184,6 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       "dialog",
       ":focus-visible",
       'button[aria-pressed="true"]',
-      '[aria-current]:not([aria-current="false"])',
       "[data-ot-color-scheme]",
       'button[type="submit"]',
       "@media (prefers-reduced-motion: reduce)",

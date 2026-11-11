@@ -1082,7 +1082,7 @@ export function buildSlowMountFiles(): ModFiles {
   ]);
 }
 
-async function answerSelectionReportingSample(route: Route): Promise<void> {
+async function answerColumnsReportingSample(route: Route): Promise<void> {
   const response = await route.fetch();
   const code = await response.text();
   if (!code.includes(SAMPLE_MOUNT_LINE)) {
@@ -1090,8 +1090,8 @@ async function answerSelectionReportingSample(route: Route): Promise<void> {
   }
   const reportingLines = [
     SAMPLE_MOUNT_LINE,
-    '  const checkedSelection = await engine.request("storage.get", { key: "selected" });',
-    '  reportToTest(context, "selected", checkedSelection);',
+    '  const checkedColumns = await engine.request("storage.get", { key: "columns" });',
+    '  reportToTest(context, "columns", checkedColumns);',
   ].join("\n");
   await route.fulfill({
     response,
@@ -1101,11 +1101,11 @@ async function answerSelectionReportingSample(route: Route): Promise<void> {
 
 /**
  * Serves the sample book list mod with a `mount` that first reads
- * `storage.get` for `selected` and reports it as `selected`. Until
+ * `storage.get` for `columns` and reports it as `columns`. Until
  * `page.unroute(SAMPLE_ENTRYPOINT_GLOB)`.
  */
-export async function serveSelectionReportingSample(page: Page): Promise<void> {
-  await page.route(SAMPLE_ENTRYPOINT_GLOB, answerSelectionReportingSample);
+export async function serveColumnsReportingSample(page: Page): Promise<void> {
+  await page.route(SAMPLE_ENTRYPOINT_GLOB, answerColumnsReportingSample);
 }
 
 export interface CheckFinding {
@@ -1134,10 +1134,10 @@ export const SAMPLE_CASE_NAMES = [
   "has no select without books",
   "opens the card of a clicked book",
   "leaves out missing metadata",
+  "shows a date without a year as written",
   "shows no small book without a cover",
-  "highlights the remembered book",
-  "marks no book for an unknown remembered source",
-  "does not reopen the remembered book's card",
+  "marks the book whose card is open",
+  "unmarks the book when its card closes",
 ];
 
 function buildPassedResults(names: string[]): CheckTestResult[] {
@@ -1386,11 +1386,10 @@ export const ENDLESS_TEST_CODE = buildTestCode(
 /** The case context on the sample mod: seeded storage, the request record, a config override, other tiles and mounting twice. */
 export const SAMPLE_CONTEXT_TEST_CODE = buildTestCode(
   [
-    "async function highlightsTheRememberedBook(context) {",
-    '  await context.storage.set("selected", context.tiles[1].source);',
+    "async function remembersTheBooksPerRow(context) {",
+    '  await context.storage.set("columns", 10);',
     "  await context.mount();",
-    "  const current = context.root.querySelector('button[aria-current=\"true\"]');",
-    '  context.expect(current.getAttribute("aria-label")).toContain("Kallocain");',
+    '  context.expect(context.root.querySelector("select").value).toBe("10");',
     "}",
     "",
     "function listStorageRequests(context) {",
@@ -1403,26 +1402,23 @@ export const SAMPLE_CONTEXT_TEST_CODE = buildTestCode(
     "  return storageRequests;",
     "}",
     "",
-    "function hasSettledSelection(context) {",
+    "function hasSettledChoice(context) {",
     "  const storageRequests = listStorageRequests(context);",
     "  return (",
-    "    storageRequests.length === 3 &&",
-    '    Object.hasOwn(storageRequests[2], "result")',
+    "    storageRequests.length === 2 &&",
+    '    Object.hasOwn(storageRequests[1], "result")',
     "  );",
     "}",
     "",
     "async function recordsTheRequests(context) {",
     "  await context.mount();",
-    '  context.root.querySelector("li > button").click();',
-    "  await context.waitFor(hasSettledSelection.bind(undefined, context));",
+    '  const select = context.root.querySelector("select");',
+    '  select.value = "10";',
+    '  select.dispatchEvent(new Event("change"));',
+    "  await context.waitFor(hasSettledChoice.bind(undefined, context));",
     "  context.expect(listStorageRequests(context)).toEqual([",
-    '    { method: "storage.get", params: { key: "selected" }, result: null },',
     '    { method: "storage.get", params: { key: "columns" }, result: null },',
-    "    {",
-    '      method: "storage.set",',
-    '      params: { key: "selected", value: context.tiles[0].source },',
-    "      result: null,",
-    "    },",
+    '    { method: "storage.set", params: { key: "columns", value: 10 }, result: null },',
     "  ]);",
     "}",
     "",
@@ -1449,7 +1445,7 @@ export const SAMPLE_CONTEXT_TEST_CODE = buildTestCode(
     "}",
   ],
   [
-    ["highlights the remembered book", "highlightsTheRememberedBook"],
+    ["remembers the books per row", "remembersTheBooksPerRow"],
     ["records the requests", "recordsTheRequests"],
     ["hides the covers", "hidesTheCovers"],
     ["shows the covers", "showsTheCovers"],

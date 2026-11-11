@@ -222,6 +222,77 @@ async function answerCollectionWithoutKallocain(
   });
 }
 
+/** The computed transform of a raised book: moved up by 2px. */
+const RAISED_TRANSFORM = "matrix(1, 0, 0, 1, 0, -2)";
+
+interface BookLook {
+  boxShadow: string;
+  transform: string;
+}
+
+/** A book that is not raised: no shadow, not moved. */
+const FLAT_LOOK: BookLook = { boxShadow: "none", transform: "none" };
+
+/** Runs on a book's button: its computed shadow and transform. */
+function readBookLook(button: Element): BookLook {
+  const style = getComputedStyle(button);
+  const look: BookLook = {
+    boxShadow: style.boxShadow,
+    transform: style.transform,
+  };
+  return look;
+}
+
+/** The value of `--ot-shadow` as the frame computes a `box-shadow`. */
+async function readThemeShadow(frame: Frame): Promise<string> {
+  const themeShadow = await frame.evaluate(readTokenAs, [
+    "--ot-shadow",
+    "box-shadow",
+  ]);
+  return themeShadow;
+}
+
+/** Waits until the book's look settles on `expected`, after its transition. */
+async function expectBookLook(
+  frame: Frame,
+  title: string,
+  expected: BookLook,
+): Promise<void> {
+  const button = bookButton(frame, title);
+  await expect
+    .poll(button.evaluate.bind(button, readBookLook))
+    .toEqual(expected);
+}
+
+/** Runs on an element: true when it shows the focus ring, as after keyboard focus. */
+function showsFocusRing(element: Element): boolean {
+  return element.matches(":focus-visible");
+}
+
+/** Expects the book to have focus, and to show the focus ring or not. */
+async function expectBookFocus(
+  frame: Frame,
+  title: string,
+  hasRing: boolean,
+): Promise<void> {
+  const button = bookButton(frame, title);
+  await expect(button).toBeFocused();
+  expect(await button.evaluate(showsFocusRing)).toBe(hasRing);
+}
+
+/** Expects the `aria-expanded` of the sample's three books, in order. */
+async function expectExpandedStates(
+  frame: Frame,
+  states: string[],
+): Promise<void> {
+  for (const [index, title] of SAMPLE_TITLES.entries()) {
+    await expect(bookButton(frame, title)).toHaveAttribute(
+      "aria-expanded",
+      states[index],
+    );
+  }
+}
+
 async function reloadTiles(page: Page): Promise<void> {
   await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
 }
@@ -464,7 +535,7 @@ test.describe("Closing the card", function describeClosingCard(): void {
     await page.keyboard.press("Escape");
 
     await expect(bookCard(frame)).toHaveCount(0);
-    await expect(bookButton(frame, "Kallocain")).toBeFocused();
+    await expectBookFocus(frame, "Kallocain", true);
   });
 
   test("Close button", async function closesOnButton({ page }): Promise<void> {
@@ -472,9 +543,25 @@ test.describe("Closing the card", function describeClosingCard(): void {
     const card = await openKallocainCard(frame);
 
     await card.getByRole("button", { name: "Close" }).click();
+    await page.mouse.move(0, 0);
 
     await expect(bookCard(frame)).toHaveCount(0);
-    await expect(bookButton(frame, "Kallocain")).toBeFocused();
+    await expectBookFocus(frame, "Kallocain", false);
+    await expectBookLook(frame, "Kallocain", FLAT_LOOK);
+  });
+
+  test("Close button with the keyboard", async function closesOnButtonKey({
+    page,
+  }): Promise<void> {
+    const frame = await openSample(page);
+    const card = await openKallocainCard(frame);
+    const closeButton = card.getByRole("button", { name: "Close" });
+    await closeButton.focus();
+
+    await page.keyboard.press("Enter");
+
+    await expect(bookCard(frame)).toHaveCount(0);
+    await expectBookFocus(frame, "Kallocain", true);
   });
 
   test("Backdrop", async function closesOnBackdrop({ page }): Promise<void> {
@@ -493,6 +580,7 @@ test.describe("Closing the card", function describeClosingCard(): void {
     await page.mouse.click(x, cardBox.y + cardBox.height / 2);
 
     await expect(bookCard(frame)).toHaveCount(0);
+    await expectBookFocus(frame, "Kallocain", false);
   });
 
   test("Click inside the card", async function staysOpenOnInsideClick({
@@ -525,6 +613,10 @@ test.describe("Card follows the tiles", function describeCardFollowsTiles(): voi
 
     await expect(card.getByText("230", { exact: true })).toBeVisible();
     await expect(card).toBeVisible();
+    await expect(bookButton(frame, "Kallocain")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   test("Tiles reloaded without the book", async function closesOpenCard({
@@ -546,39 +638,89 @@ test.describe("Card follows the tiles", function describeCardFollowsTiles(): voi
   });
 });
 
-test.describe("Last opened book", function describeLastOpenedBook(): void {
-  test("Mark after opening", async function marksOpenedBook({
+test.describe("Raised book", function describeRaisedBook(): void {
+  test("Raised on hover", async function raisesHoveredBook({
     page,
   }): Promise<void> {
     const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
+    const themeShadow = await readThemeShadow(frame);
 
-    await card.getByRole("button", { name: "Close" }).click();
+    await bookButton(frame, "Kallocain").hover();
 
-    await expect(bookButton(frame, "Kallocain")).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
-    await expect(frame.locator("[aria-current]")).toHaveCount(1);
+    await expectBookLook(frame, "Kallocain", {
+      boxShadow: themeShadow,
+      transform: RAISED_TRANSFORM,
+    });
+    await expectBookLook(frame, "Fahrenheit 451", FLAT_LOOK);
+    await expectBookLook(frame, "The Library of Babel", FLAT_LOOK);
   });
 
-  test("Remembered across starts", async function remembersOpenedBook({
+  test("Raised while the card is open", async function raisesOpenBook({
+    page,
+  }): Promise<void> {
+    const frame = await openSample(page);
+    const themeShadow = await readThemeShadow(frame);
+
+    await openKallocainCard(frame);
+    await page.mouse.move(0, 0);
+
+    await expectBookLook(frame, "Kallocain", {
+      boxShadow: themeShadow,
+      transform: RAISED_TRANSFORM,
+    });
+  });
+
+  test("Back after closing", async function lowersClosedBook({
     page,
   }): Promise<void> {
     const frame = await openSample(page);
     const card = await openKallocainCard(frame);
     await card.getByRole("button", { name: "Close" }).click();
-    await expect(bookButton(frame, "Kallocain")).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
 
-    const reopened = await reopenSample(page);
+    await frame.getByRole("heading", { name: "Book List" }).click();
 
-    await expect(bookButton(reopened, "Kallocain")).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
-    await expect(bookCard(reopened)).toHaveCount(0);
+    await expectBookLook(frame, "Kallocain", FLAT_LOOK);
+  });
+
+  test("Reduced motion", async function raisesWithoutMoving({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const frame = await openSample(page);
+    const themeShadow = await readThemeShadow(frame);
+
+    await bookButton(frame, "Kallocain").hover();
+
+    await expectBookLook(frame, "Kallocain", {
+      boxShadow: themeShadow,
+      transform: "none",
+    });
+  });
+});
+
+test.describe("The open book's state", function describeOpenBookState(): void {
+  test("State while the card is open", async function marksOpenBook({
+    page,
+  }): Promise<void> {
+    const frame = await openSample(page);
+
+    await openKallocainCard(frame);
+
+    await expect(
+      frame.locator('li > button[aria-haspopup="dialog"]'),
+    ).toHaveCount(3);
+    await expectExpandedStates(frame, ["false", "true", "false"]);
+  });
+
+  test("State after closing", async function unmarksClosedBook({
+    page,
+  }): Promise<void> {
+    const frame = await openSample(page);
+    const card = await openKallocainCard(frame);
+
+    await card.getByRole("button", { name: "Close" }).click();
+
+    await expect(bookCard(frame)).toBeHidden();
+    await expectExpandedStates(frame, ["false", "false", "false"]);
   });
 });

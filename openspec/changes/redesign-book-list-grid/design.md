@@ -11,7 +11,8 @@ How the sample works today (`public/samples/mods/book_list/main.js`):
 
 What the theme and the frame loader already give a mod:
 - A plain `<button>` is an outline button: background, a 1px border, `--ot-radius` on every corner, an accent fill on hover, a `min-height` and padding.
-- `button[aria-pressed="true"]` and `[aria-current]:not([aria-current="false"])` get a 3px `--ot-primary` outline, placed after the focus rings so it wins on focus.
+- `button[aria-pressed="true"]` gets a 3px `--ot-primary` outline, placed after the focus rings so it wins on focus.
+- `--ot-shadow` is the theme's shadow, which the base stylesheet gives `<dialog>`.
 - `<dialog>` gets the popover look, and `::backdrop` gets a dimmed background.
 - `<dl>` and `<span data-ot-variant="secondary">` (a badge) are styled. `<hr>` is styled.
 - `<ot-tile-body>` renders a tile's body and handles clicks on its links and players. It needs mod API `0.1.5`.
@@ -25,7 +26,7 @@ Two copies of the entrypoint exist:
 **Goals:**
 - Keep the sample an example of "write HTML, get the app's look":
   - Every visible element is a plain element the base stylesheet already styles.
-  - The mod's CSS adds layout and the book's corner shape only.
+  - The mod's CSS adds layout, the book's corner shape and its shadow only, the last two from theme tokens.
 - Keep the code a readable sample for mod authors: one file, no build step, with the same structure as today (small named functions and a `view` object).
 
 **Non-Goals:**
@@ -41,7 +42,7 @@ Each `<li>` holds the book `<button>`, then a caption `<p>` with `<strong>` (the
 
 Why:
 - The button's own theme surface (background and border) becomes the placeholder's book, with no colors added by the mod.
-- The `aria-current` outline and the focus ring go around the book, which is the thing the user presses.
+- The focus ring and the shadow go around the book, which is the thing the user presses.
 - `overflow: hidden` clips the image to the button's corners but not its outline, which is drawn outside the border box.
 
 The button's accessible name is set with `aria-label` to the title and the authors (`Kallocain, Karin Boye`). That matches the `sample-book-list` requirement even when the caption's authors are hidden at 8 and 10 per row. An `aria-labelledby` pointing at a partly hidden caption is computed differently across browsers. The cover keeps `alt="Cover of <title>"`, which the e2e test of relative cover paths reads.
@@ -50,15 +51,15 @@ The caption is not clickable. Only the book is.
 
 Alternatives considered:
 - The whole item as one outline button, with the cover and caption inside, like today's rows. The book would sit inside a rounded card. A placeholder would then need a surface of its own, which means a background the mod sets. That breaks the layout-only rule.
-- `clip-path: inset(0 round 0 R R 0)` for the shape, which the look probe does not flag. On the button, it clips the focus ring and the `aria-current` outline, which is an accessibility regression. On an inner element, it leaves the placeholder without a surface.
+- `clip-path: inset(0 round 0 R R 0)` for the shape, which the look probe does not flag. On the button, it clips the focus ring, which is an accessibility regression, and the shadow. On an inner element, it leaves the placeholder without a surface.
 
-### D2. The corner shape is allowed, from `--ot-radius`, in the sample only
+### D2. The corner shape and the shadow are allowed, from theme tokens, in the sample only
 
-The button gets `border-top-left-radius: 0` and `border-bottom-left-radius: 0`. The right corners keep the base stylesheet's `--ot-radius`, so the shape follows the theme.
+The button gets `border-top-left-radius: 0` and `border-bottom-left-radius: 0`. The right corners keep the base stylesheet's `--ot-radius`, so the shape follows the theme. A raised book gets `box-shadow: var(--ot-shadow)` (D7), so its shadow follows the theme too.
 
-`listOwnLookDeclarations` in `e2e/theme_probes.ts` stops flagging properties ending in `-radius`. Only the sample's test uses it. The default mods keep their own `LOOK_PROPERTY_PATTERN` in `default_mods/*/test/look_probes.ts` unchanged. The `mod-theme` delta allows corner shape for the sample's books only.
+`listOwnLookDeclarations` in `e2e/theme_probes.ts` stops flagging properties ending in `-radius`, and a `box-shadow` whose declared value is exactly `var(--ot-shadow)`. Any other shadow is still flagged. Only the sample's test uses it. The default mods keep their own `LOOK_PROPERTY_PATTERN` in `default_mods/*/test/look_probes.ts` unchanged. The `mod-theme` delta allows corner shape and the theme's shadow for the sample's books only.
 
-The mod's header comment and the theme README change from "sets layout only" to "sets layout and the books' corner shape".
+The mod's header comment and the theme README change from "sets layout only" to "sets layout, and the books' corner shape and shadow".
 
 - *Alternative:* keep the probe strict and draw the books with uniform corners. That drops a feature the user asked for.
 
@@ -101,15 +102,17 @@ At mount, the mod builds `<body>` once with two parts:
 - `openSource`, the source of the open card or `null`;
 - `card`, the `<dialog>` element.
 
+It loses `selected` (D7).
+
 ### D5. The card's content is built from the tile each time it opens
 
 `openBookCard(view, source)` does the following:
 1. Finds the tile.
 2. Fills the dialog with a `<header>`: a small book (the cover `<img>`, at a fixed width of about 6rem) when the book has a cover, a `<div>` with the `<h2 id="book-card-title">`, a `<p><small>` with the authors, a `<dl>`, and a `<p>` of genre badges.
 3. Adds an `<hr>`, then an `<ot-tile-body>` whose `tile` is set to the tile.
-4. Calls `showModal()`, sets `view.openSource`, and stores `selected` as today.
+4. Calls `showModal()`, sets `view.openSource`, and sets `aria-expanded="true"` on the book's button (D7).
 
-The `<dl>` holds date, country, language and pages. It uses labels "Published", "Country", "Language" and "Pages", and leaves out each key that is missing or not a string or number. The dialog has `aria-labelledby="book-card-title"`. A ghost close button sits at the top of the dialog (`<button type="button" data-ot-variant="ghost" aria-label="Close">×</button>`).
+The `<dl>` holds the year of publication, country, language and pages. It uses labels "Published", "Country", "Language" and "Pages", and leaves out each key that is missing or not a string or number. "Published" shows the first four digits of a `date` string that starts with four digits (`1940` for `1940-10-01`), a number `date` as it is, and any other string `date` as written, so a date the mod cannot read is still shown. The dialog has `aria-labelledby="book-card-title"`. A ghost close button sits at the top of the dialog (`<button type="button" data-ot-variant="ghost" aria-label="Close">`). It holds an inline SVG cross, `aria-hidden="true"`, 20 by 20 through its `width` and `height` attributes, drawn with `stroke="currentColor"` so it takes the button's theme color. A `×` character would need a larger `font-size` to be easy to see and hit, which the mod's CSS may not set (D2).
 
 When the body is empty, no `<hr>` is added and `<ot-tile-body>` renders nothing.
 
@@ -134,18 +137,43 @@ The dialog closes in three ways:
 
 A `close` listener does the following:
 - clears `openSource`;
-- re-renders `<main>`, so `aria-current` moves to the opened book;
-- focuses the button of the book whose card it was, found by `data-source` in the current list.
+- finds the button of the book whose card it was, by `data-source` in the current list;
+- sets `aria-expanded="false"` on it and focuses it, without re-rendering `<main>`.
+
+The focus ring shows only after a keyboard close. The button is blurred, then focused with `focus({ focusVisible: view.closedByKeyboard })`. The `blur()` is needed because a closing dialog may already have given the focus back to the book with the browser's own choice of ring, and `focus()` on a focused element changes nothing. `closedByKeyboard` is set as follows:
+- `openBookCard` sets `view.closedByKeyboard` to `false`;
+- the dialog's `cancel` event (Escape) sets it to `true`;
+- the close button's `click` sets it to `event.detail === 0`, which is `true` for Enter or Space and `false` for a mouse click;
+- a backdrop click leaves it `false`.
+
+Why: after a mouse close, WebKit counts the restored focus as keyboard focus, so the book showed the focus ring and stayed raised (D7). Chrome and Firefox did not. With the option, the three browsers agree. A browser without the `focusVisible` option falls back to its own choice, which is the behavior without it.
 
 The browser's own focus restore cannot be relied on: a `tiles.changed` while the card was open may have replaced the button it would return to.
 
-### D7. `aria-current` replaces `aria-pressed`
+### D7. The open book is raised; no book is remembered
 
-`buildBookButton` sets `aria-current="true"` only on the book whose `source` equals `view.selected`, and removes the attribute on all others. It never sets `aria-pressed`.
+`buildBookButton` gives every book `aria-haspopup="dialog"`, and `aria-expanded` set to `"true"` when its `source` equals `view.openSource`, `"false"` otherwise. A re-render on `tiles.changed` while a card is open therefore keeps the mark. Opening (D5) and closing (D6) set the attribute on the existing button, so the list is not rebuilt and the covers do not reload.
 
-The storage key `selected` and its meaning (the source of the last chosen book) stay. A slot written by today's sample keeps working after the update.
+One rule raises a book:
 
-Opening the card stores `selected` before the dialog shows. The `aria-current` mark changes when the card closes, because `<main>` is re-rendered then (D6) and not while the modal is open.
+```css
+li > button:hover,
+li > button:focus-visible,
+li > button[aria-expanded="true"] {
+  transform: translateY(-2px);
+  box-shadow: var(--ot-shadow);
+}
+```
+
+The `transition` covers `transform` and `box-shadow`. Under `prefers-reduced-motion: reduce`, only the transform is turned off, so a raised book keeps its shadow.
+
+When a card closes with the keyboard, focus goes back to the book as keyboard focus (`:focus-visible`), so the book shows the focus ring and stays raised until the focus moves. That is the focus cue. After a mouse close, the book gets the focus without the ring, so it is not raised (D6).
+
+The mod neither reads nor writes `selected` any more: the books per row (`columns`) remain the sample's example of storage. The specs that used `selected` as their example (`mod-stage`, `mod-check`, `mod-tests`) move to `columns`.
+
+Alternatives considered:
+- Marking the last opened book with `aria-current`, remembered in `selected`. The theme's outline for it only showed after the card closed, since the backdrop covers the grid while it is open, and it is not wanted.
+- A `data-open` attribute as the style hook. It works, but `aria-expanded` also tells assistive technology that the book's card is open.
 
 ### D8. The placeholder
 
@@ -160,12 +188,13 @@ The `<span>` is `aria-hidden="true"`, because the button's `aria-label` already 
 ## Risks / Trade-offs
 
 - [The base stylesheet's `button` `min-height` and padding fight the 2:3 box] → The mod resets `padding` and `min-height` on its book buttons, which is layout. The tests check the 2:3 ratio from the bounding box.
-- [With image covers, the hover fill is hidden behind the image, so pointer users get no hover feedback] → On `:hover` and `:focus-visible`, the book is lifted with `transform: translateY(-2px)` and a short `transition` on `transform`, both turned off under `prefers-reduced-motion: reduce`. These are not look properties, and the probe does not flag them.
+- [With image covers, the hover fill is hidden behind the image, so pointer users get no hover feedback] → On `:hover` and `:focus-visible`, the book is raised (D7): `transform: translateY(-2px)`, which is not a look property, and `box-shadow: var(--ot-shadow)`, which the probe allows (D2). Under `prefers-reduced-motion: reduce` the transform is turned off and the shadow stays.
+- [The raised book is hard to see while its card is open, behind the backdrop at 75% opacity] → Accepted. `aria-expanded` carries the state for assistive technology, and the book shows the focus cue when the card closes.
 - [A backdrop click detected by coordinates can be wrong for clicks on the dialog's scrollbar] → The rectangle includes the scrollbar, so those clicks count as inside.
-- [Many e2e specs locate books by `getByRole("button", { name: /Kallocain/ })` and `getByText`] → The `aria-label` keeps the title in the name, and the caption keeps the title as visible text. The specs that read `aria-pressed` move to `aria-current` (see tasks).
+- [Many e2e specs locate books by `getByRole("button", { name: /Kallocain/ })` and `getByText`] → The `aria-label` keeps the title in the name, and the caption keeps the title as visible text. The specs that read `aria-pressed` or the stored `selected` move to the books per row or to `aria-expanded` (see tasks).
 - [Hidden test frames: `showModal()` in a hidden case frame] → A modal dialog opens in a hidden document too. The mod's own cases check `card.open` and the dialog's content, not its rendering.
 - [The fixture copy in `src/test/fixtures/` drifts from the sample] → It is replaced with the new file in the same change. The fixture's `mod_conf.yaml` keeps its own paths and gains no `columns`, so the `mod-loading` scenarios about its `config` stay true.
 
 ## Migration Plan
 
-None beyond shipping. Storage slots written by the current sample keep their `selected` value, and get `columns` the first time the user changes the select. Rolling back restores the old file, which ignores `columns`.
+None beyond shipping. Storage slots written by the current sample keep their `selected` value, which the new sample does not read, and get `columns` the first time the user changes the select. Rolling back restores the old file, which reads `selected` again and ignores `columns`.

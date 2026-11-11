@@ -148,22 +148,10 @@ export function readOutlineColor(selector: string): string {
   return getComputedStyle(element).outlineColor;
 }
 
-/** Runs in a frame: the computed outline style of the first element matching `selector`, `none` when it has no outline. */
-export function readOutlineStyle(selector: string): string {
-  const element = document.querySelector(selector);
-  if (element === null) {
-    throw new Error(`No element matches "${selector}"`);
-  }
-  return getComputedStyle(element).outlineStyle;
-}
-
-/** Runs in a frame: true when the focused element matches `:focus-visible`, as after keyboard focus. */
-export function hasVisibleFocus(): boolean {
-  const focused = document.activeElement;
-  if (focused === null) {
-    return false;
-  }
-  return focused.matches(":focus-visible");
+/** Runs on an element: its computed `box-shadow`, `none` when it has none. */
+export function readBoxShadow(element: Element): string {
+  const boxShadow = getComputedStyle(element).boxShadow;
+  return boxShadow;
 }
 
 /** Runs in a frame: appends an unlayered `<style>` to `<head>`, as a mod would. */
@@ -424,14 +412,16 @@ export function readTokenAs(tokenAndProperty: string[]): string {
 /**
  * Runs in a frame: every declaration outside the `opentesela` layer that
  * sets a look property (a color, background, border, font or shadow), as
- * `selector { property }`. Corner radii are not counted: they are shape,
- * which the sample mod sets on its books from `--ot-radius`. Empty when the
- * frame's own styles are layout and shape only. Self-contained, since it runs
- * in the frame.
+ * `selector { property }`. Corner radii and a `box-shadow` of exactly
+ * `var(--ot-shadow)` are not counted: the sample mod sets them on its books
+ * from the theme's `--ot-radius` and `--ot-shadow`. Empty when the frame's own
+ * styles are layout, shape and the theme's shadow only. Self-contained, since
+ * it runs in the frame.
  */
 export function listOwnLookDeclarations(): string[] {
   const lookPattern = /^(background|border|font)|color$|shadow$/;
   const shapePattern = /-radius$/;
+  const themeShadow = "var(--ot-shadow)";
   const found: string[] = [];
   const rules: CSSRule[] = [];
   for (const sheet of document.styleSheets) {
@@ -449,7 +439,14 @@ export function listOwnLookDeclarations(): string[] {
       continue;
     }
     for (const property of rule.style) {
-      if (lookPattern.test(property) && !shapePattern.test(property)) {
+      const isThemeShadow =
+        property === "box-shadow" &&
+        rule.style.getPropertyValue(property).trim() === themeShadow;
+      if (
+        lookPattern.test(property) &&
+        !shapePattern.test(property) &&
+        !isThemeShadow
+      ) {
         found.push(`${rule.selectorText} { ${property} }`);
       }
     }

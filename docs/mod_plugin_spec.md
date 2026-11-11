@@ -249,6 +249,15 @@ The test file is an ES module whose default export is a function. The app calls 
  * mounts the mod itself through its context.
  */
 
+function findBookButton(context, title) {
+  for (const button of context.root.querySelectorAll("li > button")) {
+    if (button.getAttribute("aria-label").startsWith(title)) {
+      return button;
+    }
+  }
+  throw new Error(`No book button is named "${title}"`);
+}
+
 function readBooksPerRowChoice(context) {
   const select = context.root.querySelector("select");
   return select.value;
@@ -265,12 +274,27 @@ async function remembersTheBooksPerRow(context) {
   context.expect(readBooksPerRowChoice(context)).toBe("10");
 }
 
-async function highlightsTheRememberedBook(context) {
-  await context.storage.set("selected", context.tiles[1].source);
+function readExpandedStates(context) {
+  const states = [];
+  for (const button of context.root.querySelectorAll("li > button")) {
+    states.push(button.getAttribute("aria-expanded"));
+  }
+  return states;
+}
+
+function isUnmarked(button) {
+  return button.getAttribute("aria-expanded") === "false";
+}
+
+async function unmarksTheBookWhenItsCardCloses(context) {
   await context.mount();
-  const current = context.root.querySelectorAll('button[aria-current="true"]');
-  context.expect(current.length).toBe(1);
-  context.expect(current[0].getAttribute("aria-label")).toContain("Kallocain");
+  const kallocain = findBookButton(context, "Kallocain");
+  kallocain.click();
+  context.root.querySelector("dialog").close();
+  await context.waitFor(isUnmarked.bind(undefined, kallocain));
+  context
+    .expect(readExpandedStates(context))
+    .toEqual(["false", "false", "false"]);
 }
 
 export default function registerBookListTests(t) {
@@ -278,8 +302,10 @@ export default function registerBookListTests(t) {
   // …
   t.test("remembers the books per row", remembersTheBooksPerRow);
   // …
-  t.test("highlights the remembered book", highlightsTheRememberedBook);
-  // …
+  t.test(
+    "unmarks the book when its card closes",
+    unmarksTheBookWhenItsCardCloses,
+  );
 }
 ```
 

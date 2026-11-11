@@ -23,7 +23,7 @@ import {
   routeCovers,
   SAMPLE_TEST_RESULTS,
   serveAppOriginMod,
-  serveSelectionReportingSample,
+  serveColumnsReportingSample,
   UNDECLARED_IMAGE_HOST,
   visibleSandbox,
   waitForProbe,
@@ -225,34 +225,33 @@ test.describe("Throwaway storage slot", function describeThrowawaySlot(): void {
   }): Promise<void> {
     await routeCovers(page);
     await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    const kallocain = page
-      .frameLocator('iframe[title="Book List"]')
-      .getByRole("button", { name: /Kallocain/ });
-    await kallocain.click();
     await page
       .frameLocator('iframe[title="Book List"]')
-      .getByRole("dialog", { name: "Kallocain" })
-      .getByRole("button", { name: "Close" })
-      .click();
-    await expect(kallocain).toHaveAttribute("aria-current", "true");
+      .getByLabel("Books per row")
+      .selectOption("10");
+    await expect(
+      page
+        .frameLocator('iframe[title="Book List"]')
+        .locator('ul[data-columns="10"]'),
+    ).toHaveCount(1);
     const seenUrls = await serveAppOriginMod(page, buildCheckerFiles());
-    await serveSelectionReportingSample(page);
+    await serveColumnsReportingSample(page);
     await page.goto(`/${CHECKER_HASH}`);
     await waitForProbe(await findModFrame(page, CHECKER_TITLE));
 
     const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
     await page.unroute(SAMPLE_ENTRYPOINT_GLOB);
-    // A new document, so the sandbox the selection was made in is gone.
+    // A new document, so the sandbox the choice was made in is gone.
     await page.goto("about:blank");
     await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
 
     expect(report.status).toBe("pass");
-    expect(readReportedValue(seenUrls, "selected")).toBeNull();
+    expect(readReportedValue(seenUrls, "columns")).toBeNull();
     await expect(
       page
         .frameLocator('iframe[title="Book List"]')
-        .getByRole("button", { name: /Kallocain/ }),
-    ).toHaveAttribute("aria-current", "true");
+        .getByLabel("Books per row"),
+    ).toHaveValue("10");
   });
 });
 

@@ -1,34 +1,36 @@
 /**
  * Sample mod: shows the books it receives as a grid of covers, with a
  * "Books per row" choice, and opens a card with each book's details and
- * body. It remembers the last opened book and the books per row.
+ * body. It remembers the books per row.
  *
  * It is also an example of getting the app's look without classes: each book
- * is a plain button, `aria-current` marks the last opened one with the app's
- * primary outline, `<small>` mutes the authors, `<dialog>` is the card,
+ * is a plain button, `<small>` mutes the authors, `<dialog>` is the card,
  * `<dl>` holds the details, `<span data-ot-variant="secondary">` makes the
  * genre badges, `<ot-tile-body>` renders the body, and `role="status"` shows
- * the empty list as a notice. This mod's own CSS sets layout and the books'
- * corner shape. See "Write HTML, get the app's look" in
+ * the empty list as a notice. This mod's own CSS sets layout, and the books'
+ * corner shape and shadow, from the theme's `--ot-radius` and `--ot-shadow`.
+ * See "Write HTML, get the app's look" in
  * docs/modules/lib/core/theme/README.md.
  */
 
-const SELECTED_KEY = "selected";
 const COLUMNS_KEY = "columns";
 const BOOKS_PER_ROW_CHOICES = [4, 6, 8, 10];
 const DEFAULT_BOOKS_PER_ROW = 6;
 const CARD_TITLE_ID = "book-card-title";
 
-/** The metadata the card shows as labeled values, in order. */
+/** A year at the start of a date, as in `1940-10-01`. */
+const LEADING_YEAR = /^\d{4}/;
+
+/** The metadata the card shows as labeled values, in order, and how each is written. */
 const CARD_DETAILS = [
-  { key: "date", label: "Published" },
-  { key: "country", label: "Country" },
-  { key: "language", label: "Language" },
-  { key: "pages", label: "Pages" },
+  { key: "date", label: "Published", write: writePublishedYear },
+  { key: "country", label: "Country", write: String },
+  { key: "language", label: "Language", write: String },
+  { key: "pages", label: "Pages", write: String },
 ];
 
-// Layout and the books' corner shape only: the colors, borders, fonts and the
-// last opened book's outline come from the theme.
+// Layout, and the books' corner shape and shadow from the theme's tokens: the
+// colors, borders and fonts come from the theme.
 const BOOK_LIST_STYLE = `
   main > header {
     display: flex;
@@ -78,10 +80,16 @@ const BOOK_LIST_STYLE = `
     overflow: hidden;
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    transition: transform 150ms, color 150ms, background-color 150ms, border-color 150ms, outline-color 150ms;
+    transition: transform 150ms, box-shadow 150ms, color 150ms, background-color 150ms, border-color 150ms;
   }
+
+  /* The raised book: under the pointer, with keyboard focus, or while its card is open. */
   li > button:hover,
-  li > button:focus-visible { transform: translateY(-2px); }
+  li > button:focus-visible,
+  li > button[aria-expanded="true"] {
+    transform: translateY(-2px);
+    box-shadow: var(--ot-shadow);
+  }
   li > button > img,
   dialog > header > figure > img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -107,6 +115,7 @@ const BOOK_LIST_STYLE = `
   /* The card: the close button in its corner, the small book, when it has a cover, next to the details. */
   dialog { box-sizing: border-box; width: min(40rem, 100%); }
   dialog > button[data-ot-variant="ghost"] { position: absolute; top: var(--ot-space-2); right: var(--ot-space-2); }
+  dialog > button[data-ot-variant="ghost"] > svg { display: block; }
   dialog > header {
     display: flex;
     align-items: flex-start;
@@ -132,7 +141,8 @@ const BOOK_LIST_STYLE = `
   @media (prefers-reduced-motion: reduce) {
     li > button { transition: none; }
     li > button:hover,
-    li > button:focus-visible { transform: none; }
+    li > button:focus-visible,
+    li > button[aria-expanded="true"] { transform: none; }
   }
 `;
 
@@ -247,15 +257,14 @@ function buildBookFace(view, tile) {
   return placeholder;
 }
 
-/** A book: a plain button showing the cover, current when it is the last opened one. */
+/** A book: a plain button showing the cover, expanded while its card is open. */
 function buildBookButton(view, tile) {
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.source = tile.source;
   button.setAttribute("aria-label", readBookName(tile));
-  if (tile.source === view.selected) {
-    button.setAttribute("aria-current", "true");
-  }
+  button.setAttribute("aria-haspopup", "dialog");
+  button.setAttribute("aria-expanded", String(tile.source === view.openSource));
   button.append(buildBookFace(view, tile));
   button.addEventListener(
     "click",
@@ -345,6 +354,19 @@ function renderBookList(view) {
   view.main.replaceChildren(buildBookListHeader(view), buildBookContent(view));
 }
 
+/** Only the year of a date that starts with one; any other date as written. */
+function writePublishedYear(date) {
+  if (typeof date !== "string") {
+    return String(date);
+  }
+  const year = LEADING_YEAR.exec(date);
+  if (year === null) {
+    return date;
+  }
+  const yearText = year[0];
+  return yearText;
+}
+
 function hasCardDetail(value) {
   return typeof value === "string" || typeof value === "number";
 }
@@ -360,7 +382,7 @@ function buildCardDetails(tile) {
     const term = document.createElement("dt");
     term.textContent = detail.label;
     const description = document.createElement("dd");
-    description.textContent = String(value);
+    description.textContent = detail.write(value);
     details.append(term, description);
   }
   return details;
@@ -412,8 +434,33 @@ function buildCardHeader(view, tile) {
   return header;
 }
 
-function closeBookCard(view) {
+/** A click with no pointer (`detail` 0) is Enter or Space on the close button. */
+function closeBookCard(view, event) {
+  view.closedByKeyboard = event.detail === 0;
   view.card.close();
+}
+
+function noteKeyboardClose(view) {
+  view.closedByKeyboard = true;
+}
+
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+
+/** A 20 by 20 cross drawn in the button's color, so the theme colors it. */
+function buildCloseIcon() {
+  const icon = document.createElementNS(SVG_NAMESPACE, "svg");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("width", "20");
+  icon.setAttribute("height", "20");
+  icon.setAttribute("fill", "none");
+  icon.setAttribute("stroke", "currentColor");
+  icon.setAttribute("stroke-width", "2");
+  icon.setAttribute("stroke-linecap", "round");
+  icon.setAttribute("aria-hidden", "true");
+  const cross = document.createElementNS(SVG_NAMESPACE, "path");
+  cross.setAttribute("d", "M18 6 6 18M6 6l12 12");
+  icon.append(cross);
+  return icon;
 }
 
 function buildCloseButton(view) {
@@ -421,7 +468,7 @@ function buildCloseButton(view) {
   closeButton.type = "button";
   closeButton.dataset.otVariant = "ghost";
   closeButton.setAttribute("aria-label", "Close");
-  closeButton.textContent = "×";
+  closeButton.append(buildCloseIcon());
   closeButton.addEventListener("click", closeBookCard.bind(undefined, view));
   return closeButton;
 }
@@ -443,7 +490,7 @@ function fillBookCard(view, tile) {
   }
 }
 
-async function openBookCard(view, source) {
+function openBookCard(view, source) {
   const tile = findTile(view, source);
   if (tile === null || view.card.open) {
     return;
@@ -451,11 +498,9 @@ async function openBookCard(view, source) {
   fillBookCard(view, tile);
   view.card.showModal();
   view.openSource = source;
-  view.selected = source;
-  await view.engine.request("storage.set", {
-    key: SELECTED_KEY,
-    value: source,
-  });
+  view.closedByKeyboard = false;
+  const button = findBookButton(view, source);
+  button.setAttribute("aria-expanded", "true");
 }
 
 function isOutsideCard(view, event) {
@@ -484,14 +529,19 @@ function findBookButton(view, source) {
   return null;
 }
 
-/** After the card closes: marks the opened book, and puts the focus back on it. */
+/**
+ * After the card closes: the book is no longer expanded, and gets the focus
+ * back, with the focus ring only when the card was closed with the keyboard.
+ * The browser may have given it the focus already, with its own choice of
+ * ring, and `focus()` does nothing on a focused element: hence the `blur()`.
+ */
 function showClosedCard(view) {
-  const source = view.openSource;
+  const button = findBookButton(view, view.openSource);
   view.openSource = null;
-  renderBookList(view);
-  const button = findBookButton(view, source);
   if (button !== null) {
-    button.focus();
+    button.setAttribute("aria-expanded", "false");
+    button.blur();
+    button.focus({ focusVisible: view.closedByKeyboard });
   }
 }
 
@@ -499,6 +549,7 @@ function buildBookCard(view) {
   const card = document.createElement("dialog");
   card.setAttribute("aria-labelledby", CARD_TITLE_ID);
   card.addEventListener("click", closeOnBackdropClick.bind(undefined, view));
+  card.addEventListener("cancel", noteKeyboardClose.bind(undefined, view));
   card.addEventListener("close", showClosedCard.bind(undefined, view));
   return card;
 }
@@ -537,16 +588,14 @@ export default async function mount(engine, context) {
     title: context.mod.title,
     config: context.config,
     tiles: context.tiles,
-    selected: null,
     booksPerRow: DEFAULT_BOOKS_PER_ROW,
     openSource: null,
+    closedByKeyboard: false,
   };
   view.card = buildBookCard(view);
   engine.on("tiles.changed", showChangedTiles.bind(undefined, view));
   addBookListStyle();
   document.body.replaceChildren(view.main, view.card);
-  const selected = await engine.request("storage.get", { key: SELECTED_KEY });
-  view.selected = typeof selected === "string" ? selected : null;
   const columns = await engine.request("storage.get", { key: COLUMNS_KEY });
   view.booksPerRow = readStartBooksPerRow(columns, context.config.columns);
   renderBookList(view);

@@ -110,7 +110,7 @@ async function opensTheCardOfAClickedBook(context) {
     .toBe("Karin Boye");
   context
     .expect(readTexts(card.querySelectorAll("dd")))
-    .toEqual(["1940-10-01", "Sweden", "Swedish", "220"]);
+    .toEqual(["1940", "Sweden", "Swedish", "220"]);
   context
     .expect(readTexts(card.querySelectorAll("span[data-ot-variant]")))
     .toEqual(["Dystopian", "Political", "Social science fiction"]);
@@ -125,6 +125,19 @@ async function leavesOutMissingMetadata(context) {
   context.expect(card.querySelectorAll("span[data-ot-variant]").length).toBe(0);
 }
 
+async function showsADateWithoutAYearAsWritten(context) {
+  const tile = {
+    source: "https://example.org/books/undated.md",
+    metadata: { title: "Undated", date: "c. 1940" },
+    body: "",
+  };
+  await context.mount({ tiles: [tile] });
+  findBookButton(context, "Undated").click();
+  const card = context.root.querySelector("dialog");
+  context.expect(readTexts(card.querySelectorAll("dt"))).toEqual(["Published"]);
+  context.expect(readTexts(card.querySelectorAll("dd"))).toEqual(["c. 1940"]);
+}
+
 async function showsNoSmallBookWithoutACover(context) {
   await context.mount({ config: { show_covers: false } });
   findBookButton(context, "Kallocain").click();
@@ -133,26 +146,41 @@ async function showsNoSmallBookWithoutACover(context) {
   context.expect(card.querySelector("h2").textContent).toBe("Kallocain");
 }
 
-async function highlightsTheRememberedBook(context) {
-  await context.storage.set("selected", context.tiles[1].source);
-  await context.mount();
-  const current = context.root.querySelectorAll('button[aria-current="true"]');
-  context.expect(current.length).toBe(1);
-  context.expect(current[0].getAttribute("aria-label")).toContain("Kallocain");
+function readExpandedStates(context) {
+  const states = [];
+  for (const button of context.root.querySelectorAll("li > button")) {
+    states.push(button.getAttribute("aria-expanded"));
+  }
+  return states;
 }
 
-async function marksNoBookForAnUnknownRememberedSource(context) {
-  await context.storage.set("selected", "https://example.org/books/gone.md");
+async function marksTheBookWhoseCardIsOpen(context) {
   await context.mount();
+  findBookButton(context, "Kallocain").click();
   context
-    .expect(context.root.querySelectorAll("[aria-current]").length)
-    .toBe(0);
+    .expect(readExpandedStates(context))
+    .toEqual(["false", "true", "false"]);
+  context
+    .expect(
+      context.root.querySelectorAll('li > button[aria-haspopup="dialog"]')
+        .length,
+    )
+    .toBe(3);
 }
 
-async function doesNotReopenTheRememberedBooksCard(context) {
-  await context.storage.set("selected", context.tiles[1].source);
+function isUnmarked(button) {
+  return button.getAttribute("aria-expanded") === "false";
+}
+
+async function unmarksTheBookWhenItsCardCloses(context) {
   await context.mount();
-  context.expect(context.root.querySelector("dialog").open).toBe(false);
+  const kallocain = findBookButton(context, "Kallocain");
+  kallocain.click();
+  context.root.querySelector("dialog").close();
+  await context.waitFor(isUnmarked.bind(undefined, kallocain));
+  context
+    .expect(readExpandedStates(context))
+    .toEqual(["false", "false", "false"]);
 }
 
 export default function registerBookListTests(t) {
@@ -179,14 +207,14 @@ export default function registerBookListTests(t) {
   t.test("has no select without books", hasNoSelectWithoutBooks);
   t.test("opens the card of a clicked book", opensTheCardOfAClickedBook);
   t.test("leaves out missing metadata", leavesOutMissingMetadata);
-  t.test("shows no small book without a cover", showsNoSmallBookWithoutACover);
-  t.test("highlights the remembered book", highlightsTheRememberedBook);
   t.test(
-    "marks no book for an unknown remembered source",
-    marksNoBookForAnUnknownRememberedSource,
+    "shows a date without a year as written",
+    showsADateWithoutAYearAsWritten,
   );
+  t.test("shows no small book without a cover", showsNoSmallBookWithoutACover);
+  t.test("marks the book whose card is open", marksTheBookWhoseCardIsOpen);
   t.test(
-    "does not reopen the remembered book's card",
-    doesNotReopenTheRememberedBooksCard,
+    "unmarks the book when its card closes",
+    unmarksTheBookWhenItsCardCloses,
   );
 }

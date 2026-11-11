@@ -18,12 +18,12 @@ The app SHALL open a mod for the address hash `#/run`, with the query parameter 
 - **THEN** the sample book list mod runs
 
 ### Requirement: Sample book list mod
-The sample mod `book_list` SHALL show the tiles it receives with each book's title, authors and cover image, and SHALL declare the sample books as its sample collection. Opening a book's card SHALL mark that book as the last opened one and store its source in the mod's storage slot, and the mark SHALL show again when the mod is opened later. What the sample shows and how the user works with it is described in `sample-book-list`.
+The sample mod `book_list` SHALL show the tiles it receives with each book's title, authors and cover image, and SHALL declare the sample books as its sample collection. The number of books per row the user chooses SHALL be stored in the mod's storage slot and chosen again when the mod is opened later. What the sample shows and how the user works with it is described in `sample-book-list`.
 
 #### Scenario: Books with covers
 - **WHEN** the sample mod runs with the sample collection from the app's origin
 - **THEN** the frame shows the three books with their titles, authors and cover images
 
 #### Scenario: Selection is remembered
-- **WHEN** the user opens and closes the card of "Kallocain" in the sample mod and the app page is reloaded
-- **THEN** Kallocain's button in the sample mod has `aria-current="true"`
+- **WHEN** the user chooses 10 books per row in the sample mod and the app page is reloaded
+- **THEN** the sample mod's "Books per row" select shows 10

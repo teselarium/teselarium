@@ -117,16 +117,27 @@ Clicking a book SHALL open a modal dialog, labeled by the book's title, that sho
 - **THEN** Fahrenheit 451's card is not opened, and no dialog is open, since the click lands on the backdrop
 
 ### Requirement: Card metadata
-The top of the card SHALL show the book's cover when it has one, then its title, its authors, its `date`, `country`, `language` and `pages` as labeled values, and each of its `genres` as a badge. A key that the tile lacks, or whose value has the wrong type, SHALL be left out without an empty label. The card SHALL NOT show the `image` address as text.
+The top of the card SHALL show the book's cover when it has one, then its title, its authors, its year of publication, `country`, `language` and `pages` as labeled values, and each of its `genres` as a badge. A key that the tile lacks, or whose value has the wrong type, SHALL be left out without an empty label. The card SHALL NOT show the `image` address as text.
 
 #### Scenario: Kallocain's metadata
 - **WHEN** the user opens Kallocain's card
-- **THEN** it shows "Karin Boye", "1940-10-01", "Sweden", "Swedish" and "220" as values
+- **THEN** it shows "Karin Boye", "1940", "Sweden", "Swedish" and "220" as values
 - **AND** it shows the badges "Dystopian", "Political" and "Social science fiction"
 
 #### Scenario: Missing keys
 - **WHEN** the user opens the card of a tile whose metadata has only `title`
 - **THEN** the card shows the title and the body, and no labeled values and no badges
+
+### Requirement: Year of publication
+The card SHALL show the book's `date` labeled "Published": only its first four digits when it is a string that starts with four digits, and otherwise as written.
+
+#### Scenario: Full date
+- **WHEN** the user opens Kallocain's card, whose tile has `date: "1940-10-01"`
+- **THEN** the card shows "1940" labeled "Published"
+
+#### Scenario: Date without a year
+- **WHEN** the user opens the card of a tile whose `date` is `"c. 1940"`
+- **THEN** the card shows "c. 1940" labeled "Published"
 
 ### Requirement: No cover in the card
 When the book has no cover (no string `image`, a cover that fails to load, or `show_covers` not `true`), the card SHALL show neither a cover nor a placeholder.
@@ -143,19 +154,23 @@ Below the metadata, the card SHALL show the book's body as the engine renders it
 - **THEN** the mod sends `links.open` with that address and its frame does not navigate
 
 ### Requirement: Closing the card
-The card SHALL close when the user presses Escape, presses its close button (accessible name "Close"), or clicks the backdrop outside it. A click inside the card SHALL NOT close it. After it closes, focus SHALL be on the book whose card it was.
+The card SHALL close when the user presses Escape, presses its close button (accessible name "Close"), or clicks the backdrop outside it. A click inside the card SHALL NOT close it. After it closes, focus SHALL be on the book whose card it was. The book SHALL show the focus ring only when the card was closed with the keyboard: Escape, or Enter or Space on the close button.
 
 #### Scenario: Escape
 - **WHEN** Kallocain's card is open and the user presses Escape
-- **THEN** no dialog is open and Kallocain's button has focus
+- **THEN** no dialog is open and Kallocain's button has focus and shows the focus ring
 
 #### Scenario: Close button
-- **WHEN** Kallocain's card is open and the user presses "Close"
-- **THEN** no dialog is open and Kallocain's button has focus
+- **WHEN** Kallocain's card is open and the user clicks "Close" with the mouse, then moves the pointer off the books
+- **THEN** no dialog is open, and Kallocain's button has focus, shows no focus ring and has no `box-shadow`
+
+#### Scenario: Close button with the keyboard
+- **WHEN** Kallocain's card is open, "Close" has focus and the user presses Enter
+- **THEN** no dialog is open and Kallocain's button has focus and shows the focus ring
 
 #### Scenario: Backdrop
-- **WHEN** Kallocain's card is open and the user clicks the backdrop outside it
-- **THEN** no dialog is open
+- **WHEN** Kallocain's card is open and the user clicks the backdrop outside it, away from the books
+- **THEN** no dialog is open, and Kallocain's button has focus and shows no focus ring
 
 #### Scenario: Click inside the card
 - **WHEN** Kallocain's card is open and the user clicks its body text
@@ -167,22 +182,39 @@ While a card is open, it SHALL stay open when the tiles change and its book is s
 #### Scenario: Tiles reloaded with the book
 - **WHEN** Kallocain's card is open and the user presses "Reload tiles" with a collection that still lists Kallocain, now with `pages: 230`
 - **THEN** Kallocain's card is still open and shows "230"
+- **AND** Kallocain's button has `aria-expanded="true"`
 
 #### Scenario: Tiles reloaded without the book
 - **WHEN** Kallocain's card is open and the user presses "Reload tiles" with a collection that no longer lists Kallocain
 - **THEN** no dialog is open
 
-### Requirement: Last opened book
-The button of the book whose card was opened last SHALL have `aria-current="true"`, and no other book's button SHALL have `aria-current`. The mod SHALL store that book's `source` under the key `selected` and, when it starts, SHALL mark the stored book without opening its card. A stored source that names none of the tiles SHALL mark no book. No book's button SHALL have `aria-pressed`.
+### Requirement: Raised book
+A book SHALL be raised, moved up a little and given the theme's shadow (`--ot-shadow`), while the pointer is over it, while it has keyboard focus, and while its card is open. When the user prefers reduced motion, a raised book SHALL get the shadow without moving.
 
-#### Scenario: Mark after opening
+#### Scenario: Raised on hover
+- **WHEN** the pointer is over Kallocain's book
+- **THEN** Kallocain's button has the computed `box-shadow` of `--ot-shadow` and its computed transform moves it up
+- **AND** the other books' buttons have no `box-shadow`
+
+#### Scenario: Raised while the card is open
+- **WHEN** Kallocain's card is open
+- **THEN** Kallocain's button has the computed `box-shadow` of `--ot-shadow` and its computed transform moves it up
+
+#### Scenario: Back after closing
+- **WHEN** the user opens and closes Kallocain's card, moves the pointer off the books and clicks the heading
+- **THEN** Kallocain's button has no `box-shadow` and its computed transform is `none`
+
+#### Scenario: Reduced motion
+- **WHEN** the user prefers reduced motion and the pointer is over Kallocain's book
+- **THEN** Kallocain's button has the computed `box-shadow` of `--ot-shadow` and its computed transform is `none`
+
+### Requirement: The open book's state
+Each book's button SHALL have `aria-haspopup="dialog"`. The button of the book whose card is open SHALL have `aria-expanded="true"`, and every other book's button SHALL have `aria-expanded="false"`.
+
+#### Scenario: State while the card is open
+- **WHEN** Kallocain's card is open
+- **THEN** Kallocain's button has `aria-expanded="true"` and the other books' buttons have `aria-expanded="false"`
+
+#### Scenario: State after closing
 - **WHEN** the user opens and closes Kallocain's card
-- **THEN** Kallocain's button has `aria-current="true"` and the other books' buttons have no `aria-current`
-
-#### Scenario: Remembered across starts
-- **WHEN** the storage holds `selected` with Kallocain's `source` and the mod starts
-- **THEN** Kallocain's button has `aria-current="true"` and no dialog is open
-
-#### Scenario: Remembered book no longer listed
-- **WHEN** the storage holds `selected` with a source that is not one of the tiles
-- **THEN** no book's button has `aria-current`
+- **THEN** every book's button has `aria-expanded="false"`

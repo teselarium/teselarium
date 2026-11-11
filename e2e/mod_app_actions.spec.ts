@@ -236,7 +236,6 @@ test.describe("The action dialog names the mod", function describeNaming(): void
     await waitForProbe(frame);
     const book = frame.getByRole("button", { name: /Kallocain/ });
     await expect(book).toBeVisible();
-    await expect(book).not.toHaveAttribute("aria-current");
     const box = await book.boundingBox();
     if (box === null) {
       throw new Error("Expected the book button to be shown");
@@ -247,7 +246,6 @@ test.describe("The action dialog names the mod", function describeNaming(): void
     await page.mouse.click(box.x + 4, box.y + box.height / 2);
     await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
 
-    await expect(book).not.toHaveAttribute("aria-current");
     expect(await frame.locator("dialog[open]").count()).toBe(0);
   });
 });

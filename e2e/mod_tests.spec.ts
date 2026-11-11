@@ -283,7 +283,7 @@ test.describe("Case context", function describeCaseContext(): void {
       "sample_context",
     );
 
-    expect(findCase(report, "highlights the remembered book")).toMatchObject({
+    expect(findCase(report, "remembers the books per row")).toMatchObject({
       status: "pass",
       message: null,
     });
