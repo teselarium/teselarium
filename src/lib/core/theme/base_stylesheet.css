@@ -26,6 +26,17 @@
     color: var(--ot-foreground);
   }
 
+  /*
+   * The contained layout: the body is at most the content width, centered.
+   * The frame still fills the stage area, so the space beside the body
+   * scrolls the document. Theater and fullscreen set no limit. A mod keeps
+   * the full width with `body { max-width: none; }`.
+   */
+  html[data-ot-layout="contained"] body {
+    max-width: var(--ot-content-width);
+    margin-inline: auto;
+  }
+
   /* A color scheme section: the element gets its own color scheme's colors. */
   [data-ot-color-scheme] {
     background-color: var(--ot-background);

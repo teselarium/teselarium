@@ -40,6 +40,12 @@ export interface RunLink {
   params: Record<string, string>;
 }
 
+/**
+ * How wide a mod frame lays out its content: centered at the content width,
+ * across the stage area (theater mode), or across the screen (fullscreen).
+ */
+export type FrameLayout = "contained" | "theater" | "fullscreen";
+
 /** What a mod receives as the second argument of `mount`. Plain data. */
 export interface ModContext {
   mod: {
@@ -60,13 +66,15 @@ export interface ModContext {
   permissions: ModGrants;
   /** The theme current when the frame connected. */
   theme: Theme;
+  /** The frame's layout when the frame connected. */
+  layout: FrameLayout;
 }
 
 /**
  * The mount context as built when the mod starts loading: everything but the
- * theme, which is only known when the frame connects.
+ * theme and the layout, which are only known when the frame connects.
  */
-export type LaunchContext = Omit<ModContext, "theme">;
+export type LaunchContext = Omit<ModContext, "theme" | "layout">;
 
 /** Everything needed to start a mod's frame. Plain data. */
 export interface ModLaunch {

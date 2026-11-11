@@ -10,14 +10,14 @@ import {
 
 describe("MOD_API_VERSION", function describeModApiVersion(): void {
   it("Version of this API", function isCurrentVersion(): void {
-    expect(MOD_API_VERSION).toBe("0.1.8");
+    expect(MOD_API_VERSION).toBe("0.1.9");
   });
 });
 
 describe("isVersionInApiRange", function describeVersionInRange(): void {
   it("Caret range on 0.1", function matchesCaretOnZeroMinor(): void {
     expect(isVersionInApiRange("0.1.0", "^0.1.0")).toBe(true);
-    expect(isVersionInApiRange("0.1.8", "^0.1.0")).toBe(true);
+    expect(isVersionInApiRange("0.1.9", "^0.1.0")).toBe(true);
     expect(isVersionInApiRange("0.2.0", "^0.1.0")).toBe(false);
   });
 

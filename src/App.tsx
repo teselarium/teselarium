@@ -18,6 +18,7 @@ import type {
   SidebarSnapshot,
 } from "./main/sidebar/sidebar_layout.ts";
 import { StageView } from "./main/stage/StageView.tsx";
+import type { TheaterSetting } from "./main/stage/theater_setting.ts";
 import type { AppTheme } from "./main/theme/app_theme.ts";
 import { useStoreSnapshot } from "./main/use_store_snapshot.ts";
 import "./main/app.css";
@@ -29,6 +30,7 @@ interface AppProps {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
+  theater: TheaterSetting;
   siteDecisions: SiteDecisions;
   playerSites: PlayerSites;
   layout: SidebarLayoutStore;
@@ -56,6 +58,7 @@ function App({
   sections,
   switches,
   tileMedia,
+  theater,
   siteDecisions,
   playerSites,
   layout,
@@ -90,7 +93,11 @@ function App({
               playerSites={playerSites}
             />
           </div>
-          <StageView stage={stage} playerSites={playerSites} />
+          <StageView
+            stage={stage}
+            playerSites={playerSites}
+            theater={theater}
+          />
         </main>
       </div>
     </TooltipProvider>

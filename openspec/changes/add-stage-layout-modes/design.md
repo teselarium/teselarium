@@ -99,11 +99,11 @@ The frame is shown only after connect (see `SandboxFrame`), and the attribute is
 The rule sits in the base stylesheet, so `theme: "none"` frames never get it. `body` already has `box-sizing: border-box`, so its padding counts in the width.
 
 Two new shared tokens hold the widths:
-- `--ot-content-width: 80rem`, for mod frames;
-- `--ot-reading-width: 45rem`, for pages.
+- `--ot-content-width: 65rem`, for mod frames;
+- `--ot-reading-width: 55rem`, for pages.
 
 They have the same value in both color schemes. `PAGE_HOST_RULES` gives `.page-body` `max-width: var(--ot-reading-width)` and `margin-inline: auto`, with no layout attribute, since pages have no theater mode.
-- *Alternative: one width for frames and pages.* It was rejected because lines of text at 80rem are too long to read.
+- *Alternative: one width for frames and pages.* It was rejected because lines of text at the content width are too long to read.
 
 ### D7. The theater choice is a remembered setting in `src/main/stage/`
 
@@ -122,9 +122,9 @@ The buttons are two `StageBarIconButton`s, in the right group after the message 
 
 ## Risks / Trade-offs
 
-- **A mod's layout gets narrower** without the mod asking: on wide screens, a mod that relied on the full width now gets 80rem until theater mode is on. → It is a look change, not a break. The theme README documents the one-line opt-out, and the proposal records it as a patch.
-- **Pages at 45rem are tight for wide content.** → Images, video and SVG are already limited to `max-width: 100%`, and diagrams and block formulas scroll sideways. Tables are `width: 100%`, and their cells wrap, but a table whose cells cannot wrap, such as long code or URLs, would overflow. The vanilla pages have no such table. If one appears, a later change can let tables scroll in pages without changing the frames' width.
-- **Existing e2e tests** measure the frame at 1280×800. → The stage area there is narrower than 80rem, so `contained` changes nothing at that size. Only the new wide-viewport tests see the limit.
+- **A mod's layout gets narrower** without the mod asking: on wide screens, a mod that relied on the full width now gets 65rem until theater mode is on. → It is a look change, not a break. The theme README documents the one-line opt-out, and the proposal records it as a patch.
+- **Pages at 55rem are tight for wide content.** → Images, video and SVG are already limited to `max-width: 100%`, and diagrams and block formulas scroll sideways. Tables are `width: 100%`, and their cells wrap, but a table whose cells cannot wrap, such as long code or URLs, would overflow. The vanilla pages have no such table. If one appears, a later change can let tables scroll in pages without changing the frames' width.
+- **Existing e2e tests** measure the frame at 1280×800. → The stage area there, beside the open sidebar, is narrower than 65rem, so `contained` changes nothing at that size. Only the new wide-viewport tests see the limit.
 - **Browsers that refuse fullscreen**, such as an app embedded without `allow="fullscreen"`, or iOS Safari on iPhone for non-video elements. → The request's rejection becomes a warning in the stage bar (D4), and the mod keeps running.
 - **A message popover is open when fullscreen starts.** → The bar closes it when fullscreen starts (D4), so no popover is left open behind the fullscreen frame.
 - **A theater toggle sends one `layout.changed` to every running mod, hidden ones too.** → It is the same cost as `theme.changed`, and it is once per press.
@@ -135,5 +135,5 @@ Nothing to migrate. The stored key is new, and a missing value means theater mod
 
 ## Open Questions
 
-- **The exact token values** (80rem and 45rem). The specs refer to the tokens, not to their values, so they can be tuned after the e2e screenshots are reviewed.
+- **The exact token values** (65rem and 55rem). They were first 80rem and 45rem, and tuned after the screenshots were reviewed: 80rem left a mod's short content running across the screen, and 45rem looked narrow for pages on a wide screen. The specs refer to the tokens, not to their values, so they can be tuned again.
 - **The theater icon.** `RectangleHorizontal` is the default, and any lucide icon works without changing the specs.

@@ -11,6 +11,9 @@ const MOUNT_FAILED_METHOD = "sandbox.mountFailed";
 const MOUNTED_METHOD = "sandbox.mounted";
 const DIALOG_BLOCKED_METHOD = "sandbox.dialogBlocked";
 const THEME_CHANGED_METHOD = "theme.changed";
+const LAYOUT_CHANGED_METHOD = "layout.changed";
+// The layouts a frame can have; the attribute ignores anything else.
+const FRAME_LAYOUTS = Object.freeze(["contained", "theater", "fullscreen"]);
 const RENDER_BODY_METHOD = "tiles.renderBody";
 const OPEN_LINK_METHOD = "links.open";
 const OPEN_PLAYER_METHOD = "players.open";
@@ -53,7 +56,7 @@ const loader = {
   nextRequestId: 1,
   pendingRequests: new Map(),
   eventHandlers: new Map(),
-  // The mount context, kept until `mount` is called so a theme change can still reach it.
+  // The mount context, kept until `mount` is called so a theme or layout change can still reach it.
   context: null,
   mounted: false,
   // The newest theme, from the connect message and every theme change: the colors of the diagrams.
@@ -291,6 +294,32 @@ function applyThemeChanged(theme) {
   redrawTileBodies();
 }
 
+function isFrameLayout(layout) {
+  return FRAME_LAYOUTS.includes(layout);
+}
+
+// The attribute the base stylesheet's width limit follows. Anything but one
+// of the three layouts is ignored.
+function applyLayout(layout) {
+  if (!isFrameLayout(layout)) {
+    return;
+  }
+  document.documentElement.dataset.otLayout = layout;
+}
+
+// Before the mod's handlers run: they read the new attribute, and a mod still
+// being imported mounts with the newest layout.
+function applyLayoutChanged(params) {
+  const layout = params?.layout;
+  applyLayout(layout);
+  if (!isFrameLayout(layout)) {
+    return;
+  }
+  if (!loader.mounted && loader.context !== null) {
+    loader.context.layout = layout;
+  }
+}
+
 function handlePortMessage(event) {
   const message = event.data;
   if (typeof message !== "object" || message === null) {
@@ -302,6 +331,9 @@ function handlePortMessage(event) {
   }
   if (message.method === THEME_CHANGED_METHOD) {
     applyThemeChanged(message.params);
+  }
+  if (message.method === LAYOUT_CHANGED_METHOD) {
+    applyLayoutChanged(message.params);
   }
   if (typeof message.method === "string") {
     dispatchNotification(message);
@@ -405,6 +437,7 @@ function connectToEngine(event) {
   const params = event.data.params;
   loader.context = params.context;
   applyColorScheme(params.context?.theme);
+  applyLayout(params.context?.layout);
   if (isTheme(params.context?.theme)) {
     loader.theme = params.context.theme;
   }

@@ -15,6 +15,8 @@ import {
 import type { SiteDecisions } from "../main/settings/site_decisions.ts";
 import { createTileMediaSetting } from "../main/settings/tile_media_setting.ts";
 import type { TileMediaSetting } from "../main/settings/tile_media_setting.ts";
+import { createTheaterSetting } from "../main/stage/theater_setting.ts";
+import type { TheaterSetting } from "../main/stage/theater_setting.ts";
 import { createSidebarLayout } from "../main/sidebar/sidebar_layout.ts";
 import type { SidebarLayoutStore } from "../main/sidebar/sidebar_layout.ts";
 import { createAppTheme } from "../main/theme/app_theme.ts";
@@ -34,6 +36,7 @@ export interface AppFixture {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
+  theater: TheaterSetting;
   siteDecisions: SiteDecisions;
   playerSites: PlayerSites;
   layout: SidebarLayoutStore;
@@ -93,6 +96,7 @@ export async function startTestApp(
       optionalIds: listOptionalIds(sections),
     }),
     tileMedia: createTileMediaSetting({ storage, stage }),
+    theater: createTheaterSetting({ storage, stage }),
     siteDecisions,
     playerSites: createPlayerSites({ storage }),
     layout: createSidebarLayout({

@@ -23,6 +23,7 @@ import type { ModCheckRequest, UserNotification } from "./mod_methods.ts";
 import {
   connectModSession,
   ENGINE_METHODS,
+  LAYOUT_CHANGED_METHOD,
   THEME_CHANGED_METHOD,
   TILES_CHANGED_METHOD,
 } from "./mod_session.ts";
@@ -457,6 +458,55 @@ const SURFACE_BY_VERSION: Record<string, ModApiSurface> = {
     ],
     permissionCategories: ["code", "connect", "embed", "open", "show"],
   },
+  "0.1.9": {
+    methods: [
+      "files.save",
+      "libs.load",
+      "links.open",
+      "mods.check",
+      "mods.inspect",
+      "mods.open",
+      "players.open",
+      "storage.get",
+      "storage.set",
+      "tiles.renderBody",
+      "ui.confirm",
+      "ui.notify",
+    ],
+    events: ["layout.changed", "theme.changed", "tiles.changed"],
+    contextKeys: [
+      "api",
+      "config",
+      "issues",
+      "layout",
+      "mod",
+      "params",
+      "permissions",
+      "theme",
+      "tiles",
+    ],
+    contextMappingKeys: {
+      mod: ["description", "name", "source", "title", "version"],
+      api: ["version"],
+      permissions: ["denied", "granted"],
+      theme: ["colorScheme", "tokens"],
+    },
+    modFileKeys: [
+      "api",
+      "config",
+      "description",
+      "entrypoint",
+      "name",
+      "permissions",
+      "sample_collection",
+      "test_path",
+      "theme",
+      "title",
+      "type_path",
+      "version",
+    ],
+    permissionCategories: ["code", "connect", "embed", "open", "show"],
+  },
 };
 
 const BUMP_RULE = `The mod API surface does not match the entry of MOD_API_VERSION (${MOD_API_VERSION}). Bump MOD_API_VERSION in mod_api_version.ts as "Mod API version" in docs/modules/lib/core/engine/README.md says (while it is 0.x, a breaking change bumps the minor version, an addition or a fix the patch version), and add an entry for the new version to SURFACE_BY_VERSION`;
@@ -496,6 +546,7 @@ async function readSampleMountContext(): Promise<Record<string, object>> {
       vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
     onNotify: vi.fn<(notification: UserNotification) => void>(),
     theme: buildTheme("light"),
+    layout: "contained",
   });
   openPorts.push(session.port, readModPort(fakeFrame));
   const connect = fakeFrame.posted[0].message as {
@@ -509,7 +560,11 @@ async function buildCurrentSurface(): Promise<ModApiSurface> {
   const context = await readSampleMountContext();
   const surface: ModApiSurface = {
     methods: listSortedKeys(ENGINE_METHODS),
-    events: [THEME_CHANGED_METHOD, TILES_CHANGED_METHOD].sort(),
+    events: [
+      LAYOUT_CHANGED_METHOD,
+      THEME_CHANGED_METHOD,
+      TILES_CHANGED_METHOD,
+    ].sort(),
     contextKeys: listSortedKeys(context),
     contextMappingKeys: {
       mod: listSortedKeys(context.mod),

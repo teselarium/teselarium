@@ -42,6 +42,8 @@ Each token is a CSS custom property. The color tokens are roles, named like shad
 | `--ot-space-1` / `-2` / `-3` / `-4` / `-6` | `0.25rem` / `0.5rem` / `0.75rem` / `1rem` / `1.5rem` | same | spacing |
 | `--ot-radius` | `0.625rem` | same | corners |
 | `--ot-shadow` | `0 10px 15px -3px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.12)` | same | dialogs, player placeholders on hover |
+| `--ot-content-width` | `65rem` | same | the most a mod's `<body>` is wide in the `contained` layout |
+| `--ot-reading-width` | `55rem` | same | the most a page's content is wide; mods can use it for long text |
 
 The palette comes from Gaudí's trencadís mosaics: cobalt and turquoise glazes, saffron and leaf-green shards, on stone and white ceramic, or on night blue in dark. `accent` follows shadcn's meaning, the hover fill, not a brand color. Links are `secondary`; selection and the main action are `primary`.
 
@@ -68,7 +70,7 @@ The palette comes from Gaudí's trencadís mosaics: cobalt and turquoise glazes,
 
 Unless the mod opts out, its frame gets the tokens and a base stylesheet before the mod runs. The base stylesheet styles plain HTML elements, with no classes to learn, and gives them the look of the app's components:
 
-- the page: background, text color, font, size and line height; `<body>` has no margin, padding `--ot-space-4` and fills the frame;
+- the page: background, text color, font, size and line height; `<body>` has no margin, padding `--ot-space-4` and fills the frame, at most `--ot-content-width` wide and centered in the `contained` layout (see [Write HTML, get the app's look](#write-html-get-the-apps-look));
 - headings (`h1` and `h2` slightly tightened), paragraphs, links (`secondary`, underlined), `hr`, `small`, `blockquote`, `code`, `kbd`, `samp`, `pre`;
 - buttons: a plain `<button>` is an outline button, a `<button type="submit">` a primary button; hover (an `accent` fill, with everything inside the button in its text color) and `:disabled`;
 - form fields (`input`, `select`, `textarea`): the `card` surface, `input` border, radius, padding, the page's font, a placeholder in `muted-foreground`;
@@ -80,11 +82,44 @@ Unless the mod opts out, its frame gets the tokens and a base stylesheet before 
 - `[hidden]`: still hidden, whatever else styles the element;
 - short color transitions, none when the user prefers reduced motion.
 
-It sets no layout beyond spacing. Checkboxes, radio buttons and range inputs take the primary color through `accent-color`, and the browser's own controls and scrollbars follow the color scheme through `color-scheme`.
+It sets no layout beyond spacing and the body's width in the `contained` layout. Checkboxes, radio buttons and range inputs take the primary color through `accent-color`, and the browser's own controls and scrollbars follow the color scheme through `color-scheme`.
 
 ### Write HTML, get the app's look
 
 Mods don't get Tailwind or shadcn/ui, and need no classes. Well-written, accessible HTML already looks like OpenTesela: the base stylesheet styles elements by their meaning. The [default mods](../../../mods/README.md) are short examples of it, and so is the sample book list mod (`public/samples/mods/book_list/main.js`): its grid of books, its select, its card in a `<dialog>` and its badges all take the theme's look, and its own CSS sets layout, and the books' corner shape and shadow, from `--ot-radius` and `--ot-shadow`.
+
+**Width.** The frame fills the stage area, but in the `contained` layout, the default, the base stylesheet keeps `<body>` at most `--ot-content-width` wide (65rem) and centered, so a cover grid or a line of text does not run across a wide screen. The space beside the body still belongs to the frame: the wheel scrolls the mod there, and the scrollbar stays at the frame's edge. In theater mode, which the user turns on from the stage bar, and in fullscreen, the body has no limit:
+
+```css
+/* What the base stylesheet does, in the layer `opentesela`. */
+html[data-ot-layout="contained"] body {
+  max-width: var(--ot-content-width);
+  margin-inline: auto;
+}
+```
+
+The layout is the attribute `data-ot-layout` on the frame's `<html>`, `"contained"`, `"theater"` or `"fullscreen"`. The frame loader sets it before `mount` is called and updates it on every `layout.changed`, before the mod's handlers run; mods that opt out of the theme styles get it too. The same value is `context.layout`, and the event `layout.changed` pushes `{ layout }` each time it changes (see [Frame layout](../engine/README.md#frame-layout)). A mod that draws to its width, such as a canvas or a map, redraws on the event:
+
+```js
+export default function mount(engine, context) {
+  drawMap(context.layout);
+  engine.on("layout.changed", function redrawMap(params) {
+    drawMap(params.layout);
+  });
+}
+```
+
+A mod that needs the full width in every layout, such as media, a map or a game, opts out with one unlayered rule:
+
+```css
+body { max-width: none; }
+```
+
+A mod can keep long text at a reading width with `--ot-reading-width` (55rem), the width of the app's pages:
+
+```css
+.notes { max-width: var(--ot-reading-width); }
+```
 
 **Plain elements**
 
@@ -265,7 +300,7 @@ mod:
   theme: "none"
 ```
 
-Its frame has neither the tokens nor the base stylesheet: the browser's defaults apply. Player placeholders of rendered tile bodies are then plain buttons, which still open their player when clicked. It still receives `context.theme`, `theme.changed` and the color scheme attribute, so it can follow the app with its own styles. `theme: "default"` is the default.
+Its frame has neither the tokens nor the base stylesheet: the browser's defaults apply. Player placeholders of rendered tile bodies are then plain buttons, which still open their player when clicked. It still receives `context.theme`, `theme.changed` and the color scheme attribute, so it can follow the app with its own styles. It also gets the layout attribute, `context.layout` and `layout.changed`, but no width limit. `theme: "default"` is the default.
 
 ### Do not use `prefers-color-scheme`
 
@@ -282,7 +317,7 @@ Inside a frame, `@media (prefers-color-scheme: dark)` and `matchMedia("(prefers-
 
 The Settings page has a Theme control with System, Light and Dark (see [Settings](../../../main/settings/README.md)). System, the default, follows the operating system and changes with it while the app is open. The choice is kept in the app's storage under the key `opentesela.theme-choice`, outside the `opentesela.mod-storage:` keys, so no mod can read or change it. A missing or unknown stored value counts as System. When the storage cannot be read or written, the choice still applies until the page is closed.
 
-The app's own interface (header, sidebar, Settings page, stage bar, issue list, load errors, action dialog) uses the same tokens, through Tailwind CSS and shadcn/ui, so it always matches the mods. Markdown pages get the frames' own base stylesheet in a shadow root (see [Pages](../../../main/homepage/README.md#pages-look-like-mods)). The sidebar's colors are the app-only aliases `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`, `--sidebar-accent-foreground`, `--sidebar-border` and `--sidebar-ring` in `src/main/app.css`, from `--ot-card`, `--ot-card-foreground`, `--ot-accent`, `--ot-accent-foreground`, `--ot-border` and `--ot-ring`; mods do not get them.
+The app's own interface (header, sidebar, Settings page, stage bar, issue list, load errors, action dialog) uses the same tokens, through Tailwind CSS and shadcn/ui, so it always matches the mods. Markdown pages get the frames' own base stylesheet in a shadow root (see [Pages](../../../main/homepage/README.md#pages-look-like-mods)). A page's content is at most `--ot-reading-width` wide and centered in the page area, and fills the page area when it is narrower; pages have no theater mode. The sidebar's colors are the app-only aliases `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`, `--sidebar-accent-foreground`, `--sidebar-border` and `--sidebar-ring` in `src/main/app.css`, from `--ot-card`, `--ot-card-foreground`, `--ot-accent`, `--ot-accent-foreground`, `--ot-border` and `--ot-ring`; mods do not get them.
 
 ## Module Details
 

@@ -11,6 +11,8 @@ describe("stage module entry point", function describeEntryPoint(): void {
       "attachFrame",
       "buildSectionHash",
       "changeStageColorScheme",
+      "changeStageFullscreen",
+      "changeStageTheaterMode",
       "changeStageTileLinkedMedia",
       "checkFrameLoadedAgain",
       "clearNotifications",
@@ -26,6 +28,7 @@ describe("stage module entry point", function describeEntryPoint(): void {
       "readStageSnapshot",
       "reloadTiles",
       "subscribeStage",
+      "warnFullscreenRefused",
     ]);
   });
 });

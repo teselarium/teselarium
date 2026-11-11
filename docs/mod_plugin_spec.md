@@ -72,6 +72,14 @@ schema:
 Tiles with a title and the country they are located in.
 ```
 
+## Width and layout
+
+A mod's frame fills the stage area. By default, its layout is `contained`: the base stylesheet keeps `<body>` at most `--ot-content-width` wide and centered, so content stays readable on a wide screen. The user can turn on theater mode from the stage bar, where the body has no limit, or show the mod fullscreen. A mod reads its layout as `context.layout` or from the `data-ot-layout` attribute on `<html>`, and receives `layout.changed` with `{ layout }` when it changes (see [Write HTML, get the app's look](modules/lib/core/theme/README.md#write-html-get-the-apps-look) in the theme's README). A mod that needs the full width in every layout, such as media, a map or a game, adds one style:
+
+```css
+body { max-width: none; }
+```
+
 ## Showing a tile's body
 
 A tile's `body` is markdown, as its author wrote it. A mod does not need a markdown parser to show it: the engine renders it to safe HTML that works inside the mod's sandbox, with images, video, audio and pictures, paths resolved against the tile, links that open through the app and a placeholder for each video or audio player (see [Tile bodies](modules/lib/core/engine/README.md#tile-bodies) in the engine's README).

@@ -86,6 +86,7 @@ export async function startCheckStage(
     fetch: fetchSpy,
     colorScheme: "light",
     loadsTileLinkedMedia: true,
+    theaterMode: false,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,
   });

@@ -14,6 +14,7 @@ import {
   messageButton,
   messageCapsule,
   messagePopover,
+  OTHER_API_RANGE,
   openMessages,
   openShareMenu,
   readMessages,
@@ -40,6 +41,7 @@ import {
   SAMPLE_RUN_HASH,
   SAMPLE_TYPE_PATH,
 } from "./sample_mod.ts";
+import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 
@@ -184,13 +186,23 @@ function closeButton(page: Page): Locator {
   return stageBar(page).getByRole("button", { name: "Close" });
 }
 
-/** The boxes of every button of the stage bar, and of its separator. */
+function theaterButton(page: Page): Locator {
+  return stageBar(page).getByRole("button", { name: "Theater mode" });
+}
+
+function fullscreenButton(page: Page): Locator {
+  return stageBar(page).getByRole("button", { name: "Fullscreen" });
+}
+
+/** The boxes of every button of the stage bar, and of its separators. */
 async function readBarBoxes(page: Page): Promise<Box[]> {
   const boxes: Box[] = [];
   for (const button of await stageBar(page).getByRole("button").all()) {
     boxes.push(await readBox(button));
   }
-  boxes.push(await readBox(separator(page)));
+  for (const barSeparator of await separator(page).all()) {
+    boxes.push(await readBox(barSeparator));
+  }
   return boxes;
 }
 
@@ -394,7 +406,10 @@ test.describe("One-row stage bar", function describeLayout(): void {
       messageButton(page, "Errors"),
       messageButton(page, "Warnings"),
       messageButton(page, "Notifications"),
-      separator(page),
+      separator(page).first(),
+      theaterButton(page),
+      fullscreenButton(page),
+      separator(page).last(),
       closeButton(page),
     ];
     const boxes: Box[] = [];
@@ -431,6 +446,8 @@ test.describe("One-row stage bar", function describeLayout(): void {
       "Errors: 0, 0 unread",
       "Warnings: 0, 0 unread",
       "Notifications: 0, 0 unread",
+      "Theater mode",
+      "Fullscreen",
       "Close",
     ]);
   });
@@ -441,13 +458,103 @@ test.describe("One-row stage bar", function describeLayout(): void {
     await page.goto(`/${SAMPLE_RUN_HASH}`);
     await expect(stageBar(page)).toContainText("Book List");
 
+    await expect(separator(page)).toHaveCount(2);
     const closeBox = await readBox(closeButton(page));
-    const separatorBox = await readBox(separator(page));
+    const separatorBox = await readBox(separator(page).last());
     const barBox = await readBox(stageBar(page));
     expect(separatorBox.x).toBeLessThan(closeBox.x);
     expect(
       barBox.x + barBox.width - (closeBox.x + closeBox.width),
     ).toBeLessThan(20);
+  });
+});
+
+test.describe("One-row stage bar without a close button", function describeHomeLayout(): void {
+  test("Home mod without a close button", async function placesFullscreenLast({
+    page,
+  }): Promise<void> {
+    await page.goto(`${HOME_MOD_PREVIEW_URL}/`);
+    await expect(fullscreenButton(page)).toBeVisible();
+
+    await expect(closeButton(page)).toHaveCount(0);
+    await expect(separator(page)).toHaveCount(1);
+    const names: string[] = [];
+    for (const button of await stageBar(page).getByRole("button").all()) {
+      names.push((await button.getAttribute("aria-label")) ?? "");
+    }
+    expect(names.slice(-2)).toEqual(["Theater mode", "Fullscreen"]);
+    const fullscreenBox = await readBox(fullscreenButton(page));
+    const separatorBox = await readBox(separator(page));
+    expect(separatorBox.x).toBeLessThan(fullscreenBox.x);
+  });
+});
+
+test.describe("Theater mode button", function describeTheaterButton(): void {
+  test("Turn theater mode on", async function turnsOn({ page }): Promise<void> {
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
+    await expect(theaterButton(page)).toHaveAttribute("aria-pressed", "false");
+
+    await theaterButton(page).click();
+
+    await expect(theaterButton(page)).toHaveAttribute("aria-pressed", "true");
+    // The click closed the tooltip: the pointer leaves and comes back.
+    await page.mouse.move(0, 0);
+    await theaterButton(page).hover();
+    await expect(page.getByRole("tooltip")).toHaveText("Theater mode");
+  });
+
+  test("Turn theater mode off", async function turnsOff({
+    page,
+  }): Promise<void> {
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
+    await theaterButton(page).click();
+    await expect(theaterButton(page)).toHaveAttribute("aria-pressed", "true");
+
+    await theaterButton(page).click();
+
+    await expect(theaterButton(page)).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("Shown for a failed sandbox", async function showsWhenFailed({
+    page,
+  }): Promise<void> {
+    await page.goto(`/#/run?mod=${MISSING_MOD_REFERENCE}`);
+    await expect(stageBar(page)).toContainText("Mod not loaded");
+
+    await expect(theaterButton(page)).toBeVisible();
+  });
+});
+
+test.describe("Fullscreen button", function describeFullscreenButton(): void {
+  test("Running mod", async function showsForRunning({ page }): Promise<void> {
+    await page.goto(`/${SAMPLE_RUN_HASH}`);
+
+    await expect(fullscreenButton(page)).toBeVisible();
+    await fullscreenButton(page).hover();
+    await expect(page.getByRole("tooltip")).toHaveText("Fullscreen");
+  });
+
+  test("Failed sandbox", async function hidesWhenFailed({
+    page,
+  }): Promise<void> {
+    await page.goto(`/#/run?mod=${MISSING_MOD_REFERENCE}`);
+    await expect(stageBar(page)).toContainText("Mod not loaded");
+
+    await expect(fullscreenButton(page)).toHaveCount(0);
+  });
+
+  test("Waiting for an answer", async function hidesWhileAsking({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(
+      page,
+      buildProbeFiles("later", ['  title: "Later API"'], OTHER_API_RANGE),
+    );
+    await page.goto("/#/run?mod=./test-mods/later/");
+    await expect(page.getByRole("dialog")).toBeVisible();
+
+    await expect(theaterButton(page)).toBeVisible();
+    await expect(fullscreenButton(page)).toHaveCount(0);
   });
 });
 
@@ -576,7 +683,9 @@ test.describe("Message buttons", function describeButtons(): void {
 
     await expect(messageCapsule(page, "Notifications")).toHaveText("99+");
     const capsuleBox = await readBox(messageCapsule(page, "Notifications"));
-    expect(overlaps(capsuleBox, await readBox(separator(page)))).toBe(false);
+    expect(overlaps(capsuleBox, await readBox(separator(page).first()))).toBe(
+      false,
+    );
     expect(overlaps(capsuleBox, await readBox(closeButton(page)))).toBe(false);
   });
 

@@ -52,6 +52,7 @@ import {
 import type { ModIssue } from "../../mod/index.ts";
 import type {
   AppAction,
+  FrameLayout,
   ModCheckReport,
   ModCheckRequest,
   RunLink,
@@ -178,6 +179,10 @@ function readLightTheme(): Theme {
   return buildTheme("light");
 }
 
+function readContainedLayout(): FrameLayout {
+  return "contained";
+}
+
 function buildServices(
   appOrigin: string = APP_ORIGIN,
   siteDecisions: MemorySiteDecisions = createMemorySiteDecisions(),
@@ -206,6 +211,7 @@ function buildServices(
     onRequestAction,
     onCheckMod,
     readTheme: readLightTheme,
+    readLayout: readContainedLayout,
     loadsTileLinkedMedia: true,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,

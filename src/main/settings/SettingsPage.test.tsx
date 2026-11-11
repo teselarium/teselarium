@@ -43,6 +43,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       sections={fixture.sections}
       switches={fixture.switches}
       tileMedia={fixture.tileMedia}
+      theater={fixture.theater}
       siteDecisions={fixture.siteDecisions}
       playerSites={fixture.playerSites}
       layout={fixture.layout}

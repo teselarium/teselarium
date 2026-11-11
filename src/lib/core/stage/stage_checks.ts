@@ -572,6 +572,8 @@ function connectCheckSession(
     fetchOptions: services.fetchOptions,
     readSiteDecisions: services.readSiteDecisions,
     theme: services.readTheme(),
+    // A check's frames are never shown, so they always lay out as contained.
+    layout: "contained",
     ...hooks,
   });
 }

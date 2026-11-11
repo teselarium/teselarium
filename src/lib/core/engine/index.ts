@@ -43,6 +43,7 @@ export {
   selectModTiles,
 } from "./mod_launch.ts";
 export type {
+  FrameLayout,
   LaunchContext,
   ModContext,
   ModLaunch,
@@ -64,9 +65,15 @@ export { buildTileBodies, collectModTileLinks } from "./mod_tile_bodies.ts";
 export type { TileBodies } from "./mod_tile_bodies.ts";
 export {
   connectModSession,
+  LAYOUT_CHANGED_METHOD,
+  pushLayoutChanged,
   pushThemeChanged,
   pushTilesChanged,
   stopModSession,
   THEME_CHANGED_METHOD,
 } from "./mod_session.ts";
-export type { ModSession, ModSessionOptions } from "./mod_session.ts";
+export type {
+  LayoutChangedParams,
+  ModSession,
+  ModSessionOptions,
+} from "./mod_session.ts";

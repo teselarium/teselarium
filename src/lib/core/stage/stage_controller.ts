@@ -4,6 +4,7 @@ import { MOD_API_VERSION, resolveDefaultModSettings } from "../engine/index.ts";
 import type {
   AppAction,
   DefaultModSettings,
+  FrameLayout,
   ModCheckReport,
   ModCheckRequest,
   ResolvedDefaultModSettings,
@@ -48,11 +49,13 @@ import {
 } from "./stage_routes.ts";
 import type { StageRoute, StageRouting } from "./stage_routes.ts";
 import {
+  addFullscreenRefusedWarning,
   answerSandboxApiMismatch,
   answerSandboxSiteConsent,
   attachSandboxFrame,
   buildConsentLineKey,
   launchSandbox,
+  pushSandboxLayout,
   pushSandboxTheme,
   clearSandboxNotifications,
   dismissSandboxMessage,
@@ -80,6 +83,7 @@ import {
   rememberShownEntry,
 } from "./stage_sections.ts";
 import type { SectionMemory, SectionPlace } from "./stage_sections.ts";
+import { readSandboxLayout } from "./stage_layout.ts";
 import {
   closeStageSandbox,
   createStageState,
@@ -112,6 +116,8 @@ export interface StageOptions {
   colorScheme: ColorScheme;
   /** Whether "Load media linked by tiles" is on as the app starts. */
   loadsTileLinkedMedia: boolean;
+  /** Whether theater mode is on as the app starts. */
+  theaterMode: boolean;
   /** The remembered site decisions, read before a mod from another origin starts, by checks and by `mods.inspect`. */
   readSiteDecisions: () => readonly SiteDecision[];
   /** Keeps the decisions of a site consent answer whose Remember was checked. */
@@ -204,6 +210,8 @@ export interface StageSnapshot {
   visible: VisibleView;
   /** The section the current entry belongs to, or `null`. */
   activeSection: string | null;
+  /** Whether theater mode is on, for the stage bar's button. */
+  isTheaterMode: boolean;
 }
 
 /** The stage: open sandboxes, their history entries and the snapshot the page renders. Mutable. */
@@ -222,6 +230,10 @@ export interface Stage {
   theme: Theme;
   /** Whether mods launched from now on load the media their tiles link. Running mods keep their launch. */
   loadsTileLinkedMedia: boolean;
+  /** Whether theater mode is on. With `fullscreenSandboxId`, it decides each frame's layout (`readSandboxLayout`). */
+  theaterMode: boolean;
+  /** The sandbox whose frame is the app page's fullscreen element, or `null`. */
+  fullscreenSandboxId: string | null;
   readSiteDecisions: () => readonly SiteDecision[];
   rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
   /** The actions the visible mod asked for, oldest first. */
@@ -240,6 +252,7 @@ const EMPTY_SNAPSHOT: StageSnapshot = Object.freeze({
   action: null,
   visible: null,
   activeSection: null,
+  isTheaterMode: false,
 });
 
 function openLinkFromSandbox(
@@ -254,6 +267,14 @@ function readStageTheme(stage: Stage): Theme {
   return stage.theme;
 }
 
+function readStageLayout(stage: Stage, sandboxId: string): FrameLayout {
+  return readSandboxLayout(
+    stage.theaterMode,
+    stage.fullscreenSandboxId,
+    sandboxId,
+  );
+}
+
 function buildSandboxServices(stage: Stage): SandboxServices {
   const services: SandboxServices = {
     defaults: stage.defaults,
@@ -265,6 +286,7 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     onRequestAction: requestStageAction.bind(undefined, stage),
     onCheckMod: checkStageMod.bind(undefined, stage),
     readTheme: readStageTheme.bind(undefined, stage),
+    readLayout: readStageLayout.bind(undefined, stage),
     loadsTileLinkedMedia: stage.loadsTileLinkedMedia,
     readSiteDecisions: stage.readSiteDecisions,
     rememberSiteDecisions: stage.rememberSiteDecisions,
@@ -463,6 +485,7 @@ function buildStageSnapshot(stage: Stage): StageSnapshot {
     action: buildActionSnapshot(stage),
     visible: buildVisibleView(stage.state),
     activeSection: readVisibleEntry(stage.state)?.section ?? null,
+    isTheaterMode: stage.theaterMode,
   };
   return Object.freeze(snapshot);
 }
@@ -511,6 +534,12 @@ function applyStageChange(stage: Stage, change: StageChange): void {
       stage.runtimes.delete(closedId);
     }
   }
+  if (
+    stage.fullscreenSandboxId !== null &&
+    change.closedIds.includes(stage.fullscreenSandboxId)
+  ) {
+    stage.fullscreenSandboxId = null;
+  }
   if (change.opened !== null) {
     stage.runtimes.set(
       change.opened.id,
@@ -536,12 +565,17 @@ export function createStage(options: StageOptions): Stage {
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
     loadsTileLinkedMedia: options.loadsTileLinkedMedia,
+    theaterMode: options.theaterMode,
+    fullscreenSandboxId: null,
     readSiteDecisions: options.readSiteDecisions,
     rememberSiteDecisions: options.rememberSiteDecisions,
     actions: createStageActions(),
     checks: createStageChecks(),
     listeners: new Set(),
-    snapshot: EMPTY_SNAPSHOT,
+    snapshot: Object.freeze({
+      ...EMPTY_SNAPSHOT,
+      isTheaterMode: options.theaterMode,
+    }),
   };
   return stage;
 }
@@ -1002,6 +1036,80 @@ export function changeStageColorScheme(
   for (const runtime of stage.runtimes.values()) {
     pushSandboxTheme(runtime, stage.theme);
   }
+}
+
+/** Each runtime's layout, by sandbox id. */
+function readRuntimeLayouts(stage: Stage): Map<string, FrameLayout> {
+  const layouts = new Map<string, FrameLayout>();
+  for (const sandboxId of stage.runtimes.keys()) {
+    layouts.set(sandboxId, readStageLayout(stage, sandboxId));
+  }
+  return layouts;
+}
+
+/** Pushes `layout.changed` to each runtime whose layout is not the one it had before. */
+function pushChangedLayouts(
+  stage: Stage,
+  layoutsBefore: ReadonlyMap<string, FrameLayout>,
+): void {
+  for (const [sandboxId, runtime] of stage.runtimes) {
+    const layout = readStageLayout(stage, sandboxId);
+    if (layoutsBefore.get(sandboxId) !== layout) {
+      pushSandboxLayout(runtime, layout);
+    }
+  }
+}
+
+/**
+ * Turns theater mode on or off, pushes `layout.changed` to every running mod
+ * whose layout changed, visible or hidden, and publishes the snapshot. A
+ * fullscreen mod keeps its layout and gets nothing. Does nothing when theater
+ * mode already is `isOn`.
+ */
+export function changeStageTheaterMode(stage: Stage, isOn: boolean): void {
+  if (stage.theaterMode === isOn) {
+    return;
+  }
+  const layoutsBefore = readRuntimeLayouts(stage);
+  stage.theaterMode = isOn;
+  pushChangedLayouts(stage, layoutsBefore);
+  publishStage(stage);
+}
+
+/**
+ * Records which sandbox's frame is the app page's fullscreen element, or
+ * `null` for none, pushes `layout.changed` to the mods whose layout changed,
+ * and publishes the snapshot. Does nothing when it is already the one.
+ */
+export function changeStageFullscreen(
+  stage: Stage,
+  sandboxId: string | null,
+): void {
+  if (stage.fullscreenSandboxId === sandboxId) {
+    return;
+  }
+  const layoutsBefore = readRuntimeLayouts(stage);
+  stage.fullscreenSandboxId = sandboxId;
+  pushChangedLayouts(stage, layoutsBefore);
+  publishStage(stage);
+}
+
+/**
+ * Tells a sandbox's stage bar that the browser refused to show its frame
+ * fullscreen: a `warning` from the app, with the browser's `reason`. Does
+ * nothing for an unknown sandbox.
+ */
+export function warnFullscreenRefused(
+  stage: Stage,
+  sandboxId: string,
+  reason: string,
+): void {
+  const runtime = stage.runtimes.get(sandboxId);
+  if (runtime === undefined) {
+    return;
+  }
+  addFullscreenRefusedWarning(runtime, reason);
+  publishStage(stage);
 }
 
 /**

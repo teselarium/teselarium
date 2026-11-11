@@ -29,6 +29,7 @@ import type { ModCheckRequest, UserNotification } from "./mod_methods.ts";
 import { buildTileBodies } from "./mod_tile_bodies.ts";
 import {
   connectModSession,
+  pushLayoutChanged,
   pushThemeChanged,
   pushTilesChanged,
   stopModSession,
@@ -143,6 +144,7 @@ async function playSession(
       vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
     onNotify: vi.fn<(notification: UserNotification) => void>(),
     theme,
+    layout: "contained",
     ...hooks,
   });
   const modPort = readModPort(fakeFrame);
@@ -174,6 +176,7 @@ function buildPlainOptions(): ModSessionOptions {
       vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
     onNotify: vi.fn<(notification: UserNotification) => void>(),
     theme: buildTheme("light"),
+    layout: "contained",
   };
   return options;
 }
@@ -265,6 +268,7 @@ describe("connectModSession", function describeConnectModSession(): void {
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
       onNotify: vi.fn<(notification: UserNotification) => void>(),
       theme: buildTheme("light"),
+      layout: "contained",
     });
     openPorts.push(session.port, readModPort(fakeFrame));
 
@@ -274,7 +278,11 @@ describe("connectModSession", function describeConnectModSession(): void {
       method: "sandbox.connect",
       params: {
         code: launch.mod.code,
-        context: { ...launch.context, theme: buildTheme("light") },
+        context: {
+          ...launch.context,
+          theme: buildTheme("light"),
+          layout: "contained",
+        },
       },
     });
   });
@@ -296,6 +304,7 @@ describe("connectModSession", function describeConnectModSession(): void {
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
       onNotify: vi.fn<(notification: UserNotification) => void>(),
       theme: buildTheme("dark"),
+      layout: "contained",
     });
     openPorts.push(session.port, readModPort(fakeFrame));
 
@@ -321,11 +330,26 @@ describe("connectModSession", function describeConnectModSession(): void {
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
       onNotify: vi.fn<(notification: UserNotification) => void>(),
       theme: buildTheme("dark"),
+      layout: "contained",
     });
     openPorts.push(session.port, readModPort(fakeFrame));
 
     const context = readSentContext(fakeFrame.posted[0].message);
     expect(structuredClone(context.theme)).toEqual(context.theme);
+  });
+
+  it("puts the frame's layout in the mount context", async function sendsLayout(): Promise<void> {
+    const fakeFrame = createFakeFrame();
+    const launch = await launchSampleMod();
+
+    const session = connectModSession(fakeFrame.target, launch, {
+      ...buildPlainOptions(),
+      layout: "theater",
+    });
+    openPorts.push(session.port, readModPort(fakeFrame));
+
+    const context = readSentContext(fakeFrame.posted[0].message);
+    expect(context.layout).toBe("theater");
   });
 
   it("Store and read a value", async function storesValue(): Promise<void> {
@@ -548,6 +572,33 @@ describe("connectModSession", function describeConnectModSession(): void {
     expect(played.received).toEqual([
       { jsonrpc: "2.0", method: "theme.changed", params: theme },
     ]);
+  });
+
+  it("pushes layout.changed with the layout", async function pushesLayoutChanged(): Promise<void> {
+    const played = await playSession();
+
+    pushLayoutChanged(played.session, "theater");
+    await waitForReceived(played, 1);
+    await waitForMessages();
+
+    expect(played.received).toEqual([
+      {
+        jsonrpc: "2.0",
+        method: "layout.changed",
+        params: { layout: "theater" },
+      },
+    ]);
+  });
+
+  it("Plain data", async function clonesLayoutParams(): Promise<void> {
+    const played = await playSession();
+
+    pushLayoutChanged(played.session, "fullscreen");
+    await waitForReceived(played, 1);
+
+    const notification = played.received[0] as { params: unknown };
+    expect(structuredClone(notification.params)).toEqual(notification.params);
+    expect(notification.params).toEqual({ layout: "fullscreen" });
   });
 
   it("Repeated block is reported once", async function reportsBlockOnce(): Promise<void> {
@@ -792,7 +843,11 @@ describe("test frames", function describeTestFrames(): void {
       method: "sandbox.connect",
       params: {
         code: launch.mod.code,
-        context: { ...launch.context, theme: buildTheme("light") },
+        context: {
+          ...launch.context,
+          theme: buildTheme("light"),
+          layout: "contained",
+        },
         test: { code: TEST_CODE, caseName: "lists books" },
       },
     });

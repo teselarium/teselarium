@@ -42,7 +42,12 @@ const TOKEN_NAMES = [
   "--ot-space-6",
   "--ot-radius",
   "--ot-shadow",
+  "--ot-content-width",
+  "--ot-reading-width",
 ];
+
+/** The tokens for widths, the same in each color scheme. */
+const WIDTH_TOKEN_NAMES = ["--ot-content-width", "--ot-reading-width"];
 
 /** The text roles, drawn on each of the surfaces. */
 const TEXT_ROLE_NAMES = [
@@ -153,6 +158,16 @@ describe("theme tokens", function describeThemeTokens(): void {
       } else {
         expect(dark[tokenName]).toBe(light[tokenName]);
       }
+    }
+  });
+
+  it("keeps the width tokens the same in each color scheme", function comparesWidths(): void {
+    const light = buildTheme("light").tokens;
+    const dark = buildTheme("dark").tokens;
+
+    for (const tokenName of WIDTH_TOKEN_NAMES) {
+      expect(light[tokenName]).toMatch(/rem$/);
+      expect(dark[tokenName]).toBe(light[tokenName]);
     }
   });
 

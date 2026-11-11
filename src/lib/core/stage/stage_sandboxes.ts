@@ -14,12 +14,14 @@ import {
   loadLaunchTiles,
   loadModTiles,
   matchModApiRange,
+  pushLayoutChanged,
   pushThemeChanged,
   pushTilesChanged,
   stopModSession,
 } from "../engine/index.ts";
 import type {
   AppAction,
+  FrameLayout,
   ModCheckReport,
   ModCheckRequest,
   ModLaunch,
@@ -81,6 +83,8 @@ export interface SandboxServices {
   ) => Promise<ModCheckReport> | null;
   /** The stage's current theme, read when a session connects. */
   readTheme: () => Theme;
+  /** A sandbox's current layout (`readSandboxLayout`), read when its session connects. */
+  readLayout: (sandboxId: string) => FrameLayout;
   /** Whether "Load media linked by tiles" is on, read when a sandbox's mod starts. */
   loadsTileLinkedMedia: boolean;
   /** The remembered site decisions, read before the site consent question and when a mod starts. */
@@ -650,6 +654,7 @@ export function attachSandboxFrame(
     onCheckMod: services.onCheckMod.bind(undefined, runtime.id),
     onNotify: addRuntimeNotification.bind(undefined, runtime, services),
     theme: services.readTheme(),
+    layout: services.readLayout(runtime.id),
   });
 }
 
@@ -662,6 +667,37 @@ export function pushSandboxTheme(runtime: SandboxRuntime, theme: Theme): void {
     return;
   }
   pushThemeChanged(runtime.session, theme);
+}
+
+/**
+ * Pushes `layout.changed` to a running sandbox with a session. A sandbox still
+ * loading gets its layout when its frame connects.
+ */
+export function pushSandboxLayout(
+  runtime: SandboxRuntime,
+  layout: FrameLayout,
+): void {
+  if (runtime.status !== "running" || runtime.session === null) {
+    return;
+  }
+  pushLayoutChanged(runtime.session, layout);
+}
+
+/**
+ * Adds a warning from the app that the browser refused to show the
+ * sandbox's frame fullscreen, with the browser's reason. Its source is the
+ * mod's source, or the link's mod reference before the mod is loaded.
+ */
+export function addFullscreenRefusedWarning(
+  runtime: SandboxRuntime,
+  reason: string,
+): void {
+  const issue: ModIssue = {
+    level: "warning",
+    source: runtime.loadedMod?.source ?? runtime.modReference,
+    message: `Fullscreen is not available: ${reason}`,
+  };
+  appendRuntimeMessage(runtime, buildAppIssueContent(issue));
 }
 
 /** Stops the sandbox's session, adding `issue` when the mod was stopped for a reason. */

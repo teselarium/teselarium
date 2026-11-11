@@ -8,6 +8,7 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
+import { storeTheaterBeforeLoad } from "./layout_probes.ts";
 import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
 import {
   addModHtml,
@@ -68,6 +69,43 @@ function readCardColors(element: Element): {
     border: style.borderTopColor,
   };
   return colors;
+}
+
+/** Where a page's content sits in its page area, in pixels. */
+interface PageContentBox {
+  contentWidth: number;
+  areaWidth: number;
+  leftSpace: number;
+  rightSpace: number;
+  readingWidth: number;
+}
+
+/**
+ * Runs in the page: the page's content, measured inside its page area (the
+ * page's host), and the width of `--ot-reading-width`, measured on a probe.
+ */
+function readPageContentBox(pageContent: Element): PageContentBox {
+  const root = pageContent.getRootNode();
+  if (!(root instanceof ShadowRoot)) {
+    throw new Error(
+      "Cannot measure the page content: it is not in a shadow root.",
+    );
+  }
+  const areaBox = root.host.getBoundingClientRect();
+  const contentBox = pageContent.getBoundingClientRect();
+  const probe = document.createElement("div");
+  probe.style.width = "var(--ot-reading-width)";
+  document.body.append(probe);
+  const readingWidth = probe.getBoundingClientRect().width;
+  probe.remove();
+  const box: PageContentBox = {
+    contentWidth: contentBox.width,
+    areaWidth: areaBox.width,
+    leftSpace: contentBox.left - areaBox.left,
+    rightSpace: areaBox.right - contentBox.right,
+    readingWidth,
+  };
+  return box;
 }
 
 function readTextColor(element: Element): string {
@@ -265,6 +303,48 @@ test.describe("Pages look like mods", function describeLook(): void {
       })
       .toBe(DARK_COLORS.foreground.computed);
     expect(await page.evaluate(readPageMarker)).toBe(true);
+  });
+});
+
+test.describe("Pages keep a reading width", function describeReadingWidth(): void {
+  test("Wide page area", async function centersContent({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 2560, height: 1080 });
+
+    await page.goto("/");
+
+    await expect(pageHeading(page, "Home")).toBeVisible();
+    const box = await pageBody(page).evaluate(readPageContentBox);
+    expect(box.readingWidth).toBeGreaterThan(0);
+    expect(box.areaWidth).toBeGreaterThan(box.readingWidth);
+    expect(box.contentWidth).toBeCloseTo(box.readingWidth, 0);
+    expect(Math.abs(box.leftSpace - box.rightSpace)).toBeLessThanOrEqual(1);
+  });
+
+  test("Narrow page area", async function fillsPageArea({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 600, height: 800 });
+
+    await page.goto("/");
+
+    await expect(pageHeading(page, "Home")).toBeVisible();
+    const box = await pageBody(page).evaluate(readPageContentBox);
+    expect(box.areaWidth).toBeLessThan(box.readingWidth);
+    expect(box.contentWidth).toBeCloseTo(box.areaWidth, 0);
+  });
+  test("Theater mode does not widen pages", async function ignoresTheater({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 2560, height: 1080 });
+    await storeTheaterBeforeLoad(page, "true");
+
+    await page.goto("/");
+
+    await expect(pageHeading(page, "Home")).toBeVisible();
+    const box = await pageBody(page).evaluate(readPageContentBox);
+    expect(box.contentWidth).toBeCloseTo(box.readingWidth, 0);
   });
 });
 

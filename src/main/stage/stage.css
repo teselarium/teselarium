@@ -17,6 +17,12 @@
   min-height: 16rem;
 }
 
+/* Fullscreen shows the frame alone, edge to edge (see stage_fullscreen.ts). */
+.sandbox-frame:fullscreen {
+  border: 0;
+  border-radius: 0;
+}
+
 /* Until the frame is connected and has its color scheme (see SandboxFrame). */
 .sandbox-frame-loading {
   visibility: hidden;

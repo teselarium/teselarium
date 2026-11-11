@@ -38,9 +38,11 @@ import {
 } from "../../test/test_stages.ts";
 import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
 import { createMemoryStorage } from "../../test/memory_storage.ts";
+import type { MemoryStorage } from "../../test/memory_storage.ts";
 import { createPlayerSites } from "../settings/player_sites.ts";
 import type { PlayerSites } from "../settings/player_sites.ts";
 import { StageView } from "./StageView.tsx";
+import { createTheaterSetting, THEATER_MODE_KEY } from "./theater_setting.ts";
 
 function createTestPlayerSites(): PlayerSites {
   const playerSites = createPlayerSites({ storage: createMemoryStorage() });
@@ -48,10 +50,17 @@ function createTestPlayerSites(): PlayerSites {
 }
 
 /** Renders the stage view inside the tooltip provider the app gives it. */
-function renderStageView(stage: Stage): RenderResult {
+function renderStageView(
+  stage: Stage,
+  storage: MemoryStorage = createMemoryStorage(),
+): RenderResult {
   return render(
     <TooltipProvider>
-      <StageView stage={stage} playerSites={createTestPlayerSites()} />
+      <StageView
+        stage={stage}
+        playerSites={createTestPlayerSites()}
+        theater={createTheaterSetting({ storage, stage })}
+      />
     </TooltipProvider>,
   );
 }
@@ -124,6 +133,237 @@ async function waitForCheck(stage: Stage): Promise<CheckSnapshot> {
   }
   throw new Error("Expected the stage to list a check");
 }
+
+function theaterButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Theater mode" });
+}
+
+describe("theater mode button", function describeTheaterButton(): void {
+  it("is named Theater mode and not pressed while theater mode is off", async function showsOff(): Promise<void> {
+    const stage = await startTestStage("");
+    renderStageView(stage);
+
+    expect(theaterButton()).toHaveAttribute("aria-pressed", "false");
+    fireEvent.focus(theaterButton());
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Theater mode",
+    );
+  });
+
+  it("Turn theater mode on", async function turnsOn(): Promise<void> {
+    const storage = createMemoryStorage();
+    const stage = await startTestStage("");
+    renderStageView(stage, storage);
+
+    fireEvent.click(theaterButton());
+
+    expect(readStageSnapshot(stage).isTheaterMode).toBe(true);
+    expect(theaterButton()).toHaveAttribute("aria-pressed", "true");
+    expect(storage.getItem(THEATER_MODE_KEY)).toBe("true");
+    fireEvent.focus(theaterButton());
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Theater mode",
+    );
+  });
+
+  it("Turn theater mode off", async function turnsOff(): Promise<void> {
+    const storage = createMemoryStorage();
+    const stage = await startTestStage("");
+    renderStageView(stage, storage);
+    fireEvent.click(theaterButton());
+
+    fireEvent.click(theaterButton());
+
+    expect(readStageSnapshot(stage).isTheaterMode).toBe(false);
+    expect(theaterButton()).toHaveAttribute("aria-pressed", "false");
+    expect(storage.getItem(THEATER_MODE_KEY)).toBe("false");
+  });
+
+  it("is shown while the mod loads", function showsWhileLoading(): void {
+    const history = new FakeHistory(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
+    const stage = buildTestStage(history, MOD_HOME_ROUTING);
+    followHistory(stage, history.hash, history.state);
+
+    renderStageView(stage);
+
+    expect(readStageSnapshot(stage).sandboxes[0].status).toBe("loading");
+    expect(theaterButton()).toBeInTheDocument();
+  });
+
+  it("Shown for a failed sandbox", async function showsWhenFailed(): Promise<void> {
+    const stage = await startTestStage(`#/run?mod=${MISSING_MOD_REFERENCE}`);
+    renderStageView(stage);
+
+    expect(readStageSnapshot(stage).sandboxes[0].status).toBe("failed");
+    expect(theaterButton()).toBeInTheDocument();
+  });
+
+  it("Home mod without a close button", async function endsWithoutClose(): Promise<void> {
+    const stage = await startTestStage("");
+    renderStageView(stage);
+
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    const buttons = within(stageBar).getAllByRole("button");
+    expect(readStageSnapshot(stage).sandboxes[0].canClose).toBe(false);
+    expect(buttons.slice(-2)).toEqual([theaterButton(), fullscreenButton()]);
+    expect(fullscreenButton().nextElementSibling).toBeNull();
+  });
+});
+
+function fullscreenButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Fullscreen" });
+}
+
+function queryFullscreenButton(): HTMLElement | null {
+  return screen.queryByRole("button", { name: "Fullscreen" });
+}
+
+/** Plays the browser: `element` becomes the document's fullscreen element, and `fullscreenchange` fires. */
+function playFullscreenChange(element: Element | null): void {
+  Object.defineProperty(document, "fullscreenElement", {
+    configurable: true,
+    value: element,
+  });
+  act(function dispatchChange(): void {
+    document.dispatchEvent(new Event("fullscreenchange"));
+  });
+}
+
+function forgetFullscreenElement(): void {
+  Reflect.deleteProperty(document, "fullscreenElement");
+}
+
+/** The elements `recordFullscreenRequest` was called on. */
+const fullscreenRequests: Element[] = [];
+
+/** Plays a browser that grants fullscreen, and records the element asked for. */
+function recordFullscreenRequest(this: Element): Promise<void> {
+  fullscreenRequests.push(this);
+  return Promise.resolve();
+}
+
+/** Plays a browser that refuses fullscreen. */
+function refuseFullscreen(): Promise<void> {
+  return Promise.reject(new TypeError("Permissions check failed"));
+}
+
+describe("fullscreen", function describeFullscreen(): void {
+  afterEach(forgetFullscreenElement);
+
+  it("follows fullscreenchange", async function followsChange(): Promise<void> {
+    const stage = await startTestStage("");
+    renderStageView(stage);
+
+    playFullscreenChange(screen.getByTitle("Book List"));
+    expect(stage.fullscreenSandboxId).toBe("sandbox-1");
+
+    playFullscreenChange(null);
+    expect(stage.fullscreenSandboxId).toBeNull();
+  });
+
+  it("ignores a fullscreen element that is not a mod's frame", async function ignoresOther(): Promise<void> {
+    const stage = await startTestStage("");
+    renderStageView(stage);
+
+    playFullscreenChange(document.body);
+
+    expect(stage.fullscreenSandboxId).toBeNull();
+  });
+
+  it("stops following fullscreenchange once unmounted", async function stopsFollowing(): Promise<void> {
+    const stage = await startTestStage("");
+    const { unmount } = renderStageView(stage);
+    const frame = screen.getByTitle("Book List");
+    unmount();
+
+    playFullscreenChange(frame);
+
+    expect(stage.fullscreenSandboxId).toBeNull();
+  });
+
+  it("Running mod", async function showsForRunning(): Promise<void> {
+    const stage = await startTestStage("");
+    renderStageView(stage);
+
+    expect(readStageSnapshot(stage).sandboxes[0].status).toBe("running");
+    expect(fullscreenButton()).toBeInTheDocument();
+    fireEvent.focus(fullscreenButton());
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Fullscreen");
+  });
+
+  it("is not shown while the mod loads", function hidesWhileLoading(): void {
+    const history = new FakeHistory(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
+    const stage = buildTestStage(history, MOD_HOME_ROUTING);
+    followHistory(stage, history.hash, history.state);
+
+    renderStageView(stage);
+
+    expect(queryFullscreenButton()).toBeNull();
+  });
+
+  it("Failed sandbox", async function hidesWhenFailed(): Promise<void> {
+    const stage = await startTestStage(`#/run?mod=${MISSING_MOD_REFERENCE}`);
+    renderStageView(stage);
+
+    expect(queryFullscreenButton()).toBeNull();
+  });
+
+  it("Waiting for an answer", async function hidesWhileAsking(): Promise<void> {
+    await renderAskingStage();
+
+    expect(screen.getByRole("dialog", { name: "Other API" })).toBeVisible();
+    expect(queryFullscreenButton()).toBeNull();
+  });
+
+  it("requests fullscreen on the visible mod's frame", async function requestsFrame(): Promise<void> {
+    const original = HTMLIFrameElement.prototype.requestFullscreen;
+    HTMLIFrameElement.prototype.requestFullscreen = recordFullscreenRequest;
+    try {
+      const stage = await startTestStage("");
+      renderStageView(stage);
+
+      await act(async function pressFullscreen(): Promise<void> {
+        fireEvent.click(fullscreenButton());
+        await Promise.resolve();
+      });
+
+      const frame = screen.getByTitle("Book List");
+      expect(fullscreenRequests).toEqual([frame]);
+      expect(document.activeElement).toBe(frame);
+    } finally {
+      HTMLIFrameElement.prototype.requestFullscreen = original;
+      fullscreenRequests.length = 0;
+    }
+  });
+
+  it("Fullscreen refused", async function warnsRefused(): Promise<void> {
+    const original = HTMLIFrameElement.prototype.requestFullscreen;
+    HTMLIFrameElement.prototype.requestFullscreen = refuseFullscreen;
+    try {
+      const stage = await startTestStage("");
+      renderStageView(stage);
+
+      await act(async function pressFullscreen(): Promise<void> {
+        fireEvent.click(fullscreenButton());
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(findLevelButton("Warnings")).toHaveAccessibleName(
+        "Warnings: 1, 1 unread",
+      );
+      await openLevel("Warnings");
+      const item = screen.getByRole("listitem");
+      expect(item).toHaveTextContent("App");
+      expect(item).toHaveTextContent(SAMPLE_MOD_SOURCE);
+      expect(item).toHaveTextContent(
+        "Fullscreen is not available: Permissions check failed",
+      );
+    } finally {
+      HTMLIFrameElement.prototype.requestFullscreen = original;
+    }
+  });
+});
 
 describe("StageView", function describeStageView(): void {
   it("renders one wrapper per sandbox, only the visible one shown", async function rendersWrappers(): Promise<void> {
@@ -361,6 +601,8 @@ describe("StageView", function describeStageView(): void {
       "Errors: 0, 0 unread",
       "Warnings: 0, 0 unread",
       "Notifications: 1, 1 unread",
+      "Theater mode",
+      "Fullscreen",
       "Close",
     ]);
     const title = within(stageBar).getByText("Book List");

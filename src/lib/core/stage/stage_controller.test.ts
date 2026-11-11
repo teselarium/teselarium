@@ -31,6 +31,13 @@ import {
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
 import {
+  attachCheckingFrame,
+  closeCheckPorts,
+  finishMount,
+  startCheck,
+  startCheckStage,
+} from "../../../test/check_stages.ts";
+import {
   MOD_HOME_ROUTING,
   PAGE_HOME_ROUTING,
 } from "../../../test/test_stages.ts";
@@ -49,6 +56,8 @@ import {
   answerStageAction,
   attachFrame,
   changeStageColorScheme,
+  changeStageFullscreen,
+  changeStageTheaterMode,
   changeStageTileLinkedMedia,
   clearNotifications,
   closeSandbox,
@@ -63,6 +72,7 @@ import {
   reloadTiles,
   requestStageAction,
   subscribeStage,
+  warnFullscreenRefused,
 } from "./stage_controller.ts";
 import type { SandboxSnapshot, Stage } from "./stage_controller.ts";
 
@@ -115,6 +125,7 @@ function buildStage(
   colorScheme: ColorScheme = "light",
   routing: StageRouting = MOD_HOME_ROUTING,
   siteDecisions: MemorySiteDecisions = createMemorySiteDecisions(),
+  theaterMode = false,
 ): Stage {
   const stage = createStage({
     history,
@@ -126,6 +137,7 @@ function buildStage(
     fetch: fetchTestFile,
     colorScheme,
     loadsTileLinkedMedia: true,
+    theaterMode,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,
   });
@@ -155,6 +167,22 @@ function readConnectColorScheme(message: unknown): string {
     params: { context: { theme: { colorScheme: string } } };
   };
   return connect.params.context.theme.colorScheme;
+}
+
+/** The `layout` of the mount context in a posted `sandbox.connect`. */
+function readConnectLayout(message: unknown): string {
+  const connect = message as { params: { context: { layout: string } } };
+  return connect.params.context.layout;
+}
+
+/** A `layout.changed` notification, as the mod receives it. */
+function buildLayoutChanged(layout: string): object {
+  const notification = {
+    jsonrpc: "2.0",
+    method: "layout.changed",
+    params: { layout },
+  };
+  return notification;
 }
 
 async function settleStage(stage: Stage): Promise<void> {
@@ -1540,6 +1568,200 @@ describe("changeStageColorScheme", function describeChangeColorScheme(): void {
     await waitForMessages();
 
     expect(attached.received).toEqual([]);
+  });
+});
+
+describe("changeStageTheaterMode", function describeChangeTheaterMode(): void {
+  it("Hidden mod follows", async function pushesToHiddenMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    const hidden = attachCollectingFrame(stage, "sandbox-1");
+    const visible = attachCollectingFrame(stage, "sandbox-2");
+
+    changeStageTheaterMode(stage, true);
+    await waitForMessages();
+
+    expect(readVisible(stage).id).toBe("sandbox-2");
+    expect(hidden.received).toEqual([buildLayoutChanged("theater")]);
+    expect(visible.received).toEqual([buildLayoutChanged("theater")]);
+    expect(stage.runtimes.get("sandbox-1")?.status).toBe("running");
+    expect(stage.runtimes.get("sandbox-2")?.status).toBe("running");
+    expect(readStageSnapshot(stage).isTheaterMode).toBe(true);
+  });
+
+  it("New sandboxes start in the current mode", async function connectsInTheater(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    changeStageTheaterMode(stage, true);
+
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    expect(readConnectLayout(attached.posted[0])).toBe("theater");
+  });
+
+  it("starts in the theater mode it was created with", async function startsInTheater(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(
+      history,
+      "light",
+      MOD_HOME_ROUTING,
+      createMemorySiteDecisions(),
+      true,
+    );
+
+    expect(readStageSnapshot(stage).isTheaterMode).toBe(true);
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    expect(readConnectLayout(attached.posted[0])).toBe("theater");
+  });
+
+  it("mounts contained while theater mode is off", async function connectsContained(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    expect(readConnectLayout(attached.posted[0])).toBe("contained");
+    expect(readStageSnapshot(stage).isTheaterMode).toBe(false);
+  });
+
+  it("Theater turned on while the mod loads", async function connectsWithNewLayout(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    followHistory(stage, history.hash, history.state);
+    const runtime = stage.runtimes.get("sandbox-1");
+
+    changeStageTheaterMode(stage, true);
+    expect(runtime?.status).toBe("loading");
+    await settleStage(stage);
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+    await waitForMessages();
+
+    expect(attached.received).toEqual([]);
+    expect(readConnectLayout(attached.posted[0])).toBe("theater");
+  });
+
+  it("Theater turned off", async function pushesContained(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    changeStageTheaterMode(stage, true);
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    changeStageTheaterMode(stage, false);
+    await waitForMessages();
+
+    expect(attached.received).toEqual([buildLayoutChanged("contained")]);
+    expect(readStageSnapshot(stage).isTheaterMode).toBe(false);
+  });
+
+  it("pushes and publishes nothing when theater mode stays the same", async function skipsSameMode(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+    const snapshot = readStageSnapshot(stage);
+
+    changeStageTheaterMode(stage, false);
+    await waitForMessages();
+
+    expect(attached.received).toEqual([]);
+    expect(readStageSnapshot(stage)).toBe(snapshot);
+  });
+
+  it("Fullscreen mod keeps its layout", async function skipsFullscreenMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+    changeStageFullscreen(stage, "sandbox-1");
+    await waitForMessages();
+    expect(attached.received).toEqual([buildLayoutChanged("fullscreen")]);
+
+    changeStageTheaterMode(stage, true);
+    await waitForMessages();
+
+    expect(attached.received).toEqual([buildLayoutChanged("fullscreen")]);
+  });
+
+  it("Check frames are contained", async function checksContained(): Promise<void> {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const checkStage = await startCheckStage();
+      changeStageTheaterMode(checkStage.stage, true);
+
+      const reporting = startCheck(checkStage, {
+        source: SAMPLE_MOD_SOURCE,
+        collection: null,
+      });
+      const checkFrame = await attachCheckingFrame(checkStage);
+      await finishMount(checkFrame);
+      await reporting;
+
+      expect(checkFrame.context.layout).toBe("contained");
+    } finally {
+      vi.useRealTimers();
+      closeCheckPorts();
+    }
+  });
+});
+
+describe("changeStageFullscreen", function describeChangeFullscreen(): void {
+  it("Leaving fullscreen", async function returnsToTheater(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    changeStageTheaterMode(stage, true);
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+    changeStageFullscreen(stage, "sandbox-1");
+
+    changeStageFullscreen(stage, null);
+    await waitForMessages();
+
+    expect(attached.received).toEqual([
+      buildLayoutChanged("fullscreen"),
+      buildLayoutChanged("theater"),
+    ]);
+  });
+
+  it("pushes only to the fullscreen sandbox", async function pushesToOneMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    const hidden = attachCollectingFrame(stage, "sandbox-1");
+    const visible = attachCollectingFrame(stage, "sandbox-2");
+
+    changeStageFullscreen(stage, "sandbox-2");
+    await waitForMessages();
+
+    expect(hidden.received).toEqual([]);
+    expect(visible.received).toEqual([buildLayoutChanged("fullscreen")]);
+  });
+
+  it("Fullscreen refused", async function warnsRefused(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    warnFullscreenRefused(stage, "sandbox-1", "Permissions check failed");
+
+    expect(readIssues(readVisible(stage))).toContainEqual({
+      level: "warning",
+      source: SAMPLE_MOD_SOURCE,
+      message: "Fullscreen is not available: Permissions check failed",
+    });
+  });
+
+  it("forgets the fullscreen sandbox when it is closed", async function clearsClosed(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    changeStageFullscreen(stage, "sandbox-2");
+
+    closeSandbox(stage, "sandbox-2");
+
+    expect(stage.fullscreenSandboxId).toBeNull();
   });
 });
 

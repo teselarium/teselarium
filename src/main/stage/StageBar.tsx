@@ -1,4 +1,4 @@
-import { Info, RotateCw, X } from "lucide-react";
+import { Info, Maximize, RectangleHorizontal, RotateCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { Badge } from "@/vendor/shadcn/ui/badge.tsx";
@@ -33,12 +33,20 @@ import { MessagePopover } from "./MessagePopover.tsx";
 import { ModInfoPopover } from "./ModInfoPopover.tsx";
 import { ShareMenu } from "./ShareMenu.tsx";
 import { StageBarIconButton } from "./StageBarIconButton.tsx";
+import { changeTheaterMode } from "./theater_setting.ts";
+import type { TheaterSetting } from "./theater_setting.ts";
 import { recordUnreadMarks } from "./unread_marks.ts";
 import type { UnreadMarks } from "./unread_marks.ts";
 
 interface StageBarProps {
   stage: Stage;
   sandbox: SandboxSnapshot;
+  /** Whether theater mode is on: the stage snapshot's `isTheaterMode`. */
+  isTheaterMode: boolean;
+  /** Theater mode, which the theater mode button turns on and off. */
+  theater: TheaterSetting;
+  /** Shows the sandbox's frame fullscreen. Called during the click. */
+  onFullscreen: (sandboxId: string) => void;
 }
 
 /** The stage bar's popovers and menus: one per message level, the information popover and the Share menu. */
@@ -70,6 +78,11 @@ function markClosedLevelRead(stage: Stage, openPanel: OpenPanel): void {
   }
 }
 
+/** The fullscreen button needs a frame: only a running mod has one. */
+function hasModFrame(sandbox: SandboxSnapshot): boolean {
+  return sandbox.status === "running" && sandbox.sandboxDocument !== null;
+}
+
 /**
  * The mod's name and version once its mod file is loaded, even when the
  * sandbox failed later. Before that, "Loading mod…", or "Mod not loaded"
@@ -98,7 +111,9 @@ function renderModName(sandbox: SandboxSnapshot): ReactElement {
  * The visible sandbox's bar, in one row above its frame. On the left: the
  * mod's name and version, the information button, the Share button and
  * "Reload tiles". On the right: the errors, warnings and notifications
- * buttons, then a separator and the close button (×). Each button opens its
+ * buttons, a separator, the theater mode toggle, the fullscreen button while
+ * the mod runs in its frame, then, when the sandbox has a close button, a
+ * separator and the close button (×). Each button opens its
  * popover or menu, drawn by the app outside every mod frame, which closes on
  * a click outside it, in the mod's frame too. Opening a level marks it read,
  * marks its unread items while it is open, and closing it marks read what
@@ -106,7 +121,13 @@ function renderModName(sandbox: SandboxSnapshot): ReactElement {
  * shown flashes, and a new error, like the Share menu's "Link copied", is
  * announced politely.
  */
-export function StageBar({ stage, sandbox }: StageBarProps): ReactElement {
+export function StageBar({
+  stage,
+  sandbox,
+  isTheaterMode,
+  theater,
+  onFullscreen,
+}: StageBarProps): ReactElement {
   const [openPanel, setOpenPanel] = useState<OpenPanel | null>(null);
   const [shareFeedback, setShareFeedback] = useState("");
   // Another sandbox shown closes the open popover or menu, while rendering as for the attention.
@@ -158,6 +179,16 @@ export function StageBar({ stage, sandbox }: StageBarProps): ReactElement {
 
   function handleReloadClick(): void {
     void reloadTiles(stage, sandbox.id);
+  }
+
+  function handleTheaterClick(): void {
+    changeTheaterMode(theater, !isTheaterMode);
+  }
+
+  /** Nothing outside the frame is visible in fullscreen, so the open popover or menu closes. */
+  function handleFullscreenClick(): void {
+    setOpenPanel(null);
+    onFullscreen(sandbox.id);
   }
 
   function handleCloseClick(): void {
@@ -250,6 +281,26 @@ export function StageBar({ stage, sandbox }: StageBarProps): ReactElement {
       {/* The gap leaves room for a `99+` capsule, which sticks out of its button's corner. */}
       <div className="flex shrink-0 items-center gap-3">
         {levelButtons}
+        <Separator
+          orientation="vertical"
+          className="data-[orientation=vertical]:h-5"
+        />
+        {/* A toggle keeps one name in both states: `aria-pressed` tells which. */}
+        <StageBarIconButton
+          label="Theater mode"
+          aria-pressed={isTheaterMode}
+          onClick={handleTheaterClick}
+        >
+          <RectangleHorizontal />
+        </StageBarIconButton>
+        {hasModFrame(sandbox) ? (
+          <StageBarIconButton
+            label="Fullscreen"
+            onClick={handleFullscreenClick}
+          >
+            <Maximize />
+          </StageBarIconButton>
+        ) : null}
         {sandbox.canClose ? (
           <>
             <Separator

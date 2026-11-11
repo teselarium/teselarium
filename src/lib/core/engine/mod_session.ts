@@ -29,6 +29,7 @@ import { FILES_METHODS } from "./files_methods.ts";
 import { LIBS_METHODS } from "./libs_methods.ts";
 import { LINKS_METHODS } from "./links_methods.ts";
 import type {
+  FrameLayout,
   LaunchContext,
   ModContext,
   ModLaunch,
@@ -87,6 +88,8 @@ export interface ModSessionOptions {
   onNotify: (notification: UserNotification) => void;
   /** The theme the mod mounts with: the one current when the frame connects. */
   theme: Theme;
+  /** The layout the mod mounts with: the frame's layout when it connects. */
+  layout: FrameLayout;
   /**
    * Called when the mod's `mount` finished: for `sandbox.mounted`, and for
    * `sandbox.mountFailed` after its issue is reported. Running sandboxes pass none.
@@ -127,6 +130,14 @@ export interface ModSession {
 
 /** Engine to mod: the resolved color scheme changed. The frame loader sets its attribute first. */
 export const THEME_CHANGED_METHOD = "theme.changed";
+
+/** Engine to mod: the frame's layout changed. The frame loader sets its attribute first. */
+export const LAYOUT_CHANGED_METHOD = "layout.changed";
+
+/** The params of `layout.changed`. Plain data. */
+export interface LayoutChangedParams {
+  layout: FrameLayout;
+}
 
 /** Engine to mod: "Reload tiles" reloaded the mod's collection. */
 export const TILES_CHANGED_METHOD = "tiles.changed";
@@ -342,8 +353,9 @@ function handleModPortMessage(session: ModSession, event: MessageEvent): void {
 function buildMountContext(
   launchContext: LaunchContext,
   theme: Theme,
+  layout: FrameLayout,
 ): ModContext {
-  const context: ModContext = { ...launchContext, theme };
+  const context: ModContext = { ...launchContext, theme, layout };
   return context;
 }
 
@@ -353,7 +365,7 @@ function buildConnectParams(
 ): SandboxConnectParams {
   const connectParams: SandboxConnectParams = {
     code: launch.mod.code,
-    context: buildMountContext(launch.context, options.theme),
+    context: buildMountContext(launch.context, options.theme, options.layout),
   };
   if (options.test !== undefined) {
     connectParams.test = options.test;
@@ -363,7 +375,7 @@ function buildConnectParams(
 
 /**
  * Opens the private channel to a mod's frame, sends it the mod's code and
- * its mount context with the session's theme (and, in a check's test frames,
+ * its mount context with the session's theme and layout (and, in a check's test frames,
  * the test params), and answers the mod's requests until the session is stopped.
  */
 export function connectModSession(
@@ -424,6 +436,15 @@ export function pushTilesChanged(
 /** Pushes `theme.changed` with the new theme. */
 export function pushThemeChanged(session: ModSession, theme: Theme): void {
   sendToMod(session, buildNotification(THEME_CHANGED_METHOD, theme));
+}
+
+/** Pushes `layout.changed` with the frame's new layout. */
+export function pushLayoutChanged(
+  session: ModSession,
+  layout: FrameLayout,
+): void {
+  const params: LayoutChangedParams = { layout };
+  sendToMod(session, buildNotification(LAYOUT_CHANGED_METHOD, params));
 }
 
 /** Closes the channel. Later messages, pushes and answers to pending requests do nothing. */

@@ -63,6 +63,7 @@ export function buildTestStage(
     fetch: fetchTestFile,
     colorScheme: "light",
     loadsTileLinkedMedia: true,
+    theaterMode: false,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,
   });

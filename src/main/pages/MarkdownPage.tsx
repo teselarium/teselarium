@@ -35,13 +35,16 @@ const LOADING: PageLoad = Object.freeze({ status: "loading" });
 
 /**
  * What the base stylesheet gives `html` and `body` in a mod frame, given to
- * the element that acts as the page's body. The only class selector, and it
+ * the element that acts as the page's body, kept at the reading width and
+ * centered (pages have no theater mode). The only class selector, and it
  * never leaves the shadow root.
  */
 const PAGE_HOST_RULES = `@layer opentesela {
   .page-body {
     box-sizing: border-box;
     min-height: 100%;
+    max-width: var(--ot-reading-width);
+    margin-inline: auto;
     padding: var(--ot-space-4);
     background-color: var(--ot-background);
     color: var(--ot-foreground);

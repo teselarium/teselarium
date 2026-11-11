@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import { Alert, AlertDescription } from "@/vendor/shadcn/ui/alert.tsx";
 import {
@@ -28,12 +28,20 @@ import type { PlayerSnapshot } from "./PlayerDialog.tsx";
 import { SandboxFrame } from "./SandboxFrame.tsx";
 import { SiteConsentDialog } from "./SiteConsentDialog.tsx";
 import { StageBar } from "./StageBar.tsx";
+import {
+  findSandboxFrame,
+  followFullscreenChange,
+  showSandboxFullscreen,
+} from "./stage_fullscreen.ts";
+import type { TheaterSetting } from "./theater_setting.ts";
 import "./stage.css";
 
 interface StageViewProps {
   stage: Stage;
   /** The sites the user always plays from, which the player dialog reads and remembers. */
   playerSites: PlayerSites;
+  /** Theater mode, which the stage bar's button turns on and off. */
+  theater: TheaterSetting;
 }
 
 /** The shown action for the player dialog, or `null` when it is not a player. */
@@ -126,6 +134,21 @@ function leaveFullscreen(): void {
   document.exitFullscreen().catch(ignoreExitError);
 }
 
+function stopFollowingFullscreen(listener: () => void): void {
+  document.removeEventListener("fullscreenchange", listener);
+}
+
+/**
+ * Tells the stage which sandbox is fullscreen on every `fullscreenchange` of
+ * the app's document, whoever started or ended it. Returns the function that
+ * stops it.
+ */
+function followFullscreen(stage: Stage): () => void {
+  const listener = followFullscreenChange.bind(undefined, stage);
+  document.addEventListener("fullscreenchange", listener);
+  return stopFollowingFullscreen.bind(undefined, listener);
+}
+
 function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
   for (const sandbox of snapshot.sandboxes) {
     if (sandbox.isVisible) {
@@ -143,14 +166,34 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
  * visible mod asked for, if any, or the player dialog when it is a player, and the API mismatch dialog and then the
  * site consent dialog ask about the visible sandbox while its mod waits for
  * an answer; a sandbox asks one question at a time. When the visible sandbox
- * changes, the page leaves fullscreen. The frames of running mod checks sit
+ * changes, the page leaves fullscreen. Every `fullscreenchange` tells the
+ * stage which sandbox's frame is fullscreen, so its layout follows. The frames of running mod checks sit
  * behind the sandboxes, hidden by layout (see CheckFrame).
  */
 export function StageView({
   stage,
   playerSites,
+  theater,
 }: StageViewProps): ReactElement {
   const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
+  const stageViewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(
+    function followFullscreenChanges(): () => void {
+      return followFullscreen(stage);
+    },
+    [stage],
+  );
+
+  function handleFullscreen(sandboxId: string): void {
+    const stageView = stageViewRef.current;
+    const frame =
+      stageView === null ? null : findSandboxFrame(stageView, sandboxId);
+    if (frame === null) {
+      return;
+    }
+    void showSandboxFullscreen(stage, frame, sandboxId);
+  }
 
   function handleActionAnswer(id: number, accepted: boolean): void {
     answerStageAction(stage, id, accepted);
@@ -195,12 +238,19 @@ export function StageView({
   }
   return (
     <div
+      ref={stageViewRef}
       className="flex flex-1 flex-col gap-2 px-4 pt-2 pb-4"
       data-stage-view=""
       hidden={snapshot.visible?.kind === "page"}
     >
       {visibleSandbox === null ? null : (
-        <StageBar stage={stage} sandbox={visibleSandbox} />
+        <StageBar
+          stage={stage}
+          sandbox={visibleSandbox}
+          isTheaterMode={snapshot.isTheaterMode}
+          theater={theater}
+          onFullscreen={handleFullscreen}
+        />
       )}
       <div className="relative flex flex-1 flex-col">
         {sandboxes}

@@ -27,6 +27,10 @@ import {
   readStartTileLinkedMedia,
 } from "./main/settings/tile_media_setting.ts";
 import {
+  createTheaterSetting,
+  readStartTheaterMode,
+} from "./main/stage/theater_setting.ts";
+import {
   changeSidebarViewport,
   createSidebarLayout,
   NARROW_VIEWPORT_QUERY,
@@ -79,6 +83,7 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
     storage: window.localStorage,
     colorScheme: readStartColorScheme(window.localStorage, systemQuery),
     loadsTileLinkedMedia: readStartTileLinkedMedia(window.localStorage),
+    theaterMode: readStartTheaterMode(window.localStorage),
     readSiteDecisions: readSiteDecisionsSnapshot.bind(undefined, siteDecisions),
     rememberSiteDecisions: rememberSiteDecisions.bind(undefined, siteDecisions),
   });
@@ -107,6 +112,11 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
     storage: window.localStorage,
     stage,
   });
+  // Same lifetime as the stage: it tells the stage when theater mode is turned on or off.
+  const theater = createTheaterSetting({
+    storage: window.localStorage,
+    stage,
+  });
   followCurrentEntry(stage);
   // Fragment navigations fire `popstate` too, so `hashchange` is not needed.
   window.addEventListener(
@@ -120,6 +130,7 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
       sections={sections}
       switches={switches}
       tileMedia={tileMedia}
+      theater={theater}
       siteDecisions={siteDecisions}
       playerSites={playerSites}
       layout={layout}

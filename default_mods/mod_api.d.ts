@@ -59,6 +59,18 @@ export interface ModTheme {
   tokens: Record<string, string>;
 }
 
+/**
+ * How wide the mod's frame lays out its content: `contained` (the body at
+ * most `--ot-content-width`, centered), `theater` (the whole stage area) or
+ * `fullscreen` (the whole screen).
+ */
+export type ModLayout = "contained" | "theater" | "fullscreen";
+
+/** The params of `layout.changed`. */
+export interface ModLayoutChangedParams {
+  layout: ModLayout;
+}
+
 /** The second argument of `mount`. */
 export interface ModContext {
   mod: {
@@ -77,6 +89,8 @@ export interface ModContext {
   issues: ModTileIssue[];
   permissions: ModGrants;
   theme: ModTheme;
+  /** The frame's layout when the frame connected. */
+  layout: ModLayout;
 }
 
 /** What `mods.inspect` answers: a mod's metadata, without running it. */
@@ -143,6 +157,11 @@ export interface ModApiMethods {
   "mods.check": { params: ModCheckParams; result: ModCheckReport };
 }
 
+/** The engine events this file types: the params each one pushes. */
+export interface ModApiEvents {
+  "layout.changed": ModLayoutChangedParams;
+}
+
 /** An error the engine answers a request with. `code` is the JSON-RPC error code. */
 export interface ModRequestError extends Error {
   code: number;
@@ -156,6 +175,11 @@ export interface ModEngine {
   ): Promise<ModApiMethods[Method]["result"]>;
   /** The methods this file does not type. */
   request(method: string, params?: ModYamlMapping): Promise<unknown>;
+  on<Event extends keyof ModApiEvents>(
+    event: Event,
+    handler: (params: ModApiEvents[Event]) => void,
+  ): void;
+  /** The events this file does not type. */
   on(event: string, handler: (params: unknown) => void): void;
 }
 

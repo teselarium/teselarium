@@ -6,12 +6,12 @@ A mod's content runs across the whole stage area, so on a wide screen a cover gr
 
 ## What Changes
 
-- **A content width for mods**: in a mod frame, the base stylesheet keeps `<body>` at most `--ot-content-width` wide (about 80rem), centered. The frame itself still fills the stage area, so the gutters belong to the frame: the wheel scrolls there, and the scrollbar stays at the stage's edge. A mod that wants the full width overrides the rule with one unlayered style. A mod with `theme: "none"` gets no limit.
+- **A content width for mods**: in a mod frame, the base stylesheet keeps `<body>` at most `--ot-content-width` wide (about 65rem), centered. The frame itself still fills the stage area, so the gutters belong to the frame: the wheel scrolls there, and the scrollbar stays at the stage's edge. A mod that wants the full width overrides the rule with one unlayered style. A mod with `theme: "none"` gets no limit.
 - **Three layouts**: each mod frame has a layout, `contained`, `theater` or `fullscreen`. The width limit applies only in `contained`. The frame gets its layout before `mount` in three ways: the attribute `data-ot-layout` on its `<html>`, also for `theme: "none"` mods; `layout` in the mount context; and a new event, `layout.changed { layout }`. This follows the way the color scheme already reaches mods.
 - **Theater mode**: a toggle button in the stage bar removes the width limit for every running mod. The choice is global, and the app remembers it across reloads, like the theme choice.
 - **Fullscreen**: a stage bar button shows the visible mod's frame fullscreen. The stage bar is hidden there, and Esc leaves fullscreen. A frame that is fullscreen, whether the app or the mod started it, has the `fullscreen` layout.
 - **Stage bar order**: the right side becomes the message buttons, a separator, the theater and fullscreen buttons, then a separator and × when the sandbox has a close button.
-- **A reading width for pages**: Markdown pages are kept at most `--ot-reading-width` wide (about 45rem), centered. Mods can use the same token for long text.
+- **A reading width for pages**: Markdown pages are kept at most `--ot-reading-width` wide (about 55rem), centered. Mods can use the same token for long text.
 - **Two new theme tokens**: `--ot-content-width` and `--ot-reading-width`, with the same value in both color schemes.
 
 ## Capabilities

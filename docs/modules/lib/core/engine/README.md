@@ -74,6 +74,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 |---|---|
 | `tiles.changed` | `{ tiles, issues }`: the reloaded tiles, with the same rules as the mount context. Pushed when the user presses "Reload tiles" for a mod opened with a collection. |
 | `theme.changed` | `{ colorScheme, tokens }`: the new theme, the same shape as `context.theme`. Pushed to every running mod, visible or hidden, once each time the app's resolved color scheme changes. A new theme choice that resolves to the same color scheme pushes nothing. The frame loader updates the frame's `data-ot-color-scheme` attribute before the mod's handlers run. |
+| `layout.changed` | `{ layout }`: the frame's new layout, `"contained"`, `"theater"` or `"fullscreen"`, the same value as `context.layout` (see [Frame layout](#frame-layout)). Pushed to a running mod, visible or hidden, once each time its layout changes. A change of theater mode that leaves the mod's layout the same, such as for a fullscreen mod, pushes nothing. The frame loader updates the frame's `data-ot-layout` attribute before the mod's handlers run. Added in mod API `0.1.9`. |
 
 Inside the frame, a mod uses them through its engine API object:
 
@@ -94,13 +95,24 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.8"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.9"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
 | `issues` | The issues from loading and validating the collection. |
 | `permissions` | `granted` and `denied` lists of `{ category, host, reason }`. |
 | `theme` | `colorScheme` (`"light"` or `"dark"`) and `tokens`, a mapping from each theme token name to its value for that color scheme (see the [theme module](../theme/README.md)). It is the theme current when the frame connects, not when the mod started loading, so a mod opened while the user switches still mounts with the right one. |
+| `layout` | The frame's layout as a string: `"contained"`, `"theater"` or `"fullscreen"` (see [Frame layout](#frame-layout)). It is the layout current when the frame connects, so a mod opened while the user turns theater mode on still mounts with the right one. The frames of mod checks and test cases always get `"contained"`. Added in mod API `0.1.9`. |
+
+### Frame layout
+
+Each mod frame has one of three layouts:
+
+- `fullscreen` while the frame is the app page's fullscreen element, whether the stage bar's fullscreen button or the mod itself asked for it;
+- otherwise `theater` while the user's theater mode is on;
+- otherwise `contained`, the default.
+
+In `contained`, the base stylesheet keeps the frame's `<body>` at most `--ot-content-width` wide and centered; `theater` and `fullscreen` set no width limit (see the [theme module](../theme/README.md#write-html-get-the-apps-look)). The frame itself fills the stage area in `contained` and `theater` alike. A mod learns its layout three ways: the `data-ot-layout` attribute on its `<html>`, set before `mount` and before the `layout.changed` handlers run, also for mods with `theme: "none"`; `context.layout`; and the `layout.changed` event. The stage decides the layout (see the [stage module](../stage/README.md#frame-layout)).
 
 ### Tiles
 
@@ -171,7 +183,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.8"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.9"
     }
   ]
 }
@@ -424,7 +436,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.8` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.9` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -515,8 +527,8 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.8"`, the app's mod API version.
-- `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.8` but not `0.2.0`.
+- `MOD_API_VERSION`: `"0.1.9"`, the app's mod API version.
+- `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.9` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
 - `describeApiRangeMismatch(range)`: the message of the bundle check's warning for a range that does not match, naming the range and `MOD_API_VERSION`. Used inside the engine, not exported by `index.ts`.
@@ -611,14 +623,15 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
 
 ### Session
 
-- `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `readSiteDecisions`, `onIssue`, `onOpenLink`, `onRequestAction`, `onCheckMod`, `theme`, and the optional `onMounted`, `onErrorResponse`, `test` and `onTestReport`). Returns a `ModSession`, whose `hintsTileLinks` is `launch.tileLinks !== null`: blocked image and media reports then end with the redirect hint for tile authors (see the [sandbox module](../sandbox/README.md#blocked-request-reports)).
+- `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme` and `layout` to `options.layout`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `readSiteDecisions`, `onIssue`, `onOpenLink`, `onRequestAction`, `onCheckMod`, `theme`, `layout`, and the optional `onMounted`, `onErrorResponse`, `test` and `onTestReport`). Returns a `ModSession`, whose `hintsTileLinks` is `launch.tileLinks !== null`: blocked image and media reports then end with the redirect hint for tile authors (see the [sandbox module](../sandbox/README.md#blocked-request-reports)).
   - `onMounted()`: called when the mod's `mount` finished: for `sandbox.mounted`, and for `sandbox.mountFailed` after its issue is reported. The mod check uses it to start its settle time. Running sandboxes pass none, and ignore `sandbox.mounted`.
   - `test`: `{ code, caseName }` (`SandboxTestParams`), sent in `sandbox.connect` so the frame lists the cases of the test file (`caseName` `null`) or runs one. Only the frames of a check's tests, built with `buildModTestDocument`, pass it.
   - `onTestReport(report)`: called with each test notification of the frame, read as a `SandboxTestReport` (`listed`, `listFailed`, `answerQueued` or `caseFinished`, see the [sandbox module](../sandbox/README.md#frame-loader-messages)). Notifications of the wrong shape are ignored. Running sandboxes pass none, so a mod that sends them outside a check changes nothing.
   - `onErrorResponse(method, error)`: called for every error response the session sends, with the request's method, or `null` for a message that is not a request (`-32600`), and the response's `error` (`ResponseError`: `code`, `message`). The mod check keeps `-32600`, `-32601` and `-32602`, the signal that a mod uses the API wrongly. Without it, nothing outside the session sees the responses.
 - `pushTilesChanged(session, tiles, issues, tileBodies)`: pushes `tiles.changed`, and replaces the session's `TileBodies` with `tileBodies`, those of the reloaded tiles, so `tiles.renderBody` and `players.open` follow them. The policy stays the launch's.
 - `pushThemeChanged(session, theme)`: pushes `theme.changed` with the `Theme`.
-- `THEME_CHANGED_METHOD`: `"theme.changed"`, shared with the frame loader. `TILES_CHANGED_METHOD`, `"tiles.changed"`, and `ENGINE_METHODS`, the merged handler table, are exported by `mod_session.ts` for the surface guard, not by `index.ts`.
+- `pushLayoutChanged(session, layout)`: pushes `layout.changed` with `{ layout }` (`LayoutChangedParams`), a `FrameLayout`.
+- `THEME_CHANGED_METHOD`: `"theme.changed"`, and `LAYOUT_CHANGED_METHOD`: `"layout.changed"`, shared with the frame loader. `TILES_CHANGED_METHOD`, `"tiles.changed"`, and `ENGINE_METHODS`, the merged handler table, are exported by `mod_session.ts` for the surface guard, not by `index.ts`.
 - `stopModSession(session)`: closes the channel. Later messages, pushes and answers to pending requests do nothing.
 
 Lifecycle:

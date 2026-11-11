@@ -5,6 +5,8 @@ export {
   attachCheckFrame,
   attachFrame,
   changeStageColorScheme,
+  changeStageFullscreen,
+  changeStageTheaterMode,
   changeStageTileLinkedMedia,
   checkFrameLoadedAgain,
   clearNotifications,
@@ -20,6 +22,7 @@ export {
   readStageSnapshot,
   reloadTiles,
   subscribeStage,
+  warnFullscreenRefused,
 } from "./stage_controller.ts";
 export type {
   ActionSnapshot,
@@ -46,6 +49,7 @@ export type {
   MessageProducer,
 } from "./stage_messages.ts";
 export type { StageHistory } from "./stage_history.ts";
+export type { FrameLayout } from "./stage_layout.ts";
 export { buildSectionHash } from "./stage_routes.ts";
 export type { SectionLink, StageHome, StageRouting } from "./stage_routes.ts";
 export type { SandboxStatus, SiteConsentAnswer } from "./stage_sandboxes.ts";

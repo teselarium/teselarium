@@ -85,6 +85,8 @@ export const THEME_TOKENS: readonly Readonly<ThemeToken>[] = Object.freeze([
     "--ot-shadow",
     "0 10px 15px -3px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.12)",
   ),
+  defineSharedToken("--ot-content-width", "65rem"),
+  defineSharedToken("--ot-reading-width", "55rem"),
 ]);
 
 /** The value of a token for a color scheme. */
