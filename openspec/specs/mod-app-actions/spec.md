@@ -94,7 +94,7 @@ The action dialog SHALL be drawn by the app, outside every mod frame, and SHALL 
 
 #### Scenario: Frame cannot be used behind the dialog
 - **WHEN** the action dialog is open and the user clicks a book in the sample mod's frame
-- **THEN** the book is not selected
+- **THEN** no card opens in the sample mod's frame
 
 ### Requirement: Only the visible mod asks
 The engine SHALL answer `links.open`, `files.save`, `ui.confirm` and `players.open` from a mod whose sandbox is not the visible one with error code `-32002`, and SHALL NOT show a dialog.

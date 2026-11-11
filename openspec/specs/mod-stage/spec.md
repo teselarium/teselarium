@@ -11,7 +11,7 @@ The app SHALL open a mod for the address hash `#/run`, with the query parameter 
 
 #### Scenario: Link with a mod and a collection
 - **WHEN** the app is opened at `#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml`
-- **THEN** the stage bar shows `Book List` and `1.0.0`, and the mod's frame lists the three sample books
+- **THEN** the stage bar shows `Book List` and `1.1.0`, and the mod's frame lists the three sample books
 
 #### Scenario: Link without a collection
 - **WHEN** the app is opened at `#/run?mod=./samples/mods/book_list`
@@ -130,15 +130,15 @@ For a sandbox opened with a collection, the stage bar SHALL have a "Reload tiles
 - **THEN** the warnings popover lists the tile's issue and the warnings capsule is filled
 
 ### Requirement: Sample book list mod
-The sample mod `book_list` SHALL list the tiles it receives with each book's title, authors and cover image, and SHALL declare the sample books as its sample collection. Selecting a book SHALL highlight it and store its source in the mod's storage slot, and the selection SHALL be highlighted again when the mod is opened later.
+The sample mod `book_list` SHALL show the tiles it receives with each book's title, authors and cover image, and SHALL declare the sample books as its sample collection. The number of books per row the user chooses SHALL be stored in the mod's storage slot and chosen again when the mod is opened later. What the sample shows and how the user works with it is described in `sample-book-list`.
 
 #### Scenario: Books with covers
 - **WHEN** the sample mod runs with the sample collection from the app's origin
 - **THEN** the frame shows the three books with their titles, authors and cover images
 
 #### Scenario: Selection is remembered
-- **WHEN** the user selects "Kallocain" in the sample mod and the app page is reloaded
-- **THEN** "Kallocain" is highlighted in the sample mod
+- **WHEN** the user chooses 10 books per row in the sample mod and the app page is reloaded
+- **THEN** the sample mod's "Books per row" select shows 10
 
 ### Requirement: The visible frame fills the stage area
 The visible sandbox's frame SHALL fill the stage area: the page's width left beside the sidebar, and the viewport height left under the app header and the stage bar, following the window's size and the sidebar's width. The frame's size SHALL NOT depend on the mod's content: content taller than the frame SHALL scroll inside the frame, not the page. The frame SHALL be at least 16rem tall; when less room is left, the page scrolls.

@@ -11,7 +11,7 @@ While a sandbox is visible, the stage bar SHALL be one row above its frame. Its 
 
 #### Scenario: Sample mod with its collection
 - **WHEN** the sample book list mod runs with the sample collection
-- **THEN** the stage bar shows, from left to right, `Book List`, `1.0.0` in a capsule, the information button, the Share button, the "Reload tiles" button, the errors, warnings and notifications buttons and the close button
+- **THEN** the stage bar shows, from left to right, `Book List`, `1.1.0` in a capsule, the information button, the Share button, the "Reload tiles" button, the errors, warnings and notifications buttons and the close button
 - **AND** the stage bar is a single row
 
 #### Scenario: No collection
@@ -31,7 +31,7 @@ Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place
 
 #### Scenario: Missing collection
 - **WHEN** the app is opened with the sample book list mod and a collection that answers HTTP 404
-- **THEN** the stage bar shows `Book List` and `1.0.0`
+- **THEN** the stage bar shows `Book List` and `1.1.0`
 
 #### Scenario: Cancelled API question
 - **WHEN** a mod with `api: "^0.2.0"` is opened and the user presses "Cancel"

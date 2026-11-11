@@ -114,7 +114,7 @@ The result of `mods.inspect` SHALL also have `api`, the mod's range or `null` wh
 - **THEN** the result has `api` `null` and `apiCompatible` `null`
 
 ### Requirement: Sample and default mods declare the API range
-The sample mod and every default mod SHALL declare `api: "^0.1.0"`.
+The sample mod SHALL declare `api: "^0.1.5"`, the first mod API version with the `<ot-tile-body>` element, and every default mod SHALL declare `api: "^0.1.0"`.
 
 #### Scenario: Shipped mods match
 - **WHEN** the sample book list mod, the mod explorer and the mod viewer are each opened

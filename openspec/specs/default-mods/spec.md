@@ -40,7 +40,7 @@ The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list e
 
 #### Scenario: Vanilla explorer lists the sample
 - **WHEN** the mod explorer runs with its vanilla config
-- **THEN** its frame lists `Book List` with the description `A very simple list of books with their covers.`
+- **THEN** its frame lists `Book List` with the description `A grid of book covers, with a card for each book that shows its details and text.`
 
 #### Scenario: Select a mod
 - **WHEN** the user selects `Book List` in the mod explorer
@@ -56,8 +56,8 @@ The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the m
 
 #### Scenario: View the sample mod
 - **WHEN** the app is opened at `#/run?mod=mod_viewer&target=./samples/mods/book_list`
-- **THEN** the viewer's frame shows `Book List`, `1.0.0`, its description, the config value `show_covers`, and the `show` permission for `https://upload.wikimedia.org` with the reason `Shows the book covers`, marked as granted
-- **AND** it shows the API range `^0.1.0`, marked as matching
+- **THEN** the viewer's frame shows `Book List`, `1.1.0`, its description, the config value `show_covers`, and the `show` permission for `https://upload.wikimedia.org` with the reason `Shows the book covers`, marked as granted
+- **AND** it shows the API range `^0.1.5`, marked as matching
 
 #### Scenario: View a mod for another API
 - **WHEN** the viewer shows a mod with `api: "^0.2.0"`
@@ -161,7 +161,7 @@ The mod viewer SHALL show the report's status as a badge, with `data-ot-variant`
 #### Scenario: Sample mod passes
 - **WHEN** the viewer shows the sample book list mod and the user presses "Check mod"
 - **THEN** the viewer's frame shows that the check passed, with a `success` badge and no findings
-- **AND** it lists the cases `lists the sample books` and `highlights the remembered book`, both passed
+- **AND** it lists the sample's cases, among them `lists the sample books` and `remembers the books per row`, all passed
 - **AND** the mod viewer is still the visible mod
 
 #### Scenario: Failing mod
