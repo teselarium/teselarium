@@ -1,0 +1,12 @@
+collection:
+  name: "Markdown flashcards"
+  description: "A sample deck about general markdown, for the flashcards mod."
+  tiles:
+    - path: "./cards/emphasis.md"
+    - path: "./cards/links.md"
+    - path: "./cards/task_lists.md"
+    - path: "./cards/tables.md"
+    - path: "./cards/code_blocks.md"
+    - path: "./cards/math.md"
+    - path: "./cards/diagrams.md"
+    - path: "./cards/alerts.md"

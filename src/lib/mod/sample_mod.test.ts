@@ -5,12 +5,35 @@ import {
   loadTileCollection,
   validateTileCollection,
 } from "../tile/index.ts";
-import type { TileCollection } from "../tile/index.ts";
+import type { Tile, TileCollection, TileValidator } from "../tile/index.ts";
+import type { Metadata } from "../files/index.ts";
 import { loadMod, loadModTestCode } from "./index.ts";
 import type { LoadedMod } from "./index.ts";
 
-/** The `book_list` mod the app ships, read from `public/` like the built app serves it. */
-const SHIPPED_SAMPLE_MOD = `${APP_BASE_URL}samples/mods/book_list/`;
+/** A sample mod the app ships, read from `public/` like the built app serves it. */
+interface ShippedSample {
+  /** The mod's folder, ending with `/`. */
+  folder: string;
+  /** The `api` range its mod file declares. */
+  api: string;
+  /** Names of cases its test file registers. */
+  caseNames: string[];
+}
+
+const SHIPPED_BOOK_LIST: ShippedSample = {
+  folder: `${APP_BASE_URL}samples/mods/book_list/`,
+  api: "^0.1.5",
+  caseNames: ["lists the sample books", "remembers the books per row"],
+};
+
+const SHIPPED_FLASHCARDS: ShippedSample = {
+  folder: `${APP_BASE_URL}samples/mods/flashcards/`,
+  api: "^0.1.9",
+  caseNames: ["lists the sample tiles", "remembers the chosen fields"],
+};
+
+/** The Nobel laureates sample collection, whose tiles have no flashcard fields. */
+const NOBEL_LAUREATES_COLLECTION = `${APP_BASE_URL}samples/tiles/literature_nobel_laureates/collection.yaml`;
 
 interface ValidatedSample {
   /** Name of the mod's tile type. */
@@ -19,27 +42,43 @@ interface ValidatedSample {
   collection: TileCollection;
 }
 
-function readDeclaredPath(path: string | null, pathName: string): string {
+function readDeclaredPath(
+  sampleMod: LoadedMod,
+  path: string | null,
+  pathName: string,
+): string {
   if (path === null) {
     throw new Error(
-      `The shipped sample mod ${SHIPPED_SAMPLE_MOD} declares no ${pathName}`,
+      `The shipped sample mod ${sampleMod.source} declares no ${pathName}`,
     );
   }
   return path;
+}
+
+async function buildSampleValidator(
+  sampleMod: LoadedMod,
+): Promise<TileValidator> {
+  const typeSource = readDeclaredPath(
+    sampleMod,
+    sampleMod.typeSource,
+    "type_path",
+  );
+  const tileValidator = await buildTileValidator(typeSource, {
+    fetch: fetchAppFile,
+  });
+  return tileValidator;
 }
 
 /** Loads the sample collection the mod declares and validates it with the mod's tile type. */
 async function validateSampleCollection(
   sampleMod: LoadedMod,
 ): Promise<ValidatedSample> {
-  const typeSource = readDeclaredPath(sampleMod.typeSource, "type_path");
   const sampleCollection = readDeclaredPath(
+    sampleMod,
     sampleMod.sampleCollection,
     "sample_collection",
   );
-  const tileValidator = await buildTileValidator(typeSource, {
-    fetch: fetchAppFile,
-  });
+  const tileValidator = await buildSampleValidator(sampleMod);
   const loadedCollection = await loadTileCollection(sampleCollection, {
     fetch: fetchAppFile,
   });
@@ -50,11 +89,36 @@ async function validateSampleCollection(
   return validatedSample;
 }
 
-describe("shipped sample mod", function describeShippedSampleMod(): void {
+function loadShippedMod(sample: ShippedSample): Promise<LoadedMod> {
+  const loading = loadMod(sample.folder, { fetch: fetchAppFile });
+  return loading;
+}
+
+/** A collection of one tile with the given metadata, validated with the tile validator. */
+function validateOneTile(
+  tileValidator: TileValidator,
+  metadata: Metadata,
+): TileCollection {
+  const tile: Tile = {
+    source: `${APP_BASE_URL}cards/one.md`,
+    metadata,
+    body: "",
+    types: [],
+  };
+  const collection: TileCollection = {
+    source: `${APP_BASE_URL}cards/collection.yaml`,
+    name: "One card",
+    description: "",
+    tiles: [tile],
+    issues: [],
+  };
+  const validatedCollection = validateTileCollection(collection, tileValidator);
+  return validatedCollection;
+}
+
+function describeShippedSample(sample: ShippedSample): void {
   it("its sample collection matches its tile type", async function validatesShippedSample(): Promise<void> {
-    const sampleMod = await loadMod(SHIPPED_SAMPLE_MOD, {
-      fetch: fetchAppFile,
-    });
+    const sampleMod = await loadShippedMod(sample);
 
     expect(sampleMod.typeSource).not.toBeNull();
     expect(sampleMod.sampleCollection).not.toBeNull();
@@ -69,21 +133,76 @@ describe("shipped sample mod", function describeShippedSampleMod(): void {
   });
 
   it("declares the mod API range", async function declaresApiRange(): Promise<void> {
-    const sampleMod = await loadMod(SHIPPED_SAMPLE_MOD, {
-      fetch: fetchAppFile,
-    });
+    const sampleMod = await loadShippedMod(sample);
 
-    expect(sampleMod.api).toBe("^0.1.5");
+    expect(sampleMod.api).toBe(sample.api);
   });
 
   it("declares its test file", async function declaresTestFile(): Promise<void> {
-    const sampleMod = await loadMod(SHIPPED_SAMPLE_MOD, {
-      fetch: fetchAppFile,
-    });
+    const sampleMod = await loadShippedMod(sample);
 
-    expect(sampleMod.testSource).toBe(`${SHIPPED_SAMPLE_MOD}test.js`);
+    expect(sampleMod.testSource).toBe(`${sample.folder}test.js`);
     const testCode = await loadModTestCode(sampleMod, { fetch: fetchAppFile });
-    expect(testCode).toContain('"lists the sample books"');
-    expect(testCode).toContain('"remembers the books per row"');
+    for (const caseName of sample.caseNames) {
+      expect(testCode).toContain(`"${caseName}"`);
+    }
+  });
+}
+
+describe("shipped sample mod book_list", function describeBookList(): void {
+  describeShippedSample(SHIPPED_BOOK_LIST);
+});
+
+describe("shipped sample mod flashcards", function describeFlashcards(): void {
+  describeShippedSample(SHIPPED_FLASHCARDS);
+});
+
+describe("flashcard tile type", function describeFlashcardType(): void {
+  it("is named flashcard, with the sample deck of 8 tiles", async function namesFlashcardType(): Promise<void> {
+    const sampleMod = await loadShippedMod(SHIPPED_FLASHCARDS);
+
+    const { typeName, collection } = await validateSampleCollection(sampleMod);
+
+    expect(typeName).toBe("flashcard");
+    expect(collection.tiles.length).toBe(8);
+  });
+
+  it("matches the Nobel laureates collection", async function matchesNobelLaureates(): Promise<void> {
+    const sampleMod = await loadShippedMod(SHIPPED_FLASHCARDS);
+    const tileValidator = await buildSampleValidator(sampleMod);
+    const loadedCollection = await loadTileCollection(
+      NOBEL_LAUREATES_COLLECTION,
+      { fetch: fetchAppFile },
+    );
+
+    const collection = validateTileCollection(loadedCollection, tileValidator);
+
+    expect(collection.tiles.length).toBeGreaterThan(0);
+    for (const tile of collection.tiles) {
+      expect(tile.types).toEqual(["flashcard"]);
+    }
+    expect(collection.issues).toEqual([]);
+  });
+
+  it("matches a number as the answer", async function matchesNumberAnswer(): Promise<void> {
+    const sampleMod = await loadShippedMod(SHIPPED_FLASHCARDS);
+    const tileValidator = await buildSampleValidator(sampleMod);
+
+    const collection = validateOneTile(tileValidator, { answer: 1953 });
+
+    expect(collection.tiles[0].types).toEqual(["flashcard"]);
+    expect(collection.issues).toEqual([]);
+  });
+
+  it("warns about a title that is not a string", async function warnsAboutNumberTitle(): Promise<void> {
+    const sampleMod = await loadShippedMod(SHIPPED_FLASHCARDS);
+    const tileValidator = await buildSampleValidator(sampleMod);
+
+    const collection = validateOneTile(tileValidator, { title: 1984 });
+
+    expect(collection.tiles[0].types).toEqual([]);
+    expect(collection.issues).toHaveLength(1);
+    expect(collection.issues[0].level).toBe("warning");
+    expect(collection.issues[0].message).toContain("metadata/title");
   });
 });

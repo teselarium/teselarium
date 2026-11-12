@@ -69,3 +69,30 @@ export function readSampleModSource(page: Page): string {
   const sampleModSource = new URL(SAMPLE_MOD_FILE_PATH, page.url()).href;
   return sampleModSource;
 }
+
+/** `/samples/mods/flashcards`: the folder of the shipped sample flashcards mod. */
+export const FLASHCARDS_FOLDER_PATH = `${SAMPLE_MODS_PATH}/flashcards`;
+
+/** `/samples/mods/flashcards/flashcard_collection.yaml`: the sample deck of eight cards. */
+export const FLASHCARDS_COLLECTION_PATH = `${FLASHCARDS_FOLDER_PATH}/flashcard_collection.yaml`;
+
+/** `/samples/mods/flashcards/cards`: the folder of the sample deck's tiles. */
+export const FLASHCARDS_CARDS_FOLDER_PATH = `${FLASHCARDS_FOLDER_PATH}/cards`;
+
+/** `./samples/mods/flashcards`: the flashcards mod as a run link names it. */
+export const FLASHCARDS_MOD_REFERENCE = `.${FLASHCARDS_FOLDER_PATH}`;
+
+/** `./samples/mods/flashcards/flashcard_collection.yaml`: the sample deck as a run link names it. */
+export const FLASHCARDS_COLLECTION_REFERENCE = `.${FLASHCARDS_COLLECTION_PATH}`;
+
+/** `#/run?mod=./samples/mods/flashcards`: the run link of the flashcards mod without tiles. */
+export const FLASHCARDS_RUN_HASH = `#/run?mod=${FLASHCARDS_MOD_REFERENCE}`;
+
+/**
+ * `#/run?mod=./samples/mods/flashcards&collection=./samples/mods/flashcards/flashcard_collection.yaml`:
+ * the run link of the flashcards mod on the sample deck.
+ */
+export const FLASHCARDS_COLLECTION_RUN_HASH = `${FLASHCARDS_RUN_HASH}&collection=${FLASHCARDS_COLLECTION_REFERENCE}`;
+
+/** `**\/samples/mods/flashcards/flashcard_collection.yaml`: the route glob of the sample deck. */
+export const FLASHCARDS_COLLECTION_GLOB = `**${FLASHCARDS_COLLECTION_PATH}`;

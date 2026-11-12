@@ -110,6 +110,25 @@ test.describe("Mod explorer", function describeExplorer(): void {
       `#/run?mod=mod_viewer&target=${encodeURIComponent(readSampleModSource(page))}`,
     );
   });
+
+  test("Vanilla explorer lists the samples", async function listsSamples({
+    page,
+  }): Promise<void> {
+    await page.goto(EXPLORER_RUN_LINK);
+    const explorer = page.frameLocator('iframe[title="Mods"]');
+    const cards = explorer.getByRole("article");
+
+    await expect(cards.getByRole("heading")).toHaveText([
+      "Book List",
+      "Flashcards",
+    ]);
+    await expect(cards.nth(0)).toContainText(
+      "A grid of book covers, with a card for each book that shows its details and text.",
+    );
+    await expect(cards.nth(1)).toContainText(
+      "Explore any collection as a table, and study it as question and answer cards.",
+    );
+  });
 });
 
 /** `two_books.yaml`: a collection of two sample books, served under `/test-mods/`. */

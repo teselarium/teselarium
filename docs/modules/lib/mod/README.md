@@ -6,7 +6,12 @@ A mod is community JavaScript that OpenTesela runs in a sandbox (see [sandbox](.
 
 ### Mod file format
 
-A mod is a folder with a `mod_conf.yaml` file. By default, a mod bundles its tile type, its sample collection and its test file in that folder, so it can be copied or shared as one folder, and its tests go with it. The sample book list mod (`public/samples/mods/book_list/`) holds `mod_conf.yaml`, `main.js`, `test.js` (its tests, see the [guide to writing mod tests](../../../mod_plugin_spec.md#mod-tests)), `book_type.md`, `book_collection.yaml` and the `books/` it lists. Its `mod_conf.yaml`:
+A mod is a folder with a `mod_conf.yaml` file. By default, a mod bundles its tile type, its sample collection and its test file in that folder, so it can be copied or shared as one folder, and its tests go with it. The app ships two sample mods in `public/samples/mods/`, written in plain JavaScript and served as they are:
+
+- The book list (`book_list/`) shows its books as a grid of covers, with a card for each one. It holds `mod_conf.yaml`, `main.js`, `test.js` (its tests, see the [guide to writing mod tests](../../../mod_plugin_spec.md#mod-tests)), `book_type.md`, `book_collection.yaml` and the `books/` it lists.
+- The flashcards mod (`flashcards/`) lists any collection in a table and studies it as question and answer cards. It holds `mod_conf.yaml`, `main.js`, `test.js`, `flashcard_type.md`, whose properties are all optional so every collection matches it, `flashcard_collection.yaml` and the `cards/` of its sample deck about markdown. It is a second example of the mod API: it reads each tile's first heading from `tiles.renderBody`, hides a rendered body around that heading after `ot-rendered`, and keeps the chosen fields with `storage.set`.
+
+The book list's `mod_conf.yaml`:
 
 ```yaml
 mod:
