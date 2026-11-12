@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Describes what the shipped sample flashcards mod (`public/samples/mods/flashcards/`) shows and how the user works with it. Explore lists the tiles and opens each one. Study turns the tiles into a deck of question and answer cards and goes through it once in random order.
+Describes what the shipped sample flashcards mod (`public/samples/mods/flashcards/`) shows and how the user works with it. Explore lists the tiles and opens each one. Study turns the tiles into a deck of question and answer cards, goes through it once in random order, and says how many cards you knew.
 
 ## ADDED Requirements
 
@@ -218,7 +218,7 @@ A metadata key on a card SHALL be shown as plain text, not rendered as markdown,
 - **THEN** the answer shows `~~text~~` as written, with no `<del>` element
 
 ### Requirement: Study session
-Pressing "Start" SHALL close the setup dialog and start a session over the cards of the chosen fields. Each card SHALL show "Card i of N", its question and a "Show answer" button. Pressing "Show answer" SHALL show the answer below the question, and replace "Show answer" with "Next" and "Open full tile". A "Restart" button SHALL be shown during the session.
+Pressing "Start" SHALL close the setup dialog and start a session over the cards of the chosen fields. Each card SHALL show its question and a "Show answer" button. Pressing "Show answer" SHALL show the answer below the question, which stays shown, and replace "Show answer" with "I knew it", "Not yet" and "Open full tile". A "Restart" button SHALL be shown during the session, outside the card.
 
 #### Scenario: First card
 - **WHEN** the user starts a session with the sample collection and the default fields
@@ -226,21 +226,85 @@ Pressing "Start" SHALL close the setup dialog and start a session over the cards
 
 #### Scenario: Show the answer
 - **WHEN** a card shows its question and the user presses "Show answer"
-- **THEN** the card shows the question and its answer, "Next" and "Open full tile", and no "Show answer"
+- **THEN** the card shows the question and its answer, "I knew it", "Not yet" and "Open full tile", and no "Show answer"
 
 #### Scenario: A diagram waits for the answer
 - **WHEN** the card of Diagrams is shown with "First heading" and its answer is not shown yet
 - **THEN** no diagram has been drawn, and after "Show answer" the answer shows the drawn diagram
 
+### Requirement: Flashcard shape
+In Study, the card SHALL look like a flashcard, with its look set from the theme's tokens only, so it holds in light and dark. It SHALL be at most 32rem wide and centered, at least 16rem tall, and SHALL grow with its content. Its background SHALL be `--ot-card`, its shadow `--ot-shadow`, and its corner radius twice `--ot-radius`. The end of a round SHALL be shown in the same card.
+
+#### Scenario: A flashcard
+- **WHEN** a session shows a card, in light and in dark
+- **THEN** the card's computed background, shadow and corner radius are those of `--ot-card`, `--ot-shadow` and twice `--ot-radius`, and its width is at most 32rem
+
+### Requirement: Question and answer sides
+The question side SHALL have a visible label "Question", after Lucide's `circle-question-mark` icon, and a top border in `--ot-primary`. The answer side SHALL have a visible label "Answer", after Lucide's `lightbulb` icon, a `--ot-muted` background, and a top border in `--ot-border` that divides it from the question. The icons SHALL be drawn in the label's color and hidden from assistive technology.
+
+#### Scenario: The two sides
+- **WHEN** a card shows its answer, in light and in dark
+- **THEN** the question side's computed top border color is `--ot-primary`, the answer side's computed background is `--ot-muted`, and the labels "Question" and "Answer" are shown
+
+### Requirement: Side text
+A side shown as text SHALL be centered, with a font size of 1.25rem. A side shown as a rendered body SHALL be left-aligned.
+
+#### Scenario: Text and rendered sides
+- **WHEN** a card with Question `question` and Answer "Body" shows its answer
+- **THEN** the question side's text is centered with a computed font size of 20px, and the answer side's rendered body is left-aligned
+
+### Requirement: Answer reveal
+The answer side SHALL fade in over 150ms when it is shown, with no animation when the user prefers reduced motion.
+
+#### Scenario: Reduced motion
+- **WHEN** the user prefers reduced motion and presses "Show answer"
+- **THEN** the answer side has no animation
+
+### Requirement: Session bar
+A session bar above the card SHALL hold "Card i of N", with a font size of 0.875rem in `--ot-muted-foreground`, and a `<progress>` whose value is the number of cards graded in the round and whose maximum is N. It SHALL also hold "Round r" from the second round on, and "Restart" as a plain button.
+
+#### Scenario: The position
+- **WHEN** a session of the sample deck shows "Card 3 of 8"
+- **THEN** "Card 3 of 8" is shown above the card in `--ot-muted-foreground`, the progress has the value 2 and the maximum 8, and "Restart" is not inside the card
+
+### Requirement: Button place
+On a study card, the buttons SHALL be on the question side, below the question and above the answer side, so that the grades take the row of "Show answer", at the same height, when the answer is shown, and a long answer does not move them. The end of a round, which has no answer side, SHALL keep its buttons at the bottom of the card.
+
+#### Scenario: Same place after the flip
+- **WHEN** a card shows its question and the user presses "Show answer"
+- **THEN** "I knew it" is at the height where "Show answer" was, and the buttons come before the answer side
+
+#### Scenario: A long answer
+- **WHEN** the card of Tables is shown with "First heading" in a frame shorter than the card with its answer, and the user presses "Show answer"
+- **THEN** "I knew it" is in view without scrolling
+
+### Requirement: Double-click guard
+For 500ms after "Show answer" is pressed, a pointer click on "I knew it" or "Not yet" SHALL do nothing, so a double-click on "Show answer" does not grade the card under the pointer. Pressing either button with the keyboard SHALL work at once.
+
+#### Scenario: Double-click on Show answer
+- **WHEN** a session shows "Card 1 of 8" and the user double-clicks "Show answer"
+- **THEN** the card shows its answer and Study still shows "Card 1 of 8"
+
+#### Scenario: Click after the pause
+- **WHEN** the answer has been shown for more than 500ms and the user clicks "Not yet"
+- **THEN** Study shows "Card 2 of 8"
+
+### Requirement: Card buttons
+"Show answer" and "I knew it" SHALL be primary buttons, "Not yet" a plain button, and "Open full tile" a ghost button. "I knew it" SHALL show Lucide's `circle-check` icon and "Not yet" Lucide's `rotate-ccw` icon, each icon hidden from assistive technology.
+
+#### Scenario: Names of the grading buttons
+- **WHEN** a card shows its answer
+- **THEN** its buttons are named "I knew it", "Not yet" and "Open full tile", and "I knew it" is a primary button
+
 ### Requirement: Random order, each card once
-A session SHALL show its cards in a random order, and SHALL show each card exactly once.
+A session SHALL show the cards of each round in a random order, and SHALL show each card of a round exactly once.
 
 #### Scenario: Each card once
-- **WHEN** the user goes through a session of the sample deck, pressing "Show answer" and then "Next" on each card
+- **WHEN** the user goes through a session of the sample deck, pressing "Show answer" and then "I knew it" or "Not yet" on each card
 - **THEN** 8 cards are shown, one per sample tile, and "Card i of 8" counts from 1 to 8
 
 ### Requirement: Keyboard flow
-Pressing "Show answer" SHALL move focus to "Next", and pressing "Next" SHALL move focus to the next card's "Show answer", so Enter or Space steps through the deck.
+Pressing "Show answer" SHALL move focus to "I knew it", and grading a card SHALL move focus to the next card's "Show answer", so Enter or Space steps through the deck.
 
 #### Scenario: Step with Enter
 - **WHEN** "Show answer" has focus and the user presses Enter twice
@@ -258,7 +322,7 @@ On the answer side, "Open full tile" SHALL open the tile card of the card's tile
 - **THEN** the study card still shows the same card with its answer, and "Open full tile" has focus
 
 ### Requirement: Restart
-Pressing "Restart" SHALL open the setup dialog showing the fields of the current session. Pressing "Start" SHALL replace the session with a new one. Closing the dialog without starting SHALL keep the current session where it was.
+Pressing "Restart" SHALL open the setup dialog showing the fields of the current session. Pressing "Start" SHALL replace the session, and its results, with a new one. Closing the dialog without starting SHALL keep the current session where it was.
 
 #### Scenario: Change fields
 - **WHEN** a session with Question `question` is at "Card 3 of 8" and the user presses "Restart", chooses "First heading" and presses "Start"
@@ -268,23 +332,59 @@ Pressing "Restart" SHALL open the setup dialog showing the fields of the current
 - **WHEN** a session is at "Card 3 of 8" and the user presses "Restart" and then Escape
 - **THEN** Study shows "Card 3 of 8" as before
 
-### Requirement: End of the deck
-Pressing "Next" on the last card SHALL end the session and show "You studied all N cards." with a "Start again" button. Pressing "Start again" SHALL open the setup dialog.
+### Requirement: End of a round
+Grading the last card of a round SHALL end the round and show "You knew K of N cards.", where K is the number of cards graded "I knew it" and N the number of cards in the round, with "card" instead of "cards" when N is 1. Pressing "Start again" SHALL open the setup dialog.
 
 #### Scenario: Last card
-- **WHEN** the user presses "Next" on "Card 8 of 8"
-- **THEN** Study shows "You studied all 8 cards." and "Start again", and no card
+- **WHEN** the user grades "Card 8 of 8", after grading 2 of the cards "Not yet"
+- **THEN** Study shows "You knew 6 of 8 cards." and "Start again", and no card
 
 #### Scenario: Start again
-- **WHEN** the deck is done and the user presses "Start again"
+- **WHEN** the round is done and the user presses "Start again"
 - **THEN** the setup dialog is open
 
+### Requirement: Not yet list
+When M cards of a round were graded "Not yet", the end of the round SHALL show, below the message and on the `--ot-muted` tint, a label "Not yet · M cards" ("card" when M is 1) after Lucide's `rotate-ccw` icon, styled like a side's label. Below it SHALL be a list named by that label, holding the names of those cards (a tile's name, or its file when it has none) in the order they were shown. Then SHALL come the button that studies them again, which has focus, and "Start again".
+
+#### Scenario: Two missed cards
+- **WHEN** a round of 8 cards ends with 2 cards graded "Not yet"
+- **THEN** Study shows "Not yet · 2 cards", a list named "Not yet · 2 cards" with the names of those 2 cards, then "Study these 2 again", which has focus, and "Start again"
+
+#### Scenario: One missed card
+- **WHEN** a round ends with 1 card graded "Not yet"
+- **THEN** Study shows "Not yet · 1 card" and "Study this card again"
+
+### Requirement: Every card known
+When every card of a round was graded "I knew it", the end of the round SHALL show, below the message, "Every card known" after Lucide's `circle-check` icon, styled like a side's label, then only "Start again", which has focus.
+
+#### Scenario: All known
+- **WHEN** every card of the round was graded "I knew it"
+- **THEN** Study shows "You knew 8 of 8 cards.", "Every card known" and "Start again", which has focus, and no "Not yet" list and no button to study cards again
+
+### Requirement: Missed cards round
+The button "Study these M again" ("Study this card again" when M is 1) SHALL start a new round over only the cards graded "Not yet" in the round that ended, in a new random order, with the same fields, without opening the setup dialog. From the second round on, the session bar SHALL show "Round r".
+
+#### Scenario: Missed cards again
+- **WHEN** a round of 8 cards ends with 2 cards graded "Not yet" and the user presses "Study these 2 again"
+- **THEN** Study shows "Round 2" and "Card 1 of 2", and the round shows exactly those 2 cards
+
+### Requirement: Results last for the session
+Each round SHALL record whether each card was graded "I knew it" or "Not yet". The results SHALL be kept while the session lasts, also while it is paused in Explore. "Restart" followed by "Start", "Start again" followed by "Start", and tiles that change SHALL discard them. The results SHALL NOT be stored.
+
+#### Scenario: Results paused in Explore
+- **WHEN** 3 cards of a round were graded, the user presses "Explore" and then "Study", and goes through the rest of the round
+- **THEN** the end message counts all 8 cards
+
+#### Scenario: Restart discards the results
+- **WHEN** cards were graded "Not yet" and the user presses "Restart" and then "Start"
+- **THEN** the new session shows "Card 1 of 8" and no "Round", and its end message counts only its own grades
+
 ### Requirement: Session paused in Explore
-Switching to Explore during a session SHALL keep the session. Switching back to Study SHALL show the same card, on the same side, without opening the setup dialog.
+Switching to Explore during a session SHALL keep the session and its results. Switching back to Study SHALL show the same card, on the same side, without opening the setup dialog.
 
 #### Scenario: Back to Study
 - **WHEN** a session shows the answer of "Card 3 of 8", the user presses "Explore" and then "Study"
-- **THEN** Study shows "Card 3 of 8" with its answer, and no dialog is open
+- **THEN** Study shows "Card 3 of 8" with its answer, the grades of the first two cards are kept, and no dialog is open
 
 ### Requirement: Tiles changed during a session
 When the tiles change during a session, the session SHALL end. The next time the setup dialog opens, it SHALL show "The tiles changed, so the session ended." and SHALL offer the choices and count of the new tiles, with the fields of the ended session when they are still offered. When the user is in Study, the setup dialog SHALL open at once.

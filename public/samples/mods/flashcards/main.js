@@ -18,11 +18,15 @@
  *   outside `<main>`, so they never stack and they survive a redraw.
  * - `storage.get` and `storage.set` keep the chosen fields under
  *   `study_fields`, and `tiles.changed` ends a session that the new tiles
- *   would no longer match.
+ *   would no longer match. The grades of a session are kept in memory only.
  *
  * Like the book list, it gets the app's look from semantic HTML and the base
- * stylesheet. Its own CSS sets layout, and the muted italic of "No title"
- * from the theme's `--ot-muted-foreground`.
+ * stylesheet. Unlike the book list, whose own CSS is layout only, it also
+ * sets a look of its own from the theme's tokens: the study card's
+ * background, shadow and radius, the question side's stripe, the answer
+ * side's tint, and the muted text of the session bar and of "No title". It
+ * uses no literal colors, so it follows light and dark. Its icons are
+ * Lucide's, drawn as inline SVG in `currentColor` (see `LUCIDE_ICONS`).
  */
 
 const STUDY_FIELDS_KEY = "study_fields";
@@ -39,11 +43,96 @@ const HEADING_TAGS = ["H1", "H2", "H3", "H4", "H5", "H6"];
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
+/*
+ * The icons the mod draws, from Lucide (https://lucide.dev), the icon set of
+ * the app's own interface: the path data of lucide-react 1.61.0. `x` and
+ * `circle-question-mark` are derived from Feather (https://feathericons.com).
+ *
+ * ISC License
+ *
+ * Copyright (c) 2026 Lucide Icons and Contributors
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * The MIT License (MIT) (for the icons derived from Feather)
+ *
+ * Copyright (c) 2013-present Cole Bemis
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+const LUCIDE_ICONS = {
+  x: [
+    ["path", { d: "M18 6 6 18" }],
+    ["path", { d: "m6 6 12 12" }],
+  ],
+  "circle-question-mark": [
+    ["circle", { cx: "12", cy: "12", r: "10" }],
+    ["path", { d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" }],
+    ["path", { d: "M12 17h.01" }],
+  ],
+  lightbulb: [
+    [
+      "path",
+      {
+        d: "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5",
+      },
+    ],
+    ["path", { d: "M9 18h6" }],
+    ["path", { d: "M10 22h4" }],
+  ],
+  "circle-check": [
+    ["circle", { cx: "12", cy: "12", r: "10" }],
+    ["path", { d: "m16 9-5.5 5.5L8 12" }],
+  ],
+  "rotate-ccw": [
+    ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }],
+    ["path", { d: "M3 3v5h5" }],
+  ],
+};
+
+/** The label and icon of each side of a study card. */
+const SIDE_LABELS = {
+  question: { text: "Question", icon: "circle-question-mark" },
+  answer: { text: "Answer", icon: "lightbulb" },
+};
+
+const POSITION_ID = "study-position";
+const NOT_YET_LABEL_ID = "not-yet-label";
+
+/** How long after "Show answer" the grading buttons ignore pointer clicks, in milliseconds. */
+const GRADE_CLICK_PAUSE = 500;
+
 /** The outline of a tile without a heading, or whose body could not be rendered. */
 const EMPTY_OUTLINE = Object.freeze({ heading: null, hasSection: false });
 
-// Layout only: the colors, borders and fonts come from the theme. "No title"
-// is muted with the theme's token, and italic so it doesn't rely on color.
+// Layout, and the study card's own look, from the theme's tokens only. "No
+// title" is muted with the theme's token, and italic so it doesn't rely on color.
 const FLASHCARDS_STYLE = `
   main > header {
     display: flex;
@@ -55,7 +144,6 @@ const FLASHCARDS_STYLE = `
   }
   main > header > h1 { margin: 0; }
   main > header > [role="group"],
-  article > footer,
   [data-actions] { display: flex; flex-wrap: wrap; gap: var(--ot-space-2); }
 
   tbody > tr { cursor: pointer; }
@@ -72,15 +160,98 @@ const FLASHCARDS_STYLE = `
   dialog [data-fields] { display: grid; gap: var(--ot-space-4); }
   dialog [data-fields] > div { display: grid; gap: var(--ot-space-1); }
 
-  article > header {
+  /* Study: the session bar, then the flashcard, both as wide as a card and centered. */
+  [data-study] { display: grid; justify-items: center; gap: var(--ot-space-4); }
+  [data-session-bar] {
+    box-sizing: border-box;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--ot-space-2);
+    gap: var(--ot-space-2) var(--ot-space-4);
+    width: min(32rem, 100%);
   }
-  article > header > p { margin: 0; }
-  [data-side] > p { white-space: pre-line; }
+  [data-session-bar] > p { margin: 0; color: var(--ot-muted-foreground); font-size: 0.875rem; }
+  [data-session-bar] > progress { flex: 1; min-width: 6rem; accent-color: var(--ot-primary); }
+
+  /* The flashcard: the theme's card, shadow and a radius twice the theme's. */
+  article[data-flashcard] {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: min(32rem, 100%);
+    min-height: 16rem;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: calc(var(--ot-radius) * 2);
+    background-color: var(--ot-card);
+    color: var(--ot-card-foreground);
+    box-shadow: var(--ot-shadow);
+  }
+  article[data-flashcard] > * + * { margin-top: 0; }
+  [data-card-actions] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--ot-space-2);
+    margin-top: var(--ot-space-6);
+  }
+  article[data-flashcard] > footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--ot-space-2);
+    margin-top: auto;
+    padding: var(--ot-space-4) var(--ot-space-6) var(--ot-space-6);
+  }
+
+  /* The sides: the question under a primary stripe, the answer on the muted tint. */
+  [data-side] { padding: var(--ot-space-6); }
+  [data-side="question"] { flex: 1; border-top: 4px solid var(--ot-primary); }
+  [data-side="answer"] {
+    flex: 1;
+    border-top: 1px solid var(--ot-border);
+    background-color: var(--ot-muted);
+    animation: flashcards-reveal 150ms ease-out;
+  }
+  [data-side-label] {
+    display: flex;
+    align-items: center;
+    gap: var(--ot-space-2);
+    margin: 0 0 var(--ot-space-4);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  [data-side="question"] > [data-side-label] { color: var(--ot-primary); }
+  [data-side="answer"] > [data-side-label] { color: var(--ot-muted-foreground); }
+  [data-side-text] {
+    margin: 0;
+    font-size: 1.25rem;
+    text-align: center;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  [data-side] > ot-tile-body { display: block; text-align: start; }
+
+  /* The end of a round, in the same card. */
+  [data-round-end] { padding: var(--ot-space-6); }
+  [data-round-end] > p:not([data-side-label]) { margin: 0; font-size: 1.25rem; text-align: center; }
+  [data-round-end] > [data-side-label] { justify-content: center; margin: var(--ot-space-4) 0 0; color: var(--ot-primary); }
+  [data-not-yet] {
+    padding: var(--ot-space-4) var(--ot-space-6);
+    border-top: 1px solid var(--ot-border);
+    background-color: var(--ot-muted);
+  }
+  [data-not-yet] > [data-side-label] { margin-bottom: var(--ot-space-2); color: var(--ot-muted-foreground); }
+  [data-not-yet] > ul { margin: 0; }
+
+  @keyframes flashcards-reveal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-side="answer"] { animation: none; }
+  }
 
   /* The base stylesheet's [hidden] is layered: a body's alert or figure would show again. */
   ot-tile-body > [hidden] { display: none; }
@@ -459,6 +630,12 @@ function buildPrimaryButton(view, action, text, handler) {
   return button;
 }
 
+/** A button whose Lucide icon comes before its text, which alone names it. */
+function addButtonIcon(button, icon) {
+  button.prepend(buildIcon(icon));
+  return button;
+}
+
 function buildModeButton(view, mode, text) {
   const button = document.createElement("button");
   button.type = "button";
@@ -587,20 +764,34 @@ function findRowButton(view, source) {
 
 // Tile card ------------------------------------------------------------------
 
-/** A 20 by 20 cross drawn in the button's color, so the theme colors it. */
-function buildCloseIcon() {
-  const icon = document.createElementNS(SVG_NAMESPACE, "svg");
-  icon.setAttribute("viewBox", "0 0 24 24");
-  icon.setAttribute("width", "20");
-  icon.setAttribute("height", "20");
-  icon.setAttribute("fill", "none");
-  icon.setAttribute("stroke", "currentColor");
-  icon.setAttribute("stroke-width", "2");
-  icon.setAttribute("stroke-linecap", "round");
-  icon.setAttribute("aria-hidden", "true");
-  const cross = document.createElementNS(SVG_NAMESPACE, "path");
-  cross.setAttribute("d", "M18 6 6 18M6 6l12 12");
-  icon.append(cross);
+function buildIconShape(tag, attributes) {
+  const shape = document.createElementNS(SVG_NAMESPACE, tag);
+  for (const [name, value] of Object.entries(attributes)) {
+    shape.setAttribute(name, value);
+  }
+  return shape;
+}
+
+/**
+ * A 20 by 20 Lucide icon of `LUCIDE_ICONS`, stroked in `currentColor` so it
+ * takes the color of its label or button, and hidden from assistive
+ * technology, which reads the text next to it.
+ */
+function buildIcon(name) {
+  const icon = buildIconShape("svg", {
+    viewBox: "0 0 24 24",
+    width: "20",
+    height: "20",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    "aria-hidden": "true",
+  });
+  for (const [tag, attributes] of LUCIDE_ICONS[name]) {
+    icon.append(buildIconShape(tag, attributes));
+  }
   return icon;
 }
 
@@ -613,7 +804,7 @@ function buildCloseButton(dialog) {
   closeButton.type = "button";
   closeButton.dataset.otVariant = "ghost";
   closeButton.setAttribute("aria-label", "Close");
-  closeButton.append(buildCloseIcon());
+  closeButton.append(buildIcon("x"));
   closeButton.addEventListener("click", closeDialog.bind(undefined, dialog));
   return closeButton;
 }
@@ -1040,6 +1231,8 @@ async function startSession(view, event) {
     order: shuffleSources(sources, Math.random),
     index: 0,
     side: "question",
+    round: 1,
+    results: new Map(),
     done: false,
   };
   view.notice = null;
@@ -1047,56 +1240,65 @@ async function startSession(view, event) {
   view.setup.close("start");
 }
 
-function isRevealed(body) {
-  return body.dataset.revealed === "true";
+function keepParts(body, keptParts) {
+  for (const child of body.children) {
+    child.hidden = !keptParts.includes(child);
+  }
 }
 
 /**
- * The `ot-rendered` listener of a First heading card: hides everything but
- * the heading, and marks the section, which stays hidden until the answer is
- * shown. It runs before the element draws its diagrams, so a hidden diagram
- * is not drawn until the flip.
+ * The `ot-rendered` listener of a First heading question: hides everything
+ * but the heading. It runs before the element draws its diagrams, so the
+ * section's diagrams are never drawn on the question side.
  */
-function hideAroundHeading(event) {
+function keepOnlyHeading(event) {
   const body = event.currentTarget;
   const parts = findHeadingSection(body);
-  for (const element of [...parts.before, ...parts.after]) {
-    element.hidden = true;
-  }
-  for (const element of parts.section) {
-    element.dataset.section = "";
-    element.hidden = !isRevealed(body);
-  }
+  keepParts(body, [parts.heading]);
 }
 
-function revealSection(body) {
-  body.dataset.revealed = "true";
-  for (const element of body.querySelectorAll(":scope > [data-section]")) {
-    element.hidden = false;
-  }
+/** The `ot-rendered` listener of a section answer: hides everything but the heading's section. */
+function keepOnlySection(event) {
+  const body = event.currentTarget;
+  const parts = findHeadingSection(body);
+  keepParts(body, parts.section);
 }
 
-function buildRenderedBody(tile, field, isAnswerShown) {
+/** The whole body, or only the part of it a First heading card shows on this side. */
+function buildRenderedBody(tile, field) {
   const body = document.createElement("ot-tile-body");
   if (field === FIRST_HEADING_FIELD) {
-    body.dataset.revealed = String(isAnswerShown);
-    body.addEventListener("ot-rendered", hideAroundHeading);
+    body.addEventListener("ot-rendered", keepOnlyHeading);
+  }
+  if (field === SECTION_FIELD) {
+    body.addEventListener("ot-rendered", keepOnlySection);
   }
   body.tile = tile;
   return body;
 }
 
-/** One side of a study card: plain text for a key, the rendered body otherwise. */
-function buildSide(tile, value, sideName, isAnswerShown) {
+/** The visible label of a side, after its icon. */
+function buildSideLabel(sideName) {
+  const label = buildIconLabel(
+    SIDE_LABELS[sideName].icon,
+    SIDE_LABELS[sideName].text,
+  );
+  return label;
+}
+
+/** One side of a study card, under its label: plain text for a key, the rendered body otherwise. */
+function buildSide(tile, value, sideName) {
   const side = document.createElement("div");
   side.dataset.side = sideName;
+  side.append(buildSideLabel(sideName));
   if (value.text !== undefined) {
     const text = document.createElement("p");
+    text.dataset.sideText = "";
     text.textContent = value.text;
     side.append(text);
     return side;
   }
-  side.append(buildRenderedBody(tile, value.rendered, isAnswerShown));
+  side.append(buildRenderedBody(tile, value.rendered));
   return side;
 }
 
@@ -1105,93 +1307,174 @@ function readCurrentTile(view) {
   return tile;
 }
 
-/** The answer side, below the question. The section of a First heading card is already in the question's body. */
-function buildAnswerSide(view, tile) {
-  if (view.session.fields.answer === SECTION_FIELD) {
-    return null;
-  }
+function buildCardSide(view, tile, sideName) {
   const value = readFieldValue(
     tile,
     readOutline(view, tile.source),
-    view.session.fields.answer,
+    view.session.fields[sideName],
   );
-  const answerSide = buildSide(tile, value, "answer", true);
-  return answerSide;
+  const side = buildSide(tile, value, sideName);
+  return side;
 }
 
+/** The card's button row, which sits under the question: "Show answer", then the grades and "Open full tile" in the same place. */
 function buildCardActions(view) {
-  const actions = document.createElement("footer");
+  const actions = document.createElement("div");
+  actions.dataset.cardActions = "";
   if (view.session.side === "question") {
     actions.append(
       buildPrimaryButton(view, "show-answer", "Show answer", showAnswer),
     );
     return actions;
   }
+  const knownButton = buildPrimaryButton(
+    view,
+    "knew-it",
+    "I knew it",
+    gradeKnown,
+  );
+  const missedButton = buildActionButton(
+    view,
+    "not-yet",
+    "Not yet",
+    gradeMissed,
+  );
   const fullTileButton = buildActionButton(
     view,
     "open-full-tile",
     "Open full tile",
     openFullTile,
   );
+  fullTileButton.dataset.otVariant = "ghost";
   fullTileButton.setAttribute("aria-haspopup", "dialog");
   actions.append(
-    buildPrimaryButton(view, "next", "Next", showNextCard),
+    addButtonIcon(knownButton, "circle-check"),
+    addButtonIcon(missedButton, "rotate-ccw"),
     fullTileButton,
   );
   return actions;
 }
 
-function buildStudyCard(view) {
-  const tile = readCurrentTile(view);
+/** The session bar above the card: the round from the second one on, the position, the progress and Restart. */
+function buildSessionBar(view) {
   const session = view.session;
-  const isAnswerShown = session.side === "answer";
-  const card = document.createElement("article");
-  const header = document.createElement("header");
+  const bar = document.createElement("div");
+  bar.dataset.sessionBar = "";
+  if (session.round > 1) {
+    const round = document.createElement("p");
+    round.textContent = `Round ${session.round}`;
+    bar.append(round);
+  }
   const position = document.createElement("p");
+  position.id = POSITION_ID;
   position.textContent = `Card ${session.index + 1} of ${session.order.length}`;
-  header.append(
+  const progress = document.createElement("progress");
+  progress.max = session.order.length;
+  progress.value = session.results.size;
+  progress.setAttribute("aria-labelledby", POSITION_ID);
+  bar.append(
     position,
+    progress,
     buildActionButton(view, "restart", "Restart", restartSession),
   );
-  const question = readFieldValue(
-    tile,
-    readOutline(view, tile.source),
-    session.fields.question,
-  );
-  card.append(header, buildSide(tile, question, "question", isAnswerShown));
-  const answerSide = isAnswerShown ? buildAnswerSide(view, tile) : null;
-  if (answerSide !== null) {
-    card.append(answerSide);
-  }
-  card.append(buildCardActions(view));
+  return bar;
+}
+
+function buildFlashcard() {
+  const card = document.createElement("article");
+  card.dataset.flashcard = "";
   return card;
 }
 
-/** Shows the answer below the question, without drawing the question again. */
-function showAnswer(view) {
-  view.session.side = "answer";
-  const card = view.content.querySelector("article");
+function buildStudyCard(view) {
   const tile = readCurrentTile(view);
-  const answerSide = buildAnswerSide(view, tile);
-  if (answerSide === null) {
-    revealSection(card.querySelector('[data-side="question"] > ot-tile-body'));
-  } else {
-    card.querySelector('[data-side="question"]').after(answerSide);
+  const card = buildFlashcard();
+  const questionSide = buildCardSide(view, tile, "question");
+  questionSide.append(buildCardActions(view));
+  card.append(questionSide);
+  if (view.session.side === "answer") {
+    card.append(buildCardSide(view, tile, "answer"));
   }
-  card.querySelector("footer").replaceWith(buildCardActions(view));
-  focusAction(view, "next");
+  return card;
 }
 
-function showNextCard(view) {
+/**
+ * Shows the answer side below the question, without drawing the question
+ * again: the grades take the place of "Show answer", and the answer is added
+ * after them, so nothing above it moves.
+ */
+function showAnswer(view) {
+  view.session.side = "answer";
+  view.answerShownAt = performance.now();
+  const card = view.content.querySelector("article[data-flashcard]");
+  card.querySelector("[data-card-actions]").replaceWith(buildCardActions(view));
+  card.append(buildCardSide(view, readCurrentTile(view), "answer"));
+  focusAction(view, "knew-it");
+}
+
+/** The sources of the round's cards graded "Not yet", in the order they were shown. */
+function listMissedSources(session) {
+  const missed = [];
+  for (const source of session.order) {
+    if (session.results.get(source) === "missed") {
+      missed.push(source);
+    }
+  }
+  return missed;
+}
+
+/** Records the grade of the current card and goes to the next one, or to the end of the round. */
+function gradeCard(view, result) {
   const session = view.session;
+  session.results.set(session.order[session.index], result);
   session.index += 1;
   session.side = "question";
-  if (session.index >= session.order.length) {
-    session.done = true;
+  if (session.index < session.order.length) {
     renderContent(view);
-    focusAction(view, "start-again");
+    focusAction(view, "show-answer");
     return;
   }
+  session.done = true;
+  renderContent(view);
+  const firstAction =
+    listMissedSources(session).length > 0 ? "study-missed" : "start-again";
+  focusAction(view, firstAction);
+}
+
+/**
+ * A pointer click (`detail` above 0) within the pause after "Show answer":
+ * the second click of a double-click on "Show answer", which lands on the
+ * grade under the pointer. A click from the keyboard has `detail` 0.
+ */
+function isTooSoonAfterAnswer(view, event) {
+  return (
+    event.detail > 0 &&
+    view.answerShownAt !== null &&
+    event.timeStamp - view.answerShownAt < GRADE_CLICK_PAUSE
+  );
+}
+
+function gradeKnown(view, event) {
+  if (!isTooSoonAfterAnswer(view, event)) {
+    gradeCard(view, "known");
+  }
+}
+
+function gradeMissed(view, event) {
+  if (!isTooSoonAfterAnswer(view, event)) {
+    gradeCard(view, "missed");
+  }
+}
+
+/** A new round of the same session over the missed cards, in a new random order. */
+function studyMissedCards(view) {
+  const session = view.session;
+  session.order = shuffleSources(listMissedSources(session), Math.random);
+  session.round += 1;
+  session.results = new Map();
+  session.index = 0;
+  session.side = "question";
+  session.done = false;
   renderContent(view);
   focusAction(view, "show-answer");
 }
@@ -1208,17 +1491,103 @@ function startNewSession(view) {
   openSetup(view, "new-session");
 }
 
-function buildDeckDone(view) {
-  const done = document.createElement("div");
-  const message = document.createElement("p");
-  message.textContent = `You studied all ${view.session.order.length} cards.`;
-  const actions = document.createElement("p");
-  actions.dataset.actions = "";
-  actions.append(
-    buildPrimaryButton(view, "start-again", "Start again", startAgain),
+/** "card" for one, "cards" otherwise. */
+function writeCardWord(count) {
+  if (count === 1) {
+    return "card";
+  }
+  return "cards";
+}
+
+/** A label styled like a side's, after a Lucide icon. */
+function buildIconLabel(icon, text) {
+  const label = document.createElement("p");
+  label.dataset.sideLabel = "";
+  label.append(buildIcon(icon), text);
+  return label;
+}
+
+/**
+ * The cards graded "Not yet", on the answer side's tint: under a label with
+ * the icon of the "Not yet" button, in a list named by that label. Each card
+ * is named by its tile's name, or its file when it has none.
+ */
+function buildNotYetList(view, missedSources) {
+  const notYet = document.createElement("div");
+  notYet.dataset.notYet = "";
+  const label = buildIconLabel(
+    "rotate-ccw",
+    `Not yet · ${missedSources.length} ${writeCardWord(missedSources.length)}`,
   );
-  done.append(message, actions);
-  return done;
+  label.id = NOT_YET_LABEL_ID;
+  const list = document.createElement("ul");
+  list.setAttribute("aria-labelledby", NOT_YET_LABEL_ID);
+  for (const source of missedSources) {
+    const tile = findTile(view, source);
+    const item = document.createElement("li");
+    item.textContent = readTileName(view, tile) ?? readFileName(tile);
+    list.append(item);
+  }
+  notYet.append(label, list);
+  return notYet;
+}
+
+/** "Study these M again", or "Study this card again" for one. */
+function writeStudyAgainText(missedCount) {
+  if (missedCount === 1) {
+    return "Study this card again";
+  }
+  const text = `Study these ${missedCount} again`;
+  return text;
+}
+
+function buildRoundEndActions(view, missedCount) {
+  const actions = document.createElement("footer");
+  const startAgainButton = buildActionButton(
+    view,
+    "start-again",
+    "Start again",
+    startAgain,
+  );
+  if (missedCount === 0) {
+    startAgainButton.dataset.otVariant = "primary";
+    actions.append(startAgainButton);
+    return actions;
+  }
+  actions.append(
+    buildPrimaryButton(
+      view,
+      "study-missed",
+      writeStudyAgainText(missedCount),
+      studyMissedCards,
+    ),
+    startAgainButton,
+  );
+  return actions;
+}
+
+/**
+ * The end of a round, in the flashcard: how many cards were known, then the
+ * "Not yet" list, or "Every card known", and what to do next.
+ */
+function buildRoundEnd(view) {
+  const session = view.session;
+  const missedSources = listMissedSources(session);
+  const cardCount = session.order.length;
+  const card = buildFlashcard();
+  const summary = document.createElement("div");
+  summary.dataset.roundEnd = "";
+  const message = document.createElement("p");
+  message.textContent = `You knew ${cardCount - missedSources.length} of ${cardCount} ${writeCardWord(cardCount)}.`;
+  summary.append(message);
+  card.append(summary);
+  if (missedSources.length === 0) {
+    summary.append(buildIconLabel("circle-check", "Every card known"));
+  } else {
+    card.append(buildNotYetList(view, missedSources));
+  }
+  card.append(buildRoundEndActions(view, missedSources.length));
+  return card;
 }
 
 function buildNoSession(view) {
@@ -1239,12 +1608,14 @@ function buildStudyContent(view) {
     const noSession = buildNoSession(view);
     return noSession;
   }
+  const study = document.createElement("div");
+  study.dataset.study = "";
   if (view.session.done) {
-    const deckDone = buildDeckDone(view);
-    return deckDone;
+    study.append(buildRoundEnd(view));
+    return study;
   }
-  const studyCard = buildStudyCard(view);
-  return studyCard;
+  study.append(buildSessionBar(view), buildStudyCard(view));
+  return study;
 }
 
 // Mount ----------------------------------------------------------------------
@@ -1303,7 +1674,7 @@ function showLoadedOutlines(view) {
   view.setupPending = false;
 }
 
-/** A session in progress ends: the tile card opened from it closes, and the next setup says why. */
+/** The session ends with its results: the tile card opened from it closes, and the next setup says why. */
 function endChangedSession(view) {
   view.session = null;
   view.notice = TILES_CHANGED_NOTICE;
@@ -1319,7 +1690,7 @@ function endChangedSession(view) {
 function showChangedTiles(view, params) {
   view.tiles = params.tiles;
   view.outlinesReady = false;
-  if (view.session !== null && !view.session.done) {
+  if (view.session !== null) {
     endChangedSession(view);
   }
   renderMain(view);
@@ -1355,6 +1726,7 @@ export default async function mount(engine, context) {
     setupPending: false,
     openSource: null,
     tileCardOpener: null,
+    answerShownAt: null,
   };
   view.tileCard.addEventListener(
     "close",

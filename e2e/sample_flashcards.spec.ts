@@ -166,11 +166,19 @@ function anyDialog(frame: Frame): Locator {
 }
 
 function cardPosition(frame: Frame): Locator {
-  return frame.locator("article > header > p");
+  return frame.locator("#study-position");
+}
+
+function flashcard(frame: Frame): Locator {
+  return frame.locator("article[data-flashcard]");
 }
 
 function questionSide(frame: Frame): Locator {
   return frame.locator('[data-side="question"]');
+}
+
+function answerSide(frame: Frame): Locator {
+  return frame.locator('[data-side="answer"]');
 }
 
 async function openTablesCard(frame: Frame): Promise<Locator> {
@@ -195,7 +203,7 @@ async function startStudying(frame: Frame, question?: string): Promise<void> {
 async function stepToThirdCard(frame: Frame): Promise<void> {
   for (let step = 0; step < 2; step += 1) {
     await frame.getByRole("button", { name: "Show answer" }).click();
-    await frame.getByRole("button", { name: "Next" }).click();
+    await frame.getByRole("button", { name: "I knew it" }).press("Enter");
   }
   await expect(cardPosition(frame)).toHaveText("Card 3 of 8");
 }
@@ -221,6 +229,76 @@ function readTextLook(element: Element): TextLook {
   const style = getComputedStyle(element);
   const look: TextLook = { fontStyle: style.fontStyle, color: style.color };
   return look;
+}
+
+/** Runs in a frame: `value` as the frame computes `property`, such as a `calc()` of tokens. */
+function readValueAs(valueAndProperty: string[]): string {
+  const [value, property] = valueAndProperty;
+  const probe = document.createElement("div");
+  probe.style.setProperty(property, value);
+  document.body.append(probe);
+  const computed = getComputedStyle(probe).getPropertyValue(property);
+  probe.remove();
+  return computed;
+}
+
+interface CardLook {
+  background: string;
+  shadow: string;
+  radius: string;
+}
+
+/** Runs on the flashcard: its computed background, shadow and corner radius. */
+function readCardLook(element: Element): CardLook {
+  const style = getComputedStyle(element);
+  const look: CardLook = {
+    background: style.backgroundColor,
+    shadow: style.boxShadow,
+    radius: style.borderTopLeftRadius,
+  };
+  return look;
+}
+
+/** Runs on an element: one of its computed properties. */
+function readComputed(element: Element, property: string): string {
+  return getComputedStyle(element).getPropertyValue(property);
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+/** Runs on an element: its center, in the frame's coordinates. */
+function readCenter(element: Element): Point {
+  const box = element.getBoundingClientRect();
+  const center: Point = {
+    x: box.left + box.width / 2,
+    y: box.top + box.height / 2,
+  };
+  return center;
+}
+
+/** Runs in a frame: the text of the button at a point, or "" when there is none. */
+function readButtonTextAt(point: Point): string {
+  const button = document.elementFromPoint(point.x, point.y)?.closest("button");
+  return button?.textContent?.trim() ?? "";
+}
+
+/** Runs in a frame: the height of its viewport. */
+function readViewportHeight(): number {
+  return window.innerHeight;
+}
+
+/** Opens the sample deck in a color scheme, and starts a session with the default fields. */
+async function startSampleSession(
+  page: Page,
+  colorScheme: "light" | "dark",
+): Promise<Frame> {
+  await page.emulateMedia({ colorScheme });
+  const frame = await openSampleDeck(page);
+  await startStudying(frame);
+  return frame;
 }
 
 /** Opens the mod viewer on the flashcards mod. */
@@ -456,7 +534,9 @@ test.describe("Study session", function describeStudySession(): void {
     ).toBeFocused();
 
     await page.keyboard.press("Enter");
-    await expect(frame.getByRole("button", { name: "Next" })).toBeFocused();
+    await expect(
+      frame.getByRole("button", { name: "I knew it" }),
+    ).toBeFocused();
     await page.keyboard.press("Enter");
 
     await expect(cardPosition(frame)).toHaveText("Card 2 of 8");
@@ -497,9 +577,11 @@ test.describe("Study session", function describeStudySession(): void {
     await expect(question.getByText("This note was written")).toBeHidden();
     await frame.getByRole("button", { name: "Show answer" }).click();
 
+    const answer = answerSide(frame);
     await expect(
-      question.locator("figure[data-mermaid-source] svg"),
+      answer.locator("figure[data-mermaid-source] svg"),
     ).toBeVisible();
+    await expect(answer.getByText("This note was written")).toBeHidden();
     await expect(question.getByText("This note was written")).toBeHidden();
   });
 
@@ -520,9 +602,202 @@ test.describe("Study session", function describeStudySession(): void {
       frame.getByRole("button", { name: "Open full tile" }),
     ).toBeFocused();
     await expect(cardPosition(frame)).toHaveText("Card 1 of 1");
-    await expect(frame.locator('[data-side="answer"]')).toHaveText(
+    await expect(answerSide(frame).locator("[data-side-text]")).toHaveText(
       "The pipe, |",
     );
+  });
+});
+
+test.describe("Study card look", function describeStudyCardLook(): void {
+  for (const colorScheme of ["light", "dark"] as const) {
+    test(`A flashcard (${colorScheme})`, async function showsFlashcard({
+      page,
+    }): Promise<void> {
+      const frame = await startSampleSession(page, colorScheme);
+      const expected: CardLook = {
+        background: await frame.evaluate(readTokenAs, [
+          "--ot-card",
+          "background-color",
+        ]),
+        shadow: await frame.evaluate(readTokenAs, [
+          "--ot-shadow",
+          "box-shadow",
+        ]),
+        radius: await frame.evaluate(readValueAs, [
+          "calc(var(--ot-radius) * 2)",
+          "border-top-left-radius",
+        ]),
+      };
+
+      const card = flashcard(frame);
+
+      expect(await card.evaluate(readCardLook)).toEqual(expected);
+      const box = await card.boundingBox();
+      expect(box?.width).toBeLessThanOrEqual(512);
+    });
+
+    test(`The two sides (${colorScheme})`, async function showsSides({
+      page,
+    }): Promise<void> {
+      const frame = await startSampleSession(page, colorScheme);
+      const primary = await frame.evaluate(readTokenAs, [
+        "--ot-primary",
+        "border-top-color",
+      ]);
+      const muted = await frame.evaluate(readTokenAs, [
+        "--ot-muted",
+        "background-color",
+      ]);
+
+      await frame.getByRole("button", { name: "Show answer" }).click();
+
+      await expect(questionSide(frame).getByText("Question")).toBeVisible();
+      await expect(answerSide(frame).getByText("Answer")).toBeVisible();
+      expect(
+        await questionSide(frame).evaluate(readComputed, "border-top-color"),
+      ).toBe(primary);
+      expect(
+        await answerSide(frame).evaluate(readComputed, "background-color"),
+      ).toBe(muted);
+    });
+  }
+
+  test("The position", async function showsPosition({ page }): Promise<void> {
+    const frame = await startSampleSession(page, "light");
+    const mutedText = await frame.evaluate(readTokenAs, [
+      "--ot-muted-foreground",
+      "color",
+    ]);
+
+    await stepToThirdCard(frame);
+
+    expect(await cardPosition(frame).evaluate(readComputed, "color")).toBe(
+      mutedText,
+    );
+    const progress = frame.locator("[data-session-bar] > progress");
+    await expect(progress).toHaveJSProperty("value", 2);
+    await expect(progress).toHaveJSProperty("max", 8);
+    await expect(
+      flashcard(frame).getByRole("button", { name: "Restart" }),
+    ).toHaveCount(0);
+    const barBox = await frame.locator("[data-session-bar]").boundingBox();
+    const cardBox = await flashcard(frame).boundingBox();
+    expect((barBox?.y ?? 0) + (barBox?.height ?? 0)).toBeLessThanOrEqual(
+      cardBox?.y ?? 0,
+    );
+  });
+
+  test("Same place after the flip", async function keepsButtonRow({
+    page,
+  }): Promise<void> {
+    const frame = await startSampleSession(page, "light");
+    const showAnswerBox = await frame
+      .getByRole("button", { name: "Show answer" })
+      .boundingBox();
+
+    await frame.getByRole("button", { name: "Show answer" }).click();
+
+    const knewItBox = await frame
+      .getByRole("button", { name: "I knew it" })
+      .boundingBox();
+    const answerBox = await answerSide(frame).boundingBox();
+    expect(knewItBox?.y).toBe(showAnswerBox?.y);
+    expect((knewItBox?.y ?? 0) + (knewItBox?.height ?? 0)).toBeLessThanOrEqual(
+      answerBox?.y ?? 0,
+    );
+  });
+
+  test("Double-click on Show answer", async function ignoresSecondClick({
+    page,
+  }): Promise<void> {
+    const frame = await startSampleSession(page, "light");
+    const showAnswer = frame.getByRole("button", { name: "Show answer" });
+    const point = await showAnswer.evaluate(readCenter);
+
+    await showAnswer.dblclick();
+
+    await expect(answerSide(frame)).toBeVisible();
+    expect(await frame.evaluate(readButtonTextAt, point)).toBe("Not yet");
+    // The second click lands on the grade under the pointer, within the pause.
+    await page.waitForTimeout(600);
+    await expect(cardPosition(frame)).toHaveText("Card 1 of 8");
+  });
+
+  test("Click after the pause", async function gradesAfterPause({
+    page,
+  }): Promise<void> {
+    const frame = await startSampleSession(page, "light");
+    await frame.getByRole("button", { name: "Show answer" }).click();
+    await page.waitForTimeout(600);
+
+    await frame.getByRole("button", { name: "Not yet" }).click();
+
+    await expect(cardPosition(frame)).toHaveText("Card 2 of 8");
+  });
+
+  test("A long answer", async function keepsButtonsInView({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 1100, height: 520 });
+    const frame = await openOneCard(page, "tables.md", "Tables");
+    await startStudying(frame, "First heading");
+
+    await frame.getByRole("button", { name: "Show answer" }).click();
+
+    await expect(answerSide(frame).getByRole("table").first()).toBeAttached();
+    const frameHeight = await frame.evaluate(readViewportHeight);
+    const cardBox = await flashcard(frame).boundingBox();
+    const frameBox = await page
+      .locator('iframe[title="Flashcards"]')
+      .boundingBox();
+    // The card with its answer is taller than the frame shows.
+    expect(
+      (cardBox?.y ?? 0) + (cardBox?.height ?? 0) - (frameBox?.y ?? 0),
+    ).toBeGreaterThan(frameHeight);
+    await expect(
+      frame.getByRole("button", { name: "I knew it" }),
+    ).toBeInViewport();
+  });
+
+  test("Reduced motion", async function showsAnswerWithoutMotion({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const frame = await openSampleDeck(page);
+    await startStudying(frame);
+
+    await frame.getByRole("button", { name: "Show answer" }).click();
+
+    expect(
+      await answerSide(frame).evaluate(readComputed, "animation-name"),
+    ).toBe("none");
+  });
+
+  test("Focus at the end of a round", async function focusesRoundEnd({
+    page,
+  }): Promise<void> {
+    const frame = await openOneCard(page, "tables.md", "Tables");
+    await startStudying(frame);
+    await frame.getByRole("button", { name: "Show answer" }).click();
+
+    await frame.getByRole("button", { name: "Not yet" }).press("Enter");
+
+    await expect(frame.getByText("You knew 0 of 1 card.")).toBeVisible();
+    await expect(
+      frame.getByRole("list", { name: "Not yet · 1 card" }),
+    ).toHaveText("Tables");
+    const missedButton = frame.getByRole("button", {
+      name: "Study this card again",
+    });
+    await expect(missedButton).toBeFocused();
+    await missedButton.click();
+    await expect(frame.getByText("Round 2")).toBeVisible();
+    await frame.getByRole("button", { name: "Show answer" }).click();
+    await frame.getByRole("button", { name: "I knew it" }).press("Enter");
+    await expect(frame.getByText("You knew 1 of 1 card.")).toBeVisible();
+    await expect(
+      frame.getByRole("button", { name: "Start again" }),
+    ).toBeFocused();
   });
 });
 

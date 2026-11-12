@@ -191,7 +191,7 @@ async function startStudying(context, options, question) {
 }
 
 function readPosition(context) {
-  const position = context.root.querySelector("article > header > p");
+  const position = context.root.querySelector("#study-position");
   if (position === null) {
     return null;
   }
@@ -203,15 +203,29 @@ function findSide(context, sideName) {
   return side;
 }
 
-function readQuestionText(context) {
-  return findSide(context, "question").textContent;
+/** What a side shows under its label. */
+function readSideText(context, sideName) {
+  const content = findSide(context, sideName).querySelector(
+    ":scope > :not([data-side-label])",
+  );
+  return content.textContent;
 }
 
-/** The visible top-level children of the study card's rendered body. */
-function listShownBodyParts(context) {
-  const body = context.root.querySelector("article ot-tile-body");
+function readQuestionText(context) {
+  return readSideText(context, "question");
+}
+
+function findSideBody(context, sideName) {
+  const body = context.root.querySelector(
+    `[data-side="${sideName}"] > ot-tile-body`,
+  );
+  return body;
+}
+
+/** The visible top-level children of a side's rendered body. */
+function listShownBodyParts(context, sideName) {
   const shown = [];
-  for (const child of body.children) {
+  for (const child of findSideBody(context, sideName).children) {
     if (!child.hidden) {
       shown.push(child);
     }
@@ -219,15 +233,47 @@ function listShownBodyParts(context) {
   return shown;
 }
 
-function readShownBodyText(context) {
-  const texts = readTexts(listShownBodyParts(context));
+function readShownBodyText(context, sideName) {
+  const texts = readTexts(listShownBodyParts(context, sideName));
   return texts.join("\n");
 }
 
-/** True once the study card's First heading body is drawn: only its heading is shown. */
+/** True once the question's First heading body is drawn: only its heading is shown. */
 function showsOnlyTheHeading(context) {
-  const shown = listShownBodyParts(context);
+  const shown = listShownBodyParts(context, "question");
   return shown.length === 1 && /^H[1-6]$/.test(shown[0].tagName);
+}
+
+/** True once the answer's section body is drawn: its heading is there, and hidden. */
+function showsOnlyTheSection(context) {
+  const body = findSideBody(context, "answer");
+  const heading = body.querySelector(":scope > h1, :scope > h2, :scope > h3");
+  return heading !== null && heading.hidden;
+}
+
+function readSessionBarTexts(context) {
+  const texts = readTexts(
+    context.root.querySelectorAll("[data-session-bar] > p"),
+  );
+  return texts;
+}
+
+function readRoundEndMessage(context) {
+  return context.root.querySelector(
+    "[data-round-end] > p:not([data-side-label])",
+  ).textContent;
+}
+
+function readMissedNames(context) {
+  const names = readTexts(context.root.querySelectorAll("[data-not-yet] li"));
+  return names;
+}
+
+/** The text of the label that names the "Not yet" list. */
+function readNotYetListName(context) {
+  const list = context.root.querySelector("[data-not-yet] > ul");
+  const label = document.getElementById(list.getAttribute("aria-labelledby"));
+  return label.textContent;
 }
 
 function isTileCardOpen(context) {
@@ -242,8 +288,29 @@ function hasNoOpenDialog(context) {
   return countOpenDialogs(context) === 0;
 }
 
-/** Goes through the session, pressing "Show answer" then "Next" on each card, and gives each card's position and question. */
-function goThroughDeck(context, cardLimit) {
+function gradeAllKnown() {
+  return "I knew it";
+}
+
+function missTheFirstTwo(step) {
+  if (step < 2) {
+    return "Not yet";
+  }
+  return "I knew it";
+}
+
+function missTheFirst(step) {
+  if (step === 0) {
+    return "Not yet";
+  }
+  return "I knew it";
+}
+
+/**
+ * Goes through the round, pressing "Show answer" then the grade `chooseGrade`
+ * gives for each step, and gives each card's position and question.
+ */
+function goThroughDeck(context, cardLimit, chooseGrade) {
   const shownCards = [];
   for (let step = 0; step < cardLimit; step += 1) {
     if (queryButton(context, "Show answer") === null) {
@@ -254,16 +321,23 @@ function goThroughDeck(context, cardLimit) {
       question: readQuestionText(context),
     });
     findButton(context, "Show answer").click();
-    findButton(context, "Next").click();
+    findButton(context, chooseGrade(step)).click();
   }
   return shownCards;
 }
 
-function stepToThirdCard(context) {
-  for (let step = 0; step < 2; step += 1) {
-    findButton(context, "Show answer").click();
-    findButton(context, "Next").click();
+function stepToThirdCard(context, chooseGrade) {
+  goThroughDeck(context, 2, chooseGrade);
+}
+
+/** The title of the sample tile whose question is `question`. */
+function findTitleOfQuestion(context, question) {
+  for (const tile of context.tiles) {
+    if (tile.metadata.question === question) {
+      return tile.metadata.title;
+    }
   }
+  throw new Error(`No sample tile asks "${question}"`);
 }
 
 // Which tiles are cards, and field values --------------------------------------
@@ -282,7 +356,7 @@ async function leavesOutATileWithoutTheAnswerKey(context) {
   context.expect(readCount(context)).toBe("2 of 3 tiles have these fields.");
   await pressStart(context);
 
-  const shownCards = goThroughDeck(context, 5);
+  const shownCards = goThroughDeck(context, 5, gradeAllKnown);
 
   context.expect(shownCards.length).toBe(2);
   for (const shownCard of shownCards) {
@@ -321,6 +395,9 @@ async function showsAFieldAsWritten(context) {
   findButton(context, "Show answer").click();
 
   const answer = findSide(context, "answer");
+  context
+    .expect(readSideText(context, "answer"))
+    .toBe(findSampleTile(context, "emphasis.md").metadata.answer);
   context.expect(answer.textContent).toContain("~~text~~");
   context.expect(answer.querySelector("del")).toBe(null);
 }
@@ -337,7 +414,7 @@ async function joinsAListAndWritesANumber(context) {
   findButton(context, "Show answer").click();
 
   context.expect(readQuestionText(context)).toBe("Name, two, markups");
-  context.expect(findSide(context, "answer").textContent).toBe("1953");
+  context.expect(readSideText(context, "answer")).toBe("1953");
 }
 
 // The heading and its section ---------------------------------------------------
@@ -351,12 +428,13 @@ async function stopsTheSectionAtAHeadingOfTheSameLevel(context) {
   await context.waitFor(showsOnlyTheHeading.bind(undefined, context));
 
   findButton(context, "Show answer").click();
+  await context.waitFor(showsOnlyTheSection.bind(undefined, context));
 
-  const shownText = readShownBodyText(context);
+  const shownText = readShownBodyText(context, "answer");
   context.expect(shownText).toContain("Alignment");
   context.expect(shownText).not.toContain("See also");
   const shownTags = [];
-  for (const part of listShownBodyParts(context)) {
+  for (const part of listShownBodyParts(context, "answer")) {
     shownTags.push(part.tagName);
   }
   context.expect(shownTags).toContain("TABLE");
@@ -370,12 +448,16 @@ async function hidesTheTextBeforeTheHeading(context) {
     "first-heading",
   );
   await context.waitFor(showsOnlyTheHeading.bind(undefined, context));
-  context.expect(readShownBodyText(context)).not.toContain("This note");
+  context
+    .expect(readShownBodyText(context, "question"))
+    .not.toContain("This note");
 
   findButton(context, "Show answer").click();
+  await context.waitFor(showsOnlyTheSection.bind(undefined, context));
 
-  context.expect(readShownBodyText(context)).not.toContain("This note");
-  context.expect(readShownBodyText(context)).toContain("is drawn as a diagram");
+  const shownAnswer = readShownBodyText(context, "answer");
+  context.expect(shownAnswer).not.toContain("This note");
+  context.expect(shownAnswer).toContain("is drawn as a diagram");
 }
 
 async function ignoresAHeadingInsideAnAlert(context) {
@@ -387,8 +469,9 @@ async function ignoresAHeadingInsideAnAlert(context) {
   await context.waitFor(showsOnlyTheHeading.bind(undefined, context));
 
   findButton(context, "Show answer").click();
+  await context.waitFor(showsOnlyTheSection.bind(undefined, context));
 
-  const shownText = readShownBodyText(context);
+  const shownText = readShownBodyText(context, "answer");
   context.expect(shownText).toContain("Study often");
   context.expect(shownText).toContain("they belong to the alert");
 }
@@ -714,6 +797,24 @@ async function showsTheFirstCard(context) {
   context.expect(queryButton(context, "Restart")).not.toBe(null);
 }
 
+async function labelsTheSides(context) {
+  await startStudying(context);
+
+  findButton(context, "Show answer").click();
+
+  for (const sideName of ["question", "answer"]) {
+    const label = findSide(context, sideName).querySelector(
+      "[data-side-label]",
+    );
+    context
+      .expect(label.querySelector('svg[aria-hidden="true"]'))
+      .not.toBe(null);
+    context
+      .expect(label.textContent)
+      .toBe(sideName === "question" ? "Question" : "Answer");
+  }
+}
+
 async function showsTheAnswer(context) {
   await startStudying(context);
 
@@ -722,14 +823,83 @@ async function showsTheAnswer(context) {
   context.expect(findSide(context, "question")).not.toBe(null);
   context.expect(findSide(context, "answer")).not.toBe(null);
   context.expect(queryButton(context, "Show answer")).toBe(null);
-  context.expect(queryButton(context, "Next")).not.toBe(null);
+  context.expect(queryButton(context, "I knew it")).not.toBe(null);
+  context.expect(queryButton(context, "Not yet")).not.toBe(null);
   context.expect(queryButton(context, "Open full tile")).not.toBe(null);
+  context.expect(queryButton(context, "Next")).toBe(null);
+}
+
+/** The data attributes that mark each child, in order, such as `side-label`. */
+function listChildMarks(element) {
+  const marks = [];
+  for (const child of element.children) {
+    marks.push(Object.keys(child.dataset).join(" ") || child.tagName);
+  }
+  return marks;
+}
+
+/** A click as a pointer sends it: `detail` 1, unlike `click()`, which acts like the keyboard. */
+function clickWithPointer(button) {
+  button.dispatchEvent(
+    new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }),
+  );
+}
+
+function resolveAfter(milliseconds, resolve) {
+  setTimeout(resolve, milliseconds);
+}
+
+function waitMilliseconds(milliseconds) {
+  const waiting = new Promise(resolveAfter.bind(undefined, milliseconds));
+  return waiting;
+}
+
+async function ignoresAPointerClickRightAfterTheAnswer(context) {
+  await startStudying(context);
+  findButton(context, "Show answer").click();
+
+  clickWithPointer(findButton(context, "Not yet"));
+
+  context.expect(readPosition(context)).toBe("Card 1 of 8");
+  context.expect(findSide(context, "answer")).not.toBe(null);
+  await waitMilliseconds(550);
+  clickWithPointer(findButton(context, "Not yet"));
+  context.expect(readPosition(context)).toBe("Card 2 of 8");
+}
+
+async function gradesAtOnceFromTheKeyboard(context) {
+  await startStudying(context);
+  findButton(context, "Show answer").click();
+
+  findButton(context, "I knew it").click();
+
+  context.expect(readPosition(context)).toBe("Card 2 of 8");
+}
+
+async function putsTheButtonsBetweenQuestionAndAnswer(context) {
+  await startStudying(context);
+  const showAnswerButton = findButton(context, "Show answer");
+  const questionSide = findSide(context, "question");
+  context.expect(showAnswerButton.closest("[data-side]")).toBe(questionSide);
+
+  showAnswerButton.click();
+
+  context
+    .expect(listChildMarks(questionSide))
+    .toEqual(["sideLabel", "sideText", "cardActions"]);
+  context
+    .expect(findButton(context, "I knew it").closest("[data-side]"))
+    .toBe(questionSide);
+  context
+    .expect(questionSide.nextElementSibling)
+    .toBe(findSide(context, "answer"));
+  context.expect(findSide(context, "answer").nextElementSibling).toBe(null);
 }
 
 async function showsEachCardOnce(context) {
   await startStudying(context);
 
-  const shownCards = goThroughDeck(context, 10);
+  const shownCards = goThroughDeck(context, 10, missTheFirstTwo);
 
   const positions = [];
   const questions = [];
@@ -754,6 +924,25 @@ async function showsEachCardOnce(context) {
   }
 }
 
+async function keepsTheBarOutsideTheCard(context) {
+  await startStudying(context);
+  stepToThirdCard(context, gradeAllKnown);
+
+  const progress = context.root.querySelector("[data-session-bar] > progress");
+  context.expect(readPosition(context)).toBe("Card 3 of 8");
+  context.expect(progress.value).toBe(2);
+  context.expect(progress.max).toBe(8);
+  context
+    .expect(context.root.querySelector('article [data-action="restart"]'))
+    .toBe(null);
+  context
+    .expect(
+      context.root.querySelector('[data-session-bar] [data-action="restart"]'),
+    )
+    .not.toBe(null);
+  context.expect(readSessionBarTexts(context)).toEqual(["Card 3 of 8"]);
+}
+
 async function opensTheFullTileFromTheAnswer(context) {
   await startStudying(context, {
     tiles: [findSampleTile(context, "tables.md")],
@@ -775,7 +964,7 @@ async function opensTheFullTileFromTheAnswer(context) {
 
 async function restartsWithOtherFields(context) {
   await startStudying(context);
-  stepToThirdCard(context);
+  stepToThirdCard(context, gradeAllKnown);
   context.expect(readPosition(context)).toBe("Card 3 of 8");
 
   findButton(context, "Restart").click();
@@ -788,7 +977,7 @@ async function restartsWithOtherFields(context) {
 
 async function keepsTheSessionWhenTheRestartIsCancelled(context) {
   await startStudying(context);
-  stepToThirdCard(context);
+  stepToThirdCard(context, gradeAllKnown);
   const question = readQuestionText(context);
 
   findButton(context, "Restart").click();
@@ -802,21 +991,95 @@ async function keepsTheSessionWhenTheRestartIsCancelled(context) {
   context.expect(readQuestionText(context)).toBe(question);
 }
 
-async function endsAfterTheLastCard(context) {
+async function endsARoundWhereEveryCardWasKnown(context) {
   await startStudying(context);
 
-  goThroughDeck(context, 10);
+  goThroughDeck(context, 10, gradeAllKnown);
 
-  const main = context.root.querySelector("main");
-  context.expect(main.textContent).toContain("You studied all 8 cards.");
-  context.expect(context.root.querySelector("article")).toBe(null);
+  context.expect(readRoundEndMessage(context)).toBe("You knew 8 of 8 cards.");
+  context.expect(context.root.querySelector("[data-not-yet]")).toBe(null);
+  context
+    .expect(
+      context.root.querySelector("[data-round-end] > [data-side-label]")
+        .textContent,
+    )
+    .toBe("Every card known");
+  context.expect(findSide(context, "question")).toBe(null);
+  context
+    .expect(context.root.querySelector("article[data-flashcard]"))
+    .not.toBe(null);
+  context
+    .expect(context.root.querySelector('[data-action="study-missed"]'))
+    .toBe(null);
   findButton(context, "Start again").click();
   context.expect(findSetup(context).open).toBe(true);
 }
 
+async function listsTheMissedCards(context) {
+  await startStudying(context);
+
+  const shownCards = goThroughDeck(context, 10, missTheFirstTwo);
+
+  context.expect(readRoundEndMessage(context)).toBe("You knew 6 of 8 cards.");
+  context.expect(readNotYetListName(context)).toBe("Not yet · 2 cards");
+  context
+    .expect(readMissedNames(context))
+    .toEqual([
+      findTitleOfQuestion(context, shownCards[0].question),
+      findTitleOfQuestion(context, shownCards[1].question),
+    ]);
+  context.expect(queryButton(context, "Study these 2 again")).not.toBe(null);
+  context.expect(queryButton(context, "Start again")).not.toBe(null);
+}
+
+async function studiesTheMissedCardsAgain(context) {
+  await startStudying(context);
+  const firstRound = goThroughDeck(context, 10, missTheFirstTwo);
+
+  findButton(context, "Study these 2 again").click();
+
+  context
+    .expect(readSessionBarTexts(context))
+    .toEqual(["Round 2", "Card 1 of 2"]);
+  const secondRound = goThroughDeck(context, 10, gradeAllKnown);
+  const questions = [];
+  for (const shownCard of secondRound) {
+    questions.push(shownCard.question);
+  }
+  context.expect(questions.length).toBe(2);
+  context.expect(questions).toContain(firstRound[0].question);
+  context.expect(questions).toContain(firstRound[1].question);
+  context.expect(readRoundEndMessage(context)).toBe("You knew 2 of 2 cards.");
+}
+
+async function showsOneMissedCard(context) {
+  await startStudying(context, {
+    tiles: [findSampleTile(context, "tables.md")],
+  });
+
+  goThroughDeck(context, 1, missTheFirst);
+
+  context.expect(readRoundEndMessage(context)).toBe("You knew 0 of 1 card.");
+  context.expect(readNotYetListName(context)).toBe("Not yet · 1 card");
+  context.expect(readMissedNames(context)).toEqual(["Tables"]);
+  context.expect(queryButton(context, "Study this card again")).not.toBe(null);
+}
+
+async function discardsTheResultsOnRestart(context) {
+  await startStudying(context);
+  stepToThirdCard(context, missTheFirstTwo);
+
+  findButton(context, "Restart").click();
+  await pressStart(context);
+
+  context.expect(readSessionBarTexts(context)).toEqual(["Card 1 of 8"]);
+  goThroughDeck(context, 10, gradeAllKnown);
+  context.expect(readRoundEndMessage(context)).toBe("You knew 8 of 8 cards.");
+}
+
 async function pausesTheSessionInExplore(context) {
   await startStudying(context);
-  stepToThirdCard(context);
+  stepToThirdCard(context, missTheFirst);
   findButton(context, "Show answer").click();
   const question = readQuestionText(context);
 
@@ -828,6 +1091,9 @@ async function pausesTheSessionInExplore(context) {
   context.expect(readQuestionText(context)).toBe(question);
   context.expect(findSide(context, "answer")).not.toBe(null);
   context.expect(countOpenDialogs(context)).toBe(0);
+  findButton(context, "I knew it").click();
+  goThroughDeck(context, 10, gradeAllKnown);
+  context.expect(readRoundEndMessage(context)).toBe("You knew 7 of 8 cards.");
 }
 
 export default function registerFlashcardsTests(t) {
@@ -896,14 +1162,32 @@ export default function registerFlashcardsTests(t) {
     ignoresAStoredKeyNoLongerOffered,
   );
   t.test("shows the first card", showsTheFirstCard);
+  t.test("labels the sides", labelsTheSides);
   t.test("shows the answer", showsTheAnswer);
+  t.test(
+    "ignores a pointer click right after the answer",
+    ignoresAPointerClickRightAfterTheAnswer,
+  );
+  t.test("grades at once from the keyboard", gradesAtOnceFromTheKeyboard);
+  t.test(
+    "puts the buttons between the question and the answer",
+    putsTheButtonsBetweenQuestionAndAnswer,
+  );
   t.test("shows each card once", showsEachCardOnce);
+  t.test("keeps the bar outside the card", keepsTheBarOutsideTheCard);
   t.test("opens the full tile from the answer", opensTheFullTileFromTheAnswer);
   t.test("restarts with other fields", restartsWithOtherFields);
   t.test(
     "keeps the session when the restart is cancelled",
     keepsTheSessionWhenTheRestartIsCancelled,
   );
-  t.test("ends after the last card", endsAfterTheLastCard);
+  t.test(
+    "ends a round where every card was known",
+    endsARoundWhereEveryCardWasKnown,
+  );
+  t.test("lists the missed cards", listsTheMissedCards);
+  t.test("studies the missed cards again", studiesTheMissedCardsAgain);
+  t.test("shows one missed card", showsOneMissedCard);
+  t.test("discards the results on restart", discardsTheResultsOnRestart);
   t.test("pauses the session in Explore", pausesTheSessionInExplore);
 }

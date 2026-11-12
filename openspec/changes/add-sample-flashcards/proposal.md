@@ -2,7 +2,7 @@
 
 ## Why
 
-The app ships one sample mod, the book list, which shows how to list tiles and open a card for each one. It shows nothing about using a collection to *do* something. Studying is a common reason to keep notes as markdown tiles. A flashcards mod that turns any collection into a deck shows that use, and it gives authors a second, different example of the mod API: rendered bodies taken apart after `ot-rendered`, dialogs, storage, and choices driven by the tiles' own frontmatter.
+The app ships one sample mod, the book list, which shows how to list tiles and open a card for each one. It shows nothing about using a collection to *do* something. Studying is a common reason to keep notes as markdown tiles. A flashcards mod that turns any collection into a deck shows that use, and it gives authors a second, different example of the mod API: rendered bodies taken apart after `ot-rendered`, dialogs, storage, choices driven by the tiles' own frontmatter, and a look of its own from the theme's tokens.
 
 ## What Changes
 
@@ -12,7 +12,8 @@ The app ships one sample mod, the book list, which shows how to list tiles and o
 - **Study**: a setup dialog with a Question select (every frontmatter key, plus "First heading") and an Answer select (every frontmatter key, plus "Body"). Choosing "First heading" locks the answer to the body under that heading: its section, up to the next heading of the same or higher level.
   - Defaults: the `question` and `answer` keys when at least one tile has them, otherwise "First heading" and "Body".
   - Tiles that cannot make a card with the chosen fields are left out. The dialog shows "N of M tiles", and Start is disabled at 0.
-- A study session shows each card once, in random order. "Show answer" flips the card and "Next" goes on. The answer side has "Open full tile", which opens the same card as Explore. "Restart" goes back to the setup dialog at any time. After the last card, a message says the deck is done and offers to start again from the setup dialog.
+- A study session shows each card once, in random order, on a card that looks like a flashcard, with a labeled question side and answer side in the theme's colors. "Show answer" shows the answer below the question. "I knew it" and "Not yet" grade the card and go on. The answer side has "Open full tile", which opens the same card as Explore. A bar above the card shows the position and the progress, and holds "Restart", which goes back to the setup dialog at any time.
+- After the last card, the mod says how many cards you knew, lists the missed ones, and offers to study only those in a new round or to start again from the setup dialog. Scores last only while the session does: nothing is stored.
 - "Reload tiles" during a session ends it, with a notice, and opens the setup dialog.
 - The last chosen fields are remembered in the mod's storage.
 - Tile type `flashcard`: `title`, `question` and `answer`, all optional. Its body documents the default rules, so any collection matches it.

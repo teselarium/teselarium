@@ -53,3 +53,30 @@
 - [x] 6.3 Mention the flashcards sample in `docs/modules/lib/mod/README.md` (the shipped samples) and `docs/modules/mods/explorer/README.md` (the vanilla `mods` list). Write the module comment of `main.js` so it describes what the mod shows as an example (outline from `tiles.renderBody`, hiding the content around the heading after `ot-rendered`, dialogs, storage). Verify that the documented config matches `mod_conf.yaml`.
 - [x] 6.4 Run `npm run lint`, `npm run format:check`, `npm test` and `npm run test:e2e`, and verify that all pass.
 - [x] 6.5 Add `.changeset/add-sample-flashcards.md` with a `patch` bump for `opentesela`: a new sample and no breaking change for users or instantiations, and no mod API bump. Write a one-line summary such as "A sample flashcards mod lets you explore any collection and study it as question and answer cards." Verify that the file follows the format of the existing changesets.
+
+## 7. Study card look and scoring
+
+- [x] 7.1 Move "Card i of N" and "Restart" out of the card into a session bar above it, with the `<progress>` (value: cards graded in the round, maximum: the round's cards) and "Round r" from the second round on. Style the study card from theme tokens (spec "Flashcard shape", "Question and answer sides", "Side text", "Answer reveal", "Session bar", "Card buttons"): the labeled sides with `aria-hidden` Lucide icons drawn by one `buildIcon(name)` from a table of path data, shared with the close buttons, and a comment crediting Lucide (ISC), text sides centered at 1.25rem, rendered bodies left-aligned, the 150ms fade with no animation under reduced motion, and the button variants. Update the module comment of `main.js` (its own look from theme tokens). Update the `test.js` selectors that read the position and the sides, and verify with "Check mod".
+- [x] 7.2 Replace "Next" with "I knew it" (Lucide `circle-check`) and "Not yet" (Lucide `rotate-ccw`), record the grade in `results`, move focus from "Show answer" to "I knew it" and, after a grade, to the next card's "Show answer". Update the `test.js` helpers and cases that press "Next" (going through the deck, stepping to the third card, "shows the answer", "shows each card once") and the e2e "Step with Enter". Verify with "Check mod".
+- [x] 7.3 Show the end of a round in the card: "You knew K of N cards." with "card" when N is 1, the missed cards' names, "Study the M missed cards" with "card" when M is 1 and only when M is at least 1, "Start again", and focus on the first of the two. Start the missed cards round (spec "Missed cards round") and discard the results on Restart or Start again followed by Start and on `tiles.changed` (spec "Results last for the session"). Add `test.js` cases for "Last card", "Two missed cards", "All known", "Missed cards again", "Results paused in Explore" and "Restart discards the results". Verify with "Check mod".
+- [x] 7.4 Add e2e scenarios in `e2e/sample_flashcards.spec.ts` for "A flashcard", "The two sides" and "The position" in light and in dark, "Reduced motion", and the focus on "Study the M missed cards" or "Start again" at the end of a round. Verify with `npx playwright test e2e/sample_flashcards.spec.ts`.
+- [x] 7.5 Update the changeset summary to "A sample flashcards mod lets you explore any collection and study it as question and answer cards, and see how many you knew." and the flashcards description in `docs/modules/lib/mod/README.md` (its own look from theme tokens, scores within a session). Verify that the docs match `mod_conf.yaml` and the spec.
+- [x] 7.6 Run `npm run lint`, `npm run format:check`, `npm test` and `npm run test:e2e`, and verify that all pass.
+
+## 8. Clearer end of a round
+
+- [x] 8.1 In the end of a round, put the missed cards under a "Not yet · M cards" label ("card" when M is 1) with Lucide's `rotate-ccw` icon, styled like a side's label on the `--ot-muted` tint, in a list named by that label (`aria-labelledby`). Rename the button to "Study these M again" ("Study this card again" when M is 1). When every card was known, show "Every card known" with Lucide's `circle-check` icon instead of the list (spec "Not yet list", "Every card known", "Missed cards round").
+- [x] 8.2 Update the `test.js` cases and helpers for the list, its label, the button names and "Every card known", adding "One missed card", and the e2e "Focus at the end of a round". Verify with "Check mod" in Chromium, Firefox and WebKit, and with `npx playwright test e2e/sample_flashcards.spec.ts`.
+- [x] 8.3 Run `npm run lint`, `npm run format:check`, `npm test` and `npm run test:e2e`, and verify that all pass.
+
+## 9. Buttons between the question and the answer
+
+- [x] 9.1 Move the study card's button row into the question side, below the question and above the answer side, so the grades take the row of "Show answer", at the same height, and a long answer does not move them. Keep the end of a round's buttons at the bottom of the card (spec "Button place").
+- [x] 9.2 Update `test.js` to check the order (question, buttons, answer) and the selectors of the button row, and add e2e scenarios "Same place after the flip" and "A long answer" in `e2e/sample_flashcards.spec.ts`. Verify with "Check mod" in Chromium, Firefox and WebKit, and with `npx playwright test e2e/sample_flashcards.spec.ts`.
+- [x] 9.3 Run `npm run lint`, `npm run format:check`, `npm test` and `npm run test:e2e`, and verify that all pass.
+
+## 10. Double-click guard
+
+- [x] 10.1 Ignore pointer clicks on "I knew it" and "Not yet" for 500ms after "Show answer", and keep keyboard presses working at once (spec "Double-click guard").
+- [x] 10.2 Add a `test.js` case that sends a pointer click right after "Show answer" and another after the pause, and e2e scenarios "Double-click on Show answer" and "Click after the pause". Verify with "Check mod" in Chromium, Firefox and WebKit, and with `npx playwright test e2e/sample_flashcards.spec.ts`.
+- [x] 10.3 Run `npm run lint`, `npm run format:check`, `npm test` and `npm run test:e2e`, and verify that all pass.
