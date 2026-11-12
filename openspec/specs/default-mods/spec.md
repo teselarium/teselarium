@@ -36,11 +36,15 @@ Default mods SHALL run in a sandbox with the same policy, grants and engine API 
 - **THEN** its frame has the sandbox value `allow-scripts` and reading `parent.document` inside it fails with a security error
 
 ### Requirement: Mod explorer
-The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list each mod reference in its config's `mods` with the title and description it gets from `mods.inspect`. A reference that cannot be inspected SHALL be listed with the reference and the error message. Selecting a mod SHALL send `mods.open` for the mod in its config's `viewer`, with the selected mod's source as the `target` parameter. The vanilla config SHALL list the sample book list mod and use `mod_viewer` as viewer.
+The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list each mod reference in its config's `mods` with the title and description it gets from `mods.inspect`. A reference that cannot be inspected SHALL be listed with the reference and the error message. Selecting a mod SHALL send `mods.open` for the mod in its config's `viewer`, with the selected mod's source as the `target` parameter.
 
 #### Scenario: Vanilla explorer lists the sample
 - **WHEN** the mod explorer runs with its vanilla config
 - **THEN** its frame lists `Book List` with the description `A grid of book covers, with a card for each book that shows its details and text.`
+
+#### Scenario: Vanilla explorer lists the flashcards sample
+- **WHEN** the mod explorer runs with its vanilla config
+- **THEN** its frame lists `Flashcards` after `Book List`, with the flashcards mod's description
 
 #### Scenario: Select a mod
 - **WHEN** the user selects `Book List` in the mod explorer
@@ -50,6 +54,14 @@ The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list e
 #### Scenario: Mod that cannot be inspected
 - **WHEN** the explorer's `mods` list holds `./samples/mods/missing`
 - **THEN** its frame lists `./samples/mods/missing` with a message that names `404`
+
+### Requirement: Mod explorer vanilla config
+The mod explorer's vanilla config SHALL list the sample book list mod, then the sample flashcards mod, and use `mod_viewer` as viewer.
+
+#### Scenario: Select the flashcards sample
+- **WHEN** the user selects `Flashcards` in the mod explorer with its vanilla config
+- **THEN** the mod viewer is the visible mod and shows `Flashcards`
+- **AND** the app's address is a run link with `mod=mod_viewer` and the flashcards mod's source as `target`
 
 ### Requirement: Mod viewer
 The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the mod named by its `target` parameter, using `mods.inspect`: title, version, description, name, source, API range and whether it matches the app's mod API version, tile type, sample collection, config, and each declared permission with its reason and whether it would be granted. It SHALL NOT need a collection.

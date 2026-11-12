@@ -19,6 +19,7 @@ import {
   visibleSandbox,
 } from "./mod_routes.ts";
 import {
+  readFlashcardsModSource,
   readSampleModSource,
   SAMPLE_BOOKS_FOLDER_PATH,
   SAMPLE_COLLECTION_GLOB,
@@ -34,6 +35,30 @@ async function openViewerForSample(page: Page): Promise<void> {
   await expect(
     coverPermissionRow(page.frameLocator('iframe[title="Mod Viewer"]')),
   ).toBeVisible();
+}
+
+/**
+ * Selects the mod titled `title` in the mod explorer, and expects the mod viewer to be the
+ * visible mod, showing that mod, with `source` as the run link's `target`.
+ */
+async function expectExplorerOpensMod(
+  page: Page,
+  title: string,
+  source: string,
+): Promise<void> {
+  const explorer = page.frameLocator('iframe[title="Mods"]');
+
+  await explorer.getByRole("button", { name: title }).click();
+
+  await expect(stageBar(page)).toContainText("Mod Viewer");
+  await expect(
+    page.frameLocator('iframe[title="Mod Viewer"]').getByRole("heading", {
+      name: title,
+    }),
+  ).toBeVisible();
+  expect(new URL(page.url()).hash).toBe(
+    `#/run?mod=mod_viewer&target=${encodeURIComponent(source)}`,
+  );
 }
 
 test.describe("Default mods folder", function describeFolder(): void {
@@ -96,19 +121,8 @@ test.describe("Default mods are ordinary mods", function describeOrdinary(): voi
 test.describe("Mod explorer", function describeExplorer(): void {
   test("Select a mod", async function selectsMod({ page }): Promise<void> {
     await page.goto(EXPLORER_RUN_LINK);
-    const explorer = page.frameLocator('iframe[title="Mods"]');
 
-    await explorer.getByRole("button", { name: /Book List/ }).click();
-
-    await expect(stageBar(page)).toContainText("Mod Viewer");
-    await expect(
-      page.frameLocator('iframe[title="Mod Viewer"]').getByRole("heading", {
-        name: "Book List",
-      }),
-    ).toBeVisible();
-    expect(new URL(page.url()).hash).toBe(
-      `#/run?mod=mod_viewer&target=${encodeURIComponent(readSampleModSource(page))}`,
-    );
+    await expectExplorerOpensMod(page, "Book List", readSampleModSource(page));
   });
 
   test("Vanilla explorer lists the samples", async function listsSamples({
@@ -127,6 +141,20 @@ test.describe("Mod explorer", function describeExplorer(): void {
     );
     await expect(cards.nth(1)).toContainText(
       "Explore any collection as a table, and study it as question and answer cards.",
+    );
+  });
+});
+
+test.describe("Mod explorer vanilla config", function describeExplorerVanillaConfig(): void {
+  test("Select the flashcards sample", async function selectsFlashcards({
+    page,
+  }): Promise<void> {
+    await page.goto(EXPLORER_RUN_LINK);
+
+    await expectExplorerOpensMod(
+      page,
+      "Flashcards",
+      readFlashcardsModSource(page),
     );
   });
 });

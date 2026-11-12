@@ -73,6 +73,16 @@ export function readSampleModSource(page: Page): string {
 /** `/samples/mods/flashcards`: the folder of the shipped sample flashcards mod. */
 export const FLASHCARDS_FOLDER_PATH = `${SAMPLE_MODS_PATH}/flashcards`;
 
+/** `/samples/mods/flashcards/mod_conf.yaml`: the flashcards mod's file. */
+export const FLASHCARDS_MOD_FILE_PATH = `${FLASHCARDS_FOLDER_PATH}/mod_conf.yaml`;
+
+/** The flashcards mod's source on the page's origin, e.g. `http://localhost:4173/samples/mods/flashcards/mod_conf.yaml`. */
+export function readFlashcardsModSource(page: Page): string {
+  const flashcardsModSource = new URL(FLASHCARDS_MOD_FILE_PATH, page.url())
+    .href;
+  return flashcardsModSource;
+}
+
 /** `/samples/mods/flashcards/flashcard_collection.yaml`: the sample deck of eight cards. */
 export const FLASHCARDS_COLLECTION_PATH = `${FLASHCARDS_FOLDER_PATH}/flashcard_collection.yaml`;
 
