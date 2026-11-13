@@ -27,6 +27,7 @@ import {
   SAMPLE_MOD_SOURCE,
   serveOtherApiMod,
 } from "../../test/sample_mods.ts";
+import { FIXTURES_BASE_URL } from "../../test/sample_files.ts";
 import { testTexts } from "../../test/test_files.ts";
 import { FakeHistory } from "../../test/fake_history.ts";
 import {
@@ -471,10 +472,14 @@ describe("StageView", function describeStageView(): void {
     const stage = await startTestStage(
       `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=./fixtures/tiles/missing.yaml`,
     );
-    renderStageView(stage);
+    const { container } = renderStageView(stage);
 
     expect(readStageSnapshot(stage).sandboxes[0].status).toBe("failed");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      `${FIXTURES_BASE_URL}tiles/missing.yaml`,
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("404");
+    expect(container.querySelector("iframe")).toBeNull();
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
     expect(within(stageBar).getByText("Book List")).toBeInTheDocument();
     expect(within(stageBar).getByText("1.0.0")).toBeInTheDocument();
@@ -569,6 +574,16 @@ describe("StageView", function describeStageView(): void {
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
+  it("Cancelled API question", async function keepsNameAfterCancel(): Promise<void> {
+    await renderAskingStage();
+
+    await answerQuestion("Cancel");
+
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    expect(within(stageBar).getByText("Other API")).toBeInTheDocument();
+    expect(within(stageBar).getByText("2.0.0")).toBeInTheDocument();
+  });
+
   it("Escape", async function cancelsOnEscape(): Promise<void> {
     await renderAskingStage();
     const dialog = screen.getByRole("dialog", { name: "Other API" });
@@ -599,6 +614,27 @@ describe("StageView", function describeStageView(): void {
     expect(items[0]).toHaveTextContent("App");
     expect(items[0]).toHaveTextContent(SAMPLE_MOD_SOURCE);
     expect(items[0]).toHaveTextContent("https://images.example.net");
+  });
+
+  it("Blocked request while the mod runs", async function listsBlockedRequest(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    expect(findLevelButton("Warnings")).toHaveAccessibleName(
+      "Warnings: 0, 0 unread",
+    );
+
+    await reportBlockedImage(modPort, "https://images.example.net");
+
+    expect(findLevelButton("Warnings")).toHaveAccessibleName(
+      "Warnings: 1, 1 unread",
+    );
+    await openLevel("Warnings");
+    const item = within(
+      screen.getByRole("list", { name: "Warnings" }),
+    ).getByRole("listitem");
+    expect(item).toHaveTextContent("https://images.example.net");
+    expect(item).toHaveTextContent("permissions.show");
   });
 
   it("Read after opening", async function marksRead(): Promise<void> {

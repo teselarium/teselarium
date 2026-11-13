@@ -13,7 +13,6 @@ import {
   PROBE_MOD_CODE,
   readMessages,
   readProbeContext,
-  routeCovers,
   serveAppOriginMod,
   stageBar,
   TEST_MOD_API_RANGE,
@@ -22,11 +21,13 @@ import {
 } from "./mod_routes.ts";
 import type { ModFiles } from "./mod_routes.ts";
 import {
-  SAMPLE_BOOKS_FOLDER_PATH,
-  SAMPLE_COLLECTION_RUN_HASH,
-  SAMPLE_MOD_REFERENCE,
-  SAMPLE_TYPE_PATH,
-} from "./sample_mod.ts";
+  buildNoteTile,
+  buildTilesModFiles,
+  NOTE_TYPE,
+  openTilesMod,
+  TILES_MOD_REFERENCE,
+  TILES_TITLE,
+} from "./test_mods.ts";
 
 /** A probe mod titled "Later API", written for `OTHER_API_RANGE`. */
 const LATER_API_HASH = "#/run?mod=./test-mods/later/";
@@ -40,40 +41,32 @@ function buildLaterApiFiles(): ModFiles {
   );
 }
 
-/** A probe mod of the sample book type that declares no `api` range. */
-function buildBareBookFiles(): ModFiles {
+/** A probe mod of the typed probe's `note` type that declares no `api` range. */
+function buildBareNoteFiles(): ModFiles {
   const files: ModFiles = {
-    "bare_books/mod_conf.yaml": buildModConf(
-      "bare_books",
-      [`  type_path: "../..${SAMPLE_TYPE_PATH}"`],
+    "bare_notes/mod_conf.yaml": buildModConf(
+      "bare_notes",
+      ['  type_path: "./note_type.md"'],
       null,
     ),
-    "bare_books/main.js": PROBE_MOD_CODE,
+    "bare_notes/main.js": PROBE_MOD_CODE,
+    "bare_notes/note_type.md": NOTE_TYPE,
   };
   return files;
 }
 
-/** A collection with a sample book and a tile without `country`, which is not a book. */
+/** A collection with a note and a tile without `title`, which is not a note. */
 function buildMixedCollectionFiles(): ModFiles {
   const files: ModFiles = {
     "mixed.yaml": [
       "collection:",
       '  name: "Mixed"',
       "  tiles:",
-      `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/kallocain.md"`,
-      '    - path: "./no_country.md"',
+      '    - path: "./first.md"',
+      '    - path: "./untitled.md"',
     ].join("\n"),
-    "no_country.md": [
-      "---",
-      'title: "No country"',
-      'date: "2001-01-01"',
-      "authors:",
-      '  - "Anonymous"',
-      "genres:",
-      '  - "Mystery"',
-      "---",
-      "",
-    ].join("\n"),
+    "first.md": buildNoteTile("First note"),
+    "untitled.md": '---\nauthor: "Anonymous"\n---\n',
   };
   return files;
 }
@@ -91,7 +84,7 @@ function buildLaterExplorerFiles(): ModFiles {
       "  config:",
       '    viewer: "./test-mods/later/"',
       "    mods:",
-      `      - "${SAMPLE_MOD_REFERENCE}"`,
+      `      - "${TILES_MOD_REFERENCE}"`,
       "  permissions:",
       "    open:",
       '      - host: "*"',
@@ -146,56 +139,27 @@ async function expectCancelError(page: Page): Promise<void> {
 }
 
 test.describe("Matching mods start without asking", function describeMatching(): void {
-  test("Sample mod", async function startsSample({ page }): Promise<void> {
-    await routeCovers(page);
+  test("Sample mod", async function startsMatchingMod({ page }): Promise<void> {
+    await openTilesMod(page);
 
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-
-    await expect(stageBar(page)).toContainText("Book List");
+    await expect(stageBar(page)).toContainText(TILES_TITLE);
     await expectNoIssues(page);
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });
 
-test.describe("Sample and default mods declare the API range", function describeShipped(): void {
-  test("Shipped mods match", async function startsShippedMods({
+test.describe("Default mods declare the API range", function describeDefaultMods(): void {
+  test("Default mods match", async function startsDefaultMods({
     page,
   }): Promise<void> {
-    await routeCovers(page);
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    await expect(stageBar(page)).toContainText("Book List");
-    await expectNoIssues(page);
-
-    await followLink(page, "#/run?mod=mod_explorer");
+    await page.goto("/#/run?mod=mod_explorer");
     await expect(stageBar(page)).toContainText("Mods");
     await expectNoIssues(page);
-    await followLink(
-      page,
-      `#/run?mod=mod_viewer&target=${SAMPLE_MOD_REFERENCE}`,
-    );
+    await followLink(page, "#/run?mod=mod_viewer");
     await expect(stageBar(page)).toContainText("Mod Viewer");
 
     await expectNoIssues(page);
     await expect(page.getByRole("dialog")).toHaveCount(0);
-  });
-});
-
-test.describe("Mods without a range start with a warning", function describeNoRange(): void {
-  test("Mod without a range", async function warnsWithoutRange({
-    page,
-  }): Promise<void> {
-    await serveAppOriginMod(page, buildProbeFiles("bare", [], null));
-
-    await page.goto("/#/run?mod=./test-mods/bare/");
-    await waitForProbe(await findModFrame(page, "bare"));
-
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expectMessageCount(page, "Warnings", 1);
-    const warnings = await readMessages(page, "Warnings");
-    expect(warnings[0].producer).toBe("App");
-    expect(warnings[0].source).toBe(readTestModSource(page, "bare"));
-    expect(warnings[0].text).toContain('"api"');
-    expect(warnings[0].text).toContain(APP_MOD_API_VERSION);
   });
 });
 
@@ -253,37 +217,9 @@ test.describe("Ask before starting a mod for another API", function describeAsk(
       page.locator(`iframe[title="${LATER_API_TITLE}"]`),
     ).toHaveCount(0);
   });
-
-  test("Opened by another mod", async function asksForOpenedMod({
-    page,
-  }): Promise<void> {
-    await serveAppOriginMod(page, buildLaterApiFiles());
-    await page.goto("/#/run?mod=mod_viewer&target=./test-mods/later/");
-    const viewer = await findModFrame(page, "Mod Viewer");
-
-    await viewer.getByRole("button", { name: "Run without tiles" }).click();
-
-    await expect(apiMismatchDialog(page)).toBeVisible();
-    await expect(stageBar(page)).toContainText(LATER_API_TITLE);
-    await expect(visibleSandbox(page)).toHaveAttribute(
-      "data-sandbox-id",
-      "sandbox-2",
-    );
-    await expect(
-      page.locator(`iframe[title="${LATER_API_TITLE}"]`),
-    ).toHaveCount(0);
-  });
 });
 
 test.describe("Cancelled mods do not start", function describeCancel(): void {
-  test("Cancel", async function cancels({ page }): Promise<void> {
-    const dialog = await openLaterApiMod(page);
-
-    await dialog.getByRole("button", { name: "Cancel" }).click();
-
-    await expectCancelError(page);
-  });
-
   test("Escape", async function cancelsOnEscape({ page }): Promise<void> {
     await openLaterApiMod(page);
 
@@ -298,10 +234,11 @@ test.describe("Cancelled mods do not start", function describeCancel(): void {
     await serveAppOriginMod(page, {
       ...buildLaterApiFiles(),
       ...buildLaterExplorerFiles(),
+      ...buildTilesModFiles(),
     });
     await page.goto("/#/run?mod=./test-mods/explorer/");
     const explorer = await findModFrame(page, "Later explorer");
-    await explorer.getByRole("button", { name: /Book List/ }).click();
+    await explorer.getByRole("button", { name: /Tiles/ }).click();
     await expect(apiMismatchDialog(page)).toBeVisible();
 
     await page.goBack();
@@ -319,18 +256,18 @@ test.describe("Show the mod issues", function describeIssues(): void {
     page,
   }): Promise<void> {
     await serveAppOriginMod(page, {
-      ...buildBareBookFiles(),
+      ...buildBareNoteFiles(),
       ...buildMixedCollectionFiles(),
     });
 
     await page.goto(
-      "/#/run?mod=./test-mods/bare_books/&collection=./test-mods/mixed.yaml",
+      "/#/run?mod=./test-mods/bare_notes/&collection=./test-mods/mixed.yaml",
     );
 
     await expectMessageCount(page, "Warnings", 2);
     const warnings = await readMessages(page, "Warnings");
-    expect(warnings[0].source).toContain("/test-mods/no_country.md");
-    expect(warnings[1].source).toBe(readTestModSource(page, "bare_books"));
+    expect(warnings[0].source).toContain("/test-mods/untitled.md");
+    expect(warnings[1].source).toBe(readTestModSource(page, "bare_notes"));
     expect(warnings[1].text).toContain('"api"');
   });
 });

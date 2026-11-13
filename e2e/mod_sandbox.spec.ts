@@ -53,11 +53,17 @@ import {
 } from "./mod_routes.ts";
 import { openBodyProbe, showTileBodies } from "./tile_body_routes.ts";
 import {
-  SAMPLE_COLLECTION_GLOB,
-  SAMPLE_COLLECTION_PATH,
-  SAMPLE_COLLECTION_RUN_HASH,
-  SAMPLE_ENTRYPOINT_PATH,
-} from "./sample_mod.ts";
+  openTilesMod,
+  serveExplorerOfTilesMod,
+  serveTilesMod,
+  TILES_COLLECTION_RUN_HASH,
+  TILES_ENTRYPOINT_PATH,
+  TILES_ITEM_TITLES,
+  TILES_TITLE,
+} from "./test_mods.ts";
+
+/** An address on the app's origin that no test mod serves, for a connection a test records. */
+const APP_ORIGIN_RECORDED_PATH = "/recorded/connection.json";
 
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 const APP_PROBE_LINK = "/#/run?mod=./test-mods/probe/";
@@ -138,13 +144,11 @@ test.describe(
     test("Frame sandbox", async function checksFrameSandbox({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const frameElement = page.locator('iframe[title="Book List"]');
+      const frame = await openAppProbe(page);
+      const frameElement = page.locator('iframe[title="probe"]');
 
       await expect(frameElement).toHaveAttribute("sandbox", "allow-scripts");
       await expect(frameElement).not.toHaveAttribute("src");
-      const frame = await findModFrame(page, "Book List");
       expect(await frame.evaluate(readFrameOrigin)).toBe("null");
     });
 
@@ -172,10 +176,11 @@ test.describe(
     test("Mod opened by another mod", async function opensSiblingFrame({
       page,
     }): Promise<void> {
+      await serveExplorerOfTilesMod(page);
       await page.goto(EXPLORER_RUN_LINK);
       const explorer = await findModFrame(page, "Mods");
 
-      await explorer.getByRole("button", { name: /Book List/ }).click();
+      await explorer.getByRole("button", { name: /Tiles/ }).click();
       await expect(stageBar(page)).toContainText("Mod Viewer");
 
       expect(page.mainFrame().childFrames()).toHaveLength(2);
@@ -239,12 +244,13 @@ test.describe(
         "request",
         recordEntrypointRequest.bind(undefined, entrypointRequests),
       );
-      await routeCovers(page);
+      await serveTilesMod(page);
 
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      await findModFrame(page, "Book List");
+      await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
       await expect(
-        page.frameLocator('iframe[title="Book List"]').getByText("Kallocain"),
+        page
+          .frameLocator(`iframe[title="${TILES_TITLE}"]`)
+          .getByText(TILES_ITEM_TITLES[0]),
       ).toBeVisible();
 
       expect(entrypointRequests).toHaveLength(1);
@@ -254,7 +260,7 @@ test.describe(
 );
 
 function recordEntrypointRequest(requests: Request[], request: Request): void {
-  if (request.url().endsWith(SAMPLE_ENTRYPOINT_PATH)) {
+  if (request.url().endsWith(TILES_ENTRYPOINT_PATH)) {
     requests.push(request);
   }
 }
@@ -263,16 +269,14 @@ test.describe(
   "The mod entrypoint is mounted",
   { tag: "@frames" },
   function describeMount(): void {
-    test("Sample mod mounts", async function mountsSampleMod({
+    test("Sample mod mounts", async function mountsMod({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const sampleFrame = page.frameLocator('iframe[title="Book List"]');
+      const frame = await openTilesMod(page);
 
-      await expect(sampleFrame.getByText("Fahrenheit 451")).toBeVisible();
-      await expect(sampleFrame.getByText("Kallocain")).toBeVisible();
-      await expect(sampleFrame.getByText("The Library of Babel")).toBeVisible();
+      await expect(frame.getByRole("listitem")).toHaveText(TILES_ITEM_TITLES);
+      const context = await frame.evaluate(readProbeContext);
+      expect(context.tiles).toHaveLength(3);
     });
 
     test("No default export function", async function reportsMissingMount({
@@ -346,13 +350,13 @@ test.describe(
     test("Connections are blocked", async function blocksConnections({
       page,
     }): Promise<void> {
-      const seenUrls = await recordHost(page, SAMPLE_COLLECTION_GLOB);
+      const seenUrls = await recordHost(page, `**${APP_ORIGIN_RECORDED_PATH}`);
       const frame = await openAppProbe(page);
       const appOrigin = new URL(page.url()).origin;
 
       const outcome = await frame.evaluate(
         fetchFromFrame,
-        `${appOrigin}${SAMPLE_COLLECTION_PATH}`,
+        `${appOrigin}${APP_ORIGIN_RECORDED_PATH}`,
       );
 
       expect(outcome).not.toBe("sent");
@@ -381,23 +385,6 @@ test.describe(
   "Content hosts",
   { tag: "@frames" },
   function describeContentHosts(): void {
-    test("Sample content hosts", async function usesAppOrigin({
-      page,
-    }): Promise<void> {
-      await routeCovers(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const appOrigin = new URL(page.url()).origin;
-
-      const sandboxDocument = await page
-        .locator('iframe[title="Book List"]')
-        .getAttribute("srcdoc");
-
-      expect(sandboxDocument).toContain(
-        `img-src data: blob: ${appOrigin} https://*.archive.org https://archive.org https://covers.openlibrary.org ${COVER_HOST};`,
-      );
-      expect(sandboxDocument).toContain("connect-src 'none'");
-    });
-
     test("Tile from another host", async function allowsTileHost({
       page,
     }): Promise<void> {
@@ -451,12 +438,11 @@ test.describe(
     test("Sample covers are shown", async function showsCovers({
       page,
     }): Promise<void> {
+      await serveTilesMod(page);
       const coverUrls = await routeCovers(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const frame = await findModFrame(page, "Book List");
-      await expect(
-        page.frameLocator('iframe[title="Book List"]').getByRole("img"),
-      ).toHaveCount(3);
+      await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
+      const frame = await findModFrame(page, TILES_TITLE);
+      await expect(frame.getByRole("img")).toHaveCount(3);
 
       await expect
         .poll(function countCovers(): Promise<number> {
@@ -642,7 +628,7 @@ test.describe(
 );
 
 const ROUTER_LOGO_URL = "http://192.168.1.1/logo.png";
-/** A linked cover whose path has a comma, as in the sample book list's covers. */
+/** A linked cover whose path has a comma, as some real covers' paths have. */
 const COMMA_COVER_URL = `${MEDIA_HOST}/covers/chronicles,_volume_1.jpg`;
 
 const REDIRECT_HINT =

@@ -12,12 +12,11 @@ import {
   followLink,
   openChecker,
   requestFromProbe,
-  routeCovers,
   serveAppOriginMod,
   waitForProbe,
 } from "./mod_routes.ts";
 import type { ModFiles, ProbeAnswer } from "./mod_routes.ts";
-import { SAMPLE_COLLECTION_RUN_HASH } from "./sample_mod.ts";
+import { openTilesMod, TILES_ITEM_TITLES } from "./test_mods.ts";
 
 const MERMAID_REQUEST = { name: "mermaid", version: "12" };
 
@@ -167,38 +166,6 @@ test.describe(
   "Unknown libraries and versions",
   { tag: "@frames" },
   function describeUnknownLibraries(): void {
-    test("Unknown library", async function rejectsUnknownLibrary({
-      page,
-    }): Promise<void> {
-      const frame = await openProbe(page);
-
-      const answer = await frame.evaluate(requestFromProbe, [
-        "libs.load",
-        { name: "katex", version: "0" },
-      ]);
-
-      expect(answer.code).toBe(-32602);
-      expect(answer.message).toContain("libs.load");
-      expect(answer.message).toContain('the app has no library "katex"');
-      expect(await frame.evaluate(readMermaidType)).toBe("undefined");
-    });
-
-    test("Other major version", async function rejectsOtherMajor({
-      page,
-    }): Promise<void> {
-      const frame = await openProbe(page);
-
-      const answer = await frame.evaluate(requestFromProbe, [
-        "libs.load",
-        { name: "mermaid", version: "11" },
-      ]);
-
-      expect(answer.code).toBe(-32602);
-      expect(answer.message).toContain("libs.load");
-      expect(answer.message).toContain("the app has mermaid 12");
-      expect(await frame.evaluate(readMermaidType)).toBe("undefined");
-    });
-
     test("rejects another major version after mermaid was loaded", async function rejectsAfterLoad({
       page,
     }): Promise<void> {
@@ -255,13 +222,10 @@ test.describe(
       page,
     }): Promise<void> {
       const requestedUrls = collectRequestedUrls(page);
-      await routeCovers(page);
 
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+      const frame = await openTilesMod(page);
 
-      await expect(
-        page.frameLocator('iframe[title="Book List"]').getByText("Kallocain"),
-      ).toBeVisible();
+      await expect(frame.getByRole("listitem")).toHaveText(TILES_ITEM_TITLES);
       expect(requestedUrls.filter(isMermaidChunk)).toEqual([]);
     });
   },

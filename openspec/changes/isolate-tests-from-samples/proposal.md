@@ -40,7 +40,7 @@ None.
 - `mod-tests`: scenarios no longer name the sample; "Sample mod tests" is removed.
 - `mod-theme`: "Sample and default mods take the theme's look" is replaced by "Default mods take the theme's look".
 - `mod-api-version`: a scenario no longer names the sample; "Sample and default mods declare the API range" is replaced by "Default mods declare the API range".
-- `mod-check`, `mod-sandbox`, `mod-libraries`, `mod-app-actions`, `stage-layout`, `default-mods`, `site-consent`, `app-pages`, `app-sidebar`, `theme`: scenarios no longer name the sample.
+- `mod-check`, `mod-engine-api`, `mod-sandbox`, `mod-libraries`, `mod-app-actions`, `stage-layout`, `default-mods`, `site-consent`, `app-pages`, `app-sidebar`, `theme`: scenarios no longer name the sample.
 
 Scenario names stay the same: a modified requirement keeps its scenarios' names.
 

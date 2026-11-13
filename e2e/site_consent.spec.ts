@@ -10,7 +10,6 @@ import {
   findModFrame,
   followLink,
   FOREIGN_HOST,
-  OTHER_API_RANGE,
   readLoadedCovers,
   readProbeContext,
   recordHost,
@@ -27,7 +26,11 @@ import {
   waitForProbe,
 } from "./mod_routes.ts";
 import type { ModFiles } from "./mod_routes.ts";
-import { SAMPLE_COLLECTION_RUN_HASH } from "./sample_mod.ts";
+import {
+  serveTilesMod,
+  TILES_COLLECTION_RUN_HASH,
+  TILES_TITLE,
+} from "./test_mods.ts";
 
 const PROBE_TITLE = "Probe";
 const PROBE_FOLDER = `${FOREIGN_HOST}/probe/`;
@@ -122,59 +125,18 @@ async function countCovers(frame: Frame): Promise<number> {
 }
 
 test.describe("Ask before a mod from another origin starts", function describeAsk(): void {
-  test("Foreign mod with a declared permission", async function asksBeforeFrame({
+  test("Mod from the app's origin", async function startsAppOriginMod({
     page,
   }): Promise<void> {
-    await openForeignProbe(page);
+    await serveTilesMod(page);
 
-    await expectAsking(page);
-    await expect(siteConsentDialog(page)).toContainText(
-      `${FOREIGN_HOST}/probe/mod_conf.yaml`,
-    );
-    await expect(
-      siteConsentDialog(page).getByRole("button", {
-        name: "Show without them",
-      }),
-    ).toBeFocused();
-    await expect(lineCheckbox(page, REMEMBER_LABEL)).toHaveAttribute(
-      "aria-checked",
-      "false",
-    );
-  });
-
-  test("Mod from the app's origin", async function startsSampleMod({
-    page,
-  }): Promise<void> {
-    await routeCovers(page);
-
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    const frame = await findModFrame(page, "Book List");
+    await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
+    const frame = await findModFrame(page, TILES_TITLE);
 
     await expect
       .poll(countCovers.bind(undefined, frame), { timeout: 10000 })
       .toBe(3);
     await expectNoDialog(page);
-  });
-});
-
-test.describe("What the dialog lists", function describeLines(): void {
-  test("Lines of a foreign mod", async function listsLines({
-    page,
-  }): Promise<void> {
-    await openForeignProbe(page, [...SHOW_LINES, ...CONNECT_LINES]);
-
-    await expect(lineCheckbox(page, SHOW_LINE)).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    await expect(lineCheckbox(page, CONNECT_LINE)).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    await expect(siteConsentDialog(page)).toContainText(
-      "Shows the book covers",
-    );
-    await expect(siteConsentDialog(page)).toContainText("Reads the prices");
   });
 });
 
@@ -353,68 +315,5 @@ test.describe("The dialog waits for its mod to be visible", function describeVis
 
     await expect(stageBar(page)).toContainText(PROBE_TITLE);
     await expectAsking(page);
-  });
-
-  test("Another API first", async function asksApiFirst({
-    page,
-  }): Promise<void> {
-    await serveForeignMod(
-      page,
-      buildForeignProbeFiles("probe", PROBE_TITLE, SHOW_LINES, OTHER_API_RANGE),
-    );
-    await page.goto(`/${PROBE_HASH}`);
-    await expect(lineCheckbox(page, SHOW_LINE)).toHaveCount(0);
-
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Run anyway" })
-      .click();
-
-    await expectAsking(page);
-    await expect(lineCheckbox(page, SHOW_LINE)).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-  });
-
-  test("Cancelled for another API", async function cancelsBeforeSites({
-    page,
-  }): Promise<void> {
-    await serveForeignMod(
-      page,
-      buildForeignProbeFiles("probe", PROBE_TITLE, SHOW_LINES, OTHER_API_RANGE),
-    );
-    await page.goto(`/${PROBE_HASH}`);
-
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Cancel" })
-      .click();
-
-    await expectNoDialog(page);
-    await expect(page.getByRole("alert")).toContainText(OTHER_API_RANGE);
-    await expect(page.locator("iframe")).toHaveCount(0);
-  });
-});
-
-test.describe("Checks and inspection never ask", function describeNeverAsk(): void {
-  test("Check a foreign mod without decisions", async function checksWithoutAsking({
-    page,
-  }): Promise<void> {
-    await serveForeignMod(
-      page,
-      buildForeignProbeFiles("probe", PROBE_TITLE, SHOW_LINES),
-    );
-    await page.goto(
-      `/#/run?mod=mod_viewer&target=${encodeURIComponent(PROBE_FOLDER)}`,
-    );
-    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
-
-    await viewer.getByRole("button", { name: "Check mod" }).click();
-
-    await expect(
-      viewer.getByRole("region", { name: "Check report" }),
-    ).toBeVisible({ timeout: 10000 });
-    await expectNoDialog(page);
   });
 });

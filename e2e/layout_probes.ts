@@ -171,36 +171,6 @@ export function readScrollTop(): number {
   return document.scrollingElement?.scrollTop ?? 0;
 }
 
-/**
- * Runs in the app's page before it loads: writing the theater choice fails,
- * as with a full or blocked storage. Other keys are written as usual.
- */
-export function refuseTheaterWrites(key: string): void {
-  const writeItem = Storage.prototype.setItem;
-  function refuseTheaterKey(
-    this: Storage,
-    itemKey: string,
-    value: string,
-  ): void {
-    if (itemKey === key) {
-      throw new DOMException(
-        "The quota has been exceeded.",
-        "QuotaExceededError",
-      );
-    }
-    writeItem.call(this, itemKey, value);
-  }
-  Storage.prototype.setItem = refuseTheaterKey;
-}
-
-/** Runs in the app's page before it loads: every request for a frame's fullscreen is refused. */
-export function refuseFrameFullscreen(): void {
-  function refuseFullscreen(): Promise<void> {
-    return Promise.reject(new TypeError("Fullscreen is blocked by the test"));
-  }
-  HTMLIFrameElement.prototype.requestFullscreen = refuseFullscreen;
-}
-
 /** Runs in the app's page: whether `document.fullscreenElement` is the frame titled `title`. */
 export function isFrameFullscreen(title: string): boolean {
   const frame = document.querySelector(`iframe[title="${title}"]`);

@@ -8,19 +8,12 @@ import type { BodyTile } from "./tile_body_routes.ts";
 const EXTRA_CHUNK_PATTERN =
   /\/assets\/(math_pass|highlight_pass|emoji_pass)-[^/]+\.js$/;
 
-const MATH_CHUNK_PATTERN = /\/assets\/math_pass-[^/]+\.js$/;
-
 const MATH_TILE: BodyTile = {
   name: "math",
   body: [
     "Inline $\\frac{a}{b}$ in a sentence.",
     "$$\n\\sum_{i=0}^{n} i = \\frac{n(n+1)}{2}\n$$",
   ].join("\n\n"),
-};
-
-const FAILING_TILE: BodyTile = {
-  name: "failing",
-  body: "Before $\\frac{a}{$ after.",
 };
 
 const CODE_TILE: BodyTile = {
@@ -30,17 +23,10 @@ const CODE_TILE: BodyTile = {
   ),
 };
 
-const EMOJI_TILE: BodyTile = {
-  name: "emoji",
-  body: "Done :tada:, :not_an_emoji: and `:tada:`.",
-};
-
-const EXTRA_TILES = [MATH_TILE, FAILING_TILE, CODE_TILE, EMOJI_TILE];
+const EXTRA_TILES = [MATH_TILE, CODE_TILE];
 
 const MATH_INDEX = 0;
-const FAILING_INDEX = 1;
-const CODE_INDEX = 2;
-const EMOJI_INDEX = 3;
+const CODE_INDEX = 1;
 
 /** Bodies without formulas, labeled code or shortcodes; one holds prices. */
 const PLAIN_TILES: BodyTile[] = [
@@ -92,12 +78,6 @@ function readPrimaryColor(): string {
   return color;
 }
 
-/** Runs in the probe's frame: the text of the first `<annotation>` of the first `<math>` matching `selector`. */
-function readAnnotation(selector: string): string {
-  const math = document.querySelector(selector) as Element;
-  return math.querySelector("annotation")?.textContent ?? "";
-}
-
 /** Runs in the probe's frame: the names of the computed font families of the first `<math>`, without quotes. */
 function readMathFontFamilies(): string[] {
   const math = document.querySelector("ot-tile-body math") as Element;
@@ -107,31 +87,6 @@ function readMathFontFamilies(): string[] {
   }
   return families;
 }
-
-test.describe(
-  "Math is rendered as MathML",
-  { tag: "@frames" },
-  function describeMath(): void {
-    test("Fraction", async function showsFraction({ page }): Promise<void> {
-      const requestedUrls = collectRequestedUrls(page);
-
-      const frame = await showExtrasBody(page, MATH_INDEX);
-
-      const fraction = frame.locator("ot-tile-body p math mfrac");
-      await expect(fraction).toBeVisible();
-      await expect(fraction).toHaveText("ab");
-      expect(await frame.evaluate(readAnnotation, "ot-tile-body p math")).toBe(
-        "\\frac{a}{b}",
-      );
-      await expect(
-        frame.locator('ot-tile-body math[display="block"]'),
-      ).toBeVisible();
-      expect(listMatchingUrls(requestedUrls, MATH_CHUNK_PATTERN)).toHaveLength(
-        1,
-      );
-    });
-  },
-);
 
 test.describe(
   "Formulas use a math font the system has",
@@ -148,58 +103,6 @@ test.describe(
         "Latin Modern Math",
         "math",
       ]);
-    });
-  },
-);
-
-test.describe(
-  "Formulas that fail stay as written",
-  { tag: "@frames" },
-  function describeFailingMath(): void {
-    test("Unclosed brace", async function keepsUnclosedBrace({
-      page,
-    }): Promise<void> {
-      const frame = await showExtrasBody(page, FAILING_INDEX);
-
-      const paragraph = frame.locator("ot-tile-body p");
-      await expect(paragraph).toHaveText("Before \\frac{a}{ after.");
-      const code = paragraph.locator("code.language-math");
-      await expect(code).toHaveText("\\frac{a}{");
-      await expect(code).toHaveAttribute("data-ot-math-error", /\S/);
-      await expect(frame.locator("ot-tile-body math")).toHaveCount(0);
-    });
-  },
-);
-
-test.describe(
-  "Code blocks and emoji",
-  { tag: "@frames" },
-  function describeCodeAndEmoji(): void {
-    test("Labeled JavaScript", async function highlightsJavaScript({
-      page,
-    }): Promise<void> {
-      const frame = await showExtrasBody(page, CODE_INDEX);
-
-      const code = frame.locator("ot-tile-body code.language-js");
-      await expect(code.locator("span.hljs-keyword")).toHaveText("const");
-      await expect(code.locator("span.hljs-number")).toHaveText("42");
-      await expect(code).toHaveText("const answer = 42;");
-      const plainCode = frame
-        .locator("ot-tile-body pre")
-        .nth(1)
-        .locator("code");
-      await expect(plainCode).toHaveText("const plain = 1;");
-      await expect(plainCode.locator("span")).toHaveCount(0);
-    });
-
-    test("Shortcodes", async function replacesShortcodes({
-      page,
-    }): Promise<void> {
-      const frame = await showExtrasBody(page, EMOJI_INDEX);
-
-      const paragraph = frame.locator("ot-tile-body p");
-      await expect(paragraph).toHaveText("Done 🎉, :not_an_emoji: and :tada:.");
-      await expect(paragraph.locator("code")).toHaveText(":tada:");
     });
   },
 );

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Page, Route } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import {
   currentItem,
   hamburgerButton,
@@ -27,10 +27,9 @@ import {
   stageBar,
   waitForProbe,
 } from "./mod_routes.ts";
-import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
+import { openProbe, serveExplorerOfTilesMod } from "./test_mods.ts";
 import { DARK_COLORS, LIGHT_COLORS } from "./theme_probes.ts";
 
-const EXPLORER_HASH = "#/run?mod=mod_explorer";
 const SIDEBAR_LAYOUT_KEY = "opentesela.sidebar";
 
 /** The bottom of the frame may sit this far from the viewport's edge: the stage's padding and border. */
@@ -46,11 +45,6 @@ async function readFrameBox(
   }
   const frameBox = { x: box.x, width: box.width, right: box.x + box.width };
   return frameBox;
-}
-
-async function openSample(page: Page): Promise<void> {
-  await page.goto(`/${SAMPLE_RUN_HASH}`);
-  await expect(stageBar(page)).toContainText("Book List");
 }
 
 /** Presses the pointer on the resize handle's center, and gives that point. */
@@ -78,14 +72,6 @@ async function dragHandleToWidth(page: Page, width: number): Promise<void> {
   await dragHandleBy(page, width - currentWidth);
 }
 
-function readItemNames(element: Element): string[] {
-  const names: string[] = [];
-  for (const link of element.querySelectorAll("a")) {
-    names.push(link.textContent ?? "");
-  }
-  return names;
-}
-
 function readBackgroundColor(element: Element): string {
   return getComputedStyle(element).backgroundColor;
 }
@@ -94,41 +80,7 @@ function readTextColor(element: Element): string {
   return getComputedStyle(element).color;
 }
 
-function storeLayout(value: string): void {
-  localStorage.setItem("opentesela.sidebar", value);
-}
-
-async function serveFirstSteps(route: Route): Promise<void> {
-  await route.fulfill({
-    status: 200,
-    contentType: "text/markdown",
-    body: "# First steps\n",
-  });
-}
-
 test.describe("Vanilla sections", function describeVanilla(): void {
-  test("Vanilla sidebar", async function listsSections({
-    page,
-  }): Promise<void> {
-    await page.setViewportSize({ width: 1280, height: 800 });
-
-    await page.goto("/");
-
-    const lists = sectionsNav(page).getByRole("list");
-    await expect(lists).toHaveCount(2);
-    expect(await lists.nth(0).evaluate(readItemNames)).toEqual([
-      "Home",
-      "TilesComing soon",
-      "Mods",
-      "MosaicsComing soon",
-      "Guides",
-    ]);
-    expect(await lists.nth(1).evaluate(readItemNames)).toEqual([
-      "Settings",
-      "About",
-    ]);
-  });
-
   test("Tinted image follows the color scheme", async function tintsImage({
     page,
   }): Promise<void> {
@@ -150,23 +102,6 @@ test.describe("Vanilla sections", function describeVanilla(): void {
       .toBe(DARK_COLORS.foreground.computed);
   });
 
-  test("Tiles is coming soon", async function disablesTiles({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    const tiles = sectionItem(page, /Tiles/);
-
-    // A user can click it: Playwright would wait for a disabled item to be enabled.
-    await tiles.click({ force: true });
-
-    await expect(tiles).toHaveAttribute("aria-disabled", "true");
-    await expect(tiles).toContainText("Coming soon");
-    expect(new URL(page.url()).hash).toBe("#/");
-    await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
-    ).toBeVisible();
-  });
-
   test("Explorer switched off", async function hidesMods({
     page,
   }): Promise<void> {
@@ -184,10 +119,11 @@ test.describe("Section navigation", function describeNavigation(): void {
   test("Back where you left off", async function showsLastView({
     page,
   }): Promise<void> {
+    await serveExplorerOfTilesMod(page);
     await page.goto("/");
     await openModsSection(page);
     const explorer = await findModFrame(page, "Mods");
-    await explorer.getByRole("button", { name: /Book List/ }).click();
+    await explorer.getByRole("button", { name: /Tiles/ }).click();
     await expect(stageBar(page)).toContainText("Mod Viewer");
     const viewer = await findModFrame(page, "Mod Viewer");
     await markFrame(viewer);
@@ -203,66 +139,18 @@ test.describe("Section navigation", function describeNavigation(): void {
   test("Activating the current section returns to its start", async function showsRoot({
     page,
   }): Promise<void> {
+    await serveExplorerOfTilesMod(page);
     await page.goto("/");
     await openModsSection(page);
     const explorer = await findModFrame(page, "Mods");
     await markFrame(explorer);
-    await explorer.getByRole("button", { name: /Book List/ }).click();
+    await explorer.getByRole("button", { name: /Tiles/ }).click();
     await expect(stageBar(page)).toContainText("Mod Viewer");
 
     await openSection(page, "Mods");
 
     await expect(page.locator('iframe[title="Mods"]')).toBeVisible();
     expect(await isFrameMarked(explorer)).toBe(true);
-  });
-
-  test("One explorer for repeated visits", async function keepsOneExplorer({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-
-    for (const name of ["Mods", "Home", "Mods", "Home", "Mods"]) {
-      await openSection(page, name);
-    }
-
-    await expect(page.locator('iframe[title="Mods"]')).toBeVisible();
-    await expect(page.locator('iframe[title="Mods"]')).toHaveCount(1);
-  });
-
-  test("Closed root opens a new one", async function opensNewRoot({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    await openModsSection(page);
-    await stageBar(page).getByRole("button", { name: "Close" }).click();
-    await expect(page.locator('iframe[title="Mods"]')).toHaveCount(0);
-
-    await openModsSection(page);
-
-    await expect(
-      page.locator('[data-sandbox-id="sandbox-2"] iframe'),
-    ).toBeVisible();
-  });
-
-  test("Last page of a page section", async function showsLastPage({
-    page,
-  }): Promise<void> {
-    await page.route("**/pages/guides/first_steps.md", serveFirstSteps);
-    await page.goto("/#/guides/first_steps");
-    await expect(
-      pageBody(page).getByRole("heading", { name: "First steps" }),
-    ).toBeVisible();
-    await openSection(page, "Home");
-    await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
-    ).toBeVisible();
-
-    await openSection(page, "Guides");
-
-    await expect(
-      pageBody(page).getByRole("heading", { name: "First steps" }),
-    ).toBeVisible();
-    expect(new URL(page.url()).hash).toBe("#/guides/first_steps");
   });
 
   test("Back after switching sections", async function goesBackAcrossSections({
@@ -285,48 +173,19 @@ test.describe("Section navigation", function describeNavigation(): void {
 });
 
 test.describe("Active section", function describeActiveSection(): void {
-  test("Viewer keeps Mods active", async function keepsMods({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    await openModsSection(page);
-    const explorer = await findModFrame(page, "Mods");
-
-    await explorer.getByRole("button", { name: /Book List/ }).click();
-
-    await expect(stageBar(page)).toContainText("Mod Viewer");
-    await expect(currentItem(page)).toHaveText("Mods");
-  });
-
   test("Kept after a reload", async function keepsAfterReload({
     page,
   }): Promise<void> {
+    await serveExplorerOfTilesMod(page);
     await page.goto("/");
     await openModsSection(page);
     const explorer = await findModFrame(page, "Mods");
-    await explorer.getByRole("button", { name: /Book List/ }).click();
+    await explorer.getByRole("button", { name: /Tiles/ }).click();
     await expect(stageBar(page)).toContainText("Mod Viewer");
 
     await page.reload();
 
     await expect(stageBar(page)).toContainText("Mod Viewer");
-    await expect(currentItem(page)).toHaveText("Mods");
-  });
-
-  test("Link to another mod", async function marksNone({
-    page,
-  }): Promise<void> {
-    await openSample(page);
-
-    await expect(currentItem(page)).toHaveCount(0);
-  });
-
-  test("Typed link to a section's mod", async function marksMods({
-    page,
-  }): Promise<void> {
-    await page.goto(`/${EXPLORER_HASH}`);
-    await expect(stageBar(page)).toContainText("Mods");
-
     await expect(currentItem(page)).toHaveText("Mods");
   });
 });
@@ -336,7 +195,7 @@ test.describe("Sidebar states", function describeStates(): void {
     page,
   }): Promise<void> {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await openSample(page);
+    await openProbe(page);
     const frame = await findVisibleFrame(page);
     await markFrame(frame);
     await sidebar(page)
@@ -349,7 +208,7 @@ test.describe("Sidebar states", function describeStates(): void {
     await expect(hamburgerButton(page)).toBeVisible();
     await expect(hamburgerButton(page)).toHaveAccessibleName("Show sidebar");
     // The main area takes the whole width, and the mod keeps running.
-    const hiddenBox = await readFrameBox(page, "Book List");
+    const hiddenBox = await readFrameBox(page, "probe");
     expect(hiddenBox.x).toBeLessThanOrEqual(EDGE_TOLERANCE);
     expect(1280 - hiddenBox.right).toBeLessThanOrEqual(EDGE_TOLERANCE);
     expect(await isFrameMarked(frame)).toBe(true);
@@ -362,10 +221,10 @@ test.describe("Sidebar states", function describeStates(): void {
   test("Collapse keeps mods running", async function keepsModsRunning({
     page,
   }): Promise<void> {
-    await openSample(page);
+    await openProbe(page);
     const frame = await findVisibleFrame(page);
     await markFrame(frame);
-    const before = await readFrameBox(page, "Book List");
+    const before = await readFrameBox(page, "probe");
 
     await sidebar(page)
       .getByRole("button", { name: "Collapse sidebar" })
@@ -373,7 +232,7 @@ test.describe("Sidebar states", function describeStates(): void {
 
     await expect
       .poll(async function readFrameWidth(): Promise<number> {
-        return (await readFrameBox(page, "Book List")).width;
+        return (await readFrameBox(page, "probe")).width;
       })
       .toBeGreaterThan(before.width);
     expect(await isFrameMarked(frame)).toBe(true);
@@ -394,17 +253,6 @@ test.describe("Sidebar states", function describeStates(): void {
       "Guides",
     );
   });
-
-  test("Toggle with the keyboard", async function togglesWithShortcut({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
-
-    await page.keyboard.press("Control+b");
-
-    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
-  });
 });
 
 test.describe("Resize the sidebar", function describeResize(): void {
@@ -413,16 +261,16 @@ test.describe("Resize the sidebar", function describeResize(): void {
   });
 
   test("Drag wider", async function dragsWider({ page }): Promise<void> {
-    await openSample(page);
+    await openProbe(page);
     const frame = await findVisibleFrame(page);
     await markFrame(frame);
-    const before = await readFrameBox(page, "Book List");
+    const before = await readFrameBox(page, "probe");
     expect(await page.evaluate(readSidebarWidth)).toBe(240);
 
     await dragHandleBy(page, 100);
 
     expect(await page.evaluate(readSidebarWidth)).toBe(340);
-    const after = await readFrameBox(page, "Book List");
+    const after = await readFrameBox(page, "probe");
     expect(before.width - after.width).toBeCloseTo(100, 0);
     expect(await isFrameMarked(frame)).toBe(true);
   });
@@ -438,7 +286,7 @@ test.describe("Resize the sidebar", function describeResize(): void {
   test("Drag to collapse", async function collapsesWhileHeld({
     page,
   }): Promise<void> {
-    await openSample(page);
+    await openProbe(page);
     const start = await grabHandle(page);
 
     await page.mouse.move(start.x - 120, start.y, { steps: 10 });
@@ -451,7 +299,7 @@ test.describe("Resize the sidebar", function describeResize(): void {
   test("Drag back before releasing", async function expandsAgainWhileHeld({
     page,
   }): Promise<void> {
-    await openSample(page);
+    await openProbe(page);
     const frame = await findVisibleFrame(page);
     await markFrame(frame);
     const start = await grabHandle(page);
@@ -467,22 +315,10 @@ test.describe("Resize the sidebar", function describeResize(): void {
     expect(await isFrameMarked(frame)).toBe(true);
   });
 
-  test("Resize with the keyboard", async function resizesWithKeys({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    await resizeHandle(page).focus();
-
-    await page.keyboard.press("ArrowRight");
-
-    expect(await page.evaluate(readSidebarWidth)).toBe(256);
-    await expect(resizeHandle(page)).toHaveAttribute("aria-valuenow", "256");
-  });
-
   test("Drag over a mod's frame", async function dragsOverFrame({
     page,
   }): Promise<void> {
-    await openSample(page);
+    await openProbe(page);
     const start = await grabHandle(page);
 
     // Across the visible frame, which starts right of the sidebar.
@@ -498,10 +334,10 @@ test.describe("Resize the sidebar", function describeResize(): void {
   test("Frame beside the sidebar", async function placesFrame({
     page,
   }): Promise<void> {
-    await openSample(page);
+    await openProbe(page);
 
     const sidebarBox = await sidebar(page).boundingBox();
-    const frameBox = await readFrameBox(page, "Book List");
+    const frameBox = await readFrameBox(page, "probe");
 
     expect(frameBox.x).toBeGreaterThan(
       (sidebarBox?.x ?? 0) + (sidebarBox?.width ?? 0),
@@ -514,7 +350,7 @@ test.describe("Resize the sidebar", function describeResize(): void {
 test.describe("Expand the rail by dragging", function describeExpandRail(): void {
   test.beforeEach(async function useCollapsedSidebar({ page }): Promise<void> {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await openSample(page);
+    await openProbe(page);
     await sidebar(page)
       .getByRole("button", { name: "Collapse sidebar" })
       .click();
@@ -540,17 +376,6 @@ test.describe("Expand the rail by dragging", function describeExpandRail(): void
     await dragHandleToWidth(page, 120);
 
     await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
-  });
-
-  test("Expand with the keyboard", async function expandsWithArrow({
-    page,
-  }): Promise<void> {
-    await resizeHandle(page).focus();
-
-    await page.keyboard.press("ArrowRight");
-
-    await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
-    expect(await page.evaluate(readSidebarWidth)).toBe(240);
   });
 });
 
@@ -579,18 +404,6 @@ test.describe("Sidebar layout is remembered", function describeRemembered(): voi
 
     await expect(resizeHandle(page)).toHaveAttribute("aria-valuenow", "320");
     expect(await page.evaluate(readSidebarWidth)).toBe(320);
-  });
-
-  test("Invalid stored layout", async function ignoresInvalid({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    await page.evaluate(storeLayout, "wide");
-
-    await page.reload();
-
-    await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
-    expect(await page.evaluate(readSidebarWidth)).toBe(240);
   });
 
   test("Mods cannot reach the layout", async function hidesLayout({
@@ -623,26 +436,11 @@ test.describe("Narrow viewports", function describeNarrow(): void {
     await page.setViewportSize({ width: 375, height: 700 });
   });
 
-  test("Starts collapsed", async function startsCollapsed({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    await page.evaluate(
-      storeLayout,
-      JSON.stringify({ state: "expanded", from: "expanded", width: 300 }),
-    );
-
-    await page.reload();
-
-    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
-    await expect(resizeHandle(page)).toHaveCount(0);
-  });
-
   test("Expand over the content", async function opensDrawer({
     page,
   }): Promise<void> {
-    await openSample(page);
-    const before = await readFrameBox(page, "Book List");
+    await openProbe(page);
+    const before = await readFrameBox(page, "probe");
 
     await sidebar(page).getByRole("button", { name: "Expand sidebar" }).click();
 
@@ -651,36 +449,9 @@ test.describe("Narrow viewports", function describeNarrow(): void {
     await expect(drawer.getByRole("link", { name: "Guides" })).toHaveText(
       "Guides",
     );
-    expect((await readFrameBox(page, "Book List")).width).toBe(before.width);
-  });
-
-  test("Escape closes the drawer", async function closesOnEscape({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    await sidebar(page).getByRole("button", { name: "Expand sidebar" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-
-    await page.keyboard.press("Escape");
-
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
-  });
-
-  test("stores nothing", async function storesNothing({ page }): Promise<void> {
-    await page.goto("/");
-
-    await sidebar(page).getByRole("button", { name: "Expand sidebar" }).click();
-    await page.keyboard.press("Escape");
-    await hamburgerButton(page).click();
-
-    expect(await page.evaluate(readStoredLayout)).toBeNull();
+    expect((await readFrameBox(page, "probe")).width).toBe(before.width);
   });
 });
-
-function readStoredLayout(): string | null {
-  return localStorage.getItem("opentesela.sidebar");
-}
 
 test.describe("Sidebar colors", function describeColors(): void {
   test("follows the light color scheme", async function drawsLightSidebar({

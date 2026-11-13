@@ -58,7 +58,7 @@ describe("mapPageLink", function describeMapPageLink(): void {
     expect(mapPageLink("#/settings", GUIDES_INDEX).href).toBe("#/settings");
   });
 
-  it("Other site", function marksOtherSite(): void {
+  it("marks an address on another site as external", function marksOtherSite(): void {
     for (const href of ["https://example.com/", "http://example.com/a?b=1"]) {
       expect(mapPageLink(href, GUIDES_INDEX)).toEqual({
         href,

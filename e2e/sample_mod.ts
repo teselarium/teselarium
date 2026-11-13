@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
+import { buildPassedResults } from "./mod_routes.ts";
+import type { CheckTestResult } from "./mod_routes.ts";
 
 /** `/samples/mods`: the folder of the shipped sample mods on the app's server. */
 const SAMPLE_MODS_PATH = "/samples/mods";
@@ -13,11 +15,18 @@ export const SAMPLE_MOD_FILE_PATH = `${SAMPLE_MOD_FOLDER_PATH}/mod_conf.yaml`;
 /** `/samples/mods/book_list/main.js`: the sample mod's entrypoint. */
 export const SAMPLE_ENTRYPOINT_PATH = `${SAMPLE_MOD_FOLDER_PATH}/main.js`;
 
-/** The text of the sample mod's entrypoint, to serve it in a test mod of another folder. */
-export const SAMPLE_ENTRYPOINT_CODE = readFileSync(
-  new URL(`../public${SAMPLE_ENTRYPOINT_PATH}`, import.meta.url),
-  "utf8",
-);
+/**
+ * The text of the sample mod's entrypoint, to serve it in a test mod of
+ * another folder. It is read when a test asks for it, not when this file is
+ * imported, so the other tests load without the samples.
+ */
+export function readSampleEntrypointCode(): string {
+  const code = readFileSync(
+    new URL(`../public${SAMPLE_ENTRYPOINT_PATH}`, import.meta.url),
+    "utf8",
+  );
+  return code;
+}
 
 /** `/samples/mods/book_list/test.js`: the sample mod's test file. */
 export const SAMPLE_TEST_PATH = `${SAMPLE_MOD_FOLDER_PATH}/test.js`;
@@ -69,6 +78,29 @@ export function readSampleModSource(page: Page): string {
   const sampleModSource = new URL(SAMPLE_MOD_FILE_PATH, page.url()).href;
   return sampleModSource;
 }
+
+/** The cases of the sample mod's test file, in the order it registers them. */
+export const SAMPLE_CASE_NAMES = [
+  "lists the sample books",
+  "shows a placeholder without an image",
+  "shows placeholders when covers are off",
+  "names each book by title and authors",
+  "uses the config's books per row",
+  "ignores an unknown books per row",
+  "remembers the books per row",
+  "ignores an unknown stored books per row",
+  "has no select without books",
+  "opens the card of a clicked book",
+  "leaves out missing metadata",
+  "shows a date without a year as written",
+  "shows no small book without a cover",
+  "marks the book whose card is open",
+  "unmarks the book when its card closes",
+];
+
+/** The report's `tests` when every case of the sample mod passes. */
+export const SAMPLE_TEST_RESULTS: CheckTestResult[] =
+  buildPassedResults(SAMPLE_CASE_NAMES);
 
 /** `/samples/mods/flashcards`: the folder of the shipped sample flashcards mod. */
 export const FLASHCARDS_FOLDER_PATH = `${SAMPLE_MODS_PATH}/flashcards`;

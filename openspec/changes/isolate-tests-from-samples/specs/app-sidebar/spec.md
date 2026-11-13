@@ -1,5 +1,32 @@
 ## MODIFIED Requirements
 
+### Requirement: Section navigation
+Activating a section's item SHALL add a history entry and show, in the state it was left in: the last sandbox or page seen in that section, when the user comes from another section and it is still open; otherwise the section's start. Activating the item of the section already shown SHALL show its start. A mod section's start SHALL be its root sandbox while it is open, or a new one. A page section's start SHALL be its index page. No frame SHALL be reloaded.
+
+#### Scenario: Back where you left off
+- **WHEN** the user opens Mods, selects a mod in the explorer so the mod viewer is shown, opens Home, and then opens Mods again
+- **THEN** the mod viewer is visible in the state it was left in, and its frame was not reloaded
+
+#### Scenario: Activating the current section returns to its start
+- **WHEN** the mod viewer opened from the explorer is visible and the user activates Mods
+- **THEN** the mod explorer that was opened from Mods is visible in the state it was left in
+
+#### Scenario: One explorer for repeated visits
+- **WHEN** the user opens Mods, Home, Mods, Home and Mods again
+- **THEN** the page holds exactly one mod explorer frame
+
+#### Scenario: Closed root opens a new one
+- **WHEN** the user closes the mod explorer opened from Mods and then opens Mods again
+- **THEN** a new mod explorer sandbox is visible
+
+#### Scenario: Last page of a page section
+- **WHEN** the user is on `#/guides/first_steps`, opens Home, and opens Guides again
+- **THEN** the address is `#/guides/first_steps` and that page is shown
+
+#### Scenario: Back after switching sections
+- **WHEN** the user opens Mods, then Home, then Mods, and presses the browser's back button
+- **THEN** the Home page is shown, and pressing back again shows the mod explorer
+
 ### Requirement: Active section
 The item of the section that the shown page or sandbox belongs to SHALL be marked as the current one (`aria-current="page"`). A page belongs to its section. A sandbox SHALL belong to the section whose item opened it, or to its opener's section when a mod opened it, or, for a link typed or followed in the page, to the section whose mod link it exactly equals, or to none. The section SHALL be kept with the history entry and restored after a reload.
 

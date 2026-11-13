@@ -33,3 +33,23 @@ During the mount check, the mod SHALL have a storage slot that starts empty and 
 - **WHEN** a running mod stored a value under a key of its storage slot, and the mod is then checked
 - **THEN** during the check the mod's `storage.get` for that key returns `null`
 - **AND** after the check, the mod's `storage.get` for that key returns the stored value
+
+### Requirement: Check requests follow the inspect rules
+The engine SHALL answer `mods.check` with error code `-32002`, without requesting any file, unless the requesting mod has a granted `open` permission whose host is `"*"` or the origin of the target mod file. It SHALL answer with `-32003` for a default mod that is switched off, with `-32002` when the requesting sandbox is not the visible one, and with `-32602` when `mod` is not a non-empty string or `collection` is neither absent, `null` nor a non-empty string.
+
+#### Scenario: Mod without the open permission
+- **WHEN** a mod without a granted `open` permission sends `mods.check` with `{ "mod": "https://mods.example.net/clock/" }`
+- **THEN** the response has an error with code `-32002` whose message names `https://mods.example.net` and `permissions.open`
+- **AND** nothing is requested from `https://mods.example.net`
+
+#### Scenario: Hidden mod asks for a check
+- **WHEN** the mod explorer opened the mod viewer, and the hidden explorer sends `mods.check`
+- **THEN** the response has an error with code `-32002` whose message says that only the visible mod can check mods
+
+#### Scenario: Switched-off mod
+- **WHEN** `mod_viewer` is switched off and a mod with `open` granted for `"*"` checks `./default_mods/mod_viewer/`
+- **THEN** the response has an error with code `-32003` whose message names `mod_viewer`
+
+#### Scenario: Missing mod reference
+- **WHEN** a mod sends `mods.check` with `{}`
+- **THEN** the response has an error with code `-32602` whose message names `mods.check` and says that `mod` must be a non-empty string

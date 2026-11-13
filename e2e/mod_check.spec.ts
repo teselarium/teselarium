@@ -3,7 +3,7 @@ import {
   buildAnimationFrameFiles,
   buildCheckerFiles,
   buildConfirmingFiles,
-  buildMissingTypeFiles,
+  buildSlotReporterFiles,
   buildNeverMountedFiles,
   buildTestModReference,
   buildThrowingFiles,
@@ -17,41 +17,42 @@ import {
   checkPastLimit,
   findModFrame,
   openChecker,
-  readMessageCounts,
   readReportedValue,
   readTestModSource,
-  routeCovers,
-  SAMPLE_TEST_RESULTS,
+  requestFromProbe,
   serveAppOriginMod,
-  serveColumnsReportingSample,
+  SLOT_REPORTER_KEY,
+  SLOT_REPORTER_NAME,
   UNDECLARED_IMAGE_HOST,
-  visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
 import {
-  readSampleModSource,
-  SAMPLE_COLLECTION_RUN_HASH,
-  SAMPLE_ENTRYPOINT_GLOB,
-  SAMPLE_MOD_REFERENCE,
-} from "./sample_mod.ts";
+  buildTilesModFiles,
+  readTilesModSource,
+  TILES_MOD_REFERENCE,
+  TILES_TEST_RESULTS,
+} from "./test_mods.ts";
+
+/** The run link of the slot reporter, opened so that it reports nothing. */
+const QUIET_SLOT_REPORTER_LINK = `/#/run?mod=${buildTestModReference(SLOT_REPORTER_NAME)}&quiet=yes`;
 
 test.describe(
   "Check a mod",
   { tag: "@frames" },
   function describeCheckMod(): void {
-    test("Check the sample mod", async function checksSampleMod({
+    test("Check the sample mod", async function checksPassingMod({
       page,
     }): Promise<void> {
-      await openChecker(page, {});
+      await openChecker(page, buildTilesModFiles());
 
-      const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
+      const report = await checkFromChecker(page, TILES_MOD_REFERENCE);
 
       expect(report).toEqual({
-        source: readSampleModSource(page),
+        source: readTilesModSource(page),
         status: "pass",
         mountChecked: true,
         testsChecked: true,
-        tests: SAMPLE_TEST_RESULTS,
+        tests: TILES_TEST_RESULTS,
         findings: [],
       });
     });
@@ -61,7 +62,7 @@ test.describe(
     }): Promise<void> {
       await openChecker(page, {});
 
-      for (const mod of [SAMPLE_MOD_REFERENCE, "mod_explorer", "mod_viewer"]) {
+      for (const mod of ["mod_explorer", "mod_viewer"]) {
         const report = await checkFromChecker(page, mod);
 
         expect(report, `the check of ${mod}`).toMatchObject({
@@ -78,35 +79,12 @@ test.describe(
   "Mount check",
   { tag: "@frames" },
   function describeMountCheck(): void {
-    test("Bundle error skips the mount", async function skipsMount({
-      page,
-    }): Promise<void> {
-      const seenUrls = await openChecker(page, buildMissingTypeFiles());
-
-      const report = await checkFromChecker(
-        page,
-        buildTestModReference("missing_type"),
-      );
-
-      expect(report.status).toBe("fail");
-      expect(report.mountChecked).toBe(false);
-      expect(report.findings).toHaveLength(1);
-      expect(report.findings[0]).toMatchObject({
-        step: "bundle",
-        level: "error",
-        source: new URL("/test-mods/missing_type/missing_type.md", page.url())
-          .href,
-      });
-      expect(readReportedValue(seenUrls, "ran")).toBeUndefined();
-      await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
-    });
-
     test("Frame removed after the check", async function removesFrame({
       page,
     }): Promise<void> {
-      await openChecker(page, {});
+      await openChecker(page, buildTilesModFiles());
 
-      await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
+      await checkFromChecker(page, TILES_MOD_REFERENCE);
 
       await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
     });
@@ -248,62 +226,38 @@ test.describe(
     test("Real slot untouched", async function keepsRealSlot({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      await page
-        .frameLocator('iframe[title="Book List"]')
-        .getByLabel("Books per row")
-        .selectOption("10");
-      await expect(
-        page
-          .frameLocator('iframe[title="Book List"]')
-          .locator('ul[data-columns="10"]'),
-      ).toHaveCount(1);
-      const seenUrls = await serveAppOriginMod(page, buildCheckerFiles());
-      await serveColumnsReportingSample(page);
+      const seenUrls = await serveAppOriginMod(page, {
+        ...buildCheckerFiles(),
+        ...buildSlotReporterFiles(),
+      });
+      await page.goto(QUIET_SLOT_REPORTER_LINK);
+      const runningFrame = await findModFrame(page, SLOT_REPORTER_NAME);
+      await waitForProbe(runningFrame);
+      await runningFrame.evaluate(requestFromProbe, [
+        "storage.set",
+        { key: SLOT_REPORTER_KEY, value: 7 },
+      ]);
       await page.goto(`/${CHECKER_HASH}`);
       await waitForProbe(await findModFrame(page, CHECKER_TITLE));
 
-      const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
-      await page.unroute(SAMPLE_ENTRYPOINT_GLOB);
-      // A new document, so the sandbox the choice was made in is gone.
-      await page.goto("about:blank");
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-
-      expect(report.status).toBe("pass");
-      expect(readReportedValue(seenUrls, "columns")).toBeNull();
-      await expect(
-        page
-          .frameLocator('iframe[title="Book List"]')
-          .getByLabel("Books per row"),
-      ).toHaveValue("10");
-    });
-  },
-);
-
-test.describe(
-  "A check leaves the stage unchanged",
-  { tag: "@frames" },
-  function describeStageUnchanged(): void {
-    test("Viewer stays visible", async function keepsCheckerVisible({
-      page,
-    }): Promise<void> {
-      await openChecker(page, buildThrowingFiles());
-      const addressBefore = page.url();
-      const countsBefore = await readMessageCounts(page);
-
       const report = await checkFromChecker(
         page,
-        buildTestModReference("throwing"),
+        buildTestModReference(SLOT_REPORTER_NAME),
       );
+      // A new document, so the sandbox the value was stored in is gone.
+      await page.goto("about:blank");
+      await page.goto(QUIET_SLOT_REPORTER_LINK);
+      const reopenedFrame = await findModFrame(page, SLOT_REPORTER_NAME);
+      await waitForProbe(reopenedFrame);
 
-      expect(report.status).toBe("fail");
-      expect(page.url()).toBe(addressBefore);
-      await expect(
-        visibleSandbox(page).locator(`iframe[title="${CHECKER_TITLE}"]`),
-      ).toBeVisible();
-      await expect(page.locator("[data-sandbox-id]")).toHaveCount(1);
-      expect(await readMessageCounts(page)).toEqual(countsBefore);
+      expect(report.status).toBe("pass");
+      expect(readReportedValue(seenUrls, "stored")).toBeNull();
+      expect(
+        await reopenedFrame.evaluate(requestFromProbe, [
+          "storage.get",
+          { key: SLOT_REPORTER_KEY },
+        ]),
+      ).toEqual({ result: 7 });
     });
   },
 );

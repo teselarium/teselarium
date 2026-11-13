@@ -25,10 +25,15 @@ import {
   unreadItems,
   waitForProbe,
 } from "./mod_routes.ts";
-import type { MessageLevelName, ModFiles, ProbeAnswer } from "./mod_routes.ts";
+import type { MessageLevelName, ProbeAnswer } from "./mod_routes.ts";
+import {
+  buildNoteCollection,
+  buildTypedProbeFiles,
+  openProbe,
+  openTypedProbe,
+  PROBE_LINK,
+} from "./test_mods.ts";
 import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
-
-const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 
 /** The lines of a probe that shows images from `COVER_HOST`, so a foreign probe asks for consent. */
 const SHOW_COVERS_LINES = [
@@ -37,87 +42,6 @@ const SHOW_COVERS_LINES = [
   `      - host: "${COVER_HOST}"`,
   '        reason: "Shows the book covers"',
 ];
-
-/** Opens the probe from the app's origin, with `extraLines` in its mod file, and waits for its mount. */
-async function openProbe(
-  page: Page,
-  extraLines: string[] = [],
-  title: string = "probe",
-): Promise<Frame> {
-  await serveAppOriginMod(page, buildProbeFiles("probe", extraLines));
-  await page.goto(PROBE_LINK);
-  const frame = await findModFrame(page, title);
-  await waitForProbe(frame);
-  return frame;
-}
-
-/** `note`: the probe's tile type, a title and nothing else. */
-const NOTE_TYPE = [
-  "---",
-  "schema:",
-  "  definitions:",
-  "    note:",
-  "      properties:",
-  "        title:",
-  "          type: string",
-  "  ref: note",
-  "---",
-  "",
-  "# Note",
-  "",
-].join("\n");
-
-/** A tile of the `note` type, titled `title`. */
-function buildNoteTile(title: string): string {
-  const tile = [
-    "---",
-    `title: "${title}"`,
-    "---",
-    "",
-    "A probe note.",
-    "",
-  ].join("\n");
-  return tile;
-}
-
-/**
- * A probe of the `note` type, so a collection can be opened with it, with two
- * notes under `/test-mods/` for its collections.
- */
-function buildTypedProbeFiles(): ModFiles {
-  const files = buildProbeFiles("probe", ['  type_path: "./note_type.md"']);
-  files["probe/note_type.md"] = NOTE_TYPE;
-  files["first.md"] = buildNoteTile("First note");
-  files["second.md"] = buildNoteTile("Second note");
-  return files;
-}
-
-/** A collection of the first note, followed by `extraPaths`, relative to `/test-mods/`. */
-function buildCollection(extraPaths: string[]): string {
-  const lines = [
-    "collection:",
-    '  name: "Probe notes"',
-    "  tiles:",
-    '    - path: "./first.md"',
-  ];
-  for (const path of extraPaths) {
-    lines.push(`    - path: "${path}"`);
-  }
-  const collection = lines.join("\n");
-  return collection;
-}
-
-/**
- * Serves `files`, which a test can change before a reload, and opens the
- * typed probe with `collection.yaml`. Waits for its mount.
- */
-async function openTypedProbe(page: Page, files: ModFiles): Promise<Frame> {
-  await serveAppOriginMod(page, files);
-  await page.goto(`${PROBE_LINK}&collection=./test-mods/collection.yaml`);
-  const frame = await findModFrame(page, "probe");
-  await waitForProbe(frame);
-  return frame;
-}
 
 async function notify(frame: Frame, params: object): Promise<ProbeAnswer> {
   return frame.evaluate(requestFromProbe, ["ui.notify", params]);
@@ -343,7 +267,7 @@ test.describe("One-row stage bar", function describeLayout(): void {
     page,
   }): Promise<void> {
     const files = buildTypedProbeFiles();
-    files["collection.yaml"] = buildCollection([]);
+    files["collection.yaml"] = buildNoteCollection([]);
     await openTypedProbe(page, files);
     const bar = stageBar(page);
 
@@ -445,27 +369,35 @@ test.describe("Fullscreen button", function describeFullscreenButton(): void {
 });
 
 test.describe("Each message names its producer", function describeProducers(): void {
-  test("Message from the app and from the mod", async function labelsProducers({
+  test("Message from the app", async function labelsAppMessage({
     page,
   }): Promise<void> {
     await serveAppOriginMod(page, buildProbeFiles("probe", [], null));
     await page.goto(PROBE_LINK);
-    const frame = await findModFrame(page, "probe");
-    await waitForProbe(frame);
+    await waitForProbe(await findModFrame(page, "probe"));
+
+    await expectMessageCount(page, "Warnings", 1);
+    const warnings = await readMessages(page, "Warnings");
+    expect(warnings[0].producer).toBe("App");
+    expect(warnings[0].text).toContain('"api"');
+  });
+
+  test("Message from the mod", async function labelsModMessage({
+    page,
+  }): Promise<void> {
+    const frame = await openProbe(page);
 
     expect(await notify(frame, { message: "Saved", level: "warning" })).toEqual(
       { result: null },
     );
 
-    await expectMessageCount(page, "Warnings", 2);
+    await expectMessageCount(page, "Warnings", 1);
     const warnings = await readMessages(page, "Warnings");
     expect(warnings[0]).toEqual({
       producer: "Mod",
       source: new URL("/test-mods/probe/mod_conf.yaml", page.url()).href,
       text: "Saved",
     });
-    expect(warnings[1].producer).toBe("App");
-    expect(warnings[1].text).toContain('"api"');
   });
 });
 
@@ -530,7 +462,7 @@ test.describe("Message popovers", function describePopoverOrder(): void {
     page,
   }): Promise<void> {
     const files = buildTypedProbeFiles();
-    files["collection.yaml"] = buildCollection(["./missing.md"]);
+    files["collection.yaml"] = buildNoteCollection(["./missing.md"]);
     const frame = await openTypedProbe(page, files);
 
     await notify(frame, { message: "Broken", level: "error" });
@@ -627,7 +559,7 @@ test.describe("Share menu", function describeShare(): void {
       await page.addInitScript({ content: CLIPBOARD_RECORDER });
     }
     const files = buildTypedProbeFiles();
-    files["collection.yaml"] = buildCollection([]);
+    files["collection.yaml"] = buildNoteCollection([]);
     await openTypedProbe(page, files);
     const menu = await openShareMenu(page);
 
@@ -706,10 +638,10 @@ test.describe("The app's notifications", function describeAppNotifications(): vo
     page,
   }): Promise<void> {
     const files = buildTypedProbeFiles();
-    files["collection.yaml"] = buildCollection([]);
+    files["collection.yaml"] = buildNoteCollection([]);
     await openTypedProbe(page, files);
     await expectMessageCount(page, "Notifications", 1);
-    files["collection.yaml"] = buildCollection(["./second.md"]);
+    files["collection.yaml"] = buildNoteCollection(["./second.md"]);
 
     await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
 

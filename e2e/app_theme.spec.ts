@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
 import { currentItem, openSection, sidebar } from "./app_layout.ts";
 import {
   actionDialog,
@@ -8,13 +7,12 @@ import {
   isFrameMarked,
   markFrame,
   requestFromProbe,
-  routeCovers,
   serveAppOriginMod,
   stageBar,
   startProbeRequests,
   waitForProbe,
 } from "./mod_routes.ts";
-import { SAMPLE_COLLECTION_RUN_HASH } from "./sample_mod.ts";
+import { openProbe } from "./test_mods.ts";
 import {
   buildThemeProbeFiles,
   canFrameScroll,
@@ -34,13 +32,6 @@ const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
 /** The bottom of the frame may sit this far above the viewport's bottom: the stage's padding and border. */
 const BOTTOM_TOLERANCE = 24;
-
-async function openSample(page: Page): Promise<void> {
-  await routeCovers(page);
-  await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-  const frame = await findModFrame(page, "Book List");
-  await expect(frame.getByRole("button", { name: /Kallocain/ })).toBeVisible();
-}
 
 function readStageBarColor(element: Element): string {
   return getComputedStyle(element).color;
@@ -68,40 +59,15 @@ function readPageMarker(): boolean {
 }
 
 test.describe("Theme choice", function describeThemeChoice(): void {
-  test("Default choice", async function showsSystem({ page }): Promise<void> {
-    await page.goto("/#/settings");
-
-    await expect(themeControl(page)).toHaveValue("system");
-    await expect(themeControl(page).locator("option:checked")).toHaveText(
-      "System",
-    );
-  });
-
-  test("No Theme control in the header", async function hasNoHeaderControl({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-
-    const header = page.getByRole("banner");
-    await expect(
-      header.getByRole("button", { name: "Hide sidebar" }),
-    ).toBeVisible();
-    await expect(
-      header.getByRole("heading", { name: "OpenTesela" }),
-    ).toBeVisible();
-    await expect(header.getByLabel("Theme")).toHaveCount(0);
-  });
-
   test("Choose Dark", async function choosesDark({ page }): Promise<void> {
     await page.emulateMedia({ colorScheme: "light" });
-    await openSample(page);
-    const frame = await findModFrame(page, "Book List");
+    const frame = await openProbe(page);
     await waitForFrameColorScheme(frame, "light");
     await markFrame(frame);
 
     await chooseTheme(page, "Dark");
 
-    await expect(page.locator('iframe[title="Book List"]')).toBeVisible();
+    await expect(page.locator('iframe[title="probe"]')).toBeVisible();
     await waitForFrameColorScheme(frame, "dark");
     expect(await page.evaluate(readColorSchemeAttribute)).toBe("dark");
     expect(await frame.evaluate(readBodyColors)).toEqual({
@@ -117,8 +83,7 @@ test.describe("Resolve the color scheme", function describeResolve(): void {
     page,
   }): Promise<void> {
     await page.emulateMedia({ colorScheme: "light" });
-    await openSample(page);
-    const frame = await findModFrame(page, "Book List");
+    const frame = await openProbe(page);
 
     await page.emulateMedia({ colorScheme: "dark" });
 
@@ -256,7 +221,7 @@ test.describe(
     }): Promise<void> {
       await page.setViewportSize({ width: 1280, height: 800 });
 
-      await openSample(page);
+      await openProbe(page);
 
       const frameBox = await readVisibleFrameBox(page);
       expect(800 - frameBox.bottom).toBeGreaterThanOrEqual(0);
@@ -268,7 +233,7 @@ test.describe(
       page,
     }): Promise<void> {
       await page.setViewportSize({ width: 1280, height: 800 });
-      await openSample(page);
+      await openProbe(page);
 
       await page.setViewportSize({ width: 1024, height: 600 });
 
@@ -286,8 +251,8 @@ test.describe(
       page,
     }): Promise<void> {
       await page.setViewportSize({ width: 1280, height: 800 });
-      await openSample(page);
-      const sampleBox = await readVisibleFrameBox(page);
+      await openProbe(page);
+      const shortBox = await readVisibleFrameBox(page);
       await serveAppOriginMod(
         page,
         buildThemeProbeFiles("tall", [], TALL_PROBE_MOD_CODE),
@@ -298,7 +263,7 @@ test.describe(
       await waitForProbe(frame);
 
       const tallBox = await readVisibleFrameBox(page);
-      expect(tallBox.height).toBeCloseTo(sampleBox.height, 0);
+      expect(tallBox.height).toBeCloseTo(shortBox.height, 0);
       expect(await frame.evaluate(canFrameScroll)).toBe(true);
       expect(await page.evaluate(readPageOverflow)).toBe(0);
     });
@@ -308,7 +273,7 @@ test.describe(
     }): Promise<void> {
       await page.setViewportSize({ width: 1280, height: 300 });
 
-      await openSample(page);
+      await openProbe(page);
 
       const frameBox = await readVisibleFrameBox(page);
       expect(frameBox.height).toBe(256);

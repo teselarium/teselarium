@@ -6,32 +6,34 @@ import {
   buildSlowMountFiles,
   buildTestedProbeFiles,
   coverPermissionRow,
-  expectModInfo,
-  expectNoIssues,
   FAILING_CASE_TEST_CODE,
   findModFrame,
   readParentDocumentError,
   recordHost,
-  routeCovers,
-  SAMPLE_CASE_NAMES,
   serveAppOriginMod,
   stageBar,
   visibleSandbox,
 } from "./mod_routes.ts";
 import {
-  readFlashcardsModSource,
-  readSampleModSource,
-  SAMPLE_BOOKS_FOLDER_PATH,
-  SAMPLE_COLLECTION_GLOB,
-  SAMPLE_MOD_REFERENCE,
-} from "./sample_mod.ts";
-import { listOwnLookDeclarations } from "./theme_probes.ts";
+  readTilesModSource,
+  serveExplorerOfTilesMod,
+  serveTilesMod,
+  TILES_CASE_NAMES,
+  TILES_COLLECTION_GLOB,
+  TILES_MOD_REFERENCE,
+  TILES_TITLE,
+} from "./test_mods.ts";
 import { openModsSection, pageBody } from "./app_layout.ts";
 
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
-async function openViewerForSample(page: Page): Promise<void> {
-  await page.goto(`/#/run?mod=mod_viewer&target=${SAMPLE_MOD_REFERENCE}`);
+/** Serves the tiles mod, with `extraFiles` under `/test-mods/`, and opens the mod viewer on it. */
+async function openViewerForTilesMod(
+  page: Page,
+  extraFiles: ModFiles = {},
+): Promise<void> {
+  await serveTilesMod(page, extraFiles);
+  await page.goto(`/#/run?mod=mod_viewer&target=${TILES_MOD_REFERENCE}`);
   await expect(
     coverPermissionRow(page.frameLocator('iframe[title="Mod Viewer"]')),
   ).toBeVisible();
@@ -62,37 +64,18 @@ async function expectExplorerOpensMod(
 }
 
 test.describe(
-  "Default mods folder",
-  { tag: "@frames" },
-  function describeFolder(): void {
-    test("Explorer from the default folder", async function opensExplorer({
-      page,
-    }): Promise<void> {
-      await page.goto("/");
-      await openModsSection(page);
-
-      const explorerSource = new URL(
-        "/default_mods/mod_explorer/mod_conf.yaml",
-        page.url(),
-      ).href;
-      await expectNoIssues(page);
-      await expectModInfo(page, explorerSource);
-    });
-  },
-);
-
-test.describe(
   "Default mod settings",
   { tag: "@frames" },
   function describeSettings(): void {
     test("Vanilla settings", async function opensViewer({
       page,
     }): Promise<void> {
+      await serveExplorerOfTilesMod(page);
       await page.goto("/");
       await openModsSection(page);
       const explorer = await findModFrame(page, "Mods");
 
-      await explorer.getByRole("button", { name: /Book List/ }).click();
+      await explorer.getByRole("button", { name: /Tiles/ }).click();
 
       await expect(stageBar(page)).toContainText("Mod Viewer");
     });
@@ -132,38 +115,54 @@ test.describe(
   },
 );
 
+/** The cards of the mod explorer opened with its vanilla config. */
+function vanillaExplorerCards(page: Page): Locator {
+  return page.frameLocator('iframe[title="Mods"]').getByRole("article");
+}
+
+// The tests tagged `@sample` check how the app ships the samples, so they
+// need them (design.md of isolate-tests-from-samples, decision 4).
 test.describe(
   "Mod explorer",
   { tag: "@frames" },
   function describeExplorer(): void {
     test("Select a mod", async function selectsMod({ page }): Promise<void> {
+      await serveExplorerOfTilesMod(page);
       await page.goto(EXPLORER_RUN_LINK);
 
-      await expectExplorerOpensMod(
-        page,
-        "Book List",
-        readSampleModSource(page),
-      );
+      await expectExplorerOpensMod(page, TILES_TITLE, readTilesModSource(page));
     });
 
-    test("Vanilla explorer lists the samples", async function listsSamples({
-      page,
-    }): Promise<void> {
-      await page.goto(EXPLORER_RUN_LINK);
-      const explorer = page.frameLocator('iframe[title="Mods"]');
-      const cards = explorer.getByRole("article");
+    test(
+      "Vanilla explorer lists the sample",
+      { tag: "@sample" },
+      async function listsBookListSample({ page }): Promise<void> {
+        await page.goto(EXPLORER_RUN_LINK);
+        const cards = vanillaExplorerCards(page);
 
-      await expect(cards.getByRole("heading")).toHaveText([
-        "Book List",
-        "Flashcards",
-      ]);
-      await expect(cards.nth(0)).toContainText(
-        "A grid of book covers, with a card for each book that shows its details and text.",
-      );
-      await expect(cards.nth(1)).toContainText(
-        "Explore any collection as a table, and study it as question and answer cards.",
-      );
-    });
+        await expect(cards.nth(0).getByRole("heading")).toHaveText("Book List");
+        await expect(cards.nth(0)).toContainText(
+          "A grid of book covers, with a card for each book that shows its details and text.",
+        );
+      },
+    );
+
+    test(
+      "Vanilla explorer lists the flashcards sample",
+      { tag: "@sample" },
+      async function listsFlashcardsSample({ page }): Promise<void> {
+        await page.goto(EXPLORER_RUN_LINK);
+        const cards = vanillaExplorerCards(page);
+
+        await expect(cards.getByRole("heading")).toHaveText([
+          "Book List",
+          "Flashcards",
+        ]);
+        await expect(cards.nth(1)).toContainText(
+          "Explore any collection as a table, and study it as question and answer cards.",
+        );
+      },
+    );
   },
 );
 
@@ -171,30 +170,36 @@ test.describe(
   "Mod explorer vanilla config",
   { tag: "@frames" },
   function describeExplorerVanillaConfig(): void {
-    test("Select the flashcards sample", async function selectsFlashcards({
-      page,
-    }): Promise<void> {
-      await page.goto(EXPLORER_RUN_LINK);
+    test(
+      "Select the flashcards sample",
+      {
+        tag: "@sample",
+      },
+      async function selectsFlashcards({ page }): Promise<void> {
+        await page.goto(EXPLORER_RUN_LINK);
 
-      await expectExplorerOpensMod(
-        page,
-        "Flashcards",
-        readFlashcardsModSource(page),
-      );
-    });
+        await expectExplorerOpensMod(
+          page,
+          "Flashcards",
+          new URL("/samples/mods/flashcards/mod_conf.yaml", page.url()).href,
+        );
+      },
+    );
   },
 );
 
-/** `two_books.yaml`: a collection of two sample books, served under `/test-mods/`. */
+/** `two_books.yaml`: a collection of two books, served under `/test-mods/`. */
 function buildTwoBooksFiles(): ModFiles {
   const files = {
     "two_books.yaml": [
       "collection:",
       '  name: "Two books"',
       "  tiles:",
-      `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/kallocain.md"`,
-      `    - path: "..${SAMPLE_BOOKS_FOLDER_PATH}/fictions.md"`,
+      '    - path: "./books/kallocain.md"',
+      '    - path: "./books/fictions.md"',
     ].join("\n"),
+    "books/kallocain.md": '---\ntitle: "Kallocain"\n---\n\nA book.\n',
+    "books/fictions.md": '---\ntitle: "The Library of Babel"\n---\n\nA book.\n',
   };
   return files;
 }
@@ -214,11 +219,13 @@ async function runWithTypedCollection(
     .click();
 }
 
-/** Expects the sample book list mod to list the two books of `two_books.yaml`. */
+/** Expects the tiles mod to list the two books of `two_books.yaml`. */
 async function expectTwoBooks(page: Page): Promise<void> {
-  const sample = page.frameLocator('iframe[title="Book List"]');
-  await expect(sample.getByRole("listitem")).toHaveCount(2);
-  await expect(sample.getByText("The Library of Babel")).toBeVisible();
+  const tilesMod = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
+  await expect(tilesMod.getByRole("listitem")).toHaveText([
+    "Kallocain",
+    "The Library of Babel",
+  ]);
 }
 
 /** A parameter of the run link in the page's address, e.g. `collection`. */
@@ -236,22 +243,20 @@ test.describe(
     test("Run with the sample tiles", async function runsWithSampleTiles({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await openViewerForSample(page);
+      await openViewerForTilesMod(page);
       const viewerFrame = await findModFrame(page, "Mod Viewer");
 
       await viewerFrame
         .getByRole("button", { name: "Run with sample tiles" })
         .click();
 
-      await expect(stageBar(page)).toContainText("Book List");
-      const sample = page.frameLocator('iframe[title="Book List"]');
-      await expect(sample.getByText("Kallocain")).toBeVisible();
-      await expect(sample.getByRole("listitem")).toHaveCount(3);
+      await expect(stageBar(page)).toContainText(TILES_TITLE);
+      const tilesMod = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
+      await expect(tilesMod.getByRole("listitem")).toHaveCount(3);
       await expect(page.locator('[data-sandbox-id="sandbox-1"]')).toBeHidden();
       await expect(
         viewerFrame.getByRole("heading", {
-          name: "Book List",
+          name: TILES_TITLE,
           includeHidden: true,
         }),
       ).toBeAttached();
@@ -260,9 +265,7 @@ test.describe(
     test("Run with a typed collection", async function runsWithTypedCollection({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await serveAppOriginMod(page, buildTwoBooksFiles());
-      await openViewerForSample(page);
+      await openViewerForTilesMod(page, buildTwoBooksFiles());
       const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
 
       await runWithTypedCollection(
@@ -276,9 +279,7 @@ test.describe(
     test("Run with a relative collection address", async function runsWithRelativeCollection({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await serveAppOriginMod(page, buildTwoBooksFiles());
-      await openViewerForSample(page);
+      await openViewerForTilesMod(page, buildTwoBooksFiles());
       const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
 
       await runWithTypedCollection(viewer, "./test-mods/two_books.yaml");
@@ -295,9 +296,7 @@ test.describe(
     test("Run with a bare relative path", async function runsWithBareRelativePath({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await serveAppOriginMod(page, buildTwoBooksFiles());
-      await openViewerForSample(page);
+      await openViewerForTilesMod(page, buildTwoBooksFiles());
       const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
 
       await runWithTypedCollection(viewer, "test-mods/two_books.yaml");
@@ -308,19 +307,19 @@ test.describe(
     test("Run without tiles", async function runsWithoutTiles({
       page,
     }): Promise<void> {
-      await openViewerForSample(page);
+      await openViewerForTilesMod(page);
       const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
 
       await viewer.getByRole("button", { name: "Run without tiles" }).click();
 
-      await expect(stageBar(page)).toContainText("Book List");
+      await expect(stageBar(page)).toContainText(TILES_TITLE);
       await expect(
         page
-          .frameLocator('iframe[title="Book List"]')
-          .getByText("There are no books to show."),
+          .frameLocator(`iframe[title="${TILES_TITLE}"]`)
+          .getByText("There are no tiles to show."),
       ).toBeVisible();
       expect(new URL(page.url()).hash).toBe(
-        `#/run?mod=${encodeURIComponent(readSampleModSource(page))}`,
+        `#/run?mod=${encodeURIComponent(readTilesModSource(page))}`,
       );
     });
   },
@@ -368,12 +367,11 @@ test.describe(
     test("Check with a relative collection address", async function checksWithRelativeCollection({
       page,
     }): Promise<void> {
-      // Every file under `/test-mods/` answers `404 Not Found`.
-      await serveAppOriginMod(page, {});
-      await openViewerForSample(page);
+      // Every file under `/test-mods/` but the tiles mod's answers `404 Not Found`.
+      await openViewerForTilesMod(page);
       const sampleCollectionUrls = await recordHost(
         page,
-        SAMPLE_COLLECTION_GLOB,
+        TILES_COLLECTION_GLOB,
       );
       const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
       const missingCollection = new URL("/test-mods/missing.yaml", page.url())
@@ -408,8 +406,7 @@ test.describe(
     test("Sample mod passes", async function showsPassingReport({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await openViewerForSample(page);
+      await openViewerForTilesMod(page);
       const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
 
       await viewer.getByRole("button", { name: "Check mod" }).click();
@@ -426,7 +423,7 @@ test.describe(
       const cases = report
         .getByRole("list", { name: "Tests" })
         .getByRole("listitem");
-      await expect(cases).toHaveText(listPassedCaseTexts(SAMPLE_CASE_NAMES));
+      await expect(cases).toHaveText(listPassedCaseTexts(TILES_CASE_NAMES));
       for (const caseItem of await cases.all()) {
         await expect(caseItem.locator("span[data-ot-variant]")).toHaveAttribute(
           "data-ot-variant",
@@ -493,29 +490,6 @@ test.describe(
 );
 
 // The default mods' look is tested by their own cases (default_mods/README.md).
-test.describe(
-  "The sample mod shows how to get the app's look",
-  { tag: "@frames" },
-  function describeExamples(): void {
-    test("Own styles are layout only", async function checksOwnStyles({
-      page,
-    }): Promise<void> {
-      await openViewerForSample(page);
-      const viewer = await findModFrame(page, "Mod Viewer");
-      await routeCovers(page);
-      await viewer
-        .getByRole("button", { name: "Run with sample tiles" })
-        .click();
-      const bookList = await findModFrame(page, "Book List");
-      await expect(
-        bookList.getByRole("button", { name: /Kallocain/ }),
-      ).toBeVisible();
-
-      expect(await bookList.evaluate(listOwnLookDeclarations)).toEqual([]);
-    });
-  },
-);
-
 /** The cases of the explorer's test file (default_mods/mod_explorer/test/test.ts), in order. */
 const EXPLORER_CASES = [
   "lists the mods of its config as cards",

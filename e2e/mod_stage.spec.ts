@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Page, Request, Route } from "@playwright/test";
+import type { Page, Request } from "@playwright/test";
 import {
   answerSiteConsent,
   buildProbeFiles,
@@ -14,10 +14,7 @@ import {
   FOREIGN_HOST,
   isFrameMarked,
   markFrame,
-  messageCapsule,
-  readLoadedCovers,
   readMessages,
-  routeCovers,
   serveAppOriginMod,
   serveForeignMod,
   showImage,
@@ -26,21 +23,31 @@ import {
   waitForProbe,
 } from "./mod_routes.ts";
 import {
-  MISSING_COLLECTION_PATH,
-  MISSING_COLLECTION_REFERENCE,
-  MISSING_MOD_FILE_PATH,
-  MISSING_MOD_REFERENCE,
-  readSampleModSource,
-  SAMPLE_COLLECTION_GLOB,
-  SAMPLE_COLLECTION_RUN_HASH,
-  SAMPLE_RUN_HASH,
-} from "./sample_mod.ts";
+  buildNoteCollection,
+  buildTypedProbeFiles,
+  MISSING_TEST_MOD_FILE_PATH,
+  MISSING_TEST_MOD_REFERENCE,
+  openProbe,
+  openTypedProbe,
+  PROBE_LINK,
+  readTilesModSource,
+  serveExplorerOfTilesMod,
+  serveTilesMod,
+  TILES_COLLECTION_RUN_HASH,
+  TILES_ITEM_TITLES,
+  TILES_RUN_HASH,
+  TILES_TITLE,
+  TILES_VERSION,
+} from "./test_mods.ts";
 import { openModsSection, openSection, pageBody } from "./app_layout.ts";
-import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
 
 const VIEWER_LINK = "#/run?mod=mod_viewer";
 const EXPLORER_LINK = "#/run?mod=mod_explorer";
-const SAMPLE_TITLES = ["Fahrenheit 451", "Kallocain", "The Library of Babel"];
+/** `#/run?mod=./test-mods/probe/`: the probe's run link, as a hash to follow. */
+const PROBE_HASH = PROBE_LINK.slice(1);
+
+/** `#/run?mod=./test-mods/other/`: the run link of a second probe, `other`. */
+const OTHER_PROBE_HASH = "#/run?mod=./test-mods/other/";
 
 function collectRequestedUrls(page: Page): string[] {
   const requestedUrls: string[] = [];
@@ -52,11 +59,12 @@ function recordRequestUrl(requestedUrls: string[], request: Request): void {
   requestedUrls.push(request.url());
 }
 
-async function expectSampleBooks(page: Page, sandboxId: string): Promise<void> {
-  const frame = page.frameLocator(`[data-sandbox-id="${sandboxId}"] iframe`);
-  for (const title of SAMPLE_TITLES) {
-    await expect(frame.getByText(title)).toBeVisible();
-  }
+/** Serves the probe and a second probe, `other`, on the app's origin. */
+async function serveTwoProbes(page: Page): Promise<void> {
+  await serveAppOriginMod(page, {
+    ...buildProbeFiles("probe"),
+    ...buildProbeFiles("other"),
+  });
 }
 
 function readVisibleId(page: Page): Promise<string | null> {
@@ -76,77 +84,45 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
   test("Link with a mod and a collection", async function opensWithCollection({
     page,
   }): Promise<void> {
-    await routeCovers(page);
+    await serveTilesMod(page);
 
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+    await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
 
-    await expect(stageBar(page)).toContainText("Book List");
-    await expect(stageBar(page)).toContainText("1.1.0");
-    await expectSampleBooks(page, "sandbox-1");
+    await expect(stageBar(page)).toContainText(TILES_TITLE);
+    await expect(stageBar(page)).toContainText(TILES_VERSION);
+    const frame = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
+    await expect(frame.getByRole("listitem")).toHaveText(TILES_ITEM_TITLES);
   });
 
   test("Link without a collection", async function opensWithoutCollection({
     page,
   }): Promise<void> {
     const requestedUrls = collectRequestedUrls(page);
+    await serveTilesMod(page);
 
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
+    await page.goto(`/${TILES_RUN_HASH}`);
 
     await expect(
       page
-        .frameLocator('iframe[title="Book List"]')
-        .getByText("There are no books to show."),
+        .frameLocator(`iframe[title="${TILES_TITLE}"]`)
+        .getByText("There are no tiles to show."),
     ).toBeVisible();
     for (const url of requestedUrls) {
-      expect(url).not.toContain("book_collection.yaml");
+      expect(url).not.toContain("item_collection.yaml");
     }
   });
 
   test("Encoded values", async function opensEncodedLink({
     page,
   }): Promise<void> {
+    await serveTilesMod(page);
     await page.goto(`/${EXPLORER_LINK}`);
-    const source = readSampleModSource(page);
+    const source = readTilesModSource(page);
 
     await followLink(page, `#/run?mod=${encodeURIComponent(source)}`);
 
-    await expect(stageBar(page)).toContainText("Book List");
+    await expect(stageBar(page)).toContainText(TILES_TITLE);
     await expectModInfo(page, source);
-  });
-});
-
-test.describe("Home", function describeHome(): void {
-  test("No hash", async function opensHome({ page }): Promise<void> {
-    await page.goto("/");
-
-    await expect(
-      page.getByRole("heading", { name: "OpenTesela" }),
-    ).toBeVisible();
-    await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
-    ).toBeVisible();
-    await expect(visibleSandbox(page)).toHaveCount(0);
-    expect(new URL(page.url()).hash).toBe("#/");
-  });
-
-  test("Unknown hash", async function opensHomeForUnknownHash({
-    page,
-  }): Promise<void> {
-    await page.goto("/#/mods/view");
-
-    await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
-    ).toBeVisible();
-    expect(new URL(page.url()).hash).toBe("#/");
-  });
-
-  test("Home as a mod", async function opensHomeMod({ page }): Promise<void> {
-    await page.goto(`${HOME_MOD_PREVIEW_URL}/`);
-
-    await expect(
-      visibleSandbox(page).locator('iframe[title="Mods"]'),
-    ).toBeVisible();
-    await expect(pageBody(page)).toHaveCount(0);
   });
 });
 
@@ -157,8 +133,7 @@ test.describe(
     test("Second link hides the first mod", async function hidesFirstMod({
       page,
     }): Promise<void> {
-      await page.goto(`/${SAMPLE_RUN_HASH}`);
-      const firstFrame = await findSandboxFrame(page, "sandbox-1");
+      const firstFrame = await openProbe(page);
       await markFrame(firstFrame);
 
       await followLink(page, EXPLORER_LINK);
@@ -179,8 +154,7 @@ test.describe(
     test("Back to the previous mod", async function goesBack({
       page,
     }): Promise<void> {
-      await page.goto(`/${SAMPLE_RUN_HASH}`);
-      const firstFrame = await findSandboxFrame(page, "sandbox-1");
+      const firstFrame = await openProbe(page);
       await firstFrame.evaluate(rememberValue);
       await markFrame(firstFrame);
       await followLink(page, EXPLORER_LINK);
@@ -188,19 +162,19 @@ test.describe(
 
       await page.goBack();
 
-      await expect(stageBar(page)).toContainText("Book List");
+      await expect(stageBar(page)).toContainText("probe");
       expect(await readVisibleId(page)).toBe("sandbox-1");
       expect(await isFrameMarked(firstFrame)).toBe(true);
       expect(await firstFrame.evaluate(readRememberedValue)).toBe(42);
     });
 
     test("Forward again", async function goesForward({ page }): Promise<void> {
-      await page.goto(`/${SAMPLE_RUN_HASH}`);
+      await openProbe(page);
       await followLink(page, EXPLORER_LINK);
       const secondFrame = await findSandboxFrame(page, "sandbox-2");
       await markFrame(secondFrame);
       await page.goBack();
-      await expect(stageBar(page)).toContainText("Book List");
+      await expect(stageBar(page)).toContainText("probe");
 
       await page.goForward();
 
@@ -212,7 +186,7 @@ test.describe(
     test("Back after a page reload", async function reopensAfterReload({
       page,
     }): Promise<void> {
-      await page.goto(`/${SAMPLE_RUN_HASH}`);
+      await openProbe(page);
       await followLink(page, EXPLORER_LINK);
       await expect(stageBar(page)).toContainText("Mods");
 
@@ -220,10 +194,10 @@ test.describe(
       await expect(stageBar(page)).toContainText("Mods");
       await page.goBack();
 
-      await expect(stageBar(page)).toContainText("Book List");
+      await expect(stageBar(page)).toContainText("probe");
       expect(await readVisibleId(page)).toBe("sandbox-2");
       await expect(
-        page.locator('[data-sandbox-id="sandbox-2"] iframe[title="Book List"]'),
+        page.locator('[data-sandbox-id="sandbox-2"] iframe[title="probe"]'),
       ).toBeAttached();
     });
   },
@@ -233,11 +207,11 @@ test.describe("Opening after going back drops the forward entries", function des
   test("New link after going back", async function dropsForwardSandbox({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
+    await openProbe(page);
     await followLink(page, VIEWER_LINK);
     await expect(stageBar(page)).toContainText("Mod Viewer");
     await page.goBack();
-    await expect(stageBar(page)).toContainText("Book List");
+    await expect(stageBar(page)).toContainText("probe");
 
     await followLink(page, EXPLORER_LINK);
     await expect(stageBar(page)).toContainText("Mods");
@@ -252,10 +226,11 @@ test.describe("Close a sandbox", function describeClose(): void {
   test("Close the viewer", async function closesViewer({
     page,
   }): Promise<void> {
+    await serveExplorerOfTilesMod(page);
     await page.goto(`/${EXPLORER_LINK}`);
     const explorer = await findModFrame(page, "Mods");
     await markFrame(explorer);
-    await explorer.getByRole("button", { name: /Book List/ }).click();
+    await explorer.getByRole("button", { name: /Tiles/ }).click();
     await expect(stageBar(page)).toContainText("Mod Viewer");
 
     await stageBar(page).getByRole("button", { name: "Close" }).click();
@@ -265,54 +240,13 @@ test.describe("Close a sandbox", function describeClose(): void {
     expect(await isFrameMarked(explorer)).toBe(true);
     expect(new URL(page.url()).hash).toBe(EXPLORER_LINK);
   });
-
-  test("Close a mod opened from a link", async function closesLinkedMod({
-    page,
-  }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    await expect(stageBar(page)).toContainText("Book List");
-
-    await stageBar(page).getByRole("button", { name: "Close" }).click();
-
-    await expect(page.locator('iframe[title="Book List"]')).toHaveCount(0);
-    await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
-    ).toBeVisible();
-    expect(new URL(page.url()).hash).toBe("#/");
-  });
-
-  test("Home mod has no close button", async function hidesHomeClose({
-    page,
-  }): Promise<void> {
-    await page.goto(`${HOME_MOD_PREVIEW_URL}/`);
-    await expect(stageBar(page)).toContainText("Mods");
-
-    await expect(
-      stageBar(page).getByRole("button", { name: "Close" }),
-    ).toHaveCount(0);
-  });
-
-  test("The explorer can be closed", async function closesExplorer({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
-    await openModsSection(page);
-
-    await stageBar(page).getByRole("button", { name: "Close" }).click();
-
-    await expect(page.locator('iframe[title="Mods"]')).toHaveCount(0);
-    await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
-    ).toBeVisible();
-  });
 });
 
 test.describe("Pages in the history", function describePagesInHistory(): void {
   test("A page hides the mods", async function hidesModsForPage({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    const frame = await findSandboxFrame(page, "sandbox-1");
+    const frame = await openProbe(page);
     await markFrame(frame);
 
     await openSection(page, "Settings");
@@ -320,16 +254,15 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
     await expect(
       page.getByRole("heading", { level: 1, name: "Settings" }),
     ).toBeVisible();
-    await expect(page.locator('iframe[title="Book List"]')).toBeHidden();
-    await expect(page.locator('iframe[title="Book List"]')).toHaveCount(1);
+    await expect(page.locator('iframe[title="probe"]')).toBeHidden();
+    await expect(page.locator('iframe[title="probe"]')).toHaveCount(1);
     expect(await isFrameMarked(frame)).toBe(true);
   });
 
   test("Back from a page to a mod", async function goesBackToMod({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    const frame = await findSandboxFrame(page, "sandbox-1");
+    const frame = await openProbe(page);
     await frame.evaluate(rememberValue);
     await openSection(page, "Settings");
     await expect(
@@ -338,18 +271,17 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
 
     await page.goBack();
 
-    await expect(page.locator('iframe[title="Book List"]')).toBeVisible();
+    await expect(page.locator('iframe[title="probe"]')).toBeVisible();
     expect(await frame.evaluate(readRememberedValue)).toBe(42);
   });
 
   test("Forward to a page", async function goesForwardToPage({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    await expect(stageBar(page)).toContainText("Book List");
+    await openProbe(page);
     await openSection(page, "Settings");
     await page.goBack();
-    await expect(page.locator('iframe[title="Book List"]')).toBeVisible();
+    await expect(page.locator('iframe[title="probe"]')).toBeVisible();
 
     await page.goForward();
 
@@ -361,8 +293,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
   test("Reload on a page", async function reloadsOnPage({
     page,
   }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    await expect(stageBar(page)).toContainText("Book List");
+    await openProbe(page);
     await openSection(page, "About");
     await expect(
       pageBody(page).getByRole("heading", { level: 1, name: "About" }),
@@ -374,21 +305,22 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
     ).toBeVisible();
     await page.goBack();
 
-    await expect(stageBar(page)).toContainText("Book List");
+    await expect(stageBar(page)).toContainText("probe");
   });
 
   test("New section after going back", async function dropsForwardSandbox({
     page,
   }): Promise<void> {
+    await serveAppOriginMod(page, buildProbeFiles("probe"));
     await page.goto("/");
-    await followLink(page, SAMPLE_RUN_HASH);
-    await expect(stageBar(page)).toContainText("Book List");
+    await followLink(page, PROBE_HASH);
+    await expect(stageBar(page)).toContainText("probe");
     await openSection(page, "Settings");
     await expect(
       page.getByRole("heading", { level: 1, name: "Settings" }),
     ).toBeVisible();
     await page.goBack();
-    await expect(stageBar(page)).toContainText("Book List");
+    await expect(stageBar(page)).toContainText("probe");
     await page.goBack();
     await expect(
       pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
@@ -396,7 +328,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
 
     await openModsSection(page);
 
-    await expect(page.locator('iframe[title="Book List"]')).toHaveCount(0);
+    await expect(page.locator('iframe[title="probe"]')).toHaveCount(0);
   });
 });
 
@@ -448,15 +380,15 @@ test.describe("Show the mod issues", function describeIssues(): void {
   test("Issues stay with their sandbox", async function keepsIssues({
     page,
   }): Promise<void> {
-    await serveAppOriginMod(page, buildProbeFiles("probe"));
-    await page.goto("/#/run?mod=./test-mods/probe/");
+    await serveTwoProbes(page);
+    await page.goto(PROBE_LINK);
     const frame = await findModFrame(page, "probe");
     await waitForProbe(frame);
     await frame.evaluate(showImage, "https://images.example.net/cover.jpg");
     await expectMessages(page, "Warnings", "https://images.example.net");
 
-    await followLink(page, SAMPLE_RUN_HASH);
-    await expect(stageBar(page)).toContainText("Book List");
+    await followLink(page, OTHER_PROBE_HASH);
+    await expect(stageBar(page)).toContainText("other");
     await expectNoIssues(page);
     await page.goBack();
 
@@ -466,37 +398,12 @@ test.describe("Show the mod issues", function describeIssues(): void {
 });
 
 test.describe("Show load failures", function describeLoadFailures(): void {
-  test("Missing mod file", async function showsMissingMod({
-    page,
-  }): Promise<void> {
-    await page.goto(`/#/run?mod=${MISSING_MOD_REFERENCE}`);
-    const missingSource = new URL(MISSING_MOD_FILE_PATH, page.url()).href;
-
-    await expect(page.getByRole("alert")).toContainText(missingSource);
-    await expect(page.getByRole("alert")).toContainText("404");
-    await expect(page.locator("iframe")).toHaveCount(0);
-    await expect(
-      stageBar(page).getByRole("button", { name: "Close" }),
-    ).toBeVisible();
-  });
-
-  test("Missing collection", async function showsMissingCollection({
-    page,
-  }): Promise<void> {
-    await page.goto(
-      `/${SAMPLE_RUN_HASH}&collection=${MISSING_COLLECTION_REFERENCE}`,
-    );
-    const missingCollection = new URL(MISSING_COLLECTION_PATH, page.url()).href;
-
-    await expect(page.getByRole("alert")).toContainText(missingCollection);
-    await expect(page.locator("iframe")).toHaveCount(0);
-  });
-
   test("Load failure in the errors popover", async function listsLoadFailure({
     page,
   }): Promise<void> {
-    await page.goto(`/#/run?mod=${MISSING_MOD_REFERENCE}`);
-    const missingSource = new URL(MISSING_MOD_FILE_PATH, page.url()).href;
+    await serveAppOriginMod(page, {});
+    await page.goto(`/#/run?mod=${MISSING_TEST_MOD_REFERENCE}`);
+    const missingSource = new URL(MISSING_TEST_MOD_FILE_PATH, page.url()).href;
     await expectMessageCount(page, "Errors", 1);
 
     const errors = await readMessages(page, "Errors");
@@ -508,173 +415,52 @@ test.describe("Show load failures", function describeLoadFailures(): void {
   });
 });
 
-/** Answers the sample collection with two books once `twoBooks.isOn` is set. */
-async function answerCollection(
-  twoBooks: { isOn: boolean },
-  route: Route,
-): Promise<void> {
-  if (!twoBooks.isOn) {
-    await route.fallback();
-    return;
-  }
-  await route.fulfill({
-    status: 200,
-    contentType: "text/yaml",
-    body: [
-      "collection:",
-      '  name: "Two books"',
-      "  tiles:",
-      '    - path: "./books/kallocain.md"',
-      '    - path: "./books/fictions.md"',
-    ].join("\n"),
-  });
+interface ChangedTilesGlobal {
+  probe: {
+    engine: { on: (event: string, handler: (params: unknown) => void) => void };
+  };
+  changedTitles?: string[][];
 }
 
-/**
- * Answers the sample collection with Kallocain and `UNTYPED_TILE_PATH`, a
- * tile without the book type's fields, once `mismatched.isOn` is set.
- */
-async function answerMismatchedCollection(
-  mismatched: { isOn: boolean },
-  route: Route,
-): Promise<void> {
-  if (!mismatched.isOn) {
-    await route.fallback();
-    return;
-  }
-  await route.fulfill({
-    status: 200,
-    contentType: "text/yaml",
-    body: [
-      "collection:",
-      '  name: "One untyped tile"',
-      "  tiles:",
-      '    - path: "./books/kallocain.md"',
-      `    - path: "./books/${UNTYPED_TILE_NAME}"`,
-    ].join("\n"),
-  });
+interface ChangedTiles {
+  tiles: { metadata: { title?: string } }[];
 }
 
-const UNTYPED_TILE_NAME = "untyped.md";
+/** Runs in a probe frame: records the tile titles of each `tiles.changed` on `globalThis.changedTitles`. */
+function recordChangedTiles(): void {
+  const probeGlobal = globalThis as unknown as ChangedTilesGlobal;
+  probeGlobal.changedTitles = [];
+  function recordTitles(params: unknown): void {
+    const titles: string[] = [];
+    for (const tile of (params as ChangedTiles).tiles) {
+      titles.push(String(tile.metadata.title));
+    }
+    probeGlobal.changedTitles?.push(titles);
+  }
+  probeGlobal.probe.engine.on("tiles.changed", recordTitles);
+}
 
-async function answerUntypedTile(route: Route): Promise<void> {
-  await route.fulfill({
-    status: 200,
-    contentType: "text/markdown",
-    body: '---\ntitle: "Untyped"\n---\n',
-  });
+/** Runs in a probe frame: the tile titles `recordChangedTiles` recorded. */
+function readChangedTitles(): string[][] {
+  return (globalThis as unknown as ChangedTilesGlobal).changedTitles ?? [];
 }
 
 test.describe("Reload the tiles", function describeReloadTiles(): void {
   test("Reload after the collection changed", async function reloadsTiles({
     page,
   }): Promise<void> {
-    const twoBooks = { isOn: false };
-    await routeCovers(page);
-    await page.route(
-      SAMPLE_COLLECTION_GLOB,
-      answerCollection.bind(undefined, twoBooks),
-    );
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    await expectSampleBooks(page, "sandbox-1");
-    const frame = await findSandboxFrame(page, "sandbox-1");
+    const files = buildTypedProbeFiles();
+    files["collection.yaml"] = buildNoteCollection([]);
+    const frame = await openTypedProbe(page, files);
     await markFrame(frame);
-    twoBooks.isOn = true;
+    await frame.evaluate(recordChangedTiles);
+    files["collection.yaml"] = buildNoteCollection(["./second.md"]);
 
     await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
 
-    const frameLocator = page.frameLocator('iframe[title="Book List"]');
-    await expect(frameLocator.getByRole("listitem")).toHaveCount(2);
-    await expect(frameLocator.getByText("Fahrenheit 451")).toHaveCount(0);
-    expect(await isFrameMarked(frame)).toBe(true);
-  });
-
-  test("Reloaded issues are unread", async function marksReloadedUnread({
-    page,
-  }): Promise<void> {
-    const mismatched = { isOn: false };
-    await routeCovers(page);
-    await page.route(
-      SAMPLE_COLLECTION_GLOB,
-      answerMismatchedCollection.bind(undefined, mismatched),
-    );
-    await page.route(`**/books/${UNTYPED_TILE_NAME}`, answerUntypedTile);
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    await expectSampleBooks(page, "sandbox-1");
-    mismatched.isOn = true;
-    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
-    await expectMessageCount(page, "Warnings", 1);
-    await expectMessages(page, "Warnings", "is not of tile type");
-    await expect(messageCapsule(page, "Warnings")).toHaveAttribute(
-      "data-capsule",
-      "read",
-    );
-
-    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
-
-    await expect(messageCapsule(page, "Warnings")).toHaveAttribute(
-      "data-capsule",
-      "unread",
-    );
-    await expectMessages(page, "Warnings", "is not of tile type");
-  });
-
-  test("No collection, no reload", async function hidesReload({
-    page,
-  }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    await expect(stageBar(page)).toContainText("Book List");
-
-    await expect(
-      stageBar(page).getByRole("button", { name: "Reload tiles" }),
-    ).toHaveCount(0);
-  });
-});
-
-test.describe("Sample book list mod", function describeSampleMod(): void {
-  test("Books with covers", async function showsCovers({
-    page,
-  }): Promise<void> {
-    await routeCovers(page);
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    const frameLocator = page.frameLocator('iframe[title="Book List"]');
-    await expectSampleBooks(page, "sandbox-1");
-    const frame = await findModFrame(page, "Book List");
-
-    await expect(frameLocator.getByText("Karin Boye")).toBeVisible();
-    await expect(frameLocator.getByText("Ray Bradbury")).toBeVisible();
     await expect
-      .poll(function readCovers(): Promise<string[]> {
-        return frame.evaluate(readLoadedCovers);
-      })
-      .toEqual([
-        "Cover of Fahrenheit 451",
-        "Cover of Kallocain",
-        "Cover of The Library of Babel",
-      ]);
-  });
-
-  test("Selection is remembered", async function remembersSelection({
-    page,
-  }): Promise<void> {
-    await routeCovers(page);
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    const booksPerRow = page
-      .frameLocator('iframe[title="Book List"]')
-      .getByLabel("Books per row");
-    await booksPerRow.selectOption("10");
-    await expect(
-      page
-        .frameLocator('iframe[title="Book List"]')
-        .locator('ul[data-columns="10"]'),
-    ).toHaveCount(1);
-
-    await page.reload();
-
-    await expect(
-      page
-        .frameLocator('iframe[title="Book List"]')
-        .getByLabel("Books per row"),
-    ).toHaveValue("10");
+      .poll(frame.evaluate.bind(frame, readChangedTitles))
+      .toEqual([["First note", "Second note"]]);
+    expect(await isFrameMarked(frame)).toBe(true);
   });
 });

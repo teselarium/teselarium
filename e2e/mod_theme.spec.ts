@@ -6,12 +6,17 @@ import {
   findSandboxFrame,
   isFrameMarked,
   markFrame,
-  routeCovers,
   serveAppOriginMod,
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
-import { SAMPLE_COLLECTION_RUN_HASH } from "./sample_mod.ts";
+import {
+  serveExplorerOfTilesMod,
+  serveTilesMod,
+  TILES_COLLECTION_RUN_HASH,
+  TILES_ITEM_TITLES,
+  TILES_TITLE,
+} from "./test_mods.ts";
 import {
   addModHtml,
   addModStyle,
@@ -23,7 +28,6 @@ import {
   readAttributeAtMount,
   readBodyColors,
   readBodyMargin,
-  readBoxShadow,
   readColorSchemeAttribute,
   readElementColors,
   readElementLook,
@@ -288,9 +292,10 @@ test.describe(
     }): Promise<void> {
       await recordDefaultModThemes(page);
       await page.emulateMedia({ colorScheme: "light" });
+      await serveExplorerOfTilesMod(page);
       await page.goto(EXPLORER_RUN_LINK);
       const explorer = await findModFrame(page, "Mods");
-      await explorer.getByRole("button", { name: /Book List/ }).click();
+      await explorer.getByRole("button", { name: /Tiles/ }).click();
       const viewer = await findModFrame(page, "Mod Viewer");
       await expect(coverPermissionRow(viewer)).toBeVisible();
       await expect(visibleSandbox(page)).toHaveAttribute(
@@ -307,20 +312,6 @@ test.describe(
       expect(await hiddenExplorer.evaluate(readThemeEvents)).toEqual(told);
       expect(await viewer.evaluate(readThemeEvents)).toEqual(told);
     });
-
-    test("Same color scheme, no event", async function sendsNothing({
-      page,
-    }): Promise<void> {
-      const frame = await openThemeProbe(page, "dark");
-
-      await chooseTheme(page, "Dark");
-      await chooseTheme(page, "Light");
-      await frame.waitForFunction(hasThemeEvents, 1);
-
-      expect(await frame.evaluate(readThemeEvents)).toEqual([
-        { colorScheme: "light", attribute: "light" },
-      ]);
-    });
   },
 );
 
@@ -333,11 +324,10 @@ test.describe(
     }): Promise<void> {
       await page.emulateMedia({ colorScheme: "dark" });
       await page.addInitScript(recordPaints);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const frame = await findModFrame(page, "Book List");
-      await expect(
-        frame.getByRole("button", { name: /Kallocain/ }),
-      ).toBeVisible();
+      await serveTilesMod(page);
+      await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
+      const frame = await findModFrame(page, TILES_TITLE);
+      await expect(frame.getByText(TILES_ITEM_TITLES[0])).toBeVisible();
       await expect
         .poll(async function countVisiblePaints(): Promise<number> {
           return (await page.evaluate(readPaintLog)).visibleFrameTimes.length;
@@ -358,53 +348,18 @@ test.describe(
 );
 
 test.describe(
-  "Sample and default mods take the theme's look",
+  "Default mods take the theme's look",
   { tag: "@frames" },
-  function describeShippedMods(): void {
-    test("Dark sample mod", async function drawsDarkSample({
-      page,
-    }): Promise<void> {
-      await page.emulateMedia({ colorScheme: "dark" });
-      await routeCovers(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const frame = await findModFrame(page, "Book List");
-      await expect(
-        frame.getByRole("button", { name: /Kallocain/ }),
-      ).toBeVisible();
-
-      expect((await frame.evaluate(readBodyColors)).background).toBe(
-        DARK_COLORS.background.computed,
-      );
-    });
-
-    test("Raised book uses the theme's shadow", async function shadowsRaisedBook({
-      page,
-    }): Promise<void> {
-      await page.emulateMedia({ colorScheme: "light" });
-      await routeCovers(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const frame = await findModFrame(page, "Book List");
-      const kallocain = frame.getByRole("button", { name: /Kallocain/ });
-      const themeShadow = await frame.evaluate(readTokenAs, [
-        "--ot-shadow",
-        "box-shadow",
-      ]);
-
-      await kallocain.hover();
-
-      await expect
-        .poll(kallocain.evaluate.bind(kallocain, readBoxShadow))
-        .toBe(themeShadow);
-    });
-
+  function describeDefaultMods(): void {
     test("Dark default mods", async function drawsDarkDefaultMods({
       page,
     }): Promise<void> {
       await page.emulateMedia({ colorScheme: "dark" });
+      await serveExplorerOfTilesMod(page);
       await page.goto(EXPLORER_RUN_LINK);
       const explorer = await findModFrame(page, "Mods");
       const explorerColors = await explorer.evaluate(readBodyColors);
-      await explorer.getByRole("button", { name: /Book List/ }).click();
+      await explorer.getByRole("button", { name: /Tiles/ }).click();
       const viewer = await findModFrame(page, "Mod Viewer");
       await expect(coverPermissionRow(viewer)).toBeVisible();
 

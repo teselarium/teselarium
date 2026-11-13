@@ -50,6 +50,28 @@
       }
     },
     {
+      "files": ["e2e/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "./sample_mod.ts",
+                "message": "Only the shipped samples' own tests use e2e/sample_mod.ts (docs/code_conventions.md, Tests)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["e2e/sample_*.spec.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
       "files": ["default_mods/*"],
       "rules": {
         "no-restricted-imports": [

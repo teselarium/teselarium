@@ -131,6 +131,15 @@ describe("page markdown", function describePageMarkdown(): void {
     expect(page.querySelector("[data-ot-color-scheme]")).toBeNull();
   });
 
+  it("Other site", function opensOtherSiteElsewhere(): void {
+    const page = renderPage("[Example](https://example.com/)");
+
+    const link = page.querySelector("a");
+    expect(link?.getAttribute("href")).toBe("https://example.com/");
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
   it("maps links and images with the page's rules", function mapsLinks(): void {
     const page = renderPage(
       [

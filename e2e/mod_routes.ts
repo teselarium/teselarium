@@ -7,12 +7,6 @@ import type {
   Page,
   Route,
 } from "@playwright/test";
-import {
-  SAMPLE_COLLECTION_PATH,
-  SAMPLE_ENTRYPOINT_CODE,
-  SAMPLE_ENTRYPOINT_GLOB,
-  SAMPLE_TYPE_PATH,
-} from "./sample_mod.ts";
 import { bundleDefaultMod } from "../build/default_mod_build.ts";
 
 /** The built code of the default mod explorer (build/default_mod_build.ts), to serve a copy with another config. */
@@ -31,7 +25,7 @@ async function readExplorerCode(): Promise<string> {
   throw new Error("The build of default_mods/mod_explorer/ has no main.js.");
 }
 
-/** The host of the sample book covers. Tests answer it locally, so no test needs the network. */
+/** The host of the images the tests' mods show, such as the tiles mod's (e2e/test_mods.ts). Tests answer it locally, so no test needs the network. */
 export const COVER_HOST = "https://upload.wikimedia.org";
 
 /** A host that serves foreign mods: another origin than the app's. */
@@ -412,17 +406,6 @@ export async function expectMessageCount(
   );
 }
 
-/** The accessible names of the three message buttons, which give every count. */
-export async function readMessageCounts(page: Page): Promise<string[]> {
-  const names: string[] = [];
-  for (const level of ["Errors", "Warnings", "Notifications"] as const) {
-    names.push(
-      (await messageButton(page, level).getAttribute("aria-label")) ?? "",
-    );
-  }
-  return names;
-}
-
 /** The capsule of a level's button, with `data-capsule` `unread` or `read`. */
 export function messageCapsule(page: Page, level: MessageLevelName): Locator {
   return messageButton(page, level).locator("[data-capsule]");
@@ -497,9 +480,8 @@ export async function readMessages(
 }
 
 /**
- * The row of the sample mod's `show` permission for `COVER_HOST` in the mod
- * viewer's permission table. The sample's `show` permissions share one reason,
- * so the row is found by its host.
+ * The row of a mod's `show` permission for `COVER_HOST` in the mod viewer's
+ * permission table, found by its host.
  */
 export function coverPermissionRow(viewer: Frame | FrameLocator): Locator {
   return viewer.getByRole("row").filter({ hasText: COVER_HOST });
@@ -719,7 +701,7 @@ export function readFrameOrigin(): string {
   return self.origin;
 }
 
-/** Runs in the sample mod's frame: the alt text of each cover that loaded. */
+/** Runs in a mod frame: the alt text of each image that loaded. */
 export function readLoadedCovers(): string[] {
   const covers: string[] = [];
   for (const image of document.querySelectorAll("img")) {
@@ -733,34 +715,6 @@ export function readLoadedCovers(): string[] {
 /** Runs in a mod frame: navigates the frame to another page. */
 export function navigateFrame(url: string): void {
   location.href = url;
-}
-
-/** The line that starts the sample mod's `mount`. */
-const SAMPLE_MOUNT_LINE =
-  "export default async function mount(engine, context) {";
-
-async function answerExposedSample(route: Route): Promise<void> {
-  const response = await route.fetch();
-  const code = await response.text();
-  if (!code.includes(SAMPLE_MOUNT_LINE)) {
-    throw new Error("The sample mod's mount line changed");
-  }
-  await route.fulfill({
-    response,
-    body: code.replace(
-      SAMPLE_MOUNT_LINE,
-      `${SAMPLE_MOUNT_LINE}\n  globalThis.probe = { engine, context };`,
-    ),
-  });
-}
-
-/**
- * Serves the sample book list mod with one more line at the start of its
- * `mount`, which stores its engine API object on `globalThis.probe`, so a
- * test can send requests as the sample mod.
- */
-export async function exposeSampleEngine(page: Page): Promise<void> {
-  await page.route(SAMPLE_ENTRYPOINT_GLOB, answerExposedSample);
 }
 
 /** The app's action dialog, while it is open. */
@@ -1011,15 +965,6 @@ export function buildMissingEntrypointFiles(): ModFiles {
   return files;
 }
 
-/** A mod whose tile type answers `404 Not Found`. Its code would report `"ran"`. */
-export function buildMissingTypeFiles(): ModFiles {
-  return buildCheckedModFiles(
-    "missing_type",
-    ['  reportToTest(context, "ran", true);'],
-    ['  type_path: "./missing_type.md"'],
-  );
-}
-
 /** A mod whose `mount` throws `new Error("map failed")`. */
 export function buildThrowingFiles(): ModFiles {
   return buildCheckedModFiles("throwing", ['  throw new Error("map failed");']);
@@ -1037,6 +982,29 @@ export function buildNeverMountedFiles(): ModFiles {
 export function buildUnknownMethodFiles(): ModFiles {
   return buildCheckedModFiles("unknown_method", [
     '  await engine.request("tiles.delete").catch(function ignoreError() {});',
+  ]);
+}
+
+/** `slot_reporter`: the folder of `buildSlotReporterFiles`. */
+export const SLOT_REPORTER_NAME = "slot_reporter";
+
+/** `starts`: the storage key the slot reporter reads when it mounts. */
+export const SLOT_REPORTER_KEY = "starts";
+
+/**
+ * A mod that keeps its engine API object on `globalThis.probe`, so a test can
+ * write its storage, and whose `mount` reads `storage.get` for `starts` and
+ * reports it as `stored`, unless it was opened with the parameter
+ * `quiet=yes`.
+ */
+export function buildSlotReporterFiles(): ModFiles {
+  return buildCheckedModFiles(SLOT_REPORTER_NAME, [
+    "  globalThis.probe = { engine, context };",
+    '  if (context.params.quiet === "yes") {',
+    "    return;",
+    "  }",
+    `  const stored = await engine.request("storage.get", { key: "${SLOT_REPORTER_KEY}" });`,
+    '  reportToTest(context, "stored", stored);',
   ]);
 }
 
@@ -1082,32 +1050,6 @@ export function buildSlowMountFiles(): ModFiles {
   ]);
 }
 
-async function answerColumnsReportingSample(route: Route): Promise<void> {
-  const response = await route.fetch();
-  const code = await response.text();
-  if (!code.includes(SAMPLE_MOUNT_LINE)) {
-    throw new Error("The sample mod's mount line changed");
-  }
-  const reportingLines = [
-    SAMPLE_MOUNT_LINE,
-    '  const checkedColumns = await engine.request("storage.get", { key: "columns" });',
-    '  reportToTest(context, "columns", checkedColumns);',
-  ].join("\n");
-  await route.fulfill({
-    response,
-    body: `${REPORT_TO_TEST_CODE}\n${code.replace(SAMPLE_MOUNT_LINE, reportingLines)}`,
-  });
-}
-
-/**
- * Serves the sample book list mod with a `mount` that first reads
- * `storage.get` for `columns` and reports it as `columns`. Until
- * `page.unroute(SAMPLE_ENTRYPOINT_GLOB)`.
- */
-export async function serveColumnsReportingSample(page: Page): Promise<void> {
-  await page.route(SAMPLE_ENTRYPOINT_GLOB, answerColumnsReportingSample);
-}
-
 export interface CheckFinding {
   step: string;
   level: string;
@@ -1121,35 +1063,14 @@ export interface CheckTestResult {
   message: string | null;
 }
 
-/** The cases of the sample mod's test file, in the order it registers them. */
-export const SAMPLE_CASE_NAMES = [
-  "lists the sample books",
-  "shows a placeholder without an image",
-  "shows placeholders when covers are off",
-  "names each book by title and authors",
-  "uses the config's books per row",
-  "ignores an unknown books per row",
-  "remembers the books per row",
-  "ignores an unknown stored books per row",
-  "has no select without books",
-  "opens the card of a clicked book",
-  "leaves out missing metadata",
-  "shows a date without a year as written",
-  "shows no small book without a cover",
-  "marks the book whose card is open",
-  "unmarks the book when its card closes",
-];
-
-function buildPassedResults(names: string[]): CheckTestResult[] {
+/** The report's `tests` when each case of `names` passes. */
+export function buildPassedResults(names: string[]): CheckTestResult[] {
   const results: CheckTestResult[] = [];
   for (const name of names) {
     results.push({ name, status: "pass", message: null });
   }
   return results;
 }
-
-/** The report's `tests` when every case of the sample mod passes. */
-export const SAMPLE_TEST_RESULTS = buildPassedResults(SAMPLE_CASE_NAMES);
 
 export interface CheckReport {
   source: string;
@@ -1282,31 +1203,6 @@ export function buildTestedProbeFiles(
   return addTestFile(buildProbeFiles(name, [TEST_PATH_LINE]), name, testCode);
 }
 
-/**
- * The files of a mod named `name` that runs the sample mod's entrypoint on
- * the sample's tile type and collection, with its config and its covers
- * permission, and `testCode` as its test file.
- */
-export function buildSampleCaseFiles(name: string, testCode: string): ModFiles {
-  const files: ModFiles = {
-    [`${name}/mod_conf.yaml`]: buildModConf(name, [
-      `  title: "Book List"`,
-      `  type_path: "${SAMPLE_TYPE_PATH}"`,
-      `  sample_collection: "${SAMPLE_COLLECTION_PATH}"`,
-      TEST_PATH_LINE,
-      "  config:",
-      "    show_covers: true",
-      "  permissions:",
-      "    show:",
-      `      - host: "${COVER_HOST}"`,
-      '        reason: "Shows the book covers"',
-    ]),
-    [`${name}/main.js`]: SAMPLE_ENTRYPOINT_CODE,
-    [`${name}/test.js`]: testCode,
-  };
-  return files;
-}
-
 /** The text of a test file whose default export registers `cases`: pairs of a case name and the name of a function of `functionLines`. */
 export function buildTestCode(
   functionLines: string[],
@@ -1381,118 +1277,6 @@ export const ENDLESS_TEST_CODE = buildTestCode(
     "}",
   ],
   [["waits forever", "waitForever"]],
-);
-
-/** The case context on the sample mod: seeded storage, the request record, a config override, other tiles and mounting twice. */
-export const SAMPLE_CONTEXT_TEST_CODE = buildTestCode(
-  [
-    "async function remembersTheBooksPerRow(context) {",
-    '  await context.storage.set("columns", 10);',
-    "  await context.mount();",
-    '  context.expect(context.root.querySelector("select").value).toBe("10");',
-    "}",
-    "",
-    "function listStorageRequests(context) {",
-    "  const storageRequests = [];",
-    "  for (const request of context.requests) {",
-    '    if (request.method.startsWith("storage.")) {',
-    "      storageRequests.push(request);",
-    "    }",
-    "  }",
-    "  return storageRequests;",
-    "}",
-    "",
-    "function hasSettledChoice(context) {",
-    "  const storageRequests = listStorageRequests(context);",
-    "  return (",
-    "    storageRequests.length === 2 &&",
-    '    Object.hasOwn(storageRequests[1], "result")',
-    "  );",
-    "}",
-    "",
-    "async function recordsTheRequests(context) {",
-    "  await context.mount();",
-    '  const select = context.root.querySelector("select");',
-    '  select.value = "10";',
-    '  select.dispatchEvent(new Event("change"));',
-    "  await context.waitFor(hasSettledChoice.bind(undefined, context));",
-    "  context.expect(listStorageRequests(context)).toEqual([",
-    '    { method: "storage.get", params: { key: "columns" }, result: null },',
-    '    { method: "storage.set", params: { key: "columns", value: 10 }, result: null },',
-    "  ]);",
-    "}",
-    "",
-    "async function hidesTheCovers(context) {",
-    "  await context.mount({ config: { show_covers: false } });",
-    '  context.expect(context.root.querySelectorAll("li").length).toBe(3);',
-    '  context.expect(context.root.querySelectorAll("img").length).toBe(0);',
-    "}",
-    "",
-    "async function showsTheCovers(context) {",
-    "  await context.mount();",
-    '  context.expect(context.root.querySelectorAll("img").length).toBe(3);',
-    "}",
-    "",
-    "async function showsNoBooks(context) {",
-    "  await context.mount({ tiles: [] });",
-    "  const status = context.root.querySelector('[role=\"status\"]');",
-    '  context.expect(status.textContent).toBe("There are no books to show.");',
-    "}",
-    "",
-    "async function mountsTwice(context) {",
-    "  await context.mount();",
-    "  await context.mount();",
-    "}",
-  ],
-  [
-    ["remembers the books per row", "remembersTheBooksPerRow"],
-    ["records the requests", "recordsTheRequests"],
-    ["hides the covers", "hidesTheCovers"],
-    ["shows the covers", "showsTheCovers"],
-    ["shows no books", "showsNoBooks"],
-    ["mounts twice", "mountsTwice"],
-  ],
-);
-
-/** The expectations and `waitFor` on the sample mod. */
-export const EXPECTATION_TEST_CODE = buildTestCode(
-  [
-    "function expectsTwoToBeThree(context) {",
-    "  context.expect(2).toBe(3);",
-    "}",
-    "",
-    "function expectsNoThree(context) {",
-    "  context.expect([1, 2]).not.toContain(3);",
-    "}",
-    "",
-    "function hasThreeBooks(context) {",
-    '  return context.root.querySelectorAll("li").length === 3;',
-    "}",
-    "",
-    "async function waitsForTheList(context) {",
-    "  await context.mount();",
-    "  await context.waitFor(hasThreeBooks.bind(undefined, context));",
-    "}",
-    "",
-    "function staysFalse() {",
-    "  return false;",
-    "}",
-    "",
-    "async function waitsTooLong(context) {",
-    "  const startedAt = Date.now();",
-    "  try {",
-    "    await context.waitFor(staysFalse, 100);",
-    "  } catch (error) {",
-    "    throw new Error(`rejected after ${Date.now() - startedAt} ms: ${error.message}`);",
-    "  }",
-    "}",
-  ],
-  [
-    ["fails equality", "expectsTwoToBeThree"],
-    ["negates", "expectsNoThree"],
-    ["waits for the list", "waitsForTheList"],
-    ["waits too long", "waitsTooLong"],
-  ],
 );
 
 /** Scripted answers through the probe, which keeps the recording engine API object. */

@@ -6,7 +6,6 @@ import {
   openSection,
   pageBody,
   sectionItem,
-  sectionsNav,
 } from "./app_layout.ts";
 import {
   answerSiteConsent,
@@ -35,7 +34,7 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
-import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
+import { openProbe } from "./test_mods.ts";
 import {
   openBodyProbe,
   playerDialog,
@@ -63,37 +62,12 @@ function versionsList(page: Page): Locator {
   return page.getByLabel("Versions");
 }
 
-/** The `Versions` list as label-value pairs: each term with the definition after it. */
-function readVersions(list: Element): Record<string, string> {
-  const versions: Record<string, string> = {};
-  for (const term of list.querySelectorAll("dt")) {
-    versions[term.textContent ?? ""] =
-      term.nextElementSibling?.textContent ?? "";
-  }
-  return versions;
-}
-
 function readSelectedText(): string {
   return getSelection()?.toString() ?? "";
 }
 
 function sectionSwitch(page: Page, name: string): Locator {
   return page.getByRole("switch", { name, exact: true });
-}
-
-function sectionRow(page: Page, name: string): Locator {
-  return page
-    .getByRole("list", { name: "Sidebar sections" })
-    .getByRole("listitem")
-    .filter({ hasText: name });
-}
-
-function readItemNames(element: Element): string[] {
-  const names: string[] = [];
-  for (const link of element.querySelectorAll("a")) {
-    names.push(link.textContent?.replace("Coming soon", "") ?? "");
-  }
-  return names;
 }
 
 function tileMediaSwitch(page: Page): Locator {
@@ -130,14 +104,6 @@ function modPermissionsGroup(page: Page): Locator {
     .getByRole("main")
     .locator('[data-slot="card"]')
     .filter({ has: page.getByRole("heading", { name: "Mod permissions" }) });
-}
-
-function readHeadingTexts(element: Element): string[] {
-  const texts: string[] = [];
-  for (const heading of element.querySelectorAll('[aria-level="2"]')) {
-    texts.push(heading.textContent ?? "");
-  }
-  return texts;
 }
 
 /**
@@ -248,32 +214,6 @@ function modGroupCheckbox(page: Page, title: string): Locator {
   });
 }
 
-function writeStoredDecisions(decisions: unknown[]): void {
-  localStorage.setItem("opentesela.site-decisions", JSON.stringify(decisions));
-}
-
-function readStoredDecisions(): unknown {
-  return JSON.parse(
-    localStorage.getItem("opentesela.site-decisions") ?? "null",
-  );
-}
-
-/** A remembered decision about the covers, as the store keeps it. */
-function buildCoversDecision(
-  mod: string,
-  title: string,
-  category: string,
-): Record<string, unknown> {
-  const decision = {
-    mod,
-    title,
-    category,
-    host: category === "show" ? COVER_HOST : "https://api.example.net",
-    allowed: true,
-  };
-  return decision;
-}
-
 /** Opens Settings and switches a section off or on, as a user clicks its switch. */
 async function switchSectionTo(
   page: Page,
@@ -290,50 +230,7 @@ async function switchSectionTo(
   await expect(toggle).toHaveAttribute("aria-checked", String(isOn));
 }
 
-test.describe("Settings page", function describeSettingsPage(): void {
-  test("Vanilla settings page", async function showsSettings({
-    page,
-  }): Promise<void> {
-    await page.goto("/#/settings");
-
-    await expect(themeControl(page)).toBeVisible();
-    for (const name of ["Tiles", "Mods", "Mosaics", "Guides"]) {
-      await expect(sectionSwitch(page, name)).toBeChecked();
-    }
-    for (const name of ["Home", "Settings", "About"]) {
-      await expect(sectionRow(page, name)).toContainText("Always shown");
-      await expect(sectionRow(page, name).getByRole("switch")).toHaveCount(0);
-    }
-    await expect(sectionRow(page, "Tiles")).toContainText("Coming soon");
-    await expect(sectionRow(page, "Mosaics")).toContainText("Coming soon");
-    await expect(tileMediaSwitch(page)).toBeChecked();
-    await expect(modPermissionsGroup(page)).toContainText(
-      "No remembered decisions.",
-    );
-    const headings = await page.getByRole("main").evaluate(readHeadingTexts);
-    expect(headings.indexOf("Mod permissions")).toBe(
-      headings.indexOf("Privacy") + 1,
-    );
-  });
-});
-
 test.describe("Sites always played from in Settings", function describePlayerSites(): void {
-  test("Remembered player site", async function listsPlayerSite({
-    page,
-  }): Promise<void> {
-    await rememberPlayerSite(page);
-
-    await openSection(page, "Settings");
-
-    await expect(modPermissionsGroup(page)).toContainText(PLAYER_SITE_LINE);
-    await expect(modPermissionsGroup(page)).toContainText("Every mod");
-    await expect(
-      modPermissionsGroup(page).getByRole("button", {
-        name: `Remove: ${PLAYER_SITE_LINE}`,
-      }),
-    ).toBeVisible();
-  });
-
   test("Asked again after removing", async function asksAgainForPlayer({
     page,
   }): Promise<void> {
@@ -383,42 +280,6 @@ test.describe("Removing a remembered decision", function describeRemoving(): voi
       true,
     );
     expect(await isFrameMarked(frame)).toBe(true);
-  });
-  test("Remove all of a mod", async function removesAllOfMod({
-    page,
-  }): Promise<void> {
-    const atlasDecision = buildCoversDecision(
-      `${FOREIGN_HOST}/atlas/mod_conf.yaml`,
-      "Atlas",
-      "show",
-    );
-    await page.goto("/#/settings");
-    await page.evaluate(writeStoredDecisions, [
-      buildCoversDecision(
-        `${FOREIGN_HOST}/probe/mod_conf.yaml`,
-        "Probe",
-        "show",
-      ),
-      buildCoversDecision(
-        `${FOREIGN_HOST}/probe/mod_conf.yaml`,
-        "Probe",
-        "connect",
-      ),
-      atlasDecision,
-    ]);
-    await page.reload();
-    await expect(modGroupToggle(page, "Probe")).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-
-    await modPermissionsGroup(page)
-      .getByRole("button", { name: "Remove all decisions of Probe" })
-      .click();
-
-    await expect(modGroupToggle(page, "Probe")).toHaveCount(0);
-    await expect(modGroupToggle(page, "Atlas")).toBeVisible();
-    expect(await page.evaluate(readStoredDecisions)).toEqual([atlasDecision]);
   });
 
   test("Asked again after removing all", async function asksAgainAfterRemovingAll({
@@ -477,42 +338,6 @@ test.describe("Changing a remembered decision", function describeChanging(): voi
 });
 
 test.describe("Changing every decision of a mod", function describeChangingAll(): void {
-  test("Allow all of a mod", async function allowsAllOfMod({
-    page,
-  }): Promise<void> {
-    const probeSource = `${FOREIGN_HOST}/probe/mod_conf.yaml`;
-    const connectRefusal = {
-      ...buildCoversDecision(probeSource, "Probe", "connect"),
-      allowed: false,
-    };
-    await page.goto("/#/settings");
-    await page.evaluate(writeStoredDecisions, [
-      buildCoversDecision(probeSource, "Probe", "show"),
-      connectRefusal,
-    ]);
-    await page.reload();
-    await expect(modGroupCheckbox(page, "Probe")).toHaveAttribute(
-      "aria-checked",
-      "mixed",
-    );
-
-    await clickCheckedTo(modGroupCheckbox(page, "Probe"), true);
-
-    await expect(modGroupToggle(page, "Probe")).toContainText("2 allowed");
-    await expect(modGroupToggle(page, "Probe")).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    const stored = await page.evaluate(readStoredDecisions);
-    expect(stored).toHaveLength(2);
-    expect(stored).toEqual(
-      expect.arrayContaining([
-        buildCoversDecision(probeSource, "Probe", "show"),
-        { ...connectRefusal, allowed: true },
-      ]),
-    );
-  });
-
   test("Refuse all of a mod", async function refusesAllOfMod({
     page,
   }): Promise<void> {
@@ -581,18 +406,6 @@ test.describe("The media switch is remembered", function describeTileMediaKept()
 });
 
 test.describe("Versions on the Settings page", function describeVersions(): void {
-  test("Vanilla versions", async function showsVersions({
-    page,
-  }): Promise<void> {
-    await page.goto("/#/settings");
-
-    await expect(versionsList(page)).toBeVisible();
-    expect(await versionsList(page).evaluate(readVersions)).toEqual({
-      OpenTesela: PACKAGE_VERSION,
-      "Mod API": APP_MOD_API_VERSION,
-    });
-  });
-
   test("Copy the versions", async function copiesVersions({
     page,
   }): Promise<void> {
@@ -608,44 +421,13 @@ test.describe("Versions on the Settings page", function describeVersions(): void
 
 test.describe("Switch a section off", function describeSwitchOff(): void {
   test("Hide Guides", async function hidesGuides({ page }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    await expect(stageBar(page)).toContainText("Book List");
-    const frame = await findModFrame(page, "Book List");
+    const frame = await openProbe(page);
     await markFrame(frame);
 
     await switchSectionTo(page, "Guides", false);
 
     await expect(sectionItem(page, "Guides")).toHaveCount(0);
     expect(await isFrameMarked(frame)).toBe(true);
-  });
-
-  test("Hide a coming-soon section", async function hidesTiles({
-    page,
-  }): Promise<void> {
-    await page.goto("/#/settings");
-
-    await switchSectionTo(page, "Tiles", false);
-
-    await expect(sectionItem(page, /Tiles/)).toHaveCount(0);
-  });
-
-  test("Show it again", async function showsGuidesAgain({
-    page,
-  }): Promise<void> {
-    await page.goto("/#/settings");
-    await switchSectionTo(page, "Guides", false);
-
-    await switchSectionTo(page, "Guides", true);
-
-    expect(await sectionsNav(page).evaluate(readItemNames)).toEqual([
-      "Home",
-      "Tiles",
-      "Mods",
-      "Mosaics",
-      "Guides",
-      "Settings",
-      "About",
-    ]);
   });
 });
 

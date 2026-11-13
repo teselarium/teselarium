@@ -1,25 +1,37 @@
 import { expect, test } from "@playwright/test";
-import type { Frame, Locator, Page, Route } from "@playwright/test";
+import type { Frame, Locator, Page, Request, Route } from "@playwright/test";
 import {
   actionDialog,
   buildModConf,
+  checkFromChecker,
+  expectNoIssues,
   findModFrame,
   ICON_SVG,
   isFrameMarked,
   markFrame,
+  openChecker,
+  readLoadedCovers,
   routeCovers,
   serveAppOriginMod,
   stageBar,
 } from "./mod_routes.ts";
 import type { ModFiles } from "./mod_routes.ts";
 import {
+  readSampleEntrypointCode,
   SAMPLE_BOOKS_FOLDER_PATH,
   SAMPLE_COLLECTION_GLOB,
   SAMPLE_COLLECTION_RUN_HASH,
-  SAMPLE_ENTRYPOINT_CODE,
   SAMPLE_MOD_FILE_PATH,
+  SAMPLE_MOD_REFERENCE,
+  SAMPLE_TEST_PATH,
+  SAMPLE_TEST_RESULTS,
 } from "./sample_mod.ts";
-import { readTokenAs } from "./theme_probes.ts";
+import {
+  DARK_COLORS,
+  listOwnLookDeclarations,
+  readBodyColors,
+  readTokenAs,
+} from "./theme_probes.ts";
 
 const SAMPLE_TITLES = ["Fahrenheit 451", "Kallocain", "The Library of Babel"];
 
@@ -47,7 +59,7 @@ function buildDraftFiles(): ModFiles {
       "  config:",
       "    show_covers: true",
     ]),
-    "drafts/main.js": SAMPLE_ENTRYPOINT_CODE,
+    "drafts/main.js": readSampleEntrypointCode(),
     "drafts/tiles.yaml": [
       "collection:",
       '  name: "Drafts"',
@@ -767,6 +779,97 @@ test.describe(
 
       await expect(bookCard(frame)).toBeHidden();
       await expectExpandedStates(frame, ["false", "false", "false"]);
+    });
+  },
+);
+
+test.describe("Mod file", { tag: "@sample" }, function describeModFile(): void {
+  test("Books with covers", async function showsCovers({
+    page,
+  }): Promise<void> {
+    const frame = await openSample(page);
+
+    for (const title of SAMPLE_TITLES) {
+      await expect(bookButton(frame, title)).toBeVisible();
+    }
+    await expect(frame.getByText("Karin Boye")).toBeVisible();
+    await expect(frame.getByText("Ray Bradbury")).toBeVisible();
+    await expect(frame.getByText("Jorge Luis Borges")).toBeVisible();
+    await expect
+      .poll(frame.evaluate.bind(frame, readLoadedCovers))
+      .toEqual([
+        "Cover of Fahrenheit 451",
+        "Cover of Kallocain",
+        "Cover of The Library of Babel",
+      ]);
+  });
+
+  test("Sample matches the app's API", async function startsWithoutAsking({
+    page,
+  }): Promise<void> {
+    await openSample(page);
+
+    await expect(stageBar(page)).toContainText("Book List");
+    await expectNoIssues(page);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+});
+
+/** Records the address of each request whose path is `path`. */
+function recordRequestTo(
+  path: string,
+  requestedUrls: string[],
+  request: Request,
+): void {
+  if (new URL(request.url()).pathname === path) {
+    requestedUrls.push(request.url());
+  }
+}
+
+test.describe(
+  "Mod tests",
+  { tag: "@sample" },
+  function describeModTests(): void {
+    test("Sample tests", async function runsSampleTests({
+      page,
+    }): Promise<void> {
+      const testFileRequests: string[] = [];
+      page.on(
+        "request",
+        recordRequestTo.bind(undefined, SAMPLE_TEST_PATH, testFileRequests),
+      );
+      await openChecker(page, {});
+
+      const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
+
+      expect(report.tests).toEqual(SAMPLE_TEST_RESULTS);
+      expect(testFileRequests).toHaveLength(1);
+    });
+  },
+);
+
+test.describe(
+  "Theme look",
+  { tag: "@sample" },
+  function describeThemeLook(): void {
+    test("Dark sample mod", async function drawsDarkSample({
+      page,
+    }): Promise<void> {
+      await page.emulateMedia({ colorScheme: "dark" });
+
+      const frame = await openSample(page);
+
+      expect((await frame.evaluate(readBodyColors)).background).toBe(
+        DARK_COLORS.background.computed,
+      );
+    });
+
+    test("Sample mod's own styles", async function keepsOwnStylesToLayout({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+
+      expect(await frame.evaluate(listOwnLookDeclarations)).toEqual([]);
     });
   },
 );

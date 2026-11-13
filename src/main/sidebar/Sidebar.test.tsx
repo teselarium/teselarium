@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { RenderResult } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { TooltipProvider } from "@/vendor/shadcn/ui/tooltip.tsx";
+import { readStageSnapshot } from "../../lib/core/stage/index.ts";
 import { startTestApp } from "../../test/test_app.ts";
 import type { AppFixture } from "../../test/test_app.ts";
 import type { SectionDefinition } from "../sections/section_registry.ts";
@@ -117,6 +118,7 @@ describe("Sidebar", function describeSidebar(): void {
     const fixture = await startTestApp("");
     renderSidebar(fixture);
     const tiles = findItem(/Tiles/);
+    const visibleBefore = readStageSnapshot(fixture.stage).visible;
 
     fireEvent.click(tiles);
 
@@ -124,6 +126,7 @@ describe("Sidebar", function describeSidebar(): void {
     expect(tiles).not.toHaveAttribute("href");
     expect(tiles).toHaveTextContent("Coming soon");
     expect(fixture.history.entries).toHaveLength(1);
+    expect(readStageSnapshot(fixture.stage).visible).toEqual(visibleBefore);
   });
 
   it("gives each item its section's start address", async function linksStarts(): Promise<void> {

@@ -1,15 +1,15 @@
 import { expect, test } from "@playwright/test";
-import type { Locator, Page, Request, Route } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 import { openSection, pageBody, sectionItem, sidebar } from "./app_layout.ts";
 import {
+  buildProbeFiles,
   findModFrame,
   serveAppOriginMod,
   stageBar,
-  visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
 import { storeTheaterBeforeLoad } from "./layout_probes.ts";
-import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
+import { PROBE_LINK } from "./test_mods.ts";
 import {
   addModHtml,
   buildThemeProbeFiles,
@@ -120,20 +120,6 @@ function readPageMarker(): boolean {
   return (globalThis as { testMarker?: boolean }).testMarker === true;
 }
 
-function readPwned(): unknown {
-  return (globalThis as { pwned?: unknown }).pwned;
-}
-
-function recordRequestUrl(requestedUrls: string[], request: Request): void {
-  requestedUrls.push(request.url());
-}
-
-function collectRequestedUrls(page: Page): string[] {
-  const requestedUrls: string[] = [];
-  page.on("request", recordRequestUrl.bind(undefined, requestedUrls));
-  return requestedUrls;
-}
-
 async function answerMarkdown(markdown: string, route: Route): Promise<void> {
   await route.fulfill({
     status: 200,
@@ -169,47 +155,7 @@ async function readInterfaceLooks(page: Page): Promise<InterfaceLook[]> {
   return looks;
 }
 
-test.describe("Page routes", function describeRoutes(): void {
-  test("Index page", async function opensIndex({ page }): Promise<void> {
-    await page.goto("/#/guides");
-
-    await expect(pageHeading(page, "Guides")).toBeVisible();
-    await expect(visibleSandbox(page)).toHaveCount(0);
-  });
-
-  test("Sub-page", async function opensSubPage({ page }): Promise<void> {
-    await servePage(page, "guides/first_steps", "# First steps\n");
-
-    await page.goto("/#/guides/first_steps");
-
-    await expect(pageHeading(page, "First steps")).toBeVisible();
-  });
-
-  test("Name with a path", async function refusesPath({ page }): Promise<void> {
-    const requestedUrls = collectRequestedUrls(page);
-
-    await page.goto("/#/guides/..%2Fabout%2Findex");
-
-    await expect(pageHeading(page, "Home")).toBeVisible();
-    for (const url of requestedUrls) {
-      expect(url).not.toContain("/pages/about/");
-      expect(url).not.toContain("%2F");
-    }
-  });
-});
-
 test.describe("Page files", function describeFiles(): void {
-  test("Index file", async function readsIndexFile({ page }): Promise<void> {
-    const requestedUrls = collectRequestedUrls(page);
-
-    await page.goto("/#/about");
-
-    await expect(pageHeading(page, "About")).toBeVisible();
-    expect(requestedUrls).toContain(
-      new URL("/pages/about/index.md", page.url()).href,
-    );
-  });
-
   test("Replaced page", async function showsReplacedPage({
     page,
   }): Promise<void> {
@@ -218,17 +164,6 @@ test.describe("Page files", function describeFiles(): void {
     await page.goto("/");
 
     await expect(pageHeading(page, "Welcome to the Library")).toBeVisible();
-  });
-
-  test("Front matter", async function dropsFrontMatter({
-    page,
-  }): Promise<void> {
-    await servePage(page, "home/index", '---\ntitle: "Draft"\n---\n\n# Home\n');
-
-    await page.goto("/");
-
-    await expect(pageHeading(page, "Home")).toBeVisible();
-    await expect(pageBody(page)).not.toContainText("Draft");
   });
 });
 
@@ -348,51 +283,6 @@ test.describe("Pages keep a reading width", function describeReadingWidth(): voi
   });
 });
 
-test.describe("Allowed HTML in pages", function describeAllowedHtml(): void {
-  test("Script removed", async function removesScript({ page }): Promise<void> {
-    await servePage(
-      page,
-      "home/index",
-      [
-        "# Home",
-        "<script>window.pwned = true</script>",
-        '<img src="x.png" onerror="window.pwned = true">',
-        '<p style="position: fixed">Text</p>',
-      ].join("\n\n"),
-    );
-
-    await page.goto("/");
-
-    await expect(pageHeading(page, "Home")).toBeVisible();
-    await expect(pageBody(page).locator("script")).toHaveCount(0);
-    await expect(pageBody(page).locator("img")).not.toHaveAttribute(
-      "onerror",
-      /.*/,
-    );
-    await expect(pageBody(page).locator("p")).not.toHaveAttribute(
-      "style",
-      /.*/,
-    );
-    expect(await page.evaluate(readPwned)).toBeUndefined();
-  });
-
-  test("Badge from markdown", async function showsBadge({
-    page,
-  }): Promise<void> {
-    await servePage(
-      page,
-      "home/index",
-      '# Home\n\n<span data-ot-variant="success">New</span>\n',
-    );
-
-    await page.goto("/");
-
-    await expect(
-      pageBody(page).locator('span[data-ot-variant="success"]'),
-    ).toHaveText("New");
-  });
-});
-
 test.describe("Links in pages", function describeLinks(): void {
   test("Sibling page", async function opensSibling({ page }): Promise<void> {
     await servePage(
@@ -412,46 +302,18 @@ test.describe("Links in pages", function describeLinks(): void {
   });
 
   test("Run link", async function opensRunLink({ page }): Promise<void> {
+    await serveAppOriginMod(page, buildProbeFiles("probe"));
     await servePage(
       page,
       "home/index",
-      `# Home\n\n[Book list](${SAMPLE_RUN_HASH})\n`,
+      `# Home\n\n[Probe](${PROBE_LINK.slice(1)})\n`,
     );
     await page.goto("/");
 
-    await pageBody(page).getByRole("link", { name: "Book list" }).click();
+    await pageBody(page).getByRole("link", { name: "Probe" }).click();
 
-    await expect(stageBar(page)).toContainText("Book List");
-    await expect(page.locator('iframe[title="Book List"]')).toBeVisible();
-  });
-
-  test("Other site", async function opensElsewhere({ page }): Promise<void> {
-    await servePage(
-      page,
-      "home/index",
-      "# Home\n\n[Example](https://example.com/)\n",
-    );
-
-    await page.goto("/");
-
-    const link = pageBody(page).getByRole("link", { name: "Example" });
-    await expect(link).toHaveAttribute("href", "https://example.com/");
-    await expect(link).toHaveAttribute("target", "_blank");
-    await expect(link).toHaveAttribute("rel", "noopener noreferrer");
-  });
-});
-
-test.describe("Images in pages", function describeImages(): void {
-  test("Image next to the page", async function resolvesImage({
-    page,
-  }): Promise<void> {
-    await servePage(page, "about/index", "# About\n\n![Logo](./logo.svg)\n");
-
-    await page.goto("/#/about");
-
-    await expect(
-      pageBody(page).getByRole("img", { name: "Logo" }),
-    ).toHaveAttribute("src", new URL("/pages/about/logo.svg", page.url()).href);
+    await expect(stageBar(page)).toContainText("probe");
+    await waitForProbe(await findModFrame(page, "probe"));
   });
 });
 

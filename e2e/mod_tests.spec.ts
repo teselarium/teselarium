@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test";
-import type { Page, Request } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import {
   ANSWER_TEST_CODE,
   buildModConf,
   buildTestCode,
   PROBE_MOD_CODE,
   buildExpectedFailureCaseFiles,
-  buildSampleCaseFiles,
   buildTestedProbeFiles,
   buildTestModReference,
   buildUndeclaredImageCaseFiles,
@@ -17,7 +16,6 @@ import {
   checkFromChecker,
   checkPastLimit,
   ENDLESS_TEST_CODE,
-  EXPECTATION_TEST_CODE,
   findModFrame,
   ISOLATION_TEST_CODE,
   KEYS_PROBE_TEST_CODE,
@@ -25,18 +23,19 @@ import {
   openChecker,
   readTestFileSource,
   requestFromProbe,
-  SAMPLE_CONTEXT_TEST_CODE,
-  SAMPLE_TEST_RESULTS,
   SYNTAX_ERROR_TEST_CODE,
   UNDECLARED_IMAGE_HOST,
   waitForProbe,
   WRONG_ANSWER_TEST_CODE,
 } from "./mod_routes.ts";
 import {
-  readSampleModSource,
-  SAMPLE_MOD_REFERENCE,
-  SAMPLE_TEST_PATH,
-} from "./sample_mod.ts";
+  buildTilesCaseFiles,
+  readTilesModSource,
+  TILES_CONTEXT_TEST_CODE,
+  TILES_MOD_REFERENCE,
+  TILES_TEST_RESULTS,
+  buildTilesModFiles,
+} from "./test_mods.ts";
 import type {
   CheckReport,
   CheckTestResult,
@@ -81,27 +80,6 @@ function listFindingMessages(report: CheckReport): string[] {
   return messages;
 }
 
-/** Keeps the URL of each request for the file at `path` of the app's server. */
-function recordRequestTo(
-  path: string,
-  requestedUrls: string[],
-  request: Request,
-): void {
-  if (new URL(request.url()).pathname === path) {
-    requestedUrls.push(request.url());
-  }
-}
-
-/** The milliseconds a failure message of `waitsTooLong` reports. */
-function readWaitedMs(message: string | null): number {
-  const match = /^rejected after (\d+) ms: /.exec(message ?? "");
-  if (match === null) {
-    throw new Error(`Expected a waiting time in "${message}"`);
-  }
-  return Number(match[1]);
-}
-
-/** The two cases of the shipped sample, both passing. */
 /** A case that answers `players.open` for the YouTube page its sample tile links. */
 const PLAYER_ANSWER_TEST_CODE = buildTestCode(
   [
@@ -132,19 +110,19 @@ test.describe(
   "Tests run in the check",
   { tag: "@frames" },
   function describeTestsInCheck(): void {
-    test("Sample mod tests pass", async function passesSampleTests({
+    test("Sample mod tests pass", async function passesTests({
       page,
     }): Promise<void> {
-      await openChecker(page, {});
+      await openChecker(page, buildTilesModFiles());
 
-      const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
+      const report = await checkFromChecker(page, TILES_MOD_REFERENCE);
 
       expect(report).toEqual({
-        source: readSampleModSource(page),
+        source: readTilesModSource(page),
         status: "pass",
         mountChecked: true,
         testsChecked: true,
-        tests: SAMPLE_TEST_RESULTS,
+        tests: TILES_TEST_RESULTS,
         findings: [],
       });
       await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
@@ -253,12 +231,12 @@ test.describe(
     }): Promise<void> {
       const report = await checkTestMod(
         page,
-        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-        "sample_context",
+        buildTilesCaseFiles("tiles_context", TILES_CONTEXT_TEST_CODE),
+        "tiles_context",
       );
 
-      expect(findCase(report, "hides the covers").status).toBe("pass");
-      expect(findCase(report, "shows the covers").status).toBe("pass");
+      expect(findCase(report, "hides the images").status).toBe("pass");
+      expect(findCase(report, "shows the images").status).toBe("pass");
     });
 
     test("Other tiles", async function mountsOtherTiles({
@@ -266,11 +244,11 @@ test.describe(
     }): Promise<void> {
       const report = await checkTestMod(
         page,
-        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-        "sample_context",
+        buildTilesCaseFiles("tiles_context", TILES_CONTEXT_TEST_CODE),
+        "tiles_context",
       );
 
-      expect(findCase(report, "shows no books")).toMatchObject({
+      expect(findCase(report, "shows no tiles")).toMatchObject({
         status: "pass",
       });
     });
@@ -280,8 +258,8 @@ test.describe(
     }): Promise<void> {
       const report = await checkTestMod(
         page,
-        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-        "sample_context",
+        buildTilesCaseFiles("tiles_context", TILES_CONTEXT_TEST_CODE),
+        "tiles_context",
       );
 
       expect(findCase(report, "mounts twice")).toEqual({
@@ -302,11 +280,11 @@ test.describe(
     }): Promise<void> {
       const report = await checkTestMod(
         page,
-        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-        "sample_context",
+        buildTilesCaseFiles("tiles_context", TILES_CONTEXT_TEST_CODE),
+        "tiles_context",
       );
 
-      expect(findCase(report, "remembers the books per row")).toMatchObject({
+      expect(findCase(report, "reads the seeded starts")).toMatchObject({
         status: "pass",
         message: null,
       });
@@ -317,8 +295,8 @@ test.describe(
     }): Promise<void> {
       const report = await checkTestMod(
         page,
-        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-        "sample_context",
+        buildTilesCaseFiles("tiles_context", TILES_CONTEXT_TEST_CODE),
+        "tiles_context",
       );
 
       expect(findCase(report, "records the requests")).toMatchObject({
@@ -466,68 +444,6 @@ test.describe(
 );
 
 test.describe(
-  "Expectations",
-  { tag: "@frames" },
-  function describeExpectations(): void {
-    test("Failing equality", async function failsEquality({
-      page,
-    }): Promise<void> {
-      const report = await checkTestMod(
-        page,
-        buildSampleCaseFiles("expectations", EXPECTATION_TEST_CODE),
-        "expectations",
-      );
-
-      const result = findCase(report, "fails equality");
-      expect(result.status).toBe("fail");
-      expect(result.message).toContain("2");
-      expect(result.message).toContain("3");
-    });
-
-    test("Negation", async function passesNegation({ page }): Promise<void> {
-      const report = await checkTestMod(
-        page,
-        buildSampleCaseFiles("expectations", EXPECTATION_TEST_CODE),
-        "expectations",
-      );
-
-      expect(findCase(report, "negates").status).toBe("pass");
-    });
-  },
-);
-
-test.describe("Waiting", { tag: "@frames" }, function describeWaiting(): void {
-  test("Wait for the list", async function waitsForList({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
-      page,
-      buildSampleCaseFiles("expectations", EXPECTATION_TEST_CODE),
-      "expectations",
-    );
-
-    expect(findCase(report, "waits for the list").status).toBe("pass");
-  });
-
-  test("Waiting too long", async function rejectsLongWait({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
-      page,
-      buildSampleCaseFiles("expectations", EXPECTATION_TEST_CODE),
-      "expectations",
-    );
-
-    const result = findCase(report, "waits too long");
-    expect(result.status).toBe("fail");
-    expect(result.message).toContain("The condition was not met within 100 ms");
-    const waitedMs = readWaitedMs(result.message);
-    expect(waitedMs).toBeGreaterThanOrEqual(100);
-    expect(waitedMs).toBeLessThan(1000);
-  });
-});
-
-test.describe(
   "Case results",
   { tag: "@frames" },
   function describeCaseResults(): void {
@@ -614,28 +530,6 @@ test.describe(
         expect: ["not", "toBe", "toBeTruthy", "toContain", "toEqual"],
         not: ["toBe", "toBeTruthy", "toContain", "toEqual"],
       });
-    });
-  },
-);
-
-test.describe(
-  "Sample mod tests",
-  { tag: "@frames" },
-  function describeSampleTests(): void {
-    test("Sample tests", async function runsSampleTests({
-      page,
-    }): Promise<void> {
-      const testFileRequests: string[] = [];
-      page.on(
-        "request",
-        recordRequestTo.bind(undefined, SAMPLE_TEST_PATH, testFileRequests),
-      );
-      await openChecker(page, {});
-
-      const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
-
-      expect(report.tests).toEqual(SAMPLE_TEST_RESULTS);
-      expect(testFileRequests).toHaveLength(1);
     });
   },
 );

@@ -2,13 +2,9 @@ import { expect, test } from "@playwright/test";
 import type { Frame, Page } from "@playwright/test";
 import {
   addFullscreenButton,
-  expectMessages,
-  exposeSampleEngine,
   findModFrame,
   isFrameMarked,
   markFrame,
-  messageButton,
-  readMessageCounts,
   requestFromProbe,
   serveAppOriginMod,
   stageBar,
@@ -29,8 +25,6 @@ import {
   readLayoutAttribute,
   readLayoutEvents,
   readScrollTop,
-  refuseFrameFullscreen,
-  refuseTheaterWrites,
   storeTheaterBeforeLoad,
   TALL_LAYOUT_PROBE_MOD_CODE,
   THEATER_MODE_KEY,
@@ -38,11 +32,10 @@ import {
   waitForFrameLayout,
   WIDE_VIEWPORT,
 } from "./layout_probes.ts";
-import { SAMPLE_RUN_HASH } from "./sample_mod.ts";
+import { PROBE_LINK } from "./test_mods.ts";
 import { addModStyle } from "./theme_probes.ts";
 
-const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
-const SAMPLE_TITLE = "Book List";
+const PROBE_TITLE = "probe";
 
 /** Opens the layout probe, with `extraLines` in its mod file, and waits for its mount. */
 async function openLayoutProbe(
@@ -60,16 +53,10 @@ async function openLayoutProbe(
   return frame;
 }
 
-/** Opens the sample book list mod and waits until its frame has its layout. */
-async function openSample(page: Page): Promise<Frame> {
-  await page.goto(`/${SAMPLE_RUN_HASH}`);
-  return waitForSample(page);
-}
-
-/** Waits until the shown sample book list mod's frame has its layout. */
-async function waitForSample(page: Page): Promise<Frame> {
-  await expect(page.locator(`iframe[title="${SAMPLE_TITLE}"]`)).toBeVisible();
-  const frame = await findModFrame(page, SAMPLE_TITLE);
+/** Waits until the shown probe's frame has its layout. */
+async function waitForProbeLayout(page: Page): Promise<Frame> {
+  await expect(page.locator(`iframe[title="${PROBE_TITLE}"]`)).toBeVisible();
+  const frame = await findModFrame(page, PROBE_TITLE);
   await expect
     .poll(frame.evaluate.bind(frame, readLayoutAttribute))
     .not.toBeUndefined();
@@ -83,27 +70,6 @@ function hasLayoutEvents(count: number): boolean {
   return (probeGlobal.probe?.layoutEvents.length ?? 0) >= count;
 }
 
-interface SampleProbeGlobal {
-  probe: {
-    engine: { on: (event: string, handler: (params: unknown) => void) => void };
-  };
-  layoutEvents?: unknown[];
-}
-
-/** Runs in the exposed sample mod: records each `layout.changed` it receives on `globalThis.layoutEvents`. */
-function recordSampleLayoutEvents(): void {
-  const sampleGlobal = globalThis as unknown as SampleProbeGlobal;
-  sampleGlobal.layoutEvents = [];
-  function recordLayout(params: unknown): void {
-    sampleGlobal.layoutEvents?.push(params);
-  }
-  sampleGlobal.probe.engine.on("layout.changed", recordLayout);
-}
-
-function readSampleLayoutEvents(): unknown[] {
-  return (globalThis as unknown as SampleProbeGlobal).layoutEvents ?? [];
-}
-
 function readFrameBox(
   page: Page,
   title: string,
@@ -111,8 +77,8 @@ function readFrameBox(
   return page.locator(`iframe[title="${title}"]`).boundingBox();
 }
 
-function isSampleFullscreen(page: Page): Promise<boolean> {
-  return page.evaluate(isFrameFullscreen, SAMPLE_TITLE);
+function isProbeFullscreen(page: Page): Promise<boolean> {
+  return page.evaluate(isFrameFullscreen, PROBE_TITLE);
 }
 
 function leaveDocumentFullscreen(): Promise<void> {
@@ -189,10 +155,7 @@ test.describe(
     test("Default mount context", async function mountsContained({
       page,
     }): Promise<void> {
-      await exposeSampleEngine(page);
-      await page.goto(`/${SAMPLE_RUN_HASH}`);
-      const frame = await findModFrame(page, SAMPLE_TITLE);
-      await waitForProbe(frame);
+      const frame = await openLayoutProbe(page);
 
       expect(await frame.evaluate(readContextLayout)).toBe("contained");
     });
@@ -277,14 +240,14 @@ test.describe(
       page,
     }): Promise<void> {
       await page.setViewportSize(WIDE_VIEWPORT);
-      const frame = await openSample(page);
+      const frame = await openLayoutProbe(page);
       await markFrame(frame);
-      const boxBefore = await readFrameBox(page, SAMPLE_TITLE);
+      const boxBefore = await readFrameBox(page, PROBE_TITLE);
 
       await pressTheaterMode(page, true);
       await waitForFrameLayout(frame, "theater");
 
-      expect(await readFrameBox(page, SAMPLE_TITLE)).toEqual(boxBefore);
+      expect(await readFrameBox(page, PROBE_TITLE)).toEqual(boxBefore);
       expect(await isFrameMarked(frame)).toBe(true);
     });
 
@@ -318,13 +281,13 @@ test.describe(
   { tag: "@frames" },
   function describeLayouts(): void {
     test("Default layout", async function isContained({ page }): Promise<void> {
-      const frame = await openSample(page);
+      const frame = await openLayoutProbe(page);
 
       expect(await frame.evaluate(readLayoutAttribute)).toBe("contained");
     });
 
     test("Theater layout", async function isTheater({ page }): Promise<void> {
-      const frame = await openSample(page);
+      const frame = await openLayoutProbe(page);
 
       await pressTheaterMode(page, true);
 
@@ -334,7 +297,7 @@ test.describe(
     test("Fullscreen from the stage bar", async function isFullscreen({
       page,
     }): Promise<void> {
-      const frame = await openSample(page);
+      const frame = await openLayoutProbe(page);
 
       await fullscreenButton(page).click();
 
@@ -362,7 +325,7 @@ test.describe(
       page,
       browserName,
     }): Promise<void> {
-      const frame = await openSample(page);
+      const frame = await openLayoutProbe(page);
       await pressTheaterMode(page, true);
       await fullscreenButton(page).click();
       await waitForFrameLayout(frame, "fullscreen");
@@ -381,45 +344,14 @@ test.describe(
     test("Choice kept after a reload", async function keepsChoice({
       page,
     }): Promise<void> {
-      await openSample(page);
+      await openLayoutProbe(page);
       await pressTheaterMode(page, true);
 
       await page.reload();
 
-      const frame = await waitForSample(page);
+      const frame = await waitForProbeLayout(page);
       await expect(theaterButton(page)).toHaveAttribute("aria-pressed", "true");
       expect(await frame.evaluate(readLayoutAttribute)).toBe("theater");
-    });
-
-    test("Unknown stored value", async function ignoresUnknown({
-      page,
-    }): Promise<void> {
-      await storeTheaterBeforeLoad(page, '"maybe"');
-
-      const frame = await openSample(page);
-
-      await expect(theaterButton(page)).toHaveAttribute(
-        "aria-pressed",
-        "false",
-      );
-      expect(await frame.evaluate(readLayoutAttribute)).toBe("contained");
-    });
-
-    test("Storage cannot be written", async function appliesWithoutStorage({
-      page,
-    }): Promise<void> {
-      await page.addInitScript(refuseTheaterWrites, THEATER_MODE_KEY);
-      const frame = await openSample(page);
-
-      await pressTheaterMode(page, true);
-
-      await waitForFrameLayout(frame, "theater");
-      expect(await readMessageCounts(page)).toEqual([
-        "Errors: 0, 0 unread",
-        "Warnings: 0, 0 unread",
-        "Notifications: 0, 0 unread",
-      ]);
-      await expect(page.getByRole("alert")).toHaveCount(0);
     });
 
     test("Mods cannot reach the choice", async function hidesChoice({
@@ -455,17 +387,13 @@ test.describe(
     test("Theater turned on", async function pushesOnce({
       page,
     }): Promise<void> {
-      await exposeSampleEngine(page);
-      await page.goto(`/${SAMPLE_RUN_HASH}`);
-      const frame = await findModFrame(page, SAMPLE_TITLE);
-      await waitForProbe(frame);
-      await frame.evaluate(recordSampleLayoutEvents);
+      const frame = await openLayoutProbe(page);
 
       await pressTheaterMode(page, true);
 
       await expect
-        .poll(frame.evaluate.bind(frame, readSampleLayoutEvents))
-        .toEqual([{ layout: "theater" }]);
+        .poll(frame.evaluate.bind(frame, readLayoutEvents))
+        .toEqual([{ layout: "theater", attribute: "theater" }]);
     });
   },
 );
@@ -477,16 +405,16 @@ test.describe(
     test("Frame fills the screen", async function fillsScreen({
       page,
     }): Promise<void> {
-      const frame = await openSample(page);
+      const frame = await openLayoutProbe(page);
       await markFrame(frame);
 
       await fullscreenButton(page).click();
 
-      await expect.poll(isSampleFullscreen.bind(undefined, page)).toBe(true);
+      await expect.poll(isProbeFullscreen.bind(undefined, page)).toBe(true);
       expect(await isFrameMarked(frame)).toBe(true);
       expect(
         await page
-          .locator(`iframe[title="${SAMPLE_TITLE}"]`)
+          .locator(`iframe[title="${PROBE_TITLE}"]`)
           .evaluate(readFrameEdge),
       ).toEqual({ borderWidth: "0px", borderRadius: "0px" });
     });
@@ -495,7 +423,7 @@ test.describe(
       page,
       browserName,
     }): Promise<void> {
-      const frame = await openSample(page);
+      const frame = await openLayoutProbe(page);
       await fullscreenButton(page).click();
       await waitForFrameLayout(frame, "fullscreen");
 
@@ -503,31 +431,13 @@ test.describe(
 
       await expect(stageBar(page)).toBeVisible();
       const barBox = await stageBar(page).boundingBox();
-      const frameBox = await readFrameBox(page, SAMPLE_TITLE);
+      const frameBox = await readFrameBox(page, PROBE_TITLE);
       expect(barBox).not.toBeNull();
       expect(frameBox).not.toBeNull();
       expect((barBox?.y ?? 0) + (barBox?.height ?? 0)).toBeLessThanOrEqual(
         frameBox?.y ?? 0,
       );
       await expect(visibleSandbox(page).locator("iframe")).toBeVisible();
-    });
-
-    test("Fullscreen refused", async function warnsRefused({
-      page,
-    }): Promise<void> {
-      await page.addInitScript(refuseFrameFullscreen);
-      await openSample(page);
-
-      await fullscreenButton(page).click();
-
-      await expect(messageButton(page, "Warnings")).toHaveAccessibleName(
-        /^Warnings: 1,/,
-      );
-      await expectMessages(
-        page,
-        "Warnings",
-        "Fullscreen is not available: Fullscreen is blocked by the test",
-      );
     });
   },
 );

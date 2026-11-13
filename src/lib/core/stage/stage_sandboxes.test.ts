@@ -901,6 +901,26 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
     expect(readNotifications(runtime)[0].producer).toBe("app");
   });
 
+  it("App errors stay", async function keepsTileIssue(): Promise<void> {
+    serveFourBooks();
+    const spied = buildServices();
+    const { runtime, modPort } = await startSandbox(
+      buildSandbox(SAMPLE_MOD_REFERENCE, FOUR_BOOKS_SOURCE),
+      spied,
+    );
+    const tileIssues = readSandboxMessages(runtime).filter(isWarning);
+    expect(tileIssues).toHaveLength(1);
+
+    for (let id = 1; id <= 200; id += 1) {
+      sendNotify(modPort, id, { message: `Note ${id}`, level: "warning" });
+    }
+    await waitForMessages();
+
+    const warnings = readSandboxMessages(runtime).filter(isWarning);
+    expect(warnings).toContainEqual(tileIssues[0]);
+    expect(warnings.filter(isFromMod)).toHaveLength(100);
+  });
+
   it("passes mods.open to onOpenLink with the runtime's id", async function opensWithId(): Promise<void> {
     serveTestMod(OPENER_MOD_SOURCE, [
       '  name: "opener"',

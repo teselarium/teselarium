@@ -1,0 +1,7 @@
+collection:
+  name: "Three items"
+  description: "The tiles mod's sample collection."
+  tiles:
+    - path: "./items/first.md"
+    - path: "./items/second.md"
+    - path: "./items/third.md"

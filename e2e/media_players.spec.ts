@@ -10,7 +10,6 @@ import {
 } from "./mod_routes.ts";
 import {
   BODIES_COLLECTION_URL,
-  buildBodyProbeLink,
   openBodyProbe,
   playerDialog,
   playerFrame,
@@ -23,8 +22,6 @@ import {
   YOUTUBE_PAGE,
 } from "./tile_body_routes.ts";
 import type { BodyTile, PlayerRequest } from "./tile_body_routes.ts";
-
-const OTHER_YOUTUBE_PAGE = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
 const OPEN_ANY_SITE_LINES = [
   "  permissions:",
@@ -41,8 +38,6 @@ const FILM_TILES: BodyTile[] = [
     body: `<iframe src="${YOUTUBE_EMBED}" title="Big Buck Bunny"></iframe>`,
   },
 ];
-
-const ALWAYS_PLAY_LABEL = `Always play from ${YOUTUBE_FRAME_HOST}`;
 
 interface PlayerPage {
   frame: Frame;
@@ -101,29 +96,6 @@ test.describe(
 );
 
 test.describe(
-  "Ask before contacting the site",
-  { tag: "@frames" },
-  function describeQuestion(): void {
-    test("Cancel", async function cancelsPlayer({ page }): Promise<void> {
-      const { frame, playerRequests } = await openPlayerProbe(page);
-      await askForPlayer(frame, YOUTUBE_PAGE);
-      await expect(playerDialog(page)).toBeVisible();
-      await expect(
-        playerDialog(page).getByRole("button", { name: "Cancel" }),
-      ).toBeFocused();
-
-      await playerDialog(page).getByRole("button", { name: "Cancel" }).click();
-
-      await expect(playerDialog(page)).toBeHidden();
-      expect(await frame.evaluate(readProbeAnswers)).toEqual([
-        { result: false },
-      ]);
-      expect(playerRequests).toEqual([]);
-    });
-  },
-);
-
-test.describe(
   "Open a player",
   { tag: "@frames" },
   function describeOpenPlayer(): void {
@@ -145,22 +117,6 @@ test.describe(
       expect(await frame.evaluate(readProbeAnswers)).toEqual([
         { result: true },
       ]);
-    });
-
-    test("Address not from the tiles", async function refusesOtherAddress({
-      page,
-    }): Promise<void> {
-      const { frame } = await openPlayerProbe(page);
-
-      await askForPlayer(frame, OTHER_YOUTUBE_PAGE);
-
-      expect(await frame.evaluate(readProbeAnswers)).toEqual([
-        {
-          code: -32002,
-          message: `players.open: ${OTHER_YOUTUBE_PAGE} is not a player of the mod's tiles`,
-        },
-      ]);
-      await expect(playerDialog(page)).toBeHidden();
     });
   },
 );
@@ -209,31 +165,6 @@ test.describe(
   "Always play from a site",
   { tag: "@frames" },
   function describeAlwaysPlay(): void {
-    test("Remembered site", async function skipsQuestion({
-      page,
-    }): Promise<void> {
-      const { frame } = await openPlayerProbe(
-        page,
-        [],
-        buildProbeFiles("probe2"),
-      );
-      await askForPlayer(frame, YOUTUBE_PAGE);
-      await playerDialog(page).getByLabel(ALWAYS_PLAY_LABEL).check();
-      await pressPlay(page);
-      await playerDialog(page).getByRole("button", { name: "Close" }).click();
-      await expect(playerDialog(page)).toBeHidden();
-
-      await page.goto(buildBodyProbeLink("probe2"));
-      const otherFrame = await findModFrame(page, "probe2");
-      await waitForProbe(otherFrame);
-      await askForPlayer(otherFrame, YOUTUBE_PAGE);
-
-      await expect(playerFrame(page)).toHaveAttribute("src", YOUTUBE_FRAME);
-      await expect(
-        playerDialog(page).getByRole("button", { name: "Play" }),
-      ).toHaveCount(0);
-    });
-
     test("Not checked", async function asksAgain({ page }): Promise<void> {
       const { frame } = await openPlayerProbe(page);
       await askForPlayer(frame, YOUTUBE_PAGE);

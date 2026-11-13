@@ -4,21 +4,16 @@ import type { Download, Frame, Page, Route } from "@playwright/test";
 import {
   actionDialog,
   buildProbeFiles,
-  exposeSampleEngine,
   findModFrame,
   findSandboxFrame,
   hasProbeAnswer,
   navigateFrame,
   readProbeAnswers,
-  routeCovers,
   serveAppOriginMod,
   startProbeRequests,
   waitForProbe,
 } from "./mod_routes.ts";
-import {
-  readSampleModSource,
-  SAMPLE_COLLECTION_RUN_HASH,
-} from "./sample_mod.ts";
+import { openTilesMod, readTilesModSource, TILES_TITLE } from "./test_mods.ts";
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
 const OPEN_ANY_SITE_LINES = [
@@ -54,6 +49,25 @@ async function answerBlankPage(route: Route): Promise<void> {
     contentType: "text/html",
     body: "<!doctype html><title>Elsewhere</title>",
   });
+}
+
+/** Runs in a probe frame: adds a "Count" button that counts its clicks on `globalThis.clicks`. */
+function addClickCounter(): void {
+  const probeGlobal = globalThis as { clicks?: number };
+  probeGlobal.clicks = 0;
+  function countClick(): void {
+    probeGlobal.clicks = (probeGlobal.clicks ?? 0) + 1;
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Count";
+  button.addEventListener("click", countClick);
+  document.body.append(button);
+}
+
+/** Runs in a probe frame: the clicks the "Count" button of `addClickCounter` received. */
+function readClickCount(): number {
+  return (globalThis as { clicks?: number }).clicks ?? 0;
 }
 
 function readOpener(): boolean {
@@ -236,18 +250,14 @@ test.describe(
     test("Sample mod asks", async function namesSampleMod({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await exposeSampleEngine(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const frame = await findModFrame(page, "Book List");
-      await waitForProbe(frame);
-      const source = readSampleModSource(page);
+      const frame = await openTilesMod(page);
+      const source = readTilesModSource(page);
 
       await ask(frame, "ui.confirm", { message: "Delete this list?" });
 
       const dialog = actionDialog(page);
       await expect(dialog).toBeVisible();
-      await expect(dialog.getByRole("heading")).toHaveText("Book List");
+      await expect(dialog.getByRole("heading")).toHaveText(TILES_TITLE);
       await expect(dialog).toContainText(source);
       expect(await frame.locator("dialog[open]").count()).toBe(0);
       expect(await page.locator("dialog[open]").count()).toBe(1);
@@ -256,24 +266,21 @@ test.describe(
     test("Frame cannot be used behind the dialog", async function blocksFrame({
       page,
     }): Promise<void> {
-      await routeCovers(page);
-      await exposeSampleEngine(page);
-      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-      const frame = await findModFrame(page, "Book List");
-      await waitForProbe(frame);
-      const book = frame.getByRole("button", { name: /Kallocain/ });
-      await expect(book).toBeVisible();
-      const box = await book.boundingBox();
+      const frame = await openProbe(page);
+      await frame.evaluate(addClickCounter);
+      const box = await frame
+        .getByRole("button", { name: "Count" })
+        .boundingBox();
       if (box === null) {
-        throw new Error("Expected the book button to be shown");
+        throw new Error("Expected the Count button to be shown");
       }
       await ask(frame, "ui.confirm", { message: "Delete this list?" });
       await expect(actionDialog(page)).toBeVisible();
 
-      await page.mouse.click(box.x + 4, box.y + box.height / 2);
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
 
-      expect(await frame.locator("dialog[open]").count()).toBe(0);
+      expect(await frame.evaluate(readClickCount)).toBe(0);
     });
   },
 );
