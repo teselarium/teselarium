@@ -5,7 +5,8 @@
 This change builds on `streamline-test-suite`, which must be applied first. That change gives this one:
 - the "Tests" convention in `docs/code_conventions.md`
 - the `@sample` and `@frames` tags, and the default, samples and full runs
-- a stage bar that is already tested on its own, with the probe helpers it uses (`openProbe`, and `openTypedProbe` with a collection)
+- a stage bar that is already tested on its own, with the probe helpers it uses (`openProbe`, and `openTypedProbe` with a collection), both local to `stage_bar.spec.ts`
+- five `stage-bar` scenarios with no test named after them, left to this change's duplicate audit (its task 5.3)
 
 Where the coupling is today:
 
@@ -50,14 +51,14 @@ D also covers the mod file's `sample_collection` key, a product term, and the de
 | Mod | Holds | Used for |
 |---|---|---|
 | probe (exists, `buildProbeFiles`) | a mod file and a `main.js` that stores `{ engine, context }` on `globalThis.probe` | a running mod, a frame, the layout, the stage, requests sent as the mod |
-| typed probe (exists in `stage_bar.spec.ts`) | the probe, plus a tile type and a collection of three tiles | tiles of the mod's type, a collection, reloading the tiles |
+| typed probe (exists in `stage_bar.spec.ts`) | the probe, plus a `note` tile type and two notes; each test writes its `collection.yaml` (`buildCollection`) | tiles of the mod's type, a collection, reloading the tiles |
 | tiles mod (new) | a mod file with a tile type, a sample collection of three tiles, a `show` permission for `COVER_HOST`, a config key and `test_path`; a `main.js` that lists each tile as an `<li>` with its title and image, reads and writes one storage key, and also stores `globalThis.probe`; a test file of two passing cases | the mod viewer and the checker, the mod test API, declared permissions and covers, storage |
 
 - **Files.** The tiles mod is real files in `e2e/test_mods/tiles/`. A route serves them at `/test-mods/tiles/` on the preview origin, so the mod is on the app's origin.
 - **Shared helpers.** A new `e2e/test_mods.ts` holds the shared helpers:
   - its path, run links and reference constants
   - `serveTilesMod`
-  - `openTypedProbe`, lifted from `stage_bar.spec.ts`
+  - `openProbe` and `openTypedProbe`, with the typed probe's builders, lifted from `stage_bar.spec.ts`
   - `MISSING_TEST_MOD_REFERENCE` (`./test-mods/missing`, answered with HTTP 404)
 - **`mod_routes.ts`.** It stops importing `sample_mod.ts`:
   - `exposeSampleEngine` and `serveColumnsReportingSample` give way to the tiles mod, which exposes its engine itself
@@ -125,13 +126,13 @@ The rule and the check before each removal are the ones `streamline-test-suite` 
 - A scenario keeps its e2e test only when jsdom or Node cannot observe it: frames, the sandbox and the content policy, layout and geometry, real focus and pointer, navigation and history, storage across reloads, fullscreen, clipboard or native dialogs.
 - Before an e2e test is removed, its covering unit test must assert every THEN and AND of the scenario. A missing assertion is added to the unit test first. If it cannot be observed there, the e2e test stays, and the task notes why.
 
-The 173 overlapping titles, per file:
+The 172 overlapping titles, per file:
 
 | File | Overlaps / tests | File | Overlaps / tests |
 |---|---|---|---|
 | app_sidebar | 28 / 37 | mod_api_version | 7 / 11 |
 | mod_sandbox | 25 / 55 | stage_layout | 5 / 24 |
-| mod_stage | 25 / 32 | mod_engine_api | 4 / 12 |
+| mod_stage | 24 / 31 | mod_engine_api | 4 / 12 |
 | app_settings | 14 / 24 | tile_body_extras | 4 / 7 |
 | app_pages | 12 / 22 | app_theme, media_players, mod_app_actions, mod_libraries | 3 each |
 | mod_tests | 12 / 24 | default_mods, mod_theme | 2 each |
@@ -140,13 +141,15 @@ The 173 overlapping titles, per file:
 
 The audit is expected to keep most overlaps in the files tagged `@frames` (`mod_sandbox`, `mod_check`, `mod_tests`), where the e2e test checks the real frame and the unit test checks the logic. It is expected to remove most of them in the app-shell files (`app_sidebar`, `app_settings`, `app_pages`). A few titles are generic ("Escape", "Cancel", "Index page"), and the same title can mean different scenarios: the audit compares scenarios, not titles.
 
+`streamline-test-suite` left five `stage-bar` scenarios with no test named after them: "App errors stay", "Blocked request while the mod runs", "Cancelled API question", "Message from the app" and "Message from the mod". The last two share the e2e test "Message from the app and from the mod". Each gets a test named after it, at the lowest level that can prove it, by the same rule: a unit test is named after it, or the shared e2e test is split. The `stage-bar` spec does not change.
+
 ## Risks / Trade-offs
 
 - [Test-owned mods drift from what real mods do] → They use only the mod API, as any mod does. The samples run still exercises the real samples end to end, and the full run before a release includes it.
 - [A rewording changes what a scenario means] → Each delta copies its requirement from the main spec and changes only the listed lines. The review compares each changed line with the original.
 - [The audit removes coverage] → Each removal names its covering test and passes the check before it is removed.
 - [The lint misses a literal address] → The grep check in the tasks, and the B tests are tagged.
-- [The change is large: about 100 tests move, 173 overlaps are judged] → The tasks go file by file, and each file's group ends green.
+- [The change is large: about 100 tests move, 172 overlaps are judged] → The tasks go file by file, and each file's group ends green.
 
 ## Migration Plan
 

@@ -15,7 +15,7 @@
   Follow `docs/code_conventions.md`. Verify with `npm run lint` and `npm run format:check`.
 - [ ] 2.2 Add `e2e/test_mods.ts`:
   - `serveTilesMod`, which serves `e2e/test_mods/tiles/` at `/test-mods/tiles/`, and the tiles mod's path, reference and run link constants
-  - `openTypedProbe` and the typed probe's builders, moved from `e2e/stage_bar.spec.ts`
+  - `openProbe`, `openTypedProbe` and the typed probe's builders, moved from `e2e/stage_bar.spec.ts`
   - `MISSING_TEST_MOD_REFERENCE` (`./test-mods/missing`, answered with HTTP 404)
 
   Make `stage_bar.spec.ts` import from it. Verify that `E2E_RUN=full npx playwright test e2e/stage_bar.spec.ts` passes.
@@ -81,18 +81,19 @@ For every task in this group:
 - [ ] 6.2 Stage: `mod_stage` and `stage_layout`.
 - [ ] 6.3 Mods and frames: `mod_sandbox`, `mod_check`, `mod_tests`, `mod_engine_api`, `mod_libraries`, `mod_app_actions`, `mod_api_version`, `site_consent`, `media_players`, `mod_theme` and `default_mods`.
 - [ ] 6.4 Tile bodies: `tile_bodies`, `tile_body_diagrams` and `tile_body_extras`.
+- [ ] 6.5 Stage bar scenarios without a test named after them (design.md decision 6): "App errors stay", "Blocked request while the mod runs", "Cancelled API question", "Message from the app" and "Message from the mod". Give each one test named after it, at the lowest level that can prove it: name a covering unit test after it, or split `stage_bar.spec.ts` › "Message from the app and from the mod" into "Message from the app" and "Message from the mod". Run the check before renaming or removing a test. Verify that each of the five names appears among the test titles, and that `npm run test` and `E2E_RUN=full npx playwright test e2e/stage_bar.spec.ts` pass.
 
-## 7. Verification
+## 7. Changeset
 
-- [ ] 7.1 Check that the core's tests no longer need the samples:
+- [ ] 7.1 Add `.changeset/isolate-tests-from-samples.md` with a `patch` bump for `opentesela` and the summary "The tests no longer depend on the shipped samples; no change to the app.", following the "Bump rule" section of `docs/releasing.md`. Verify with `npx changeset status` (it lists the patch) and `npm run format:check`.
+
+## 8. Verification
+
+- [ ] 8.1 Check that the core's tests no longer need the samples:
   - move `public/samples/` out of the repository temporarily, then run `npm run test:e2e`
   - verify that it passes: its builds no longer contain the samples, and the default run has no `@sample` test
   - also run `npm run test`, and verify that only `src/lib/mod/sample_mod.test.ts` fails
   - move `public/samples/` back, and verify that `git status` shows no change under `public/`
-- [ ] 7.2 On a clean install (`npm ci`), run `npm run build`, `npm run test`, `npm run lint`, `npm run format:check`, `npm run test:e2e`, `npm run test:e2e:samples` and `npm run test:e2e:full`, and verify that all pass. The samples run is needed because this change edits specs of the mod API.
+- [ ] 8.2 On a clean install (`npm ci`), run `npm run build`, `npm run test`, `npm run lint`, `npm run format:check`, `npm run test:e2e`, `npm run test:e2e:samples` and `npm run test:e2e:full`, and verify that all pass. The samples run is needed because this change edits specs of the mod API.
   - Run the default run with `PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/isolate-after.json npx playwright test --reporter=json,line`, and report its runs, wall time and test time per engine next to task 1.2's numbers.
   - Verify that `git status` shows only the files in the proposal's Impact section plus this change's folder.
-
-## 8. Changeset
-
-- [ ] 8.1 Add `.changeset/isolate-tests-from-samples.md` with a `patch` bump for `opentesela` and the summary "The tests no longer depend on the shipped samples; no change to the app.", following the "Bump rule" section of `docs/releasing.md`. Verify with `npx changeset status` (it lists the patch) and `npm run format:check`.

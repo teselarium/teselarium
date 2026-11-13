@@ -24,7 +24,8 @@ A change to an example can break the core's tests, and the core's specs make cla
   - Two of their scenarios repeat ones `sample-book-list` already has, and are dropped.
 - The tests of the vanilla explorer's list of the samples stay in `e2e/default_mods.spec.ts`, tagged `@sample`, because they test how the samples ship.
 - An oxlint `no-restricted-imports` rule: only `e2e/sample_*.spec.ts` may import `e2e/sample_mod.ts`.
-- The remaining tests that repeat a scenario at two levels (173 e2e titles also used by a unit test, in 20 spec files) are audited. Each scenario keeps one test, at the lowest level that can prove it.
+- The remaining tests that repeat a scenario at two levels (172 e2e titles also used by a unit test, in 20 spec files) are audited. Each scenario keeps one test, at the lowest level that can prove it.
+- Five `stage-bar` scenarios that `streamline-test-suite` left without a test named after them get one.
 
 ## Capabilities
 
@@ -54,6 +55,7 @@ Scenario names stay the same: a modified requirement keeps its scenarios' names.
 - e2e:
   - the 16 spec files that use the sample: `app_pages`, `app_settings`, `app_sidebar`, `app_theme`, `default_mods`, `mod_api_version`, `mod_app_actions`, `mod_check`, `mod_engine_api`, `mod_libraries`, `mod_sandbox`, `mod_stage`, `mod_tests`, `mod_theme`, `site_consent` and `stage_layout`
   - `e2e/mod_routes.ts`, `e2e/sample_book_list.spec.ts`, and a new home for the test-owned mods
+  - `e2e/stage_bar.spec.ts`, whose probe helpers move to that home
   - the files that the duplicate audit touches
 - Unit tests named after reworded scenarios keep their names, and their assertions may get the ones a removed e2e test had.
 - `.oxlintrc.json`
