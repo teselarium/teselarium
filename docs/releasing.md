@@ -26,13 +26,39 @@ The mod viewer shows the mod's license.
 
 `npx changeset status` lists the pending changesets and the version they add up to.
 
+## Release checks
+
+```sh
+npm run release:check
+```
+
+runs every check of the project, and stops at the first one that fails:
+
+1. `npm run build`
+2. `npm run test`: the unit tests
+3. `npm run lint`
+4. `npm run format:check`
+5. `npm run test:e2e:full`: every e2e test in Chromium, Firefox and WebKit
+
+`npm run version` runs it first, so a release cannot skip it: a failure stops the release before any file changes. A flaky test stops it too: rerun it, or fix the flake.
+
+The e2e tests have three runs. `E2E_RUN` chooses one, and `playwright.config.ts` maps the tests' tags to engines:
+
+| Run | Command | Tests |
+| --- | --- | --- |
+| default | `npm run test:e2e` | every test but `@sample` in Chromium, and the `@frames` tests in Firefox and WebKit |
+| samples | `npm run test:e2e:samples` | the shipped samples' own tests (`@sample`) in all three engines |
+| full | `npm run test:e2e:full` | every test in all three engines |
+
+`@frames` marks the tests whose result depends on how the engine treats frames. The default run is the one every change runs. A change that touches the samples or the mod API also runs the samples run. Only the full run checks the untagged tests in Firefox and WebKit, which is why a release runs it.
+
 ## Apply the changesets
 
 ```sh
 npm run version
 ```
 
-applies every pending changeset: it bumps `package.json` by the highest bump among them, writes their summaries into `CHANGELOG.md`, deletes them, and updates `package-lock.json` to the new version. Review the diff and commit it.
+runs the [release checks](#release-checks) first. When they pass, it applies every pending changeset: it bumps `package.json` by the highest bump among them, writes their summaries into `CHANGELOG.md`, deletes them, and updates `package-lock.json` to the new version. Review the diff and commit it.
 
 A running dev server keeps the version it started with: restart it after `npm run version`. Builds and tests always read the version fresh.
 

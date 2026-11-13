@@ -108,119 +108,150 @@ function readMathFontFamilies(): string[] {
   return families;
 }
 
-test.describe("Math is rendered as MathML", function describeMath(): void {
-  test("Fraction", async function showsFraction({ page }): Promise<void> {
-    const requestedUrls = collectRequestedUrls(page);
+test.describe(
+  "Math is rendered as MathML",
+  { tag: "@frames" },
+  function describeMath(): void {
+    test("Fraction", async function showsFraction({ page }): Promise<void> {
+      const requestedUrls = collectRequestedUrls(page);
 
-    const frame = await showExtrasBody(page, MATH_INDEX);
+      const frame = await showExtrasBody(page, MATH_INDEX);
 
-    const fraction = frame.locator("ot-tile-body p math mfrac");
-    await expect(fraction).toBeVisible();
-    await expect(fraction).toHaveText("ab");
-    expect(await frame.evaluate(readAnnotation, "ot-tile-body p math")).toBe(
-      "\\frac{a}{b}",
-    );
-    await expect(
-      frame.locator('ot-tile-body math[display="block"]'),
-    ).toBeVisible();
-    expect(listMatchingUrls(requestedUrls, MATH_CHUNK_PATTERN)).toHaveLength(1);
-  });
-});
+      const fraction = frame.locator("ot-tile-body p math mfrac");
+      await expect(fraction).toBeVisible();
+      await expect(fraction).toHaveText("ab");
+      expect(await frame.evaluate(readAnnotation, "ot-tile-body p math")).toBe(
+        "\\frac{a}{b}",
+      );
+      await expect(
+        frame.locator('ot-tile-body math[display="block"]'),
+      ).toBeVisible();
+      expect(listMatchingUrls(requestedUrls, MATH_CHUNK_PATTERN)).toHaveLength(
+        1,
+      );
+    });
+  },
+);
 
-test.describe("Formulas use a math font the system has", function describeMathFont(): void {
-  test("Math font", async function namesMathFonts({ page }): Promise<void> {
-    const frame = await showExtrasBody(page, MATH_INDEX);
-    await expect(frame.locator("ot-tile-body math").first()).toBeVisible();
+test.describe(
+  "Formulas use a math font the system has",
+  { tag: "@frames" },
+  function describeMathFont(): void {
+    test("Math font", async function namesMathFonts({ page }): Promise<void> {
+      const frame = await showExtrasBody(page, MATH_INDEX);
+      await expect(frame.locator("ot-tile-body math").first()).toBeVisible();
 
-    expect(await frame.evaluate(readMathFontFamilies)).toEqual([
-      "STIX Two Math",
-      "STIX Math",
-      "Cambria Math",
-      "Latin Modern Math",
-      "math",
-    ]);
-  });
-});
+      expect(await frame.evaluate(readMathFontFamilies)).toEqual([
+        "STIX Two Math",
+        "STIX Math",
+        "Cambria Math",
+        "Latin Modern Math",
+        "math",
+      ]);
+    });
+  },
+);
 
-test.describe("Formulas that fail stay as written", function describeFailingMath(): void {
-  test("Unclosed brace", async function keepsUnclosedBrace({
-    page,
-  }): Promise<void> {
-    const frame = await showExtrasBody(page, FAILING_INDEX);
+test.describe(
+  "Formulas that fail stay as written",
+  { tag: "@frames" },
+  function describeFailingMath(): void {
+    test("Unclosed brace", async function keepsUnclosedBrace({
+      page,
+    }): Promise<void> {
+      const frame = await showExtrasBody(page, FAILING_INDEX);
 
-    const paragraph = frame.locator("ot-tile-body p");
-    await expect(paragraph).toHaveText("Before \\frac{a}{ after.");
-    const code = paragraph.locator("code.language-math");
-    await expect(code).toHaveText("\\frac{a}{");
-    await expect(code).toHaveAttribute("data-ot-math-error", /\S/);
-    await expect(frame.locator("ot-tile-body math")).toHaveCount(0);
-  });
-});
+      const paragraph = frame.locator("ot-tile-body p");
+      await expect(paragraph).toHaveText("Before \\frac{a}{ after.");
+      const code = paragraph.locator("code.language-math");
+      await expect(code).toHaveText("\\frac{a}{");
+      await expect(code).toHaveAttribute("data-ot-math-error", /\S/);
+      await expect(frame.locator("ot-tile-body math")).toHaveCount(0);
+    });
+  },
+);
 
-test.describe("Code blocks and emoji", function describeCodeAndEmoji(): void {
-  test("Labeled JavaScript", async function highlightsJavaScript({
-    page,
-  }): Promise<void> {
-    const frame = await showExtrasBody(page, CODE_INDEX);
+test.describe(
+  "Code blocks and emoji",
+  { tag: "@frames" },
+  function describeCodeAndEmoji(): void {
+    test("Labeled JavaScript", async function highlightsJavaScript({
+      page,
+    }): Promise<void> {
+      const frame = await showExtrasBody(page, CODE_INDEX);
 
-    const code = frame.locator("ot-tile-body code.language-js");
-    await expect(code.locator("span.hljs-keyword")).toHaveText("const");
-    await expect(code.locator("span.hljs-number")).toHaveText("42");
-    await expect(code).toHaveText("const answer = 42;");
-    const plainCode = frame.locator("ot-tile-body pre").nth(1).locator("code");
-    await expect(plainCode).toHaveText("const plain = 1;");
-    await expect(plainCode.locator("span")).toHaveCount(0);
-  });
+      const code = frame.locator("ot-tile-body code.language-js");
+      await expect(code.locator("span.hljs-keyword")).toHaveText("const");
+      await expect(code.locator("span.hljs-number")).toHaveText("42");
+      await expect(code).toHaveText("const answer = 42;");
+      const plainCode = frame
+        .locator("ot-tile-body pre")
+        .nth(1)
+        .locator("code");
+      await expect(plainCode).toHaveText("const plain = 1;");
+      await expect(plainCode.locator("span")).toHaveCount(0);
+    });
 
-  test("Shortcodes", async function replacesShortcodes({
-    page,
-  }): Promise<void> {
-    const frame = await showExtrasBody(page, EMOJI_INDEX);
+    test("Shortcodes", async function replacesShortcodes({
+      page,
+    }): Promise<void> {
+      const frame = await showExtrasBody(page, EMOJI_INDEX);
 
-    const paragraph = frame.locator("ot-tile-body p");
-    await expect(paragraph).toHaveText("Done 🎉, :not_an_emoji: and :tada:.");
-    await expect(paragraph.locator("code")).toHaveText(":tada:");
-  });
-});
+      const paragraph = frame.locator("ot-tile-body p");
+      await expect(paragraph).toHaveText("Done 🎉, :not_an_emoji: and :tada:.");
+      await expect(paragraph.locator("code")).toHaveText(":tada:");
+    });
+  },
+);
 
-test.describe("Highlighted code follows the theme", function describeCodeTheme(): void {
-  test("Keyword color", async function colorsKeyword({ page }): Promise<void> {
-    await page.emulateMedia({ colorScheme: "dark" });
-    const frame = await showExtrasBody(page, CODE_INDEX);
-    const keywordSelector = "ot-tile-body span.hljs-keyword";
-    await expect(frame.locator(keywordSelector)).toBeVisible();
-    const darkPrimary = await frame.evaluate(readPrimaryColor);
-    await markFrame(frame);
+test.describe(
+  "Highlighted code follows the theme",
+  { tag: "@frames" },
+  function describeCodeTheme(): void {
+    test("Keyword color", async function colorsKeyword({
+      page,
+    }): Promise<void> {
+      await page.emulateMedia({ colorScheme: "dark" });
+      const frame = await showExtrasBody(page, CODE_INDEX);
+      const keywordSelector = "ot-tile-body span.hljs-keyword";
+      await expect(frame.locator(keywordSelector)).toBeVisible();
+      const darkPrimary = await frame.evaluate(readPrimaryColor);
+      await markFrame(frame);
 
-    expect(await frame.evaluate(readComputedColor, keywordSelector)).toBe(
-      darkPrimary,
-    );
+      expect(await frame.evaluate(readComputedColor, keywordSelector)).toBe(
+        darkPrimary,
+      );
 
-    await page.emulateMedia({ colorScheme: "light" });
-    await expect
-      .poll(function readLightPrimary(): Promise<string> {
-        return frame.evaluate(readPrimaryColor);
-      })
-      .not.toBe(darkPrimary);
-    const lightPrimary = await frame.evaluate(readPrimaryColor);
-    expect(await frame.evaluate(readComputedColor, keywordSelector)).toBe(
-      lightPrimary,
-    );
-    expect(await isFrameMarked(frame)).toBe(true);
-  });
-});
+      await page.emulateMedia({ colorScheme: "light" });
+      await expect
+        .poll(function readLightPrimary(): Promise<string> {
+          return frame.evaluate(readPrimaryColor);
+        })
+        .not.toBe(darkPrimary);
+      const lightPrimary = await frame.evaluate(readPrimaryColor);
+      expect(await frame.evaluate(readComputedColor, keywordSelector)).toBe(
+        lightPrimary,
+      );
+      expect(await isFrameMarked(frame)).toBe(true);
+    });
+  },
+);
 
-test.describe("Extras load only when a body needs them", function describeExtraLoading(): void {
-  test("Plain body", async function loadsNoExtras({ page }): Promise<void> {
-    const requestedUrls = collectRequestedUrls(page);
-    const { frame } = await openBodyProbe(page, PLAIN_TILES);
+test.describe(
+  "Extras load only when a body needs them",
+  { tag: "@frames" },
+  function describeExtraLoading(): void {
+    test("Plain body", async function loadsNoExtras({ page }): Promise<void> {
+      const requestedUrls = collectRequestedUrls(page);
+      const { frame } = await openBodyProbe(page, PLAIN_TILES);
 
-    await frame.evaluate(showTileBodies, [0, 1]);
+      await frame.evaluate(showTileBodies, [0, 1]);
 
-    await expect(frame.locator("ot-tile-body").first()).toHaveText(
-      "It costs $5 and $10.",
-    );
-    await expect(frame.locator("ot-tile-body em")).toHaveText("calm");
-    expect(listMatchingUrls(requestedUrls, EXTRA_CHUNK_PATTERN)).toEqual([]);
-  });
-});
+      await expect(frame.locator("ot-tile-body").first()).toHaveText(
+        "It costs $5 and $10.",
+      );
+      await expect(frame.locator("ot-tile-body em")).toHaveText("calm");
+      expect(listMatchingUrls(requestedUrls, EXTRA_CHUNK_PATTERN)).toEqual([]);
+    });
+  },
+);

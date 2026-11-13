@@ -145,139 +145,159 @@ function buildDrawingCaseFiles(name: string): ModFiles {
   return files;
 }
 
-test.describe("Load a library", function describeLoadLibrary(): void {
-  test("Load mermaid", async function loadsMermaid({ page }): Promise<void> {
-    const frame = await openProbe(page);
+test.describe(
+  "Load a library",
+  { tag: "@frames" },
+  function describeLoadLibrary(): void {
+    test("Load mermaid", async function loadsMermaid({ page }): Promise<void> {
+      const frame = await openProbe(page);
 
-    const answer = await loadMermaid(frame);
+      const answer = await loadMermaid(frame);
 
-    const result = answer.result as Record<string, unknown>;
-    expect(Object.keys(result).sort()).toEqual(["name", "version"]);
-    expect(result.name).toBe("mermaid");
-    expect(result.version).toMatch(/^12\.\d+\.\d+$/);
-    expect(await frame.evaluate(readRenderType)).toBe("function");
-  });
-});
+      const result = answer.result as Record<string, unknown>;
+      expect(Object.keys(result).sort()).toEqual(["name", "version"]);
+      expect(result.name).toBe("mermaid");
+      expect(result.version).toMatch(/^12\.\d+\.\d+$/);
+      expect(await frame.evaluate(readRenderType)).toBe("function");
+    });
+  },
+);
 
-test.describe("Unknown libraries and versions", function describeUnknownLibraries(): void {
-  test("Unknown library", async function rejectsUnknownLibrary({
-    page,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-
-    const answer = await frame.evaluate(requestFromProbe, [
-      "libs.load",
-      { name: "katex", version: "0" },
-    ]);
-
-    expect(answer.code).toBe(-32602);
-    expect(answer.message).toContain("libs.load");
-    expect(answer.message).toContain('the app has no library "katex"');
-    expect(await frame.evaluate(readMermaidType)).toBe("undefined");
-  });
-
-  test("Other major version", async function rejectsOtherMajor({
-    page,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-
-    const answer = await frame.evaluate(requestFromProbe, [
-      "libs.load",
-      { name: "mermaid", version: "11" },
-    ]);
-
-    expect(answer.code).toBe(-32602);
-    expect(answer.message).toContain("libs.load");
-    expect(answer.message).toContain("the app has mermaid 12");
-    expect(await frame.evaluate(readMermaidType)).toBe("undefined");
-  });
-
-  test("rejects another major version after mermaid was loaded", async function rejectsAfterLoad({
-    page,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-    await loadMermaid(frame);
-
-    const answer = await frame.evaluate(requestFromProbe, [
-      "libs.load",
-      { name: "mermaid", version: "11" },
-    ]);
-
-    expect(answer.code).toBe(-32602);
-  });
-});
-
-test.describe("A frame receives a library once", function describeOnce(): void {
-  test("Two requests", async function loadsOnce({ page }): Promise<void> {
-    const frame = await openProbe(page);
-    const first = await loadMermaid(frame);
-    await frame.evaluate(markMermaid);
-
-    const second = await loadMermaid(frame);
-
-    expect(second.result).toEqual(first.result);
-    expect(await frame.evaluate(readMermaidMarker)).toBe(1);
-  });
-});
-
-test.describe("Libraries come from the app", function describeFromApp(): void {
-  test("No third-party request", async function requestsOnlyApp({
-    page,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-    const requestedUrls = collectRequestedUrls(page);
-
-    await loadMermaid(frame);
-
-    const networkUrls = listNetworkUrls(requestedUrls);
-    expect(networkUrls.filter(isMermaidChunk)).toHaveLength(1);
-    expect(new Set(networkUrls.map(readOrigin))).toEqual(
-      new Set([readOrigin(PREVIEW_URL)]),
-    );
-  });
-
-  test("Not downloaded before a request", async function downloadsNothing({
-    page,
-  }): Promise<void> {
-    const requestedUrls = collectRequestedUrls(page);
-    await routeCovers(page);
-
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-
-    await expect(
-      page.frameLocator('iframe[title="Book List"]').getByText("Kallocain"),
-    ).toBeVisible();
-    expect(requestedUrls.filter(isMermaidChunk)).toEqual([]);
-  });
-});
-
-test.describe("Libraries run in the mod's frame", function describeInFrame(): void {
-  test("Other frames", async function staysInFrame({ page }): Promise<void> {
-    await openProbes(page, ["probe", "other"]);
-    await followLink(page, buildProbeLink("other"));
-    const otherFrame = await findModFrame(page, "other");
-    await waitForProbe(otherFrame);
-    const probeFrame = await findModFrame(page, "probe");
-
-    await loadMermaid(otherFrame);
-
-    expect(await otherFrame.evaluate(readMermaidType)).toBe("object");
-    expect(await probeFrame.evaluate(readMermaidType)).toBe("undefined");
-    expect(await page.evaluate(readMermaidType)).toBe("undefined");
-  });
-
-  test("In a test case", async function drawsInCase({ page }): Promise<void> {
-    await openChecker(page, buildDrawingCaseFiles("drawing_case"));
-
-    const report = await checkFromChecker(
+test.describe(
+  "Unknown libraries and versions",
+  { tag: "@frames" },
+  function describeUnknownLibraries(): void {
+    test("Unknown library", async function rejectsUnknownLibrary({
       page,
-      buildTestModReference("drawing_case"),
-    );
+    }): Promise<void> {
+      const frame = await openProbe(page);
 
-    expect(report.tests).toEqual([
-      { name: "draws a diagram", status: "pass", message: null },
-    ]);
-    expect(report.findings).toEqual([]);
-    expect(report.status).toBe("pass");
-  });
-});
+      const answer = await frame.evaluate(requestFromProbe, [
+        "libs.load",
+        { name: "katex", version: "0" },
+      ]);
+
+      expect(answer.code).toBe(-32602);
+      expect(answer.message).toContain("libs.load");
+      expect(answer.message).toContain('the app has no library "katex"');
+      expect(await frame.evaluate(readMermaidType)).toBe("undefined");
+    });
+
+    test("Other major version", async function rejectsOtherMajor({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "libs.load",
+        { name: "mermaid", version: "11" },
+      ]);
+
+      expect(answer.code).toBe(-32602);
+      expect(answer.message).toContain("libs.load");
+      expect(answer.message).toContain("the app has mermaid 12");
+      expect(await frame.evaluate(readMermaidType)).toBe("undefined");
+    });
+
+    test("rejects another major version after mermaid was loaded", async function rejectsAfterLoad({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+      await loadMermaid(frame);
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "libs.load",
+        { name: "mermaid", version: "11" },
+      ]);
+
+      expect(answer.code).toBe(-32602);
+    });
+  },
+);
+
+test.describe(
+  "A frame receives a library once",
+  { tag: "@frames" },
+  function describeOnce(): void {
+    test("Two requests", async function loadsOnce({ page }): Promise<void> {
+      const frame = await openProbe(page);
+      const first = await loadMermaid(frame);
+      await frame.evaluate(markMermaid);
+
+      const second = await loadMermaid(frame);
+
+      expect(second.result).toEqual(first.result);
+      expect(await frame.evaluate(readMermaidMarker)).toBe(1);
+    });
+  },
+);
+
+test.describe(
+  "Libraries come from the app",
+  { tag: "@frames" },
+  function describeFromApp(): void {
+    test("No third-party request", async function requestsOnlyApp({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+      const requestedUrls = collectRequestedUrls(page);
+
+      await loadMermaid(frame);
+
+      const networkUrls = listNetworkUrls(requestedUrls);
+      expect(networkUrls.filter(isMermaidChunk)).toHaveLength(1);
+      expect(new Set(networkUrls.map(readOrigin))).toEqual(
+        new Set([readOrigin(PREVIEW_URL)]),
+      );
+    });
+
+    test("Not downloaded before a request", async function downloadsNothing({
+      page,
+    }): Promise<void> {
+      const requestedUrls = collectRequestedUrls(page);
+      await routeCovers(page);
+
+      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+
+      await expect(
+        page.frameLocator('iframe[title="Book List"]').getByText("Kallocain"),
+      ).toBeVisible();
+      expect(requestedUrls.filter(isMermaidChunk)).toEqual([]);
+    });
+  },
+);
+
+test.describe(
+  "Libraries run in the mod's frame",
+  { tag: "@frames" },
+  function describeInFrame(): void {
+    test("Other frames", async function staysInFrame({ page }): Promise<void> {
+      await openProbes(page, ["probe", "other"]);
+      await followLink(page, buildProbeLink("other"));
+      const otherFrame = await findModFrame(page, "other");
+      await waitForProbe(otherFrame);
+      const probeFrame = await findModFrame(page, "probe");
+
+      await loadMermaid(otherFrame);
+
+      expect(await otherFrame.evaluate(readMermaidType)).toBe("object");
+      expect(await probeFrame.evaluate(readMermaidType)).toBe("undefined");
+      expect(await page.evaluate(readMermaidType)).toBe("undefined");
+    });
+
+    test("In a test case", async function drawsInCase({ page }): Promise<void> {
+      await openChecker(page, buildDrawingCaseFiles("drawing_case"));
+
+      const report = await checkFromChecker(
+        page,
+        buildTestModReference("drawing_case"),
+      );
+
+      expect(report.tests).toEqual([
+        { name: "draws a diagram", status: "pass", message: null },
+      ]);
+      expect(report.findings).toEqual([]);
+      expect(report.status).toBe("pass");
+    });
+  },
+);

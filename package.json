@@ -10,10 +10,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:samples": "E2E_RUN=samples playwright test",
+    "test:e2e:full": "E2E_RUN=full playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "changeset": "changeset",
-    "version": "changeset version && npm install --package-lock-only"
+    "release:check": "npm run build && npm run test && npm run lint && npm run format:check && npm run test:e2e:full",
+    "version": "npm run release:check && changeset version && npm install --package-lock-only"
   },
   "dependencies": {
     "@11ty/gray-matter": "^3.0.0",

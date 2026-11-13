@@ -64,12 +64,17 @@ This project's way of applying the rules (tags, runs, probe mods) lives in this 
 
 ### 2. The tooltip flake is fixed in the test, not in the app
 
-**Cause** (from `@radix-ui/react-tooltip`):
+**Cause** (from `@radix-ui/react-tooltip`, confirmed with event logs in all three engines):
 
 ```
- click on the button
-   |  the tooltip closes, but its content stays mounted ~150 ms
-   |  for the exit animation (shadcn's animate-out)
+ click(): Playwright moves onto the button, presses and releases
+   |  the move schedules the tooltip's opening in a setTimeout(0).
+   |  Chromium's click usually lands first: the tooltip never opens,
+   |  and the rest of this race does not happen.
+   |  Firefox and WebKit usually open it first (8/8 and 6/8 runs).
+   v
+ the click closes the open tooltip, but its content stays mounted
+   |  ~150 ms for the exit animation (shadcn's animate-out)
    v
  mouse.move(0, 0)
    |  pointerleave while the content is mounted: the hoverable content
@@ -84,16 +89,20 @@ This project's way of applying the rules (tags, runs, probe mods) lives in this 
  no more pointermoves, so the tooltip never opens
 ```
 
-Load delays the animation's end and React's effects past the re-hover. This explains why the failure depends on CPU load, and why an extra pointer move did not help: neither move clears the flag before the trigger reads it.
+The old test still passes most of the time, for the wrong reason: `getByRole("tooltip")` also matches the closing content, which says "Theater mode" until it unmounts. The test fails only when the re-hover lands in the last milliseconds of the exit animation and the content unmounts before the assertion's first check. Load moves the re-hover into that window, which explains why the failure depends on CPU load.
 
 A user's mouse sends many pointermoves, so the next one opens the tooltip. Users don't hit this; only Playwright's single move does.
 
-**Fix:** after the click, the test waits until the tooltip is gone (`toHaveCount(0)`) before it moves the pointer away and back. Once the content is unmounted, leaving the button makes no grace area, and the hover opens the tooltip. The test still checks what the requirement asks for: the tooltip says "Theater mode" while the button is pressed.
+**A second race.** The test does not wait for the mod to run. When the mod starts after the click, the Fullscreen button appears after the theater mode button, and the right-aligned group shifts the theater mode button out from under the pointer. Firefox then closes the tooltip, and Chromium can show the Fullscreen tooltip instead. Moving the test to `openProbe` (decision 7), which waits for the probe's mount, removes this race.
 
-**Before the fix, the cause is confirmed deterministically.** A throwaway spec, deleted afterwards, stretches the tooltip's exit animation to 2 s with a style tag (`[data-slot="tooltip-content"] { animation-duration: 2s !important }`). The old steps must fail on every run and the fixed steps must pass. If the old steps pass, the cause is something else, and the fix is reconsidered before going on.
+**Fix:** after the click, the test waits until the tooltip is gone (`toHaveCount(0)`) before it moves the pointer away and back. Once the content is unmounted, leaving the button makes no grace area, and the hover opens the tooltip. The assertion can then only match a tooltip that opened again, so the test checks what the requirement asks for: the tooltip says "Theater mode" while the button is pressed. The wait costs about 3 ms in Chromium, where the tooltip was not open, and 170 to 190 ms in Firefox and WebKit, the exit animation.
+
+**Before the fix, the cause is confirmed deterministically.** A throwaway spec, deleted afterwards, stretches the tooltip's exit animation to 2 s with a style tag (`[data-slot="tooltip-content"] { animation-duration: 2s !important }`), and asserts an open tooltip (`[data-slot="tooltip-content"]:not([data-state="closed"])`), so the closing content cannot satisfy it. The old steps must fail on every run where the tooltip was open at the click: every Firefox run and most WebKit runs. The fixed steps must pass on every run in all three engines. If the old steps pass with the tooltip open at the click, the cause is something else, and the fix is reconsidered before going on.
 
 - Alternative: `disableHoverableContent` on the stage bar's tooltips. This removes the grace area, but users could no longer move the pointer onto the tooltip without it closing (WCAG 1.4.13). It also changes vendored-component behavior to work around a test. Rejected.
 - Alternative: retry the gesture with `toPass`. This hides the race instead of removing it. Rejected.
+- Alternative: a second pointer move after the hover, as a real mouse sends. The first move is still ignored, and the test passes for a reason it does not state. Rejected.
+- Alternative: assert the open state (`data-state`) in the stage bar test. After the fix, only a reopened tooltip can match, and the test would depend on a Radix-internal attribute. Rejected.
 - Alternative: wait for `data-ot-layout="theater"`. The race does not involve the layout. Rejected.
 
 ### 3. Two tags, named by what a test is

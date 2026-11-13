@@ -150,76 +150,84 @@ test.describe("Home", function describeHome(): void {
   });
 });
 
-test.describe("Several sandboxes, at most one visible", function describeSandboxes(): void {
-  test("Second link hides the first mod", async function hidesFirstMod({
-    page,
-  }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    const firstFrame = await findSandboxFrame(page, "sandbox-1");
-    await markFrame(firstFrame);
+test.describe(
+  "Several sandboxes, at most one visible",
+  { tag: "@frames" },
+  function describeSandboxes(): void {
+    test("Second link hides the first mod", async function hidesFirstMod({
+      page,
+    }): Promise<void> {
+      await page.goto(`/${SAMPLE_RUN_HASH}`);
+      const firstFrame = await findSandboxFrame(page, "sandbox-1");
+      await markFrame(firstFrame);
 
-    await followLink(page, EXPLORER_LINK);
-    await expect(stageBar(page)).toContainText("Mods");
+      await followLink(page, EXPLORER_LINK);
+      await expect(stageBar(page)).toContainText("Mods");
 
-    await expect(page.locator("[data-sandbox-id] iframe")).toHaveCount(2);
-    expect(await readVisibleId(page)).toBe("sandbox-2");
-    await expect(page.locator('[data-sandbox-id="sandbox-1"]')).toBeHidden();
-    expect(await isFrameMarked(firstFrame)).toBe(true);
-  });
-});
+      await expect(page.locator("[data-sandbox-id] iframe")).toHaveCount(2);
+      expect(await readVisibleId(page)).toBe("sandbox-2");
+      await expect(page.locator('[data-sandbox-id="sandbox-1"]')).toBeHidden();
+      expect(await isFrameMarked(firstFrame)).toBe(true);
+    });
+  },
+);
 
-test.describe("Back and forward keep the sandbox state", function describeHistory(): void {
-  test("Back to the previous mod", async function goesBack({
-    page,
-  }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    const firstFrame = await findSandboxFrame(page, "sandbox-1");
-    await firstFrame.evaluate(rememberValue);
-    await markFrame(firstFrame);
-    await followLink(page, EXPLORER_LINK);
-    await expect(stageBar(page)).toContainText("Mods");
+test.describe(
+  "Back and forward keep the sandbox state",
+  { tag: "@frames" },
+  function describeHistory(): void {
+    test("Back to the previous mod", async function goesBack({
+      page,
+    }): Promise<void> {
+      await page.goto(`/${SAMPLE_RUN_HASH}`);
+      const firstFrame = await findSandboxFrame(page, "sandbox-1");
+      await firstFrame.evaluate(rememberValue);
+      await markFrame(firstFrame);
+      await followLink(page, EXPLORER_LINK);
+      await expect(stageBar(page)).toContainText("Mods");
 
-    await page.goBack();
+      await page.goBack();
 
-    await expect(stageBar(page)).toContainText("Book List");
-    expect(await readVisibleId(page)).toBe("sandbox-1");
-    expect(await isFrameMarked(firstFrame)).toBe(true);
-    expect(await firstFrame.evaluate(readRememberedValue)).toBe(42);
-  });
+      await expect(stageBar(page)).toContainText("Book List");
+      expect(await readVisibleId(page)).toBe("sandbox-1");
+      expect(await isFrameMarked(firstFrame)).toBe(true);
+      expect(await firstFrame.evaluate(readRememberedValue)).toBe(42);
+    });
 
-  test("Forward again", async function goesForward({ page }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    await followLink(page, EXPLORER_LINK);
-    const secondFrame = await findSandboxFrame(page, "sandbox-2");
-    await markFrame(secondFrame);
-    await page.goBack();
-    await expect(stageBar(page)).toContainText("Book List");
+    test("Forward again", async function goesForward({ page }): Promise<void> {
+      await page.goto(`/${SAMPLE_RUN_HASH}`);
+      await followLink(page, EXPLORER_LINK);
+      const secondFrame = await findSandboxFrame(page, "sandbox-2");
+      await markFrame(secondFrame);
+      await page.goBack();
+      await expect(stageBar(page)).toContainText("Book List");
 
-    await page.goForward();
+      await page.goForward();
 
-    await expect(stageBar(page)).toContainText("Mods");
-    expect(await readVisibleId(page)).toBe("sandbox-2");
-    expect(await isFrameMarked(secondFrame)).toBe(true);
-  });
+      await expect(stageBar(page)).toContainText("Mods");
+      expect(await readVisibleId(page)).toBe("sandbox-2");
+      expect(await isFrameMarked(secondFrame)).toBe(true);
+    });
 
-  test("Back after a page reload", async function reopensAfterReload({
-    page,
-  }): Promise<void> {
-    await page.goto(`/${SAMPLE_RUN_HASH}`);
-    await followLink(page, EXPLORER_LINK);
-    await expect(stageBar(page)).toContainText("Mods");
+    test("Back after a page reload", async function reopensAfterReload({
+      page,
+    }): Promise<void> {
+      await page.goto(`/${SAMPLE_RUN_HASH}`);
+      await followLink(page, EXPLORER_LINK);
+      await expect(stageBar(page)).toContainText("Mods");
 
-    await page.reload();
-    await expect(stageBar(page)).toContainText("Mods");
-    await page.goBack();
+      await page.reload();
+      await expect(stageBar(page)).toContainText("Mods");
+      await page.goBack();
 
-    await expect(stageBar(page)).toContainText("Book List");
-    expect(await readVisibleId(page)).toBe("sandbox-2");
-    await expect(
-      page.locator('[data-sandbox-id="sandbox-2"] iframe[title="Book List"]'),
-    ).toBeAttached();
-  });
-});
+      await expect(stageBar(page)).toContainText("Book List");
+      expect(await readVisibleId(page)).toBe("sandbox-2");
+      await expect(
+        page.locator('[data-sandbox-id="sandbox-2"] iframe[title="Book List"]'),
+      ).toBeAttached();
+    });
+  },
+);
 
 test.describe("Opening after going back drops the forward entries", function describeForwardEntries(): void {
   test("New link after going back", async function dropsForwardSandbox({
@@ -393,17 +401,6 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
 });
 
 test.describe("Show the mod issues", function describeIssues(): void {
-  test("Sample mod has no issues", async function showsNoIssues({
-    page,
-  }): Promise<void> {
-    await routeCovers(page);
-
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-
-    await expect(stageBar(page)).toContainText("Book List");
-    await expectNoIssues(page);
-  });
-
   test("Foreign mod permission issue is listed", async function listsForeignIssue({
     page,
   }): Promise<void> {

@@ -128,336 +128,375 @@ function buildPlayerAnswerFiles(): ModFiles {
   return files;
 }
 
-test.describe("Tests run in the check", function describeTestsInCheck(): void {
-  test("Sample mod tests pass", async function passesSampleTests({
-    page,
-  }): Promise<void> {
-    await openChecker(page, {});
+test.describe(
+  "Tests run in the check",
+  { tag: "@frames" },
+  function describeTestsInCheck(): void {
+    test("Sample mod tests pass", async function passesSampleTests({
+      page,
+    }): Promise<void> {
+      await openChecker(page, {});
 
-    const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
+      const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
 
-    expect(report).toEqual({
-      source: readSampleModSource(page),
-      status: "pass",
-      mountChecked: true,
-      testsChecked: true,
-      tests: SAMPLE_TEST_RESULTS,
-      findings: [],
+      expect(report).toEqual({
+        source: readSampleModSource(page),
+        status: "pass",
+        mountChecked: true,
+        testsChecked: true,
+        tests: SAMPLE_TEST_RESULTS,
+        findings: [],
+      });
+      await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
     });
-    await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
-  });
 
-  test("Opening does not fetch the tests", async function skipsTestFile({
-    page,
-  }): Promise<void> {
-    const seenUrls = await openChecker(
+    test("Opening does not fetch the tests", async function skipsTestFile({
       page,
-      buildTestedProbeFiles("opened_tests", ONE_FAILING_TEST_CODE),
-    );
-    const testFileSource = readTestFileSource(page, "opened_tests");
-    const checkerFrame = await findModFrame(page, CHECKER_TITLE);
+    }): Promise<void> {
+      const seenUrls = await openChecker(
+        page,
+        buildTestedProbeFiles("opened_tests", ONE_FAILING_TEST_CODE),
+      );
+      const testFileSource = readTestFileSource(page, "opened_tests");
+      const checkerFrame = await findModFrame(page, CHECKER_TITLE);
 
-    const inspection: ProbeAnswer = await checkerFrame.evaluate(
-      requestFromProbe,
-      ["mods.inspect", { mod: buildTestModReference("opened_tests") }],
-    );
-    await page.goto(`/#/run?mod=${buildTestModReference("opened_tests")}`);
-    await waitForProbe(await findModFrame(page, "opened_tests"));
+      const inspection: ProbeAnswer = await checkerFrame.evaluate(
+        requestFromProbe,
+        ["mods.inspect", { mod: buildTestModReference("opened_tests") }],
+      );
+      await page.goto(`/#/run?mod=${buildTestModReference("opened_tests")}`);
+      await waitForProbe(await findModFrame(page, "opened_tests"));
 
-    expect(inspection.result).toMatchObject({ testSource: testFileSource });
-    expect(seenUrls).toContain(
-      new URL("/test-mods/opened_tests/main.js", page.url()).href,
-    );
-    expect(seenUrls).not.toContain(testFileSource);
-  });
-});
-
-test.describe("Test file format", function describeTestFileFormat(): void {
-  test("Syntax error", async function reportsSyntaxError({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
-      page,
-      buildTestedProbeFiles("syntax_error", SYNTAX_ERROR_TEST_CODE),
-      "syntax_error",
-    );
-
-    expect(report.status).toBe("fail");
-    expect(report.mountChecked).toBe(true);
-    expect(report.testsChecked).toBe(false);
-    expect(report.findings).toHaveLength(1);
-    expect(report.findings[0]).toMatchObject({
-      step: "test",
-      level: "error",
-      source: readTestFileSource(page, "syntax_error"),
+      expect(inspection.result).toMatchObject({ testSource: testFileSource });
+      expect(seenUrls).toContain(
+        new URL("/test-mods/opened_tests/main.js", page.url()).href,
+      );
+      expect(seenUrls).not.toContain(testFileSource);
     });
-    await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
-  });
-});
+  },
+);
 
-test.describe("Each case in a fresh frame", function describeFreshFrames(): void {
-  test("Cases do not share storage", async function isolatesStorage({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+test.describe(
+  "Test file format",
+  { tag: "@frames" },
+  function describeTestFileFormat(): void {
+    test("Syntax error", async function reportsSyntaxError({
       page,
-      buildTestedProbeFiles("isolation", ISOLATION_TEST_CODE),
-      "isolation",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("syntax_error", SYNTAX_ERROR_TEST_CODE),
+        "syntax_error",
+      );
 
-    expect(findCase(report, "changes the storage and the page").status).toBe(
-      "pass",
-    );
-    expect(findCase(report, "reads the storage")).toEqual({
-      name: "reads the storage",
-      status: "pass",
-      message: null,
+      expect(report.status).toBe("fail");
+      expect(report.mountChecked).toBe(true);
+      expect(report.testsChecked).toBe(false);
+      expect(report.findings).toHaveLength(1);
+      expect(report.findings[0]).toMatchObject({
+        step: "test",
+        level: "error",
+        source: readTestFileSource(page, "syntax_error"),
+      });
+      await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
     });
-  });
+  },
+);
 
-  test("Cases do not share the page", async function isolatesPage({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+test.describe(
+  "Each case in a fresh frame",
+  { tag: "@frames" },
+  function describeFreshFrames(): void {
+    test("Cases do not share storage", async function isolatesStorage({
       page,
-      buildTestedProbeFiles("isolation", ISOLATION_TEST_CODE),
-      "isolation",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("isolation", ISOLATION_TEST_CODE),
+        "isolation",
+      );
 
-    expect(findCase(report, "reads the page")).toEqual({
-      name: "reads the page",
-      status: "pass",
-      message: null,
+      expect(findCase(report, "changes the storage and the page").status).toBe(
+        "pass",
+      );
+      expect(findCase(report, "reads the storage")).toEqual({
+        name: "reads the storage",
+        status: "pass",
+        message: null,
+      });
     });
-  });
-});
 
-test.describe("Mounting from a case", function describeMountingFromCase(): void {
-  test("Config override", async function overridesConfig({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+    test("Cases do not share the page", async function isolatesPage({
       page,
-      buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-      "sample_context",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("isolation", ISOLATION_TEST_CODE),
+        "isolation",
+      );
 
-    expect(findCase(report, "hides the covers").status).toBe("pass");
-    expect(findCase(report, "shows the covers").status).toBe("pass");
-  });
-
-  test("Other tiles", async function mountsOtherTiles({ page }): Promise<void> {
-    const report = await checkTestMod(
-      page,
-      buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-      "sample_context",
-    );
-
-    expect(findCase(report, "shows no books")).toMatchObject({
-      status: "pass",
+      expect(findCase(report, "reads the page")).toEqual({
+        name: "reads the page",
+        status: "pass",
+        message: null,
+      });
     });
-  });
+  },
+);
 
-  test("Mount twice", async function rejectsSecondMount({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+test.describe(
+  "Mounting from a case",
+  { tag: "@frames" },
+  function describeMountingFromCase(): void {
+    test("Config override", async function overridesConfig({
       page,
-      buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-      "sample_context",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
+        "sample_context",
+      );
 
-    expect(findCase(report, "mounts twice")).toEqual({
-      name: "mounts twice",
-      status: "fail",
-      message: "the mod is already mounted",
+      expect(findCase(report, "hides the covers").status).toBe("pass");
+      expect(findCase(report, "shows the covers").status).toBe("pass");
     });
-  });
-});
 
-test.describe("Case context", function describeCaseContext(): void {
-  test("Seeded storage", async function seedsStorage({ page }): Promise<void> {
-    const report = await checkTestMod(
+    test("Other tiles", async function mountsOtherTiles({
       page,
-      buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-      "sample_context",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
+        "sample_context",
+      );
 
-    expect(findCase(report, "remembers the books per row")).toMatchObject({
-      status: "pass",
-      message: null,
+      expect(findCase(report, "shows no books")).toMatchObject({
+        status: "pass",
+      });
     });
-  });
 
-  test("Requests are recorded", async function recordsRequests({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+    test("Mount twice", async function rejectsSecondMount({
       page,
-      buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
-      "sample_context",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
+        "sample_context",
+      );
 
-    expect(findCase(report, "records the requests")).toMatchObject({
-      status: "pass",
-      message: null,
+      expect(findCase(report, "mounts twice")).toEqual({
+        name: "mounts twice",
+        status: "fail",
+        message: "the mod is already mounted",
+      });
     });
-  });
-});
+  },
+);
 
-test.describe("Scripted answers", function describeScriptedAnswers(): void {
-  test("Confirm answered yes", async function answersConfirm({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+test.describe(
+  "Case context",
+  { tag: "@frames" },
+  function describeCaseContext(): void {
+    test("Seeded storage", async function seedsStorage({
       page,
-      buildTestedProbeFiles("answers", ANSWER_TEST_CODE),
-      "answers",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
+        "sample_context",
+      );
 
-    expect(findCase(report, "confirms yes").status).toBe("pass");
-    expect(findCase(report, "confirms no without an answer").status).toBe(
-      "pass",
-    );
-    expect(findCase(report, "opens nothing").status).toBe("pass");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.locator("[data-sandbox-id]")).toHaveCount(1);
-    expect(report.findings).toEqual([]);
-  });
-
-  test("Player answered", async function answersPlayer({
-    page,
-  }): Promise<void> {
-    const playerRequests = await routePlayerSites(page);
-    await serveBodyTiles(page, [
-      {
-        name: "bunny",
-        metadataLines: [`video: "${YOUTUBE_PAGE}"`],
-        body: "Big Buck Bunny.",
-      },
-    ]);
-
-    const report = await checkTestMod(
-      page,
-      buildPlayerAnswerFiles(),
-      "player_answer",
-    );
-
-    expect(findCase(report, "plays the answered player")).toEqual({
-      name: "plays the answered player",
-      status: "pass",
-      message: null,
+      expect(findCase(report, "remembers the books per row")).toMatchObject({
+        status: "pass",
+        message: null,
+      });
     });
-    expect(report.findings).toEqual([]);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    expect(playerRequests).toEqual([]);
-  });
 
-  test("Wrong answer type", async function rejectsWrongAnswer({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+    test("Requests are recorded", async function recordsRequests({
       page,
-      buildTestedProbeFiles("wrong_answer", WRONG_ANSWER_TEST_CODE),
-      "wrong_answer",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildSampleCaseFiles("sample_context", SAMPLE_CONTEXT_TEST_CODE),
+        "sample_context",
+      );
 
-    expect(findCase(report, "answers with text")).toEqual({
-      name: "answers with text",
-      status: "fail",
-      message: "the answer to ui.confirm must be a boolean",
+      expect(findCase(report, "records the requests")).toMatchObject({
+        status: "pass",
+        message: null,
+      });
     });
-  });
-});
+  },
+);
 
-test.describe("What a case records", function describeCaseRecords(): void {
-  test("Unknown method in a case", async function recordsUnknownMethod({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+test.describe(
+  "Scripted answers",
+  { tag: "@frames" },
+  function describeScriptedAnswers(): void {
+    test("Confirm answered yes", async function answersConfirm({
       page,
-      buildUnknownMethodCaseFiles(),
-      "unknown_method_case",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("answers", ANSWER_TEST_CODE),
+        "answers",
+      );
 
-    expect(report.status).toBe("fail");
-    expect(findCase(report, "deletes a book").status).toBe("pass");
-    expect(report.findings).toHaveLength(1);
-    expect(report.findings[0]).toMatchObject({ step: "test", level: "error" });
-    expect(report.findings[0].message).toContain("deletes a book");
-    expect(report.findings[0].message).toContain("tiles.delete");
-    expect(report.findings[0].message).toContain("Unknown method");
-  });
-
-  test("Blocked image in a case", async function recordsBlockedImage({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
-      page,
-      buildUndeclaredImageCaseFiles(),
-      "undeclared_image_case",
-    );
-
-    expect(report.status).toBe("warn");
-    expect(report.findings).toHaveLength(1);
-    expect(report.findings[0]).toMatchObject({
-      step: "test",
-      level: "warning",
+      expect(findCase(report, "confirms yes").status).toBe("pass");
+      expect(findCase(report, "confirms no without an answer").status).toBe(
+        "pass",
+      );
+      expect(findCase(report, "opens nothing").status).toBe("pass");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(page.locator("[data-sandbox-id]")).toHaveCount(1);
+      expect(report.findings).toEqual([]);
     });
-    expect(report.findings[0].message).toContain("shows covers");
-    expect(report.findings[0].message).toContain(UNDECLARED_IMAGE_HOST);
-    expect(report.findings[0].message).toContain("permissions.show");
-  });
 
-  test("Expected mount failure", async function ignoresExpectedFailure({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+    test("Player answered", async function answersPlayer({
       page,
-      buildExpectedFailureCaseFiles(),
-      "expected_failure_case",
-    );
+    }): Promise<void> {
+      const playerRequests = await routePlayerSites(page);
+      await serveBodyTiles(page, [
+        {
+          name: "bunny",
+          metadataLines: [`video: "${YOUTUBE_PAGE}"`],
+          body: "Big Buck Bunny.",
+        },
+      ]);
 
-    expect(findCase(report, "expects a mount failure")).toEqual({
-      name: "expects a mount failure",
-      status: "pass",
-      message: null,
+      const report = await checkTestMod(
+        page,
+        buildPlayerAnswerFiles(),
+        "player_answer",
+      );
+
+      expect(findCase(report, "plays the answered player")).toEqual({
+        name: "plays the answered player",
+        status: "pass",
+        message: null,
+      });
+      expect(report.findings).toEqual([]);
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      expect(playerRequests).toEqual([]);
     });
-    expect(report.status).toBe("pass");
-    for (const message of listFindingMessages(report)) {
-      expect(message).not.toContain("map failed");
-    }
-  });
-});
 
-test.describe("Expectations", function describeExpectations(): void {
-  test("Failing equality", async function failsEquality({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
+    test("Wrong answer type", async function rejectsWrongAnswer({
       page,
-      buildSampleCaseFiles("expectations", EXPECTATION_TEST_CODE),
-      "expectations",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("wrong_answer", WRONG_ANSWER_TEST_CODE),
+        "wrong_answer",
+      );
 
-    const result = findCase(report, "fails equality");
-    expect(result.status).toBe("fail");
-    expect(result.message).toContain("2");
-    expect(result.message).toContain("3");
-  });
+      expect(findCase(report, "answers with text")).toEqual({
+        name: "answers with text",
+        status: "fail",
+        message: "the answer to ui.confirm must be a boolean",
+      });
+    });
+  },
+);
 
-  test("Negation", async function passesNegation({ page }): Promise<void> {
-    const report = await checkTestMod(
+test.describe(
+  "What a case records",
+  { tag: "@frames" },
+  function describeCaseRecords(): void {
+    test("Unknown method in a case", async function recordsUnknownMethod({
       page,
-      buildSampleCaseFiles("expectations", EXPECTATION_TEST_CODE),
-      "expectations",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildUnknownMethodCaseFiles(),
+        "unknown_method_case",
+      );
 
-    expect(findCase(report, "negates").status).toBe("pass");
-  });
-});
+      expect(report.status).toBe("fail");
+      expect(findCase(report, "deletes a book").status).toBe("pass");
+      expect(report.findings).toHaveLength(1);
+      expect(report.findings[0]).toMatchObject({
+        step: "test",
+        level: "error",
+      });
+      expect(report.findings[0].message).toContain("deletes a book");
+      expect(report.findings[0].message).toContain("tiles.delete");
+      expect(report.findings[0].message).toContain("Unknown method");
+    });
 
-test.describe("Waiting", function describeWaiting(): void {
+    test("Blocked image in a case", async function recordsBlockedImage({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildUndeclaredImageCaseFiles(),
+        "undeclared_image_case",
+      );
+
+      expect(report.status).toBe("warn");
+      expect(report.findings).toHaveLength(1);
+      expect(report.findings[0]).toMatchObject({
+        step: "test",
+        level: "warning",
+      });
+      expect(report.findings[0].message).toContain("shows covers");
+      expect(report.findings[0].message).toContain(UNDECLARED_IMAGE_HOST);
+      expect(report.findings[0].message).toContain("permissions.show");
+    });
+
+    test("Expected mount failure", async function ignoresExpectedFailure({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildExpectedFailureCaseFiles(),
+        "expected_failure_case",
+      );
+
+      expect(findCase(report, "expects a mount failure")).toEqual({
+        name: "expects a mount failure",
+        status: "pass",
+        message: null,
+      });
+      expect(report.status).toBe("pass");
+      for (const message of listFindingMessages(report)) {
+        expect(message).not.toContain("map failed");
+      }
+    });
+  },
+);
+
+test.describe(
+  "Expectations",
+  { tag: "@frames" },
+  function describeExpectations(): void {
+    test("Failing equality", async function failsEquality({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildSampleCaseFiles("expectations", EXPECTATION_TEST_CODE),
+        "expectations",
+      );
+
+      const result = findCase(report, "fails equality");
+      expect(result.status).toBe("fail");
+      expect(result.message).toContain("2");
+      expect(result.message).toContain("3");
+    });
+
+    test("Negation", async function passesNegation({ page }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildSampleCaseFiles("expectations", EXPECTATION_TEST_CODE),
+        "expectations",
+      );
+
+      expect(findCase(report, "negates").status).toBe("pass");
+    });
+  },
+);
+
+test.describe("Waiting", { tag: "@frames" }, function describeWaiting(): void {
   test("Wait for the list", async function waitsForList({
     page,
   }): Promise<void> {
@@ -488,97 +527,115 @@ test.describe("Waiting", function describeWaiting(): void {
   });
 });
 
-test.describe("Case results", function describeCaseResults(): void {
-  test("One case fails", async function runsEveryCase({ page }): Promise<void> {
-    const report = await checkTestMod(
+test.describe(
+  "Case results",
+  { tag: "@frames" },
+  function describeCaseResults(): void {
+    test("One case fails", async function runsEveryCase({
       page,
-      buildTestedProbeFiles("one_failing", ONE_FAILING_TEST_CODE),
-      "one_failing",
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("one_failing", ONE_FAILING_TEST_CODE),
+        "one_failing",
+      );
 
-    expect(report.tests).toHaveLength(3);
-    expect(report.tests[0]).toEqual({
-      name: "first",
-      status: "pass",
-      message: null,
+      expect(report.tests).toHaveLength(3);
+      expect(report.tests[0]).toEqual({
+        name: "first",
+        status: "pass",
+        message: null,
+      });
+      expect(report.tests[1]).toMatchObject({ name: "second", status: "fail" });
+      expect(report.tests[1].message).toContain("no books");
+      expect(report.tests[2]).toEqual({
+        name: "third",
+        status: "pass",
+        message: null,
+      });
+      await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
     });
-    expect(report.tests[1]).toMatchObject({ name: "second", status: "fail" });
-    expect(report.tests[1].message).toContain("no books");
-    expect(report.tests[2]).toEqual({
-      name: "third",
-      status: "pass",
-      message: null,
+
+    test("Case too long", async function failsLongCase({
+      page,
+    }): Promise<void> {
+      await page.clock.install();
+      const seenUrls = await openChecker(
+        page,
+        buildTestedProbeFiles("endless", ENDLESS_TEST_CODE),
+      );
+
+      const { report, elapsedMs } = await checkPastLimit(
+        page,
+        buildTestModReference("endless"),
+        seenUrls,
+      );
+
+      expect(elapsedMs).toBeGreaterThanOrEqual(CHECK_LIMIT_MS);
+      expect(report.tests).toEqual([
+        {
+          name: "waits forever",
+          status: "fail",
+          message: "The test did not finish within 10 seconds.",
+        },
+      ]);
+      await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
     });
-    await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
-  });
+  },
+);
 
-  test("Case too long", async function failsLongCase({ page }): Promise<void> {
-    await page.clock.install();
-    const seenUrls = await openChecker(
+test.describe(
+  "Test API names",
+  { tag: "@frames" },
+  function describeTestApiNames(): void {
+    test("pins the names of t, the case context and the matchers", async function pinsNames({
       page,
-      buildTestedProbeFiles("endless", ENDLESS_TEST_CODE),
-    );
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("keys_probe", KEYS_PROBE_TEST_CODE),
+        "keys_probe",
+      );
 
-    const { report, elapsedMs } = await checkPastLimit(
-      page,
-      buildTestModReference("endless"),
-      seenUrls,
-    );
-
-    expect(elapsedMs).toBeGreaterThanOrEqual(CHECK_LIMIT_MS);
-    expect(report.tests).toEqual([
-      {
-        name: "waits forever",
-        status: "fail",
-        message: "The test did not finish within 10 seconds.",
-      },
-    ]);
-    await expect(page.locator(CHECK_FRAME_SELECTOR)).toHaveCount(0);
-  });
-});
-
-test.describe("Test API names", function describeTestApiNames(): void {
-  test("pins the names of t, the case context and the matchers", async function pinsNames({
-    page,
-  }): Promise<void> {
-    const report = await checkTestMod(
-      page,
-      buildTestedProbeFiles("keys_probe", KEYS_PROBE_TEST_CODE),
-      "keys_probe",
-    );
-
-    const result = findCase(report, "reports the keys");
-    expect(JSON.parse(result.message ?? "null")).toEqual({
-      t: ["test"],
-      context: [
-        "answer",
-        "expect",
-        "mount",
-        "requests",
-        "root",
-        "storage",
-        "tiles",
-        "waitFor",
-      ],
-      storage: ["get", "set"],
-      expect: ["not", "toBe", "toBeTruthy", "toContain", "toEqual"],
-      not: ["toBe", "toBeTruthy", "toContain", "toEqual"],
+      const result = findCase(report, "reports the keys");
+      expect(JSON.parse(result.message ?? "null")).toEqual({
+        t: ["test"],
+        context: [
+          "answer",
+          "expect",
+          "mount",
+          "requests",
+          "root",
+          "storage",
+          "tiles",
+          "waitFor",
+        ],
+        storage: ["get", "set"],
+        expect: ["not", "toBe", "toBeTruthy", "toContain", "toEqual"],
+        not: ["toBe", "toBeTruthy", "toContain", "toEqual"],
+      });
     });
-  });
-});
+  },
+);
 
-test.describe("Sample mod tests", function describeSampleTests(): void {
-  test("Sample tests", async function runsSampleTests({ page }): Promise<void> {
-    const testFileRequests: string[] = [];
-    page.on(
-      "request",
-      recordRequestTo.bind(undefined, SAMPLE_TEST_PATH, testFileRequests),
-    );
-    await openChecker(page, {});
+test.describe(
+  "Sample mod tests",
+  { tag: "@frames" },
+  function describeSampleTests(): void {
+    test("Sample tests", async function runsSampleTests({
+      page,
+    }): Promise<void> {
+      const testFileRequests: string[] = [];
+      page.on(
+        "request",
+        recordRequestTo.bind(undefined, SAMPLE_TEST_PATH, testFileRequests),
+      );
+      await openChecker(page, {});
 
-    const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
+      const report = await checkFromChecker(page, SAMPLE_MOD_REFERENCE);
 
-    expect(report.tests).toEqual(SAMPLE_TEST_RESULTS);
-    expect(testFileRequests).toHaveLength(1);
-  });
-});
+      expect(report.tests).toEqual(SAMPLE_TEST_RESULTS);
+      expect(testFileRequests).toHaveLength(1);
+    });
+  },
+);

@@ -178,51 +178,59 @@ test.describe("What the dialog lists", function describeLines(): void {
   });
 });
 
-test.describe("Allow grants the checked lines", function describeAllow(): void {
-  test("One line unchecked", async function allowsCheckedLines({
-    page,
-  }): Promise<void> {
-    const apiUrls = await recordHost(page, `${API_HOST}/**`);
-    await openForeignProbe(page, [...SHOW_LINES, ...CONNECT_LINES]);
+test.describe(
+  "Allow grants the checked lines",
+  { tag: "@frames" },
+  function describeAllow(): void {
+    test("One line unchecked", async function allowsCheckedLines({
+      page,
+    }): Promise<void> {
+      const apiUrls = await recordHost(page, `${API_HOST}/**`);
+      await openForeignProbe(page, [...SHOW_LINES, ...CONNECT_LINES]);
 
-    await answerSiteConsent(page, "Allow", { unchecked: [CONNECT_LINE] });
-    const frame = await waitForProbeFrame(page);
+      await answerSiteConsent(page, "Allow", { unchecked: [CONNECT_LINE] });
+      const frame = await waitForProbeFrame(page);
 
-    expect(await frame.evaluate(showImage, COVER_URL)).toBe(true);
-    expect(await frame.evaluate(fetchFromFrame, `${API_HOST}/prices`)).not.toBe(
-      "sent",
-    );
-    expect(apiUrls).toEqual([]);
-    const context = await frame.evaluate(readProbeContext);
-    expect(context.permissions).toEqual({
-      granted: [
-        {
-          category: "show",
-          host: COVER_HOST,
-          reason: "Shows the book covers",
-        },
-      ],
-      denied: [
-        { category: "connect", host: API_HOST, reason: "Reads the prices" },
-      ],
+      expect(await frame.evaluate(showImage, COVER_URL)).toBe(true);
+      expect(
+        await frame.evaluate(fetchFromFrame, `${API_HOST}/prices`),
+      ).not.toBe("sent");
+      expect(apiUrls).toEqual([]);
+      const context = await frame.evaluate(readProbeContext);
+      expect(context.permissions).toEqual({
+        granted: [
+          {
+            category: "show",
+            host: COVER_HOST,
+            reason: "Shows the book covers",
+          },
+        ],
+        denied: [
+          { category: "connect", host: API_HOST, reason: "Reads the prices" },
+        ],
+      });
     });
-  });
-});
+  },
+);
 
-test.describe("Show without them refuses the listed lines", function describeShowWithout(): void {
-  test("Escape", async function refusesOnEscape({ page }): Promise<void> {
-    await openForeignProbe(page);
-    await expectAsking(page);
+test.describe(
+  "Show without them refuses the listed lines",
+  { tag: "@frames" },
+  function describeShowWithout(): void {
+    test("Escape", async function refusesOnEscape({ page }): Promise<void> {
+      await openForeignProbe(page);
+      await expectAsking(page);
 
-    await clickCheckedTo(lineCheckbox(page, REMEMBER_LABEL), true);
-    await page.keyboard.press("Escape");
-    const frame = await waitForProbeFrame(page);
+      await clickCheckedTo(lineCheckbox(page, REMEMBER_LABEL), true);
+      await page.keyboard.press("Escape");
+      const frame = await waitForProbeFrame(page);
 
-    expect(await frame.evaluate(showImage, COVER_URL)).toBe(false);
-    await reopenProbe(page);
-    await expectAsking(page);
-  });
-});
+      expect(await frame.evaluate(showImage, COVER_URL)).toBe(false);
+      await reopenProbe(page);
+      await expectAsking(page);
+    });
+  },
+);
 
 test.describe("Remember keeps the answer for that mod", function describeRemember(): void {
   test("Remembered allow", async function remembersAllow({

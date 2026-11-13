@@ -311,565 +311,607 @@ async function openViewer(page: Page): Promise<Frame> {
   return viewer;
 }
 
-test.describe("The sample in the app", function describeSampleInApp(): void {
-  test("Inspect the sample", async function inspectsSample({
-    page,
-  }): Promise<void> {
-    const viewer = await openViewer(page);
-
-    const permissions = viewer
-      .getByRole("heading", { name: "Permissions" })
-      .locator("xpath=following-sibling::*[1]");
-    await expect(permissions).toHaveText("(none)");
-  });
-
-  test("Check mod passes", async function checksSample({
-    page,
-  }): Promise<void> {
-    // The check runs every case of test.js, each in a fresh frame.
-    test.setTimeout(180000);
-    const viewer = await openViewer(page);
-
-    await viewer.getByRole("button", { name: "Check mod" }).click();
-
-    const report = viewer.getByRole("region", { name: "Check report" });
-    await expect(report.getByRole("heading")).toContainText("Check passed", {
-      timeout: 170000,
-    });
-    await expect(report.getByText("No findings.")).toBeVisible();
-  });
-});
-
-test.describe("Explore and Study modes", function describeModes(): void {
-  test("Start in Explore", async function startsInExplore({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-
-    await expect(modeButton(frame, "Explore")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await expect(modeButton(frame, "Study")).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    await expect(tileTable(frame)).toBeVisible();
-    await expect(frame.getByRole("row")).toHaveCount(
-      SAMPLE_CARD_FILES.length + 1,
-    );
-  });
-
-  test("Switch to Study", async function switchesToStudy({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-
-    await modeButton(frame, "Study").click();
-
-    await expect(setupDialog(frame)).toBeVisible();
-    await expect(modeButton(frame, "Study")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await expect(modeButton(frame, "Explore")).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    await expect(tileTable(frame)).toHaveCount(0);
-  });
-});
-
-test.describe("Tile table", function describeTileTable(): void {
-  test("Click on the file cell", async function opensFromFileCell({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-
-    await frame.getByRole("cell", { name: "tables.md", exact: true }).click();
-
-    await expect(tileCard(frame, "Tables")).toBeVisible();
-  });
-
-  test("Names from the tiles", async function namesTiles({
-    page,
-  }): Promise<void> {
-    await serveExtraCards(page);
-    await serveDeck(page, ["monad.md", "notes_03.md"]);
-
-    const frame = await openFlashcards(page, "What is a monad?");
-
-    await expect(frame.locator("td > button")).toHaveText([
-      "What is a monad?",
-      "No title",
-    ]);
-  });
-
-  test("No title and no heading", async function showsNoTitle({
-    page,
-  }): Promise<void> {
-    await serveExtraCards(page);
-    await serveDeck(page, ["notes_03.md"]);
-    const frame = await openFlashcards(page, "No title");
-    const button = rowButton(frame, "No title");
-    const mutedColor = await frame.evaluate(readTokenAs, [
-      "--ot-muted-foreground",
-      "color",
-    ]);
-
-    const look = await button.locator("span").evaluate(readTextLook);
-
-    expect(look).toEqual({ fontStyle: "italic", color: mutedColor });
-    await expect(button).toHaveAccessibleName(/No title.*notes_03\.md/);
-    await button.click();
-    await expect(tileCard(frame, "notes_03.md")).toBeVisible();
-  });
-});
-
-test.describe("Tile card", function describeTileCard(): void {
-  test("Open the card of Tables", async function opensTablesCard({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-
-    const card = await openTablesCard(frame);
-
-    await expect(card.getByRole("table").first()).toBeVisible();
-    await expect(card.getByRole("heading", { name: "See also" })).toBeVisible();
-    await expect(rowButton(frame, "Tables")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    await expect(rowButton(frame, "Links")).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-  });
-
-  test("Escape", async function closesOnEscape({ page }): Promise<void> {
-    const frame = await openSampleDeck(page);
-    await openTablesCard(frame);
-
-    await page.keyboard.press("Escape");
-
-    await expect(anyDialog(frame)).toHaveCount(0);
-    await expect(rowButton(frame, "Tables")).toBeFocused();
-  });
-
-  test("Backdrop", async function closesOnBackdrop({ page }): Promise<void> {
-    const frame = await openSampleDeck(page);
-    const card = await openTablesCard(frame);
-    const frameBox = await page
-      .locator('iframe[title="Flashcards"]')
-      .boundingBox();
-    const cardBox = await card.boundingBox();
-    if (frameBox === null || cardBox === null) {
-      throw new Error("Expected the frame and the card to be shown");
-    }
-    const x = frameBox.x + 4;
-    expect(x).toBeLessThan(cardBox.x);
-
-    await page.mouse.click(x, cardBox.y + cardBox.height / 2);
-
-    await expect(anyDialog(frame)).toHaveCount(0);
-    await expect(rowButton(frame, "Tables")).toBeFocused();
-  });
-
-  test("Click inside", async function staysOpenOnInsideClick({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-    const card = await openTablesCard(frame);
-
-    await card.getByText("Pipes separate the cells").click();
-
-    await expect(card).toBeVisible();
-  });
-
-  test("Reloaded with the tile", async function followsTile({
-    page,
-  }): Promise<void> {
-    const changed: RouteSwitch = { isOn: false };
-    await page.route(
-      `**${FLASHCARDS_CARDS_FOLDER_PATH}/tables.md`,
-      answerChangedTables.bind(undefined, changed),
-    );
-    const frame = await openSampleDeck(page);
-    const card = await openTablesCard(frame);
-    changed.isOn = true;
-
-    await reloadTiles(page);
-
-    await expect(card.getByText("A vertical bar")).toBeVisible();
-    await expect(card).toBeVisible();
-  });
-
-  test("Reloaded without the tile", async function closesWithoutTile({
-    page,
-  }): Promise<void> {
-    const changed: RouteSwitch = { isOn: false };
-    await page.route(
-      FLASHCARDS_COLLECTION_GLOB,
-      answerChangedDeck.bind(undefined, changed, ["emphasis.md", "links.md"]),
-    );
-    const frame = await openSampleDeck(page);
-    await openTablesCard(frame);
-    changed.isOn = true;
-
-    await reloadTiles(page);
-
-    await expect(anyDialog(frame)).toHaveCount(0);
-    await expect(frame.locator("td > button")).toHaveCount(2);
-  });
-});
-
-test.describe("Study session", function describeStudySession(): void {
-  test("Step with Enter", async function stepsWithEnter({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-    await startStudying(frame);
-    await expect(
-      frame.getByRole("button", { name: "Show answer" }),
-    ).toBeFocused();
-
-    await page.keyboard.press("Enter");
-    await expect(
-      frame.getByRole("button", { name: "I knew it" }),
-    ).toBeFocused();
-    await page.keyboard.press("Enter");
-
-    await expect(cardPosition(frame)).toHaveText("Card 2 of 8");
-    await expect(
-      frame.getByRole("button", { name: "Show answer" }),
-    ).toBeFocused();
-  });
-
-  test("Math in the heading", async function showsMathHeading({
-    page,
-  }): Promise<void> {
-    const frame = await openOneCard(page, "math.md", "Math");
-
-    await startStudying(frame, "First heading");
-
-    await expect(questionSide(frame).locator("h2 math")).toHaveCount(1);
-    await expect(questionSide(frame).locator("h2")).toBeVisible();
-    await expect(
-      questionSide(frame).getByText("A formula inside a sentence"),
-    ).toBeHidden();
-  });
-
-  test("A diagram waits for the answer", async function drawsDiagramAfterFlip({
-    page,
-  }): Promise<void> {
-    const frame = await openOneCard(page, "diagrams.md", "Diagrams");
-    await startStudying(frame, "First heading");
-    const question = questionSide(frame);
-    await expect(
-      question.getByRole("heading", { name: "Diagrams" }),
-    ).toBeVisible();
-    // A diagram in view is drawn in about a second: long enough to see one.
-    await page.waitForTimeout(3000);
-
-    await expect(
-      question.locator("figure[data-mermaid-source] svg"),
-    ).toHaveCount(0);
-    await expect(question.getByText("This note was written")).toBeHidden();
-    await frame.getByRole("button", { name: "Show answer" }).click();
-
-    const answer = answerSide(frame);
-    await expect(
-      answer.locator("figure[data-mermaid-source] svg"),
-    ).toBeVisible();
-    await expect(answer.getByText("This note was written")).toBeHidden();
-    await expect(question.getByText("This note was written")).toBeHidden();
-  });
-
-  test("Back to the session", async function returnsFromFullTile({
-    page,
-  }): Promise<void> {
-    const frame = await openOneCard(page, "tables.md", "Tables");
-    await startStudying(frame);
-    await frame.getByRole("button", { name: "Show answer" }).click();
-    await frame.getByRole("button", { name: "Open full tile" }).click();
-    const card = tileCard(frame, "Tables");
-    await expect(card.getByRole("heading", { name: "See also" })).toBeVisible();
-
-    await page.keyboard.press("Escape");
-
-    await expect(anyDialog(frame)).toHaveCount(0);
-    await expect(
-      frame.getByRole("button", { name: "Open full tile" }),
-    ).toBeFocused();
-    await expect(cardPosition(frame)).toHaveText("Card 1 of 1");
-    await expect(answerSide(frame).locator("[data-side-text]")).toHaveText(
-      "The pipe, |",
-    );
-  });
-});
-
-test.describe("Study card look", function describeStudyCardLook(): void {
-  for (const colorScheme of ["light", "dark"] as const) {
-    test(`A flashcard (${colorScheme})`, async function showsFlashcard({
+test.describe(
+  "The sample in the app",
+  { tag: "@sample" },
+  function describeSampleInApp(): void {
+    test("Inspect the sample", async function inspectsSample({
       page,
     }): Promise<void> {
-      const frame = await startSampleSession(page, colorScheme);
-      const expected: CardLook = {
-        background: await frame.evaluate(readTokenAs, [
-          "--ot-card",
+      const viewer = await openViewer(page);
+
+      const permissions = viewer
+        .getByRole("heading", { name: "Permissions" })
+        .locator("xpath=following-sibling::*[1]");
+      await expect(permissions).toHaveText("(none)");
+    });
+
+    test("Check mod passes", async function checksSample({
+      page,
+    }): Promise<void> {
+      // The check runs every case of test.js, each in a fresh frame.
+      test.setTimeout(180000);
+      const viewer = await openViewer(page);
+
+      await viewer.getByRole("button", { name: "Check mod" }).click();
+
+      const report = viewer.getByRole("region", { name: "Check report" });
+      await expect(report.getByRole("heading")).toContainText("Check passed", {
+        timeout: 170000,
+      });
+      await expect(report.getByText("No findings.")).toBeVisible();
+    });
+  },
+);
+
+test.describe(
+  "Explore and Study modes",
+  { tag: "@sample" },
+  function describeModes(): void {
+    test("Start in Explore", async function startsInExplore({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+
+      await expect(modeButton(frame, "Explore")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await expect(modeButton(frame, "Study")).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+      await expect(tileTable(frame)).toBeVisible();
+      await expect(frame.getByRole("row")).toHaveCount(
+        SAMPLE_CARD_FILES.length + 1,
+      );
+    });
+
+    test("Switch to Study", async function switchesToStudy({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+
+      await modeButton(frame, "Study").click();
+
+      await expect(setupDialog(frame)).toBeVisible();
+      await expect(modeButton(frame, "Study")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await expect(modeButton(frame, "Explore")).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+      await expect(tileTable(frame)).toHaveCount(0);
+    });
+  },
+);
+
+test.describe(
+  "Tile table",
+  { tag: "@sample" },
+  function describeTileTable(): void {
+    test("Click on the file cell", async function opensFromFileCell({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+
+      await frame.getByRole("cell", { name: "tables.md", exact: true }).click();
+
+      await expect(tileCard(frame, "Tables")).toBeVisible();
+    });
+
+    test("Names from the tiles", async function namesTiles({
+      page,
+    }): Promise<void> {
+      await serveExtraCards(page);
+      await serveDeck(page, ["monad.md", "notes_03.md"]);
+
+      const frame = await openFlashcards(page, "What is a monad?");
+
+      await expect(frame.locator("td > button")).toHaveText([
+        "What is a monad?",
+        "No title",
+      ]);
+    });
+
+    test("No title and no heading", async function showsNoTitle({
+      page,
+    }): Promise<void> {
+      await serveExtraCards(page);
+      await serveDeck(page, ["notes_03.md"]);
+      const frame = await openFlashcards(page, "No title");
+      const button = rowButton(frame, "No title");
+      const mutedColor = await frame.evaluate(readTokenAs, [
+        "--ot-muted-foreground",
+        "color",
+      ]);
+
+      const look = await button.locator("span").evaluate(readTextLook);
+
+      expect(look).toEqual({ fontStyle: "italic", color: mutedColor });
+      await expect(button).toHaveAccessibleName(/No title.*notes_03\.md/);
+      await button.click();
+      await expect(tileCard(frame, "notes_03.md")).toBeVisible();
+    });
+  },
+);
+
+test.describe(
+  "Tile card",
+  { tag: "@sample" },
+  function describeTileCard(): void {
+    test("Open the card of Tables", async function opensTablesCard({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+
+      const card = await openTablesCard(frame);
+
+      await expect(card.getByRole("table").first()).toBeVisible();
+      await expect(
+        card.getByRole("heading", { name: "See also" }),
+      ).toBeVisible();
+      await expect(rowButton(frame, "Tables")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      await expect(rowButton(frame, "Links")).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+    });
+
+    test("Escape", async function closesOnEscape({ page }): Promise<void> {
+      const frame = await openSampleDeck(page);
+      await openTablesCard(frame);
+
+      await page.keyboard.press("Escape");
+
+      await expect(anyDialog(frame)).toHaveCount(0);
+      await expect(rowButton(frame, "Tables")).toBeFocused();
+    });
+
+    test("Backdrop", async function closesOnBackdrop({ page }): Promise<void> {
+      const frame = await openSampleDeck(page);
+      const card = await openTablesCard(frame);
+      const frameBox = await page
+        .locator('iframe[title="Flashcards"]')
+        .boundingBox();
+      const cardBox = await card.boundingBox();
+      if (frameBox === null || cardBox === null) {
+        throw new Error("Expected the frame and the card to be shown");
+      }
+      const x = frameBox.x + 4;
+      expect(x).toBeLessThan(cardBox.x);
+
+      await page.mouse.click(x, cardBox.y + cardBox.height / 2);
+
+      await expect(anyDialog(frame)).toHaveCount(0);
+      await expect(rowButton(frame, "Tables")).toBeFocused();
+    });
+
+    test("Click inside", async function staysOpenOnInsideClick({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+      const card = await openTablesCard(frame);
+
+      await card.getByText("Pipes separate the cells").click();
+
+      await expect(card).toBeVisible();
+    });
+
+    test("Reloaded with the tile", async function followsTile({
+      page,
+    }): Promise<void> {
+      const changed: RouteSwitch = { isOn: false };
+      await page.route(
+        `**${FLASHCARDS_CARDS_FOLDER_PATH}/tables.md`,
+        answerChangedTables.bind(undefined, changed),
+      );
+      const frame = await openSampleDeck(page);
+      const card = await openTablesCard(frame);
+      changed.isOn = true;
+
+      await reloadTiles(page);
+
+      await expect(card.getByText("A vertical bar")).toBeVisible();
+      await expect(card).toBeVisible();
+    });
+
+    test("Reloaded without the tile", async function closesWithoutTile({
+      page,
+    }): Promise<void> {
+      const changed: RouteSwitch = { isOn: false };
+      await page.route(
+        FLASHCARDS_COLLECTION_GLOB,
+        answerChangedDeck.bind(undefined, changed, ["emphasis.md", "links.md"]),
+      );
+      const frame = await openSampleDeck(page);
+      await openTablesCard(frame);
+      changed.isOn = true;
+
+      await reloadTiles(page);
+
+      await expect(anyDialog(frame)).toHaveCount(0);
+      await expect(frame.locator("td > button")).toHaveCount(2);
+    });
+  },
+);
+
+test.describe(
+  "Study session",
+  { tag: "@sample" },
+  function describeStudySession(): void {
+    test("Step with Enter", async function stepsWithEnter({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+      await startStudying(frame);
+      await expect(
+        frame.getByRole("button", { name: "Show answer" }),
+      ).toBeFocused();
+
+      await page.keyboard.press("Enter");
+      await expect(
+        frame.getByRole("button", { name: "I knew it" }),
+      ).toBeFocused();
+      await page.keyboard.press("Enter");
+
+      await expect(cardPosition(frame)).toHaveText("Card 2 of 8");
+      await expect(
+        frame.getByRole("button", { name: "Show answer" }),
+      ).toBeFocused();
+    });
+
+    test("Math in the heading", async function showsMathHeading({
+      page,
+    }): Promise<void> {
+      const frame = await openOneCard(page, "math.md", "Math");
+
+      await startStudying(frame, "First heading");
+
+      await expect(questionSide(frame).locator("h2 math")).toHaveCount(1);
+      await expect(questionSide(frame).locator("h2")).toBeVisible();
+      await expect(
+        questionSide(frame).getByText("A formula inside a sentence"),
+      ).toBeHidden();
+    });
+
+    test("A diagram waits for the answer", async function drawsDiagramAfterFlip({
+      page,
+    }): Promise<void> {
+      const frame = await openOneCard(page, "diagrams.md", "Diagrams");
+      await startStudying(frame, "First heading");
+      const question = questionSide(frame);
+      await expect(
+        question.getByRole("heading", { name: "Diagrams" }),
+      ).toBeVisible();
+      // A diagram in view is drawn in about a second: long enough to see one.
+      await page.waitForTimeout(3000);
+
+      await expect(
+        question.locator("figure[data-mermaid-source] svg"),
+      ).toHaveCount(0);
+      await expect(question.getByText("This note was written")).toBeHidden();
+      await frame.getByRole("button", { name: "Show answer" }).click();
+
+      const answer = answerSide(frame);
+      await expect(
+        answer.locator("figure[data-mermaid-source] svg"),
+      ).toBeVisible();
+      await expect(answer.getByText("This note was written")).toBeHidden();
+      await expect(question.getByText("This note was written")).toBeHidden();
+    });
+
+    test("Back to the session", async function returnsFromFullTile({
+      page,
+    }): Promise<void> {
+      const frame = await openOneCard(page, "tables.md", "Tables");
+      await startStudying(frame);
+      await frame.getByRole("button", { name: "Show answer" }).click();
+      await frame.getByRole("button", { name: "Open full tile" }).click();
+      const card = tileCard(frame, "Tables");
+      await expect(
+        card.getByRole("heading", { name: "See also" }),
+      ).toBeVisible();
+
+      await page.keyboard.press("Escape");
+
+      await expect(anyDialog(frame)).toHaveCount(0);
+      await expect(
+        frame.getByRole("button", { name: "Open full tile" }),
+      ).toBeFocused();
+      await expect(cardPosition(frame)).toHaveText("Card 1 of 1");
+      await expect(answerSide(frame).locator("[data-side-text]")).toHaveText(
+        "The pipe, |",
+      );
+    });
+  },
+);
+
+test.describe(
+  "Study card look",
+  { tag: "@sample" },
+  function describeStudyCardLook(): void {
+    for (const colorScheme of ["light", "dark"] as const) {
+      test(`A flashcard (${colorScheme})`, async function showsFlashcard({
+        page,
+      }): Promise<void> {
+        const frame = await startSampleSession(page, colorScheme);
+        const expected: CardLook = {
+          background: await frame.evaluate(readTokenAs, [
+            "--ot-card",
+            "background-color",
+          ]),
+          shadow: await frame.evaluate(readTokenAs, [
+            "--ot-shadow",
+            "box-shadow",
+          ]),
+          radius: await frame.evaluate(readValueAs, [
+            "calc(var(--ot-radius) * 2)",
+            "border-top-left-radius",
+          ]),
+        };
+
+        const card = flashcard(frame);
+
+        expect(await card.evaluate(readCardLook)).toEqual(expected);
+        const box = await card.boundingBox();
+        expect(box?.width).toBeLessThanOrEqual(512);
+      });
+
+      test(`The two sides (${colorScheme})`, async function showsSides({
+        page,
+      }): Promise<void> {
+        const frame = await startSampleSession(page, colorScheme);
+        const primary = await frame.evaluate(readTokenAs, [
+          "--ot-primary",
+          "border-top-color",
+        ]);
+        const muted = await frame.evaluate(readTokenAs, [
+          "--ot-muted",
           "background-color",
-        ]),
-        shadow: await frame.evaluate(readTokenAs, [
-          "--ot-shadow",
-          "box-shadow",
-        ]),
-        radius: await frame.evaluate(readValueAs, [
-          "calc(var(--ot-radius) * 2)",
-          "border-top-left-radius",
-        ]),
-      };
+        ]);
 
-      const card = flashcard(frame);
+        await frame.getByRole("button", { name: "Show answer" }).click();
 
-      expect(await card.evaluate(readCardLook)).toEqual(expected);
-      const box = await card.boundingBox();
-      expect(box?.width).toBeLessThanOrEqual(512);
+        await expect(questionSide(frame).getByText("Question")).toBeVisible();
+        await expect(answerSide(frame).getByText("Answer")).toBeVisible();
+        expect(
+          await questionSide(frame).evaluate(readComputed, "border-top-color"),
+        ).toBe(primary);
+        expect(
+          await answerSide(frame).evaluate(readComputed, "background-color"),
+        ).toBe(muted);
+      });
+    }
+
+    test("The position", async function showsPosition({ page }): Promise<void> {
+      const frame = await startSampleSession(page, "light");
+      const mutedText = await frame.evaluate(readTokenAs, [
+        "--ot-muted-foreground",
+        "color",
+      ]);
+
+      await stepToThirdCard(frame);
+
+      expect(await cardPosition(frame).evaluate(readComputed, "color")).toBe(
+        mutedText,
+      );
+      const progress = frame.locator("[data-session-bar] > progress");
+      await expect(progress).toHaveJSProperty("value", 2);
+      await expect(progress).toHaveJSProperty("max", 8);
+      await expect(
+        flashcard(frame).getByRole("button", { name: "Restart" }),
+      ).toHaveCount(0);
+      const barBox = await frame.locator("[data-session-bar]").boundingBox();
+      const cardBox = await flashcard(frame).boundingBox();
+      expect((barBox?.y ?? 0) + (barBox?.height ?? 0)).toBeLessThanOrEqual(
+        cardBox?.y ?? 0,
+      );
     });
 
-    test(`The two sides (${colorScheme})`, async function showsSides({
+    test("Same place after the flip", async function keepsButtonRow({
       page,
     }): Promise<void> {
-      const frame = await startSampleSession(page, colorScheme);
-      const primary = await frame.evaluate(readTokenAs, [
-        "--ot-primary",
-        "border-top-color",
-      ]);
-      const muted = await frame.evaluate(readTokenAs, [
-        "--ot-muted",
-        "background-color",
-      ]);
+      const frame = await startSampleSession(page, "light");
+      const showAnswerBox = await frame
+        .getByRole("button", { name: "Show answer" })
+        .boundingBox();
 
       await frame.getByRole("button", { name: "Show answer" }).click();
 
-      await expect(questionSide(frame).getByText("Question")).toBeVisible();
-      await expect(answerSide(frame).getByText("Answer")).toBeVisible();
+      const knewItBox = await frame
+        .getByRole("button", { name: "I knew it" })
+        .boundingBox();
+      const answerBox = await answerSide(frame).boundingBox();
+      expect(knewItBox?.y).toBe(showAnswerBox?.y);
       expect(
-        await questionSide(frame).evaluate(readComputed, "border-top-color"),
-      ).toBe(primary);
+        (knewItBox?.y ?? 0) + (knewItBox?.height ?? 0),
+      ).toBeLessThanOrEqual(answerBox?.y ?? 0);
+    });
+
+    test("Double-click on Show answer", async function ignoresSecondClick({
+      page,
+    }): Promise<void> {
+      const frame = await startSampleSession(page, "light");
+      const showAnswer = frame.getByRole("button", { name: "Show answer" });
+      const point = await showAnswer.evaluate(readCenter);
+
+      await showAnswer.dblclick();
+
+      await expect(answerSide(frame)).toBeVisible();
+      expect(await frame.evaluate(readButtonTextAt, point)).toBe("Not yet");
+      // The second click lands on the grade under the pointer, within the pause.
+      await page.waitForTimeout(600);
+      await expect(cardPosition(frame)).toHaveText("Card 1 of 8");
+    });
+
+    test("Click after the pause", async function gradesAfterPause({
+      page,
+    }): Promise<void> {
+      const frame = await startSampleSession(page, "light");
+      await frame.getByRole("button", { name: "Show answer" }).click();
+      await page.waitForTimeout(600);
+
+      await frame.getByRole("button", { name: "Not yet" }).click();
+
+      await expect(cardPosition(frame)).toHaveText("Card 2 of 8");
+    });
+
+    test("A long answer", async function keepsButtonsInView({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize({ width: 1100, height: 520 });
+      const frame = await openOneCard(page, "tables.md", "Tables");
+      await startStudying(frame, "First heading");
+
+      await frame.getByRole("button", { name: "Show answer" }).click();
+
+      await expect(answerSide(frame).getByRole("table").first()).toBeAttached();
+      const frameHeight = await frame.evaluate(readViewportHeight);
+      const cardBox = await flashcard(frame).boundingBox();
+      const frameBox = await page
+        .locator('iframe[title="Flashcards"]')
+        .boundingBox();
+      // The card with its answer is taller than the frame shows.
       expect(
-        await answerSide(frame).evaluate(readComputed, "background-color"),
-      ).toBe(muted);
+        (cardBox?.y ?? 0) + (cardBox?.height ?? 0) - (frameBox?.y ?? 0),
+      ).toBeGreaterThan(frameHeight);
+      await expect(
+        frame.getByRole("button", { name: "I knew it" }),
+      ).toBeInViewport();
     });
-  }
 
-  test("The position", async function showsPosition({ page }): Promise<void> {
-    const frame = await startSampleSession(page, "light");
-    const mutedText = await frame.evaluate(readTokenAs, [
-      "--ot-muted-foreground",
-      "color",
-    ]);
+    test("Reduced motion", async function showsAnswerWithoutMotion({
+      page,
+    }): Promise<void> {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const frame = await openSampleDeck(page);
+      await startStudying(frame);
 
-    await stepToThirdCard(frame);
+      await frame.getByRole("button", { name: "Show answer" }).click();
 
-    expect(await cardPosition(frame).evaluate(readComputed, "color")).toBe(
-      mutedText,
-    );
-    const progress = frame.locator("[data-session-bar] > progress");
-    await expect(progress).toHaveJSProperty("value", 2);
-    await expect(progress).toHaveJSProperty("max", 8);
-    await expect(
-      flashcard(frame).getByRole("button", { name: "Restart" }),
-    ).toHaveCount(0);
-    const barBox = await frame.locator("[data-session-bar]").boundingBox();
-    const cardBox = await flashcard(frame).boundingBox();
-    expect((barBox?.y ?? 0) + (barBox?.height ?? 0)).toBeLessThanOrEqual(
-      cardBox?.y ?? 0,
-    );
-  });
-
-  test("Same place after the flip", async function keepsButtonRow({
-    page,
-  }): Promise<void> {
-    const frame = await startSampleSession(page, "light");
-    const showAnswerBox = await frame
-      .getByRole("button", { name: "Show answer" })
-      .boundingBox();
-
-    await frame.getByRole("button", { name: "Show answer" }).click();
-
-    const knewItBox = await frame
-      .getByRole("button", { name: "I knew it" })
-      .boundingBox();
-    const answerBox = await answerSide(frame).boundingBox();
-    expect(knewItBox?.y).toBe(showAnswerBox?.y);
-    expect((knewItBox?.y ?? 0) + (knewItBox?.height ?? 0)).toBeLessThanOrEqual(
-      answerBox?.y ?? 0,
-    );
-  });
-
-  test("Double-click on Show answer", async function ignoresSecondClick({
-    page,
-  }): Promise<void> {
-    const frame = await startSampleSession(page, "light");
-    const showAnswer = frame.getByRole("button", { name: "Show answer" });
-    const point = await showAnswer.evaluate(readCenter);
-
-    await showAnswer.dblclick();
-
-    await expect(answerSide(frame)).toBeVisible();
-    expect(await frame.evaluate(readButtonTextAt, point)).toBe("Not yet");
-    // The second click lands on the grade under the pointer, within the pause.
-    await page.waitForTimeout(600);
-    await expect(cardPosition(frame)).toHaveText("Card 1 of 8");
-  });
-
-  test("Click after the pause", async function gradesAfterPause({
-    page,
-  }): Promise<void> {
-    const frame = await startSampleSession(page, "light");
-    await frame.getByRole("button", { name: "Show answer" }).click();
-    await page.waitForTimeout(600);
-
-    await frame.getByRole("button", { name: "Not yet" }).click();
-
-    await expect(cardPosition(frame)).toHaveText("Card 2 of 8");
-  });
-
-  test("A long answer", async function keepsButtonsInView({
-    page,
-  }): Promise<void> {
-    await page.setViewportSize({ width: 1100, height: 520 });
-    const frame = await openOneCard(page, "tables.md", "Tables");
-    await startStudying(frame, "First heading");
-
-    await frame.getByRole("button", { name: "Show answer" }).click();
-
-    await expect(answerSide(frame).getByRole("table").first()).toBeAttached();
-    const frameHeight = await frame.evaluate(readViewportHeight);
-    const cardBox = await flashcard(frame).boundingBox();
-    const frameBox = await page
-      .locator('iframe[title="Flashcards"]')
-      .boundingBox();
-    // The card with its answer is taller than the frame shows.
-    expect(
-      (cardBox?.y ?? 0) + (cardBox?.height ?? 0) - (frameBox?.y ?? 0),
-    ).toBeGreaterThan(frameHeight);
-    await expect(
-      frame.getByRole("button", { name: "I knew it" }),
-    ).toBeInViewport();
-  });
-
-  test("Reduced motion", async function showsAnswerWithoutMotion({
-    page,
-  }): Promise<void> {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    const frame = await openSampleDeck(page);
-    await startStudying(frame);
-
-    await frame.getByRole("button", { name: "Show answer" }).click();
-
-    expect(
-      await answerSide(frame).evaluate(readComputed, "animation-name"),
-    ).toBe("none");
-  });
-
-  test("Focus at the end of a round", async function focusesRoundEnd({
-    page,
-  }): Promise<void> {
-    const frame = await openOneCard(page, "tables.md", "Tables");
-    await startStudying(frame);
-    await frame.getByRole("button", { name: "Show answer" }).click();
-
-    await frame.getByRole("button", { name: "Not yet" }).press("Enter");
-
-    await expect(frame.getByText("You knew 0 of 1 card.")).toBeVisible();
-    await expect(
-      frame.getByRole("list", { name: "Not yet · 1 card" }),
-    ).toHaveText("Tables");
-    const missedButton = frame.getByRole("button", {
-      name: "Study this card again",
+      expect(
+        await answerSide(frame).evaluate(readComputed, "animation-name"),
+      ).toBe("none");
     });
-    await expect(missedButton).toBeFocused();
-    await missedButton.click();
-    await expect(frame.getByText("Round 2")).toBeVisible();
-    await frame.getByRole("button", { name: "Show answer" }).click();
-    await frame.getByRole("button", { name: "I knew it" }).press("Enter");
-    await expect(frame.getByText("You knew 1 of 1 card.")).toBeVisible();
-    await expect(
-      frame.getByRole("button", { name: "Start again" }),
-    ).toBeFocused();
-  });
-});
 
-test.describe("Tiles changed during a session", function describeTilesChanged(): void {
-  test("Reload while studying", async function endsSessionOnReload({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-    await startStudying(frame);
-    await stepToThirdCard(frame);
+    test("Focus at the end of a round", async function focusesRoundEnd({
+      page,
+    }): Promise<void> {
+      const frame = await openOneCard(page, "tables.md", "Tables");
+      await startStudying(frame);
+      await frame.getByRole("button", { name: "Show answer" }).click();
 
-    await reloadTiles(page);
+      await frame.getByRole("button", { name: "Not yet" }).press("Enter");
 
-    const setup = setupDialog(frame);
-    await expect(setup).toBeVisible();
-    await expect(setup).toContainText(TILES_CHANGED_NOTICE);
-    await expect(setup.getByLabel("Question")).toHaveValue("key:question");
-  });
+      await expect(frame.getByText("You knew 0 of 1 card.")).toBeVisible();
+      await expect(
+        frame.getByRole("list", { name: "Not yet · 1 card" }),
+      ).toHaveText("Tables");
+      const missedButton = frame.getByRole("button", {
+        name: "Study this card again",
+      });
+      await expect(missedButton).toBeFocused();
+      await missedButton.click();
+      await expect(frame.getByText("Round 2")).toBeVisible();
+      await frame.getByRole("button", { name: "Show answer" }).click();
+      await frame.getByRole("button", { name: "I knew it" }).press("Enter");
+      await expect(frame.getByText("You knew 1 of 1 card.")).toBeVisible();
+      await expect(
+        frame.getByRole("button", { name: "Start again" }),
+      ).toBeFocused();
+    });
+  },
+);
 
-  test("Reload while the full tile is open", async function closesFullTileOnReload({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-    await startStudying(frame);
-    await frame.getByRole("button", { name: "Show answer" }).click();
-    await frame.getByRole("button", { name: "Open full tile" }).click();
-    await expect(anyDialog(frame)).toHaveCount(1);
+test.describe(
+  "Tiles changed during a session",
+  { tag: "@sample" },
+  function describeTilesChanged(): void {
+    test("Reload while studying", async function endsSessionOnReload({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+      await startStudying(frame);
+      await stepToThirdCard(frame);
 
-    await reloadTiles(page);
+      await reloadTiles(page);
 
-    await expect(setupDialog(frame)).toBeVisible();
-    await expect(anyDialog(frame)).toHaveCount(1);
-  });
+      const setup = setupDialog(frame);
+      await expect(setup).toBeVisible();
+      await expect(setup).toContainText(TILES_CHANGED_NOTICE);
+      await expect(setup.getByLabel("Question")).toHaveValue("key:question");
+    });
 
-  test("Reload while the setup dialog is open", async function updatesOpenSetup({
-    page,
-  }): Promise<void> {
-    const changed: RouteSwitch = { isOn: false };
-    await page.route(
-      FLASHCARDS_COLLECTION_GLOB,
-      answerChangedDeck.bind(undefined, changed, SAMPLE_CARD_FILES.slice(0, 5)),
-    );
-    const frame = await openSampleDeck(page);
-    await modeButton(frame, "Study").click();
-    await expect(setupDialog(frame)).toContainText("of 8 tiles");
-    changed.isOn = true;
+    test("Reload while the full tile is open", async function closesFullTileOnReload({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+      await startStudying(frame);
+      await frame.getByRole("button", { name: "Show answer" }).click();
+      await frame.getByRole("button", { name: "Open full tile" }).click();
+      await expect(anyDialog(frame)).toHaveCount(1);
 
-    await reloadTiles(page);
+      await reloadTiles(page);
 
-    await expect(setupDialog(frame)).toContainText(
-      "5 of 5 tiles have these fields.",
-    );
-  });
-});
+      await expect(setupDialog(frame)).toBeVisible();
+      await expect(anyDialog(frame)).toHaveCount(1);
+    });
 
-test.describe("Remembered fields", function describeRememberedFields(): void {
-  test("Fields kept across starts", async function keepsFields({
-    page,
-  }): Promise<void> {
-    const frame = await openSampleDeck(page);
-    await modeButton(frame, "Study").click();
-    const setup = setupDialog(frame);
-    await setup.getByLabel("Question").selectOption({ label: "title" });
-    await setup.getByLabel("Answer").selectOption({ label: "Body" });
-    await setup.getByRole("button", { name: "Start" }).click();
-    await expect(cardPosition(frame)).toHaveText("Card 1 of 8");
+    test("Reload while the setup dialog is open", async function updatesOpenSetup({
+      page,
+    }): Promise<void> {
+      const changed: RouteSwitch = { isOn: false };
+      await page.route(
+        FLASHCARDS_COLLECTION_GLOB,
+        answerChangedDeck.bind(
+          undefined,
+          changed,
+          SAMPLE_CARD_FILES.slice(0, 5),
+        ),
+      );
+      const frame = await openSampleDeck(page);
+      await modeButton(frame, "Study").click();
+      await expect(setupDialog(frame)).toContainText("of 8 tiles");
+      changed.isOn = true;
 
-    const reopened = await reopenSampleDeck(page);
-    await modeButton(reopened, "Study").click();
+      await reloadTiles(page);
 
-    const reopenedSetup = setupDialog(reopened);
-    await expect(reopenedSetup.getByLabel("Question")).toHaveValue("key:title");
-    await expect(reopenedSetup.getByLabel("Answer")).toHaveValue("body");
-  });
-});
+      await expect(setupDialog(frame)).toContainText(
+        "5 of 5 tiles have these fields.",
+      );
+    });
+  },
+);
+
+test.describe(
+  "Remembered fields",
+  { tag: "@sample" },
+  function describeRememberedFields(): void {
+    test("Fields kept across starts", async function keepsFields({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+      await modeButton(frame, "Study").click();
+      const setup = setupDialog(frame);
+      await setup.getByLabel("Question").selectOption({ label: "title" });
+      await setup.getByLabel("Answer").selectOption({ label: "Body" });
+      await setup.getByRole("button", { name: "Start" }).click();
+      await expect(cardPosition(frame)).toHaveText("Card 1 of 8");
+
+      const reopened = await reopenSampleDeck(page);
+      await modeButton(reopened, "Study").click();
+
+      const reopenedSetup = setupDialog(reopened);
+      await expect(reopenedSetup.getByLabel("Question")).toHaveValue(
+        "key:title",
+      );
+      await expect(reopenedSetup.getByLabel("Answer")).toHaveValue("body");
+    });
+  },
+);

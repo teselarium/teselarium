@@ -105,6 +105,7 @@ describe("MessagePopover", function describeMessagePopover(): void {
     expect(items[1]).toHaveTextContent("App");
     expect(items[1]).toHaveTextContent(MOD_SOURCE);
     expect(items[1]).toHaveTextContent("Tile is not of tile type book");
+    expect(screen.queryByText(/dropped/)).toBeNull();
   });
 
   it("Reloaded issue on top", function listsReloadedIssueFirst(): void {

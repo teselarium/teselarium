@@ -408,6 +408,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
 
     expect(runtime.status).toBe("failed");
     expect(runtime.launch).toBeNull();
+    expect(runtime.modReference).toBe(MISSING_MOD_SOURCE);
     expect(runtime.errorMessage).toContain(MISSING_MOD_SOURCE);
     expect(runtime.errorMessage).toContain("404");
     expect(spied.onChange).toHaveBeenCalledOnce();
@@ -1076,6 +1077,9 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     expect(reloadedWarnings[0].text).toContain("is not of tile type");
     expect(readIds).not.toContain(reloadedWarnings[0].id);
     expect(runtime.readMessageIds.has(reloadedWarnings[0].id)).toBe(false);
+    for (const readId of readIds) {
+      expect(reloadedWarnings[0].id).toBeGreaterThan(readId);
+    }
   });
 
   it("Reloaded tiles have their relative paths resolved", async function resolvesReloadedTiles(): Promise<void> {

@@ -20,18 +20,88 @@ function buildInstantiationServer(
   return server;
 }
 
+/** The e2e runs `E2E_RUN` chooses; unset means `default`. */
+const E2E_RUNS = ["default", "samples", "full"] as const;
+
+type E2eRun = (typeof E2E_RUNS)[number];
+
+/** The tests whose result depends on how the engine treats frames. */
+const FRAMES_TAG = /@frames/;
+
+/** The shipped samples' own tests. */
+const SAMPLE_TAG = /@sample/;
+
+/** The filters of one project: the tests it runs, minus the ones it skips. */
+interface ProjectFilters {
+  grep?: RegExp;
+  grepInvert?: RegExp;
+}
+
+/** Reads the run from `E2E_RUN`, and throws for a value that names no run. */
+function readE2eRun(value: string | undefined): E2eRun {
+  const name = value ?? "default";
+  for (const run of E2E_RUNS) {
+    if (run === name) {
+      return run;
+    }
+  }
+  throw new Error(
+    `Unknown E2E_RUN "${name}": expected one of ${E2E_RUNS.join(", ")}.`,
+  );
+}
+
+/**
+ * The filters of an engine's project in a run. `runsEveryTest` is true for
+ * the engine that runs every test of the default run, false for the engines
+ * that run only the `@frames` tests in it.
+ */
+function buildProjectFilters(
+  run: E2eRun,
+  runsEveryTest: boolean,
+): ProjectFilters {
+  let filters: ProjectFilters = {};
+  if (run === "samples") {
+    filters = { grep: SAMPLE_TAG };
+  } else if (run === "default" && runsEveryTest) {
+    filters = { grepInvert: SAMPLE_TAG };
+  } else if (run === "default") {
+    filters = { grep: FRAMES_TAG, grepInvert: SAMPLE_TAG };
+  }
+  return filters;
+}
+
+const e2eRun = readE2eRun(process.env.E2E_RUN);
+
 export default defineConfig({
   testDir: "e2e",
   // Each test opens its own page, so the tests of one file can run in
   // different workers, which spreads the long files over the run.
   fullyParallel: true,
   use: { baseURL: PREVIEW_URL },
-  // Mods rely on frame behavior that differs between engines (design.md of
-  // add-mod-ui-capabilities, Browser differences), so every test runs in all three.
+  // Engines: every test needs a real browser, but only the tests tagged
+  // `@frames` depend on the engine, because mods rely on frame behavior that
+  // differs between engines (design.md of add-mod-ui-capabilities, Browser
+  // differences). `E2E_RUN` chooses the run (package.json scripts):
+  // - default: every test but `@sample` in Chromium, and the `@frames` tests
+  //   but `@sample` in Firefox and WebKit
+  // - samples: the shipped samples' own tests (`@sample`) in all three
+  // - full: every test in all three, before a release (docs/releasing.md)
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      ...buildProjectFilters(e2eRun, true),
+    },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+      ...buildProjectFilters(e2eRun, false),
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
+      ...buildProjectFilters(e2eRun, false),
+    },
   ],
   webServer: [
     {

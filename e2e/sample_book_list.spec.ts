@@ -297,430 +297,476 @@ async function reloadTiles(page: Page): Promise<void> {
   await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
 }
 
-test.describe("Books in a grid", function describeGrid(): void {
-  test("The sample books", async function showsSampleBooks({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
+test.describe(
+  "Books in a grid",
+  { tag: "@sample" },
+  function describeGrid(): void {
+    test("The sample books", async function showsSampleBooks({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
 
-    await expect(frame.getByRole("listitem")).toHaveCount(3);
-    await expect(frame.locator("li > p > strong")).toHaveText(SAMPLE_TITLES);
-    const boxes = await frame.evaluate(readBookBoxes);
-    for (const box of boxes) {
-      expect(box.width).toBe(boxes[0].width);
-      expect(box.height).toBe(boxes[0].height);
-      expect(Math.abs(box.height - 1.5 * box.width)).toBeLessThanOrEqual(1);
-    }
-  });
+      await expect(frame.getByRole("listitem")).toHaveCount(3);
+      await expect(frame.locator("li > p > strong")).toHaveText(SAMPLE_TITLES);
+      const boxes = await frame.evaluate(readBookBoxes);
+      for (const box of boxes) {
+        expect(box.width).toBe(boxes[0].width);
+        expect(box.height).toBe(boxes[0].height);
+        expect(Math.abs(box.height - 1.5 * box.width)).toBeLessThanOrEqual(1);
+      }
+    });
 
-  test("Corners of a book", async function shapesBooks({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const radius = await frame.evaluate(readTokenAs, [
-      "--ot-radius",
-      "border-top-right-radius",
-    ]);
+    test("Corners of a book", async function shapesBooks({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const radius = await frame.evaluate(readTokenAs, [
+        "--ot-radius",
+        "border-top-right-radius",
+      ]);
 
-    const corners = await frame.evaluate(readBookCorners);
+      const corners = await frame.evaluate(readBookCorners);
 
-    expect(corners).toHaveLength(3);
-    for (const corner of corners) {
-      expect(corner).toEqual({
-        topLeft: "0px",
-        bottomLeft: "0px",
-        topRight: radius,
-        bottomRight: radius,
+      expect(corners).toHaveLength(3);
+      for (const corner of corners) {
+        expect(corner).toEqual({
+          topLeft: "0px",
+          bottomLeft: "0px",
+          topRight: radius,
+          bottomRight: radius,
+        });
+      }
+    });
+
+    test("Text under the cover", async function showsTextUnderCover({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const item = bookItem(frame, "Kallocain");
+      const title = item.getByText("Kallocain", { exact: true });
+
+      await expect(title).toBeVisible();
+      await expect(item.getByText("Karin Boye")).toBeVisible();
+      const buttonBox = await bookButton(frame, "Kallocain").boundingBox();
+      const titleBox = await title.boundingBox();
+      expect(titleBox?.y).toBeGreaterThanOrEqual(
+        (buttonBox?.y ?? 0) + (buttonBox?.height ?? 0),
+      );
+    });
+  },
+);
+
+test.describe(
+  "Placeholder book",
+  { tag: "@sample" },
+  function describePlaceholder(): void {
+    test("Cover fails to load", async function showsPlaceholderForMissingCover({
+      page,
+    }): Promise<void> {
+      await routeCovers(page);
+      await page.route(KALLOCAIN_COVER_GLOB, answerMissingCover);
+      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+      const frame = await findModFrame(page, "Book List");
+      const kallocain = bookButton(frame, "Kallocain");
+
+      await expect(kallocain.locator("span")).toHaveText("Kallocain");
+      await expect(kallocain.locator("img")).toHaveCount(0);
+    });
+
+    test("No image", async function showsPlaceholderWithoutImage({
+      page,
+    }): Promise<void> {
+      await serveAppOriginMod(page, buildDraftFiles());
+      await page.goto(`/${DRAFT_RUN_HASH}`);
+      const frame = await findModFrame(page, "Drafts");
+      const draft = bookButton(frame, "Untitled draft");
+
+      await expect(draft.locator("span")).toHaveText("Untitled draft");
+      await expect(draft.locator("img")).toHaveCount(0);
+      const boxes = await frame.evaluate(readBookBoxes);
+      expect(boxes[1]).toEqual(boxes[0]);
+    });
+  },
+);
+
+test.describe(
+  "Books per row",
+  { tag: "@sample" },
+  function describeBooksPerRow(): void {
+    test("Default books per row", async function showsSixPerRow({
+      page,
+    }): Promise<void> {
+      await sizeFrame(page, 1200, WIDE_FRAME_INSET);
+      const frame = await openSample(page);
+      await expectFrameWidth(page, 1200);
+
+      await expect(booksPerRow(frame)).toHaveValue("6");
+      expect(await frame.evaluate(readColumnCount)).toBe(6);
+    });
+
+    test("Choosing books per row", async function choosesFourPerRow({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const widthBefore = await readFirstBookWidth(frame);
+
+      await booksPerRow(frame).selectOption("4");
+
+      expect(await frame.evaluate(readColumnCount)).toBe(4);
+      expect(await readFirstBookWidth(frame)).toBeGreaterThan(widthBefore);
+    });
+
+    test("Authors left out at 10 per row", async function leavesOutAuthors({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+
+      await booksPerRow(frame).selectOption("10");
+
+      await expect(
+        bookItem(frame, "Kallocain").getByText("Karin Boye"),
+      ).toBeHidden();
+      await expect(bookButton(frame, "Kallocain")).toHaveAccessibleName(
+        /Karin Boye/,
+      );
+    });
+
+    test("Choice kept across starts", async function keepsChoice({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      await booksPerRow(frame).selectOption("8");
+      await expect(frame.locator('ul[data-columns="8"]')).toHaveCount(1);
+
+      const reopened = await reopenSample(page);
+
+      await expect(booksPerRow(reopened)).toHaveValue("8");
+    });
+
+    test("Ten per row in a narrow frame", async function fitsNarrowFrame({
+      page,
+    }): Promise<void> {
+      await sizeFrame(page, 400, NARROW_FRAME_INSET);
+      const frame = await openSample(page);
+      await expectFrameWidth(page, 400);
+
+      await booksPerRow(frame).selectOption("10");
+
+      await expect(booksPerRow(frame)).toHaveValue("10");
+      expect(await frame.evaluate(readColumnCount)).toBeLessThan(10);
+      for (const box of await frame.evaluate(readBookBoxes)) {
+        expect(box.width).toBeGreaterThanOrEqual(BOOK_MIN_WIDTH);
+      }
+    });
+  },
+);
+
+test.describe(
+  "Book card",
+  { tag: "@sample" },
+  function describeBookCard(): void {
+    test("Open Kallocain's card", async function opensCard({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+
+      const card = await openKallocainCard(frame);
+
+      await expect(
+        card.getByRole("heading", { level: 2, name: "Kallocain" }),
+      ).toBeVisible();
+      await expect(
+        card.getByText("Kallocain is a 1940 dystopian novel"),
+      ).toBeVisible();
+    });
+  },
+);
+
+test.describe(
+  "Book card behind",
+  { tag: "@sample" },
+  function describeGridBehindCard(): void {
+    test("Grid behind the card", async function keepsGridInert({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const fahrenheitBox = await bookButton(
+        frame,
+        "Fahrenheit 451",
+      ).boundingBox();
+      if (fahrenheitBox === null) {
+        throw new Error("Expected Fahrenheit 451's book to be shown");
+      }
+      await openKallocainCard(frame);
+
+      await page.mouse.click(
+        fahrenheitBox.x + fahrenheitBox.width / 2,
+        fahrenheitBox.y + fahrenheitBox.height / 2,
+      );
+
+      await expect(bookCard(frame)).toHaveCount(0);
+      await expect(
+        frame.getByRole("dialog", { name: "Fahrenheit 451" }),
+      ).toHaveCount(0);
+    });
+  },
+);
+
+test.describe(
+  "No cover in the card",
+  { tag: "@sample" },
+  function describeNoCoverInCard(): void {
+    test("Covers switched off in the card", async function leavesOutSmallBook({
+      page,
+    }): Promise<void> {
+      await page.route(`**${SAMPLE_MOD_FILE_PATH}`, answerCoversOff);
+      const frame = await openSample(page);
+
+      const card = await openKallocainCard(frame);
+
+      await expect(card.locator("img, figure")).toHaveCount(0);
+      await expect(
+        card.getByRole("heading", { level: 2, name: "Kallocain" }),
+      ).toBeVisible();
+    });
+  },
+);
+
+test.describe(
+  "Card body",
+  { tag: "@sample" },
+  function describeCardBody(): void {
+    test("A link in the body", async function opensBodyLink({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const card = await openKallocainCard(frame);
+      await markFrame(frame);
+
+      await card
+        .getByRole("link", { name: "https://en.wikipedia.org/wiki/Kallocain" })
+        .click();
+
+      await expect(actionDialog(page)).toContainText(
+        "https://en.wikipedia.org/wiki/Kallocain",
+      );
+      expect(await isFrameMarked(frame)).toBe(true);
+    });
+  },
+);
+
+test.describe(
+  "Closing the card",
+  { tag: "@sample" },
+  function describeClosingCard(): void {
+    test("Escape", async function closesOnEscape({ page }): Promise<void> {
+      const frame = await openSample(page);
+      await openKallocainCard(frame);
+
+      await page.keyboard.press("Escape");
+
+      await expect(bookCard(frame)).toHaveCount(0);
+      await expectBookFocus(frame, "Kallocain", true);
+    });
+
+    test("Close button", async function closesOnButton({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const card = await openKallocainCard(frame);
+
+      await card.getByRole("button", { name: "Close" }).click();
+      await page.mouse.move(0, 0);
+
+      await expect(bookCard(frame)).toHaveCount(0);
+      await expectBookFocus(frame, "Kallocain", false);
+      await expectBookLook(frame, "Kallocain", FLAT_LOOK);
+    });
+
+    test("Close button with the keyboard", async function closesOnButtonKey({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const card = await openKallocainCard(frame);
+      const closeButton = card.getByRole("button", { name: "Close" });
+      await closeButton.focus();
+
+      await page.keyboard.press("Enter");
+
+      await expect(bookCard(frame)).toHaveCount(0);
+      await expectBookFocus(frame, "Kallocain", true);
+    });
+
+    test("Backdrop", async function closesOnBackdrop({ page }): Promise<void> {
+      const frame = await openSample(page);
+      const card = await openKallocainCard(frame);
+      const frameBox = await page
+        .locator('iframe[title="Book List"]')
+        .boundingBox();
+      const cardBox = await card.boundingBox();
+      if (frameBox === null || cardBox === null) {
+        throw new Error("Expected the frame and the card to be shown");
+      }
+      const x = frameBox.x + 4;
+      expect(x).toBeLessThan(cardBox.x);
+
+      await page.mouse.click(x, cardBox.y + cardBox.height / 2);
+
+      await expect(bookCard(frame)).toHaveCount(0);
+      await expectBookFocus(frame, "Kallocain", false);
+    });
+
+    test("Click inside the card", async function staysOpenOnInsideClick({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const card = await openKallocainCard(frame);
+
+      await card.getByText("Kallocain is a 1940 dystopian novel").click();
+
+      await expect(card).toBeVisible();
+    });
+  },
+);
+
+test.describe(
+  "Card follows the tiles",
+  { tag: "@sample" },
+  function describeCardFollowsTiles(): void {
+    test("Tiles reloaded with the book", async function updatesOpenCard({
+      page,
+    }): Promise<void> {
+      const changed = { isOn: false };
+      await page.route(
+        KALLOCAIN_TILE_GLOB,
+        answerChangedKallocain.bind(undefined, changed),
+      );
+      const frame = await openSample(page);
+      const card = await openKallocainCard(frame);
+      await expect(card.getByText("220", { exact: true })).toBeVisible();
+      changed.isOn = true;
+
+      await reloadTiles(page);
+
+      await expect(card.getByText("230", { exact: true })).toBeVisible();
+      await expect(card).toBeVisible();
+      await expect(bookButton(frame, "Kallocain")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+    });
+
+    test("Tiles reloaded without the book", async function closesOpenCard({
+      page,
+    }): Promise<void> {
+      const withoutKallocain = { isOn: false };
+      await page.route(
+        SAMPLE_COLLECTION_GLOB,
+        answerCollectionWithoutKallocain.bind(undefined, withoutKallocain),
+      );
+      const frame = await openSample(page);
+      await openKallocainCard(frame);
+      withoutKallocain.isOn = true;
+
+      await reloadTiles(page);
+
+      await expect(bookCard(frame)).toHaveCount(0);
+      await expect(frame.getByRole("listitem")).toHaveCount(2);
+    });
+  },
+);
+
+test.describe(
+  "Raised book",
+  { tag: "@sample" },
+  function describeRaisedBook(): void {
+    test("Raised on hover", async function raisesHoveredBook({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const themeShadow = await readThemeShadow(frame);
+
+      await bookButton(frame, "Kallocain").hover();
+
+      await expectBookLook(frame, "Kallocain", {
+        boxShadow: themeShadow,
+        transform: RAISED_TRANSFORM,
       });
-    }
-  });
-
-  test("Text under the cover", async function showsTextUnderCover({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const item = bookItem(frame, "Kallocain");
-    const title = item.getByText("Kallocain", { exact: true });
-
-    await expect(title).toBeVisible();
-    await expect(item.getByText("Karin Boye")).toBeVisible();
-    const buttonBox = await bookButton(frame, "Kallocain").boundingBox();
-    const titleBox = await title.boundingBox();
-    expect(titleBox?.y).toBeGreaterThanOrEqual(
-      (buttonBox?.y ?? 0) + (buttonBox?.height ?? 0),
-    );
-  });
-});
-
-test.describe("Placeholder book", function describePlaceholder(): void {
-  test("Cover fails to load", async function showsPlaceholderForMissingCover({
-    page,
-  }): Promise<void> {
-    await routeCovers(page);
-    await page.route(KALLOCAIN_COVER_GLOB, answerMissingCover);
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    const frame = await findModFrame(page, "Book List");
-    const kallocain = bookButton(frame, "Kallocain");
-
-    await expect(kallocain.locator("span")).toHaveText("Kallocain");
-    await expect(kallocain.locator("img")).toHaveCount(0);
-  });
-
-  test("No image", async function showsPlaceholderWithoutImage({
-    page,
-  }): Promise<void> {
-    await serveAppOriginMod(page, buildDraftFiles());
-    await page.goto(`/${DRAFT_RUN_HASH}`);
-    const frame = await findModFrame(page, "Drafts");
-    const draft = bookButton(frame, "Untitled draft");
-
-    await expect(draft.locator("span")).toHaveText("Untitled draft");
-    await expect(draft.locator("img")).toHaveCount(0);
-    const boxes = await frame.evaluate(readBookBoxes);
-    expect(boxes[1]).toEqual(boxes[0]);
-  });
-});
-
-test.describe("Books per row", function describeBooksPerRow(): void {
-  test("Default books per row", async function showsSixPerRow({
-    page,
-  }): Promise<void> {
-    await sizeFrame(page, 1200, WIDE_FRAME_INSET);
-    const frame = await openSample(page);
-    await expectFrameWidth(page, 1200);
-
-    await expect(booksPerRow(frame)).toHaveValue("6");
-    expect(await frame.evaluate(readColumnCount)).toBe(6);
-  });
-
-  test("Choosing books per row", async function choosesFourPerRow({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const widthBefore = await readFirstBookWidth(frame);
-
-    await booksPerRow(frame).selectOption("4");
-
-    expect(await frame.evaluate(readColumnCount)).toBe(4);
-    expect(await readFirstBookWidth(frame)).toBeGreaterThan(widthBefore);
-  });
-
-  test("Authors left out at 10 per row", async function leavesOutAuthors({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-
-    await booksPerRow(frame).selectOption("10");
-
-    await expect(
-      bookItem(frame, "Kallocain").getByText("Karin Boye"),
-    ).toBeHidden();
-    await expect(bookButton(frame, "Kallocain")).toHaveAccessibleName(
-      /Karin Boye/,
-    );
-  });
-
-  test("Choice kept across starts", async function keepsChoice({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    await booksPerRow(frame).selectOption("8");
-    await expect(frame.locator('ul[data-columns="8"]')).toHaveCount(1);
-
-    const reopened = await reopenSample(page);
-
-    await expect(booksPerRow(reopened)).toHaveValue("8");
-  });
-
-  test("Ten per row in a narrow frame", async function fitsNarrowFrame({
-    page,
-  }): Promise<void> {
-    await sizeFrame(page, 400, NARROW_FRAME_INSET);
-    const frame = await openSample(page);
-    await expectFrameWidth(page, 400);
-
-    await booksPerRow(frame).selectOption("10");
-
-    await expect(booksPerRow(frame)).toHaveValue("10");
-    expect(await frame.evaluate(readColumnCount)).toBeLessThan(10);
-    for (const box of await frame.evaluate(readBookBoxes)) {
-      expect(box.width).toBeGreaterThanOrEqual(BOOK_MIN_WIDTH);
-    }
-  });
-});
-
-test.describe("Book card", function describeBookCard(): void {
-  test("Open Kallocain's card", async function opensCard({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-
-    const card = await openKallocainCard(frame);
-
-    await expect(
-      card.getByRole("heading", { level: 2, name: "Kallocain" }),
-    ).toBeVisible();
-    await expect(
-      card.getByText("Kallocain is a 1940 dystopian novel"),
-    ).toBeVisible();
-  });
-});
-
-test.describe("Book card behind", function describeGridBehindCard(): void {
-  test("Grid behind the card", async function keepsGridInert({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const fahrenheitBox = await bookButton(
-      frame,
-      "Fahrenheit 451",
-    ).boundingBox();
-    if (fahrenheitBox === null) {
-      throw new Error("Expected Fahrenheit 451's book to be shown");
-    }
-    await openKallocainCard(frame);
-
-    await page.mouse.click(
-      fahrenheitBox.x + fahrenheitBox.width / 2,
-      fahrenheitBox.y + fahrenheitBox.height / 2,
-    );
-
-    await expect(bookCard(frame)).toHaveCount(0);
-    await expect(
-      frame.getByRole("dialog", { name: "Fahrenheit 451" }),
-    ).toHaveCount(0);
-  });
-});
-
-test.describe("No cover in the card", function describeNoCoverInCard(): void {
-  test("Covers switched off in the card", async function leavesOutSmallBook({
-    page,
-  }): Promise<void> {
-    await page.route(`**${SAMPLE_MOD_FILE_PATH}`, answerCoversOff);
-    const frame = await openSample(page);
-
-    const card = await openKallocainCard(frame);
-
-    await expect(card.locator("img, figure")).toHaveCount(0);
-    await expect(
-      card.getByRole("heading", { level: 2, name: "Kallocain" }),
-    ).toBeVisible();
-  });
-});
-
-test.describe("Card body", function describeCardBody(): void {
-  test("A link in the body", async function opensBodyLink({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
-    await markFrame(frame);
-
-    await card
-      .getByRole("link", { name: "https://en.wikipedia.org/wiki/Kallocain" })
-      .click();
-
-    await expect(actionDialog(page)).toContainText(
-      "https://en.wikipedia.org/wiki/Kallocain",
-    );
-    expect(await isFrameMarked(frame)).toBe(true);
-  });
-});
-
-test.describe("Closing the card", function describeClosingCard(): void {
-  test("Escape", async function closesOnEscape({ page }): Promise<void> {
-    const frame = await openSample(page);
-    await openKallocainCard(frame);
-
-    await page.keyboard.press("Escape");
-
-    await expect(bookCard(frame)).toHaveCount(0);
-    await expectBookFocus(frame, "Kallocain", true);
-  });
-
-  test("Close button", async function closesOnButton({ page }): Promise<void> {
-    const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
-
-    await card.getByRole("button", { name: "Close" }).click();
-    await page.mouse.move(0, 0);
-
-    await expect(bookCard(frame)).toHaveCount(0);
-    await expectBookFocus(frame, "Kallocain", false);
-    await expectBookLook(frame, "Kallocain", FLAT_LOOK);
-  });
-
-  test("Close button with the keyboard", async function closesOnButtonKey({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
-    const closeButton = card.getByRole("button", { name: "Close" });
-    await closeButton.focus();
-
-    await page.keyboard.press("Enter");
-
-    await expect(bookCard(frame)).toHaveCount(0);
-    await expectBookFocus(frame, "Kallocain", true);
-  });
-
-  test("Backdrop", async function closesOnBackdrop({ page }): Promise<void> {
-    const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
-    const frameBox = await page
-      .locator('iframe[title="Book List"]')
-      .boundingBox();
-    const cardBox = await card.boundingBox();
-    if (frameBox === null || cardBox === null) {
-      throw new Error("Expected the frame and the card to be shown");
-    }
-    const x = frameBox.x + 4;
-    expect(x).toBeLessThan(cardBox.x);
-
-    await page.mouse.click(x, cardBox.y + cardBox.height / 2);
-
-    await expect(bookCard(frame)).toHaveCount(0);
-    await expectBookFocus(frame, "Kallocain", false);
-  });
-
-  test("Click inside the card", async function staysOpenOnInsideClick({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
-
-    await card.getByText("Kallocain is a 1940 dystopian novel").click();
-
-    await expect(card).toBeVisible();
-  });
-});
-
-test.describe("Card follows the tiles", function describeCardFollowsTiles(): void {
-  test("Tiles reloaded with the book", async function updatesOpenCard({
-    page,
-  }): Promise<void> {
-    const changed = { isOn: false };
-    await page.route(
-      KALLOCAIN_TILE_GLOB,
-      answerChangedKallocain.bind(undefined, changed),
-    );
-    const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
-    await expect(card.getByText("220", { exact: true })).toBeVisible();
-    changed.isOn = true;
-
-    await reloadTiles(page);
-
-    await expect(card.getByText("230", { exact: true })).toBeVisible();
-    await expect(card).toBeVisible();
-    await expect(bookButton(frame, "Kallocain")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-  });
-
-  test("Tiles reloaded without the book", async function closesOpenCard({
-    page,
-  }): Promise<void> {
-    const withoutKallocain = { isOn: false };
-    await page.route(
-      SAMPLE_COLLECTION_GLOB,
-      answerCollectionWithoutKallocain.bind(undefined, withoutKallocain),
-    );
-    const frame = await openSample(page);
-    await openKallocainCard(frame);
-    withoutKallocain.isOn = true;
-
-    await reloadTiles(page);
-
-    await expect(bookCard(frame)).toHaveCount(0);
-    await expect(frame.getByRole("listitem")).toHaveCount(2);
-  });
-});
-
-test.describe("Raised book", function describeRaisedBook(): void {
-  test("Raised on hover", async function raisesHoveredBook({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const themeShadow = await readThemeShadow(frame);
-
-    await bookButton(frame, "Kallocain").hover();
-
-    await expectBookLook(frame, "Kallocain", {
-      boxShadow: themeShadow,
-      transform: RAISED_TRANSFORM,
+      await expectBookLook(frame, "Fahrenheit 451", FLAT_LOOK);
+      await expectBookLook(frame, "The Library of Babel", FLAT_LOOK);
     });
-    await expectBookLook(frame, "Fahrenheit 451", FLAT_LOOK);
-    await expectBookLook(frame, "The Library of Babel", FLAT_LOOK);
-  });
 
-  test("Raised while the card is open", async function raisesOpenBook({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const themeShadow = await readThemeShadow(frame);
+    test("Raised while the card is open", async function raisesOpenBook({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const themeShadow = await readThemeShadow(frame);
 
-    await openKallocainCard(frame);
-    await page.mouse.move(0, 0);
+      await openKallocainCard(frame);
+      await page.mouse.move(0, 0);
 
-    await expectBookLook(frame, "Kallocain", {
-      boxShadow: themeShadow,
-      transform: RAISED_TRANSFORM,
+      await expectBookLook(frame, "Kallocain", {
+        boxShadow: themeShadow,
+        transform: RAISED_TRANSFORM,
+      });
     });
-  });
 
-  test("Back after closing", async function lowersClosedBook({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
-    await card.getByRole("button", { name: "Close" }).click();
+    test("Back after closing", async function lowersClosedBook({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const card = await openKallocainCard(frame);
+      await card.getByRole("button", { name: "Close" }).click();
 
-    await frame.getByRole("heading", { name: "Book List" }).click();
+      await frame.getByRole("heading", { name: "Book List" }).click();
 
-    await expectBookLook(frame, "Kallocain", FLAT_LOOK);
-  });
-
-  test("Reduced motion", async function raisesWithoutMoving({
-    page,
-  }): Promise<void> {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    const frame = await openSample(page);
-    const themeShadow = await readThemeShadow(frame);
-
-    await bookButton(frame, "Kallocain").hover();
-
-    await expectBookLook(frame, "Kallocain", {
-      boxShadow: themeShadow,
-      transform: "none",
+      await expectBookLook(frame, "Kallocain", FLAT_LOOK);
     });
-  });
-});
 
-test.describe("The open book's state", function describeOpenBookState(): void {
-  test("State while the card is open", async function marksOpenBook({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
+    test("Reduced motion", async function raisesWithoutMoving({
+      page,
+    }): Promise<void> {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const frame = await openSample(page);
+      const themeShadow = await readThemeShadow(frame);
 
-    await openKallocainCard(frame);
+      await bookButton(frame, "Kallocain").hover();
 
-    await expect(
-      frame.locator('li > button[aria-haspopup="dialog"]'),
-    ).toHaveCount(3);
-    await expectExpandedStates(frame, ["false", "true", "false"]);
-  });
+      await expectBookLook(frame, "Kallocain", {
+        boxShadow: themeShadow,
+        transform: "none",
+      });
+    });
+  },
+);
 
-  test("State after closing", async function unmarksClosedBook({
-    page,
-  }): Promise<void> {
-    const frame = await openSample(page);
-    const card = await openKallocainCard(frame);
+test.describe(
+  "The open book's state",
+  { tag: "@sample" },
+  function describeOpenBookState(): void {
+    test("State while the card is open", async function marksOpenBook({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
 
-    await card.getByRole("button", { name: "Close" }).click();
+      await openKallocainCard(frame);
 
-    await expect(bookCard(frame)).toBeHidden();
-    await expectExpandedStates(frame, ["false", "false", "false"]);
-  });
-});
+      await expect(
+        frame.locator('li > button[aria-haspopup="dialog"]'),
+      ).toHaveCount(3);
+      await expectExpandedStates(frame, ["false", "true", "false"]);
+    });
+
+    test("State after closing", async function unmarksClosedBook({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      const card = await openKallocainCard(frame);
+
+      await card.getByRole("button", { name: "Close" }).click();
+
+      await expect(bookCard(frame)).toBeHidden();
+      await expectExpandedStates(frame, ["false", "false", "false"]);
+    });
+  },
+);

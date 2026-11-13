@@ -416,6 +416,21 @@ describe("StageView", function describeStageView(): void {
     renderStageView(stage);
 
     expect(screen.queryByRole("button", { name: "Reload tiles" })).toBeNull();
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    const names: string[] = [];
+    for (const button of within(stageBar).getAllByRole("button")) {
+      names.push(button.getAttribute("aria-label") ?? "");
+    }
+    expect(names).toEqual([
+      "Mod information",
+      "Share",
+      "Errors: 0, 0 unread",
+      "Warnings: 0, 0 unread",
+      "Notifications: 0, 0 unread",
+      "Theater mode",
+      "Fullscreen",
+      "Close",
+    ]);
   });
 
   it("shows Reload tiles for a mod opened with a collection", async function showsReload(): Promise<void> {
@@ -447,6 +462,22 @@ describe("StageView", function describeStageView(): void {
     expect(screen.getByRole("alert")).toHaveTextContent("404");
     expect(container.querySelector("iframe")).toBeNull();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    expect(within(stageBar).getByText("Mod not loaded")).toBeInTheDocument();
+    expect(stageBar.querySelector("[data-slot=badge]")).toBeNull();
+  });
+
+  it("Missing collection", async function keepsModName(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=./fixtures/tiles/missing.yaml`,
+    );
+    renderStageView(stage);
+
+    expect(readStageSnapshot(stage).sandboxes[0].status).toBe("failed");
+    expect(screen.getByRole("alert")).toHaveTextContent("404");
+    const stageBar = screen.getByRole("region", { name: "Stage bar" });
+    expect(within(stageBar).getByText("Book List")).toBeInTheDocument();
+    expect(within(stageBar).getByText("1.0.0")).toBeInTheDocument();
   });
 
   it("Sample mod has no issues", async function showsNoIssues(): Promise<void> {
@@ -581,6 +612,20 @@ describe("StageView", function describeStageView(): void {
 
     expect(readCapsuleState("Warnings")).toBe("read");
     expect(readCapsuleState("Errors")).toBe("unread");
+  });
+
+  it("New message after reading", async function fillsAgain(): Promise<void> {
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    await reportBlockedImage(modPort, "https://first.example.net");
+    await openLevel("Warnings");
+    await closeLevel("Warnings");
+    expect(readCapsuleState("Warnings")).toBe("read");
+
+    await reportBlockedImage(modPort, "https://second.example.net");
+
+    expect(readCapsuleState("Warnings")).toBe("unread");
   });
 
   it("lists the stage bar's items in order", async function ordersItems(): Promise<void> {
@@ -754,7 +799,7 @@ describe("StageView", function describeStageView(): void {
     expect(screen.queryByText("Unread")).toBeNull();
   });
 
-  it("Message arriving while the popover is open, on top", async function marksArrival(): Promise<void> {
+  it("New message on top, marked while the popover is open", async function marksArrival(): Promise<void> {
     const stage = await startTestStage("");
     const modPort = attachTestFrame(stage, "sandbox-1");
     renderStageView(stage);
@@ -819,7 +864,7 @@ describe("StageView", function describeStageView(): void {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("dismisses a notification and clears them all", async function dismisses(): Promise<void> {
+  it("Dismiss one, then Clear all", async function dismisses(): Promise<void> {
     const stage = await startTestStage(
       `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
     );
@@ -828,10 +873,16 @@ describe("StageView", function describeStageView(): void {
       await reloadTiles(stage, "sandbox-1");
     });
     await openLevel("Notifications");
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    const keptText = items[1].textContent;
 
     fireEvent.click(screen.getAllByRole("button", { name: /^Dismiss: / })[0]);
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByRole("listitem")).toHaveTextContent(keptText ?? "");
+    expect(findLevelButton("Notifications")).toHaveAccessibleName(
+      "Notifications: 1, 0 unread",
+    );
     await act(async function reloadAgain(): Promise<void> {
       await reloadTiles(stage, "sandbox-1");
     });

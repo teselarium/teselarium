@@ -375,287 +375,323 @@ async function waitForDrawnEvents(frame: Frame, count: number): Promise<void> {
     .toBe(count);
 }
 
-test.describe("The tile body element draws diagrams", function describeDrawing(): void {
-  test("Body with a diagram", async function drawsDiagram({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
+test.describe(
+  "The tile body element draws diagrams",
+  { tag: "@frames" },
+  function describeDrawing(): void {
+    test("Body with a diagram", async function drawsDiagram({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
 
-    await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
-    await waitForDrawnEvents(frame, 1);
+      await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
+      await waitForDrawnEvents(frame, 1);
 
-    const log = await frame.evaluate(readBodyLog);
-    expect(log[0]).toEqual({
-      event: "ot-rendered",
-      paragraphs: 1,
-      codeBlocks: 1,
-      figures: 0,
+      const log = await frame.evaluate(readBodyLog);
+      expect(log[0]).toEqual({
+        event: "ot-rendered",
+        paragraphs: 1,
+        codeBlocks: 1,
+        figures: 0,
+      });
+      expect(log[1]).toEqual({
+        event: "paint",
+        paragraphs: 1,
+        codeBlocks: 1,
+        figures: 0,
+      });
+      const figures = await frame.evaluate(readFigures);
+      expect(figures).toHaveLength(1);
+      expect(figures[0].svgs).toBe(1);
+      expect(figures[0].text).toContain("Tile");
+      expect(figures[0].text).toContain("Mod");
+      expect(figures[0].source).toBe("flowchart LR\n  Tile --> Mod\n");
+      expect(await frame.evaluate(readCodeBlocks)).toEqual([]);
     });
-    expect(log[1]).toEqual({
-      event: "paint",
-      paragraphs: 1,
-      codeBlocks: 1,
-      figures: 0,
+
+    test("Markup in a label", async function keepsLabelsAsText({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
+
+      await frame.evaluate(showDiagramBody, { index: MARKUP_INDEX });
+      await waitForDrawnEvents(frame, 1);
+
+      const figures = await frame.evaluate(readFigures);
+      expect(figures).toHaveLength(1);
+      expect(figures[0].svgs).toBe(1);
+      expect(figures[0].images).toBe(0);
+      expect(figures[0].onerrors).toBe(0);
     });
-    const figures = await frame.evaluate(readFigures);
-    expect(figures).toHaveLength(1);
-    expect(figures[0].svgs).toBe(1);
-    expect(figures[0].text).toContain("Tile");
-    expect(figures[0].text).toContain("Mod");
-    expect(figures[0].source).toBe("flowchart LR\n  Tile --> Mod\n");
-    expect(await frame.evaluate(readCodeBlocks)).toEqual([]);
-  });
+  },
+);
 
-  test("Markup in a label", async function keepsLabelsAsText({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
+test.describe(
+  "A diagram's own configuration",
+  { tag: "@frames" },
+  function describeOwnConfiguration(): void {
+    test("HTML labels in the diagram's configuration", async function keepsHtmlLabelsOff({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
 
-    await frame.evaluate(showDiagramBody, { index: MARKUP_INDEX });
-    await waitForDrawnEvents(frame, 1);
+      await frame.evaluate(showDiagramBody, { index: HTML_LABELS_INDEX });
+      await waitForDrawnEvents(frame, 1);
 
-    const figures = await frame.evaluate(readFigures);
-    expect(figures).toHaveLength(1);
-    expect(figures[0].svgs).toBe(1);
-    expect(figures[0].images).toBe(0);
-    expect(figures[0].onerrors).toBe(0);
-  });
-});
-
-test.describe("A diagram's own configuration", function describeOwnConfiguration(): void {
-  test("HTML labels in the diagram's configuration", async function keepsHtmlLabelsOff({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
-
-    await frame.evaluate(showDiagramBody, { index: HTML_LABELS_INDEX });
-    await waitForDrawnEvents(frame, 1);
-
-    const figures = await frame.evaluate(readFigures);
-    expect(figures).toHaveLength(2);
-    for (const figure of figures) {
-      expect(figure.svgs).toBe(1);
-      expect(figure.images).toBe(0);
-      expect(figure.foreignObjects).toBe(0);
-    }
-  });
-});
-
-test.describe("Diagrams are drawn when they come into view", function describeInView(): void {
-  test("Block below the fold", async function waitsForView({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
-    const chunkRequests = collectMermaidChunkRequests(page);
-
-    await frame.evaluate(showDiagramBody, { index: BELOW_FOLD_INDEX });
-    await frame.evaluate(waitForQuietFrame, 500);
-
-    expect(chunkRequests).toEqual([]);
-    expect(await frame.evaluate(readMermaidType)).toBe("undefined");
-    expect(await frame.evaluate(countDrawnEvents)).toBe(0);
-
-    await frame.evaluate(scrollToDiagramBlock);
-    await waitForDrawnEvents(frame, 1);
-
-    expect(chunkRequests).toHaveLength(1);
-    expect(await frame.evaluate(readFigures)).toHaveLength(1);
-  });
-});
-
-test.describe("Blocks being drawn are marked busy", function describeBusy(): void {
-  test("Busy while drawing", async function marksBusyBlock({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
-
-    await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
-    await waitForDrawnEvents(frame, 1);
-
-    expect(await frame.evaluate(readBusyLog)).toEqual([
-      { change: "busy", tag: "pre", busy: "true" },
-      { change: "removed", tag: "pre", busy: "true" },
-      { change: "added", tag: "figure", busy: null },
-    ]);
-    expect(await frame.evaluate(countBusyElements)).toBe(0);
-  });
-
-  test("Failed block is not busy", async function unmarksFailedBlock({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
-
-    await frame.evaluate(showDiagramBody, { index: SYNTAX_ERROR_INDEX });
-    await waitForDrawnEvents(frame, 1);
-
-    expect(await frame.evaluate(readCodeBlocks)).toEqual([
-      "flowchart LR\n  A -->\n",
-    ]);
-    expect(await frame.evaluate(readBusyLog)).toContainEqual({
-      change: "busy",
-      tag: "pre",
-      busy: null,
+      const figures = await frame.evaluate(readFigures);
+      expect(figures).toHaveLength(2);
+      for (const figure of figures) {
+        expect(figure.svgs).toBe(1);
+        expect(figure.images).toBe(0);
+        expect(figure.foreignObjects).toBe(0);
+      }
     });
-    expect(await frame.evaluate(countBusyElements)).toBe(0);
-  });
+  },
+);
 
-  test("Busy while redrawn", async function marksRedrawnFigure({
-    page,
-  }): Promise<void> {
-    await page.emulateMedia({ colorScheme: "light" });
-    const frame = await openDiagramProbe(page);
-    await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
-    await waitForDrawnEvents(frame, 1);
-    await frame.evaluate(clearBusyLog);
+test.describe(
+  "Diagrams are drawn when they come into view",
+  { tag: "@frames" },
+  function describeInView(): void {
+    test("Block below the fold", async function waitsForView({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
+      const chunkRequests = collectMermaidChunkRequests(page);
 
-    await page.emulateMedia({ colorScheme: "dark" });
-    await waitForDrawnEvents(frame, 2);
+      await frame.evaluate(showDiagramBody, { index: BELOW_FOLD_INDEX });
+      await frame.evaluate(waitForQuietFrame, 500);
 
-    expect(await frame.evaluate(readBusyLog)).toEqual([
-      { change: "busy", tag: "figure", busy: "true" },
-      { change: "removed", tag: "figure", busy: "true" },
-      { change: "added", tag: "figure", busy: null },
-    ]);
-    expect(await frame.evaluate(countBusyElements)).toBe(0);
-  });
+      expect(chunkRequests).toEqual([]);
+      expect(await frame.evaluate(readMermaidType)).toBe("undefined");
+      expect(await frame.evaluate(countDrawnEvents)).toBe(0);
 
-  test("Not busy out of view or as code", async function leavesOtherBlocks({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
+      await frame.evaluate(scrollToDiagramBlock);
+      await waitForDrawnEvents(frame, 1);
 
-    await frame.evaluate(showDiagramBody, { index: BELOW_FOLD_INDEX });
-    await frame.evaluate(waitForQuietFrame, 500);
-
-    expect(await frame.evaluate(readCodeBlocks)).toHaveLength(1);
-    expect(await frame.evaluate(readBusyLog)).toEqual([]);
-    expect(await frame.evaluate(countBusyElements)).toBe(0);
-
-    await frame.evaluate(showDiagramBody, {
-      index: FLOWCHART_INDEX,
-      diagrams: "source",
+      expect(chunkRequests).toHaveLength(1);
+      expect(await frame.evaluate(readFigures)).toHaveLength(1);
     });
-    await frame.evaluate(waitForQuietFrame, 500);
+  },
+);
 
-    expect(await frame.evaluate(readCodeBlocks)).toHaveLength(1);
-    expect(await frame.evaluate(readBusyLog)).toEqual([]);
-    expect(await frame.evaluate(countBusyElements)).toBe(0);
-  });
-});
+test.describe(
+  "Blocks being drawn are marked busy",
+  { tag: "@frames" },
+  function describeBusy(): void {
+    test("Busy while drawing", async function marksBusyBlock({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
 
-test.describe("A block that fails stays as code", function describeFailures(): void {
-  test("Syntax error", async function keepsFailingBlock({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
+      await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
+      await waitForDrawnEvents(frame, 1);
 
-    await frame.evaluate(showDiagramBody, { index: SYNTAX_ERROR_INDEX });
-    await waitForDrawnEvents(frame, 1);
+      expect(await frame.evaluate(readBusyLog)).toEqual([
+        { change: "busy", tag: "pre", busy: "true" },
+        { change: "removed", tag: "pre", busy: "true" },
+        { change: "added", tag: "figure", busy: null },
+      ]);
+      expect(await frame.evaluate(countBusyElements)).toBe(0);
+    });
 
-    expect(await frame.evaluate(readCodeBlocks)).toEqual([
-      "flowchart LR\n  A -->\n",
-    ]);
-    const figures = await frame.evaluate(readFigures);
-    expect(figures).toHaveLength(1);
-    expect(figures[0].text).toContain("Tile");
-    expect(await frame.evaluate(countStraySvgs)).toBe(0);
-  });
-});
+    test("Failed block is not busy", async function unmarksFailedBlock({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
 
-test.describe("Diagrams follow the color scheme", function describeColorScheme(): void {
-  test("Switch to dark", async function redrawsInDark({ page }): Promise<void> {
-    await page.emulateMedia({ colorScheme: "light" });
-    const frame = await openDiagramProbe(page);
-    await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
-    await waitForDrawnEvents(frame, 1);
-    const lightFill = await frame.evaluate(readNodeFill);
-    await markFrame(frame);
+      await frame.evaluate(showDiagramBody, { index: SYNTAX_ERROR_INDEX });
+      await waitForDrawnEvents(frame, 1);
 
-    await page.emulateMedia({ colorScheme: "dark" });
-    await waitForDrawnEvents(frame, 2);
+      expect(await frame.evaluate(readCodeBlocks)).toEqual([
+        "flowchart LR\n  A -->\n",
+      ]);
+      expect(await frame.evaluate(readBusyLog)).toContainEqual({
+        change: "busy",
+        tag: "pre",
+        busy: null,
+      });
+      expect(await frame.evaluate(countBusyElements)).toBe(0);
+    });
 
-    // The card token of each scheme: #ffffff and #18202c.
-    expect(lightFill).toBe("rgb(255, 255, 255)");
-    expect(await frame.evaluate(readNodeFill)).toBe("rgb(24, 32, 44)");
-    expect(await frame.evaluate(readFigures)).toHaveLength(1);
-    expect(await isFrameMarked(frame)).toBe(true);
-  });
-});
+    test("Busy while redrawn", async function marksRedrawnFigure({
+      page,
+    }): Promise<void> {
+      await page.emulateMedia({ colorScheme: "light" });
+      const frame = await openDiagramProbe(page);
+      await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
+      await waitForDrawnEvents(frame, 1);
+      await frame.evaluate(clearBusyLog);
 
-test.describe("Diagrams drawn event", function describeDrawnEvent(): void {
-  test("Events in order", async function firesInOrder({ page }): Promise<void> {
-    const frame = await openDiagramProbe(page);
+      await page.emulateMedia({ colorScheme: "dark" });
+      await waitForDrawnEvents(frame, 2);
 
-    await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
-    await waitForDrawnEvents(frame, 1);
+      expect(await frame.evaluate(readBusyLog)).toEqual([
+        { change: "busy", tag: "figure", busy: "true" },
+        { change: "removed", tag: "figure", busy: "true" },
+        { change: "added", tag: "figure", busy: null },
+      ]);
+      expect(await frame.evaluate(countBusyElements)).toBe(0);
+    });
 
-    const log = await frame.evaluate(readBodyLog);
-    expect(log).toEqual([
-      { event: "ot-rendered", paragraphs: 1, codeBlocks: 1, figures: 0 },
-      { event: "paint", paragraphs: 1, codeBlocks: 1, figures: 0 },
-      {
-        event: "ot-diagrams-drawn",
+    test("Not busy out of view or as code", async function leavesOtherBlocks({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
+
+      await frame.evaluate(showDiagramBody, { index: BELOW_FOLD_INDEX });
+      await frame.evaluate(waitForQuietFrame, 500);
+
+      expect(await frame.evaluate(readCodeBlocks)).toHaveLength(1);
+      expect(await frame.evaluate(readBusyLog)).toEqual([]);
+      expect(await frame.evaluate(countBusyElements)).toBe(0);
+
+      await frame.evaluate(showDiagramBody, {
+        index: FLOWCHART_INDEX,
+        diagrams: "source",
+      });
+      await frame.evaluate(waitForQuietFrame, 500);
+
+      expect(await frame.evaluate(readCodeBlocks)).toHaveLength(1);
+      expect(await frame.evaluate(readBusyLog)).toEqual([]);
+      expect(await frame.evaluate(countBusyElements)).toBe(0);
+    });
+  },
+);
+
+test.describe(
+  "A block that fails stays as code",
+  { tag: "@frames" },
+  function describeFailures(): void {
+    test("Syntax error", async function keepsFailingBlock({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
+
+      await frame.evaluate(showDiagramBody, { index: SYNTAX_ERROR_INDEX });
+      await waitForDrawnEvents(frame, 1);
+
+      expect(await frame.evaluate(readCodeBlocks)).toEqual([
+        "flowchart LR\n  A -->\n",
+      ]);
+      const figures = await frame.evaluate(readFigures);
+      expect(figures).toHaveLength(1);
+      expect(figures[0].text).toContain("Tile");
+      expect(await frame.evaluate(countStraySvgs)).toBe(0);
+    });
+  },
+);
+
+test.describe(
+  "Diagrams follow the color scheme",
+  { tag: "@frames" },
+  function describeColorScheme(): void {
+    test("Switch to dark", async function redrawsInDark({
+      page,
+    }): Promise<void> {
+      await page.emulateMedia({ colorScheme: "light" });
+      const frame = await openDiagramProbe(page);
+      await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
+      await waitForDrawnEvents(frame, 1);
+      const lightFill = await frame.evaluate(readNodeFill);
+      await markFrame(frame);
+
+      await page.emulateMedia({ colorScheme: "dark" });
+      await waitForDrawnEvents(frame, 2);
+
+      // The card token of each scheme: #ffffff and #18202c.
+      expect(lightFill).toBe("rgb(255, 255, 255)");
+      expect(await frame.evaluate(readNodeFill)).toBe("rgb(24, 32, 44)");
+      expect(await frame.evaluate(readFigures)).toHaveLength(1);
+      expect(await isFrameMarked(frame)).toBe(true);
+    });
+  },
+);
+
+test.describe(
+  "Diagrams drawn event",
+  { tag: "@frames" },
+  function describeDrawnEvent(): void {
+    test("Events in order", async function firesInOrder({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
+
+      await frame.evaluate(showDiagramBody, { index: FLOWCHART_INDEX });
+      await waitForDrawnEvents(frame, 1);
+
+      const log = await frame.evaluate(readBodyLog);
+      expect(log).toEqual([
+        { event: "ot-rendered", paragraphs: 1, codeBlocks: 1, figures: 0 },
+        { event: "paint", paragraphs: 1, codeBlocks: 1, figures: 0 },
+        {
+          event: "ot-diagrams-drawn",
+          paragraphs: 1,
+          codeBlocks: 0,
+          figures: 1,
+        },
+      ]);
+    });
+
+    test("New tile while drawing", async function dropsReplacedBody({
+      page,
+    }): Promise<void> {
+      const frame = await openDiagramProbe(page);
+
+      await frame.evaluate(showDiagramBody, {
+        index: FLOWCHART_INDEX,
+        nextIndex: PLAIN_INDEX,
+      });
+      await expect
+        .poll(function readEvents(): Promise<string[]> {
+          return frame.evaluate(listLoggedEvents);
+        })
+        .toEqual(["ot-rendered", "paint", "ot-rendered"]);
+      await expect
+        .poll(function readType(): Promise<string> {
+          return frame.evaluate(readMermaidType);
+        })
+        .toBe("object");
+      await frame.evaluate(waitForQuietFrame, 500);
+
+      const log = await frame.evaluate(readBodyLog);
+      expect(log[2]).toEqual({
+        event: "ot-rendered",
         paragraphs: 1,
         codeBlocks: 0,
-        figures: 1,
-      },
-    ]);
-  });
-
-  test("New tile while drawing", async function dropsReplacedBody({
-    page,
-  }): Promise<void> {
-    const frame = await openDiagramProbe(page);
-
-    await frame.evaluate(showDiagramBody, {
-      index: FLOWCHART_INDEX,
-      nextIndex: PLAIN_INDEX,
+        figures: 0,
+      });
+      expect(await frame.evaluate(listLoggedEvents)).toEqual([
+        "ot-rendered",
+        "paint",
+        "ot-rendered",
+      ]);
+      expect(await frame.evaluate(readFigures)).toEqual([]);
     });
-    await expect
-      .poll(function readEvents(): Promise<string[]> {
-        return frame.evaluate(listLoggedEvents);
-      })
-      .toEqual(["ot-rendered", "paint", "ot-rendered"]);
-    await expect
-      .poll(function readType(): Promise<string> {
-        return frame.evaluate(readMermaidType);
-      })
-      .toBe("object");
-    await frame.evaluate(waitForQuietFrame, 500);
+  },
+);
 
-    const log = await frame.evaluate(readBodyLog);
-    expect(log[2]).toEqual({
-      event: "ot-rendered",
-      paragraphs: 1,
-      codeBlocks: 0,
-      figures: 0,
+test.describe(
+  "Keep diagrams as code",
+  { tag: "@frames" },
+  function describeSourceOnly(): void {
+    test("Source only", async function keepsSource({ page }): Promise<void> {
+      const frame = await openDiagramProbe(page);
+      const chunkRequests = collectMermaidChunkRequests(page);
+
+      await frame.evaluate(showDiagramBody, {
+        index: FLOWCHART_INDEX,
+        diagrams: "source",
+      });
+      await frame.evaluate(waitForQuietFrame, 500);
+
+      expect(await frame.evaluate(readCodeBlocks)).toEqual([
+        "flowchart LR\n  Tile --> Mod\n",
+      ]);
+      expect(await frame.evaluate(readFigures)).toEqual([]);
+      expect(await frame.evaluate(countDrawnEvents)).toBe(0);
+      expect(await frame.evaluate(readMermaidType)).toBe("undefined");
+      expect(chunkRequests).toEqual([]);
     });
-    expect(await frame.evaluate(listLoggedEvents)).toEqual([
-      "ot-rendered",
-      "paint",
-      "ot-rendered",
-    ]);
-    expect(await frame.evaluate(readFigures)).toEqual([]);
-  });
-});
-
-test.describe("Keep diagrams as code", function describeSourceOnly(): void {
-  test("Source only", async function keepsSource({ page }): Promise<void> {
-    const frame = await openDiagramProbe(page);
-    const chunkRequests = collectMermaidChunkRequests(page);
-
-    await frame.evaluate(showDiagramBody, {
-      index: FLOWCHART_INDEX,
-      diagrams: "source",
-    });
-    await frame.evaluate(waitForQuietFrame, 500);
-
-    expect(await frame.evaluate(readCodeBlocks)).toEqual([
-      "flowchart LR\n  Tile --> Mod\n",
-    ]);
-    expect(await frame.evaluate(readFigures)).toEqual([]);
-    expect(await frame.evaluate(countDrawnEvents)).toBe(0);
-    expect(await frame.evaluate(readMermaidType)).toBe("undefined");
-    expect(chunkRequests).toEqual([]);
-  });
-});
+  },
+);

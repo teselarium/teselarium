@@ -71,272 +71,312 @@ async function readDownload(download: Download): Promise<Buffer> {
   return readFile(path);
 }
 
-test.describe("Open a link", function describeOpenLink(): void {
-  test("Link opened", async function opensLink({
-    page,
-    context,
-  }): Promise<void> {
-    await context.route("https://example.org/**", answerBlankPage);
-    const frame = await openProbe(page);
-    await ask(frame, "links.open", { url: "https://example.org/books?id=1" });
-    await expect(actionDialog(page)).toContainText(
-      "https://example.org/books?id=1",
-    );
+test.describe(
+  "Open a link",
+  { tag: "@frames" },
+  function describeOpenLink(): void {
+    test("Link opened", async function opensLink({
+      page,
+      context,
+    }): Promise<void> {
+      await context.route("https://example.org/**", answerBlankPage);
+      const frame = await openProbe(page);
+      await ask(frame, "links.open", { url: "https://example.org/books?id=1" });
+      await expect(actionDialog(page)).toContainText(
+        "https://example.org/books?id=1",
+      );
 
-    const opening = context.waitForEvent("page");
-    await actionDialog(page).getByRole("button", { name: "Open" }).click();
-    const newPage = await opening;
-    await newPage.waitForLoadState();
+      const opening = context.waitForEvent("page");
+      await actionDialog(page).getByRole("button", { name: "Open" }).click();
+      const newPage = await opening;
+      await newPage.waitForLoadState();
 
-    expect(newPage.url()).toBe("https://example.org/books?id=1");
-    expect(await newPage.evaluate(readOpener)).toBe(true);
-    expect(await frame.evaluate(readProbeAnswers)).toEqual([{ result: true }]);
-    await expect(actionDialog(page)).toBeHidden();
-  });
-
-  test("Link cancelled", async function cancelsLink({
-    page,
-    context,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-    await ask(frame, "links.open", { url: "https://example.org/" });
-
-    await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
-
-    expect(await frame.evaluate(readProbeAnswers)).toEqual([{ result: false }]);
-    expect(context.pages()).toHaveLength(1);
-  });
-});
-
-test.describe("Save a file", function describeSaveFile(): void {
-  test("Text file saved", async function savesText({ page }): Promise<void> {
-    const frame = await openProbe(page);
-    await ask(frame, "files.save", {
-      name: "books.csv",
-      content: "title\nKallocain\n",
-      type: "text/csv",
+      expect(newPage.url()).toBe("https://example.org/books?id=1");
+      expect(await newPage.evaluate(readOpener)).toBe(true);
+      expect(await frame.evaluate(readProbeAnswers)).toEqual([
+        { result: true },
+      ]);
+      await expect(actionDialog(page)).toBeHidden();
     });
 
-    const downloading = page.waitForEvent("download");
-    await actionDialog(page).getByRole("button", { name: "Save" }).click();
-    const download = await downloading;
+    test("Link cancelled", async function cancelsLink({
+      page,
+      context,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+      await ask(frame, "links.open", { url: "https://example.org/" });
 
-    expect(download.suggestedFilename()).toBe("books.csv");
-    expect((await readDownload(download)).toString("utf8")).toBe(
-      "title\nKallocain\n",
-    );
-    expect(await frame.evaluate(readProbeAnswers)).toEqual([{ result: true }]);
-  });
+      await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
 
-  test("Binary file saved", async function savesBinary({
-    page,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-    await ask(frame, "files.save", {
-      name: "cover.png",
-      content: "iVBORw0KGgo=",
-      encoding: "base64",
-      type: "image/png",
+      expect(await frame.evaluate(readProbeAnswers)).toEqual([
+        { result: false },
+      ]);
+      expect(context.pages()).toHaveLength(1);
+    });
+  },
+);
+
+test.describe(
+  "Save a file",
+  { tag: "@frames" },
+  function describeSaveFile(): void {
+    test("Text file saved", async function savesText({ page }): Promise<void> {
+      const frame = await openProbe(page);
+      await ask(frame, "files.save", {
+        name: "books.csv",
+        content: "title\nKallocain\n",
+        type: "text/csv",
+      });
+
+      const downloading = page.waitForEvent("download");
+      await actionDialog(page).getByRole("button", { name: "Save" }).click();
+      const download = await downloading;
+
+      expect(download.suggestedFilename()).toBe("books.csv");
+      expect((await readDownload(download)).toString("utf8")).toBe(
+        "title\nKallocain\n",
+      );
+      expect(await frame.evaluate(readProbeAnswers)).toEqual([
+        { result: true },
+      ]);
     });
 
-    const downloading = page.waitForEvent("download");
-    await actionDialog(page).getByRole("button", { name: "Save" }).click();
-    const download = await downloading;
+    test("Binary file saved", async function savesBinary({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+      await ask(frame, "files.save", {
+        name: "cover.png",
+        content: "iVBORw0KGgo=",
+        encoding: "base64",
+        type: "image/png",
+      });
 
-    expect(download.suggestedFilename()).toBe("cover.png");
-    expect(await readDownload(download)).toEqual(
-      Buffer.from("iVBORw0KGgo=", "base64"),
-    );
-  });
+      const downloading = page.waitForEvent("download");
+      await actionDialog(page).getByRole("button", { name: "Save" }).click();
+      const download = await downloading;
 
-  test("Save cancelled", async function cancelsSave({ page }): Promise<void> {
-    const downloads = recordDownloads(page);
-    const frame = await openProbe(page);
-    await ask(frame, "files.save", { name: "books.csv", content: "title\n" });
-
-    await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
-
-    expect(await frame.evaluate(readProbeAnswers)).toEqual([{ result: false }]);
-    expect(downloads).toEqual([]);
-  });
-
-  test("Size shown", async function showsSize({ page }): Promise<void> {
-    const frame = await openProbe(page);
-
-    await ask(frame, "files.save", {
-      name: "books.csv",
-      content: "a".repeat(2048),
+      expect(download.suggestedFilename()).toBe("cover.png");
+      expect(await readDownload(download)).toEqual(
+        Buffer.from("iVBORw0KGgo=", "base64"),
+      );
     });
 
-    await expect(actionDialog(page)).toContainText("books.csv");
-    await expect(actionDialog(page)).toContainText("2 KB");
-  });
-});
+    test("Save cancelled", async function cancelsSave({ page }): Promise<void> {
+      const downloads = recordDownloads(page);
+      const frame = await openProbe(page);
+      await ask(frame, "files.save", { name: "books.csv", content: "title\n" });
 
-test.describe("Ask for a confirmation", function describeConfirm(): void {
-  test("Confirmed with a custom label", async function confirms({
-    page,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-    await ask(frame, "ui.confirm", {
-      message: "Delete this list?",
-      confirmLabel: "Delete",
+      await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
+
+      expect(await frame.evaluate(readProbeAnswers)).toEqual([
+        { result: false },
+      ]);
+      expect(downloads).toEqual([]);
     });
 
-    await expect(actionDialog(page)).toContainText("Delete this list?");
-    const buttons = actionDialog(page).getByRole("button");
-    await expect(buttons).toHaveText(["Cancel", "Delete"]);
-    await actionDialog(page).getByRole("button", { name: "Delete" }).click();
+    test("Size shown", async function showsSize({ page }): Promise<void> {
+      const frame = await openProbe(page);
 
-    expect(await frame.evaluate(readProbeAnswers)).toEqual([{ result: true }]);
-  });
+      await ask(frame, "files.save", {
+        name: "books.csv",
+        content: "a".repeat(2048),
+      });
 
-  test("Escape answers no", async function answersEscape({
-    page,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-    await ask(frame, "ui.confirm", { message: "Delete this list?" });
-    await expect(actionDialog(page)).toBeVisible();
-
-    await page.keyboard.press("Escape");
-
-    await expect(actionDialog(page)).toBeHidden();
-    expect(await frame.evaluate(readProbeAnswers)).toEqual([{ result: false }]);
-  });
-});
-
-test.describe("The action dialog names the mod", function describeNaming(): void {
-  test("Sample mod asks", async function namesSampleMod({
-    page,
-  }): Promise<void> {
-    await routeCovers(page);
-    await exposeSampleEngine(page);
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    const frame = await findModFrame(page, "Book List");
-    await waitForProbe(frame);
-    const source = readSampleModSource(page);
-
-    await ask(frame, "ui.confirm", { message: "Delete this list?" });
-
-    const dialog = actionDialog(page);
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("heading")).toHaveText("Book List");
-    await expect(dialog).toContainText(source);
-    expect(await frame.locator("dialog[open]").count()).toBe(0);
-    expect(await page.locator("dialog[open]").count()).toBe(1);
-  });
-
-  test("Frame cannot be used behind the dialog", async function blocksFrame({
-    page,
-  }): Promise<void> {
-    await routeCovers(page);
-    await exposeSampleEngine(page);
-    await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
-    const frame = await findModFrame(page, "Book List");
-    await waitForProbe(frame);
-    const book = frame.getByRole("button", { name: /Kallocain/ });
-    await expect(book).toBeVisible();
-    const box = await book.boundingBox();
-    if (box === null) {
-      throw new Error("Expected the book button to be shown");
-    }
-    await ask(frame, "ui.confirm", { message: "Delete this list?" });
-    await expect(actionDialog(page)).toBeVisible();
-
-    await page.mouse.click(box.x + 4, box.y + box.height / 2);
-    await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
-
-    expect(await frame.locator("dialog[open]").count()).toBe(0);
-  });
-});
-
-test.describe("The action dialog is centered", function describeCentering(): void {
-  test("in the middle of the viewport", async function centersDialog({
-    page,
-  }): Promise<void> {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    const frame = await openProbe(page);
-
-    await ask(frame, "ui.confirm", { message: "Delete this list?" });
-    await expect(actionDialog(page)).toBeVisible();
-
-    const box = await actionDialog(page).boundingBox();
-    if (box === null) {
-      throw new Error("Expected the action dialog to have a box");
-    }
-    expect(box.x + box.width / 2).toBeCloseTo(640, 0);
-    expect(box.y + box.height / 2).toBeCloseTo(400, 0);
-    expect(box.width).toBeLessThanOrEqual(512);
-  });
-});
-
-test.describe("One action dialog at a time", function describeQueue(): void {
-  test("Two confirmations", async function showsInOrder({
-    page,
-  }): Promise<void> {
-    const frame = await openProbe(page);
-    await frame.evaluate(startProbeRequests, [
-      ["ui.confirm", { message: "First" }],
-      ["ui.confirm", { message: "Second" }],
-    ]);
-
-    await expect(actionDialog(page)).toContainText("First");
-    await expect(page.locator("dialog[open]")).toHaveCount(1);
-    await expect(actionDialog(page)).not.toContainText("Second");
-    await actionDialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(actionDialog(page)).toContainText("Second");
-    await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
-
-    expect(await frame.evaluate(readProbeAnswers)).toEqual([
-      { result: true },
-      { result: false },
-    ]);
-    await expect(actionDialog(page)).toBeHidden();
-  });
-});
-
-test.describe("A mod that leaves gets no", function describeLeaving(): void {
-  test("Back while a dialog is open", async function dropsOnBack({
-    page,
-  }): Promise<void> {
-    const opener = await openProbe(page, OPEN_ANY_SITE_LINES);
-    await ask(opener, "mods.open", {
-      mod: "./test-mods/probe/",
-      params: { from: "opener" },
+      await expect(actionDialog(page)).toContainText("books.csv");
+      await expect(actionDialog(page)).toContainText("2 KB");
     });
-    const opened = await findSandboxFrame(page, "sandbox-2");
-    await waitForProbe(opened);
-    await ask(opened, "ui.confirm", { message: "Delete this list?" });
-    await expect(actionDialog(page)).toBeVisible();
+  },
+);
 
-    await page.goBack();
+test.describe(
+  "Ask for a confirmation",
+  { tag: "@frames" },
+  function describeConfirm(): void {
+    test("Confirmed with a custom label", async function confirms({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+      await ask(frame, "ui.confirm", {
+        message: "Delete this list?",
+        confirmLabel: "Delete",
+      });
 
-    await expect(actionDialog(page)).toBeHidden();
-    expect(await opened.evaluate(readProbeAnswers)).toEqual([
-      { result: false },
-    ]);
-    await expect(page.locator('[data-sandbox-id="sandbox-1"]')).toBeVisible();
-  });
+      await expect(actionDialog(page)).toContainText("Delete this list?");
+      const buttons = actionDialog(page).getByRole("button");
+      await expect(buttons).toHaveText(["Cancel", "Delete"]);
+      await actionDialog(page).getByRole("button", { name: "Delete" }).click();
 
-  test("Stopped while a dialog is open", async function dropsOnStop({
-    page,
-  }): Promise<void> {
-    await page.route("https://example.org/**", answerBlankPage);
-    const downloads = recordDownloads(page);
-    const frame = await openProbe(page);
-    await ask(frame, "files.save", { name: "books.csv", content: "title\n" });
-    await expect(actionDialog(page)).toBeVisible();
-    expect(await frame.evaluate(hasProbeAnswer)).toBe(false);
+      expect(await frame.evaluate(readProbeAnswers)).toEqual([
+        { result: true },
+      ]);
+    });
 
-    await frame
-      .evaluate(navigateFrame, "https://example.org/")
-      .catch(ignoreError);
+    test("Escape answers no", async function answersEscape({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+      await ask(frame, "ui.confirm", { message: "Delete this list?" });
+      await expect(actionDialog(page)).toBeVisible();
 
-    await expect(actionDialog(page)).toBeHidden();
-    await expect(page.locator("iframe")).toHaveCount(0);
-    expect(downloads).toEqual([]);
-  });
-});
+      await page.keyboard.press("Escape");
+
+      await expect(actionDialog(page)).toBeHidden();
+      expect(await frame.evaluate(readProbeAnswers)).toEqual([
+        { result: false },
+      ]);
+    });
+  },
+);
+
+test.describe(
+  "The action dialog names the mod",
+  { tag: "@frames" },
+  function describeNaming(): void {
+    test("Sample mod asks", async function namesSampleMod({
+      page,
+    }): Promise<void> {
+      await routeCovers(page);
+      await exposeSampleEngine(page);
+      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+      const frame = await findModFrame(page, "Book List");
+      await waitForProbe(frame);
+      const source = readSampleModSource(page);
+
+      await ask(frame, "ui.confirm", { message: "Delete this list?" });
+
+      const dialog = actionDialog(page);
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByRole("heading")).toHaveText("Book List");
+      await expect(dialog).toContainText(source);
+      expect(await frame.locator("dialog[open]").count()).toBe(0);
+      expect(await page.locator("dialog[open]").count()).toBe(1);
+    });
+
+    test("Frame cannot be used behind the dialog", async function blocksFrame({
+      page,
+    }): Promise<void> {
+      await routeCovers(page);
+      await exposeSampleEngine(page);
+      await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+      const frame = await findModFrame(page, "Book List");
+      await waitForProbe(frame);
+      const book = frame.getByRole("button", { name: /Kallocain/ });
+      await expect(book).toBeVisible();
+      const box = await book.boundingBox();
+      if (box === null) {
+        throw new Error("Expected the book button to be shown");
+      }
+      await ask(frame, "ui.confirm", { message: "Delete this list?" });
+      await expect(actionDialog(page)).toBeVisible();
+
+      await page.mouse.click(box.x + 4, box.y + box.height / 2);
+      await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
+
+      expect(await frame.locator("dialog[open]").count()).toBe(0);
+    });
+  },
+);
+
+test.describe(
+  "The action dialog is centered",
+  { tag: "@frames" },
+  function describeCentering(): void {
+    test("in the middle of the viewport", async function centersDialog({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      const frame = await openProbe(page);
+
+      await ask(frame, "ui.confirm", { message: "Delete this list?" });
+      await expect(actionDialog(page)).toBeVisible();
+
+      const box = await actionDialog(page).boundingBox();
+      if (box === null) {
+        throw new Error("Expected the action dialog to have a box");
+      }
+      expect(box.x + box.width / 2).toBeCloseTo(640, 0);
+      expect(box.y + box.height / 2).toBeCloseTo(400, 0);
+      expect(box.width).toBeLessThanOrEqual(512);
+    });
+  },
+);
+
+test.describe(
+  "One action dialog at a time",
+  { tag: "@frames" },
+  function describeQueue(): void {
+    test("Two confirmations", async function showsInOrder({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+      await frame.evaluate(startProbeRequests, [
+        ["ui.confirm", { message: "First" }],
+        ["ui.confirm", { message: "Second" }],
+      ]);
+
+      await expect(actionDialog(page)).toContainText("First");
+      await expect(page.locator("dialog[open]")).toHaveCount(1);
+      await expect(actionDialog(page)).not.toContainText("Second");
+      await actionDialog(page).getByRole("button", { name: "OK" }).click();
+      await expect(actionDialog(page)).toContainText("Second");
+      await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
+
+      expect(await frame.evaluate(readProbeAnswers)).toEqual([
+        { result: true },
+        { result: false },
+      ]);
+      await expect(actionDialog(page)).toBeHidden();
+    });
+  },
+);
+
+test.describe(
+  "A mod that leaves gets no",
+  { tag: "@frames" },
+  function describeLeaving(): void {
+    test("Back while a dialog is open", async function dropsOnBack({
+      page,
+    }): Promise<void> {
+      const opener = await openProbe(page, OPEN_ANY_SITE_LINES);
+      await ask(opener, "mods.open", {
+        mod: "./test-mods/probe/",
+        params: { from: "opener" },
+      });
+      const opened = await findSandboxFrame(page, "sandbox-2");
+      await waitForProbe(opened);
+      await ask(opened, "ui.confirm", { message: "Delete this list?" });
+      await expect(actionDialog(page)).toBeVisible();
+
+      await page.goBack();
+
+      await expect(actionDialog(page)).toBeHidden();
+      expect(await opened.evaluate(readProbeAnswers)).toEqual([
+        { result: false },
+      ]);
+      await expect(page.locator('[data-sandbox-id="sandbox-1"]')).toBeVisible();
+    });
+
+    test("Stopped while a dialog is open", async function dropsOnStop({
+      page,
+    }): Promise<void> {
+      await page.route("https://example.org/**", answerBlankPage);
+      const downloads = recordDownloads(page);
+      const frame = await openProbe(page);
+      await ask(frame, "files.save", { name: "books.csv", content: "title\n" });
+      await expect(actionDialog(page)).toBeVisible();
+      expect(await frame.evaluate(hasProbeAnswer)).toBe(false);
+
+      await frame
+        .evaluate(navigateFrame, "https://example.org/")
+        .catch(ignoreError);
+
+      await expect(actionDialog(page)).toBeHidden();
+      await expect(page.locator("iframe")).toHaveCount(0);
+      expect(downloads).toEqual([]);
+    });
+  },
+);
 
 function ignoreError(): void {
   // The frame's document is replaced while the evaluation runs.

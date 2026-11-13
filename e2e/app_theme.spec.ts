@@ -247,66 +247,72 @@ test.describe("The app follows the color scheme", function describeApp(): void {
   });
 });
 
-test.describe("The visible frame fills the stage area", function describeFrameSize(): void {
-  test("Frame reaches the bottom of the viewport", async function fillsViewport({
-    page,
-  }): Promise<void> {
-    await page.setViewportSize({ width: 1280, height: 800 });
-
-    await openSample(page);
-
-    const frameBox = await readVisibleFrameBox(page);
-    expect(800 - frameBox.bottom).toBeGreaterThanOrEqual(0);
-    expect(800 - frameBox.bottom).toBeLessThanOrEqual(BOTTOM_TOLERANCE);
-    expect(await page.evaluate(readPageOverflow)).toBe(0);
-  });
-
-  test("Window resized", async function followsResize({ page }): Promise<void> {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await openSample(page);
-
-    await page.setViewportSize({ width: 1024, height: 600 });
-
-    await expect
-      .poll(async function readBottomGap(): Promise<number> {
-        const frameBox = await readVisibleFrameBox(page);
-        return 600 - frameBox.bottom;
-      })
-      .toBeLessThanOrEqual(BOTTOM_TOLERANCE);
-    const frameBox = await readVisibleFrameBox(page);
-    expect(600 - frameBox.bottom).toBeGreaterThanOrEqual(0);
-  });
-
-  test("Tall content scrolls inside the frame", async function scrollsInside({
-    page,
-  }): Promise<void> {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await openSample(page);
-    const sampleBox = await readVisibleFrameBox(page);
-    await serveAppOriginMod(
+test.describe(
+  "The visible frame fills the stage area",
+  { tag: "@frames" },
+  function describeFrameSize(): void {
+    test("Frame reaches the bottom of the viewport", async function fillsViewport({
       page,
-      buildThemeProbeFiles("tall", [], TALL_PROBE_MOD_CODE),
-    );
+    }): Promise<void> {
+      await page.setViewportSize({ width: 1280, height: 800 });
 
-    await page.goto("/#/run?mod=./test-mods/tall/");
-    const frame = await findModFrame(page, "tall");
-    await waitForProbe(frame);
+      await openSample(page);
 
-    const tallBox = await readVisibleFrameBox(page);
-    expect(tallBox.height).toBeCloseTo(sampleBox.height, 0);
-    expect(await frame.evaluate(canFrameScroll)).toBe(true);
-    expect(await page.evaluate(readPageOverflow)).toBe(0);
-  });
+      const frameBox = await readVisibleFrameBox(page);
+      expect(800 - frameBox.bottom).toBeGreaterThanOrEqual(0);
+      expect(800 - frameBox.bottom).toBeLessThanOrEqual(BOTTOM_TOLERANCE);
+      expect(await page.evaluate(readPageOverflow)).toBe(0);
+    });
 
-  test("Small viewport", async function keepsMinimumHeight({
-    page,
-  }): Promise<void> {
-    await page.setViewportSize({ width: 1280, height: 300 });
+    test("Window resized", async function followsResize({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await openSample(page);
 
-    await openSample(page);
+      await page.setViewportSize({ width: 1024, height: 600 });
 
-    const frameBox = await readVisibleFrameBox(page);
-    expect(frameBox.height).toBe(256);
-    expect(await page.evaluate(readPageOverflow)).toBeGreaterThan(0);
-  });
-});
+      await expect
+        .poll(async function readBottomGap(): Promise<number> {
+          const frameBox = await readVisibleFrameBox(page);
+          return 600 - frameBox.bottom;
+        })
+        .toBeLessThanOrEqual(BOTTOM_TOLERANCE);
+      const frameBox = await readVisibleFrameBox(page);
+      expect(600 - frameBox.bottom).toBeGreaterThanOrEqual(0);
+    });
+
+    test("Tall content scrolls inside the frame", async function scrollsInside({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await openSample(page);
+      const sampleBox = await readVisibleFrameBox(page);
+      await serveAppOriginMod(
+        page,
+        buildThemeProbeFiles("tall", [], TALL_PROBE_MOD_CODE),
+      );
+
+      await page.goto("/#/run?mod=./test-mods/tall/");
+      const frame = await findModFrame(page, "tall");
+      await waitForProbe(frame);
+
+      const tallBox = await readVisibleFrameBox(page);
+      expect(tallBox.height).toBeCloseTo(sampleBox.height, 0);
+      expect(await frame.evaluate(canFrameScroll)).toBe(true);
+      expect(await page.evaluate(readPageOverflow)).toBe(0);
+    });
+
+    test("Small viewport", async function keepsMinimumHeight({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize({ width: 1280, height: 300 });
+
+      await openSample(page);
+
+      const frameBox = await readVisibleFrameBox(page);
+      expect(frameBox.height).toBe(256);
+      expect(await page.evaluate(readPageOverflow)).toBeGreaterThan(0);
+    });
+  },
+);

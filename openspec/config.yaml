@@ -28,11 +28,18 @@ rules:
       "Mod API version" section of docs/modules/lib/core/engine/README.md
   tasks:
     - >-
-      End tasks.md with a task that adds .changeset/<change-name>.md with the
-      bump that fits the change (patch, minor or major), following the "Bump
-      rule" section of docs/releasing.md, and a one-line summary for the people
-      who use or instantiate the app. A change that bumps the mod API bumps the
-      app at least as much
+      Before the final verification task, add a task that adds
+      .changeset/<change-name>.md with the bump that fits the change (patch,
+      minor or major), following the "Bump rule" section of docs/releasing.md,
+      and a one-line summary for the people who use or instantiate the app. A
+      change that bumps the mod API bumps the app at least as much
+    - >-
+      End tasks.md with a verification task: on a clean install (npm ci), run
+      npm run build, npm run test, npm run lint, npm run format:check and npm
+      run test:e2e. When the change touches public/samples/ or the specs of the
+      mod API (mod-engine-api, mod-loading's mod file format, mod-api-version,
+      mod-theme's mount context and events, mod-app-actions), it also runs npm
+      run test:e2e:samples
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.

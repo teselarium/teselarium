@@ -140,162 +140,198 @@ function readWarningColor(): string {
   return color;
 }
 
-test.describe("The tile body element", function describeTileBodyElement(): void {
-  test("Show a body with no code", async function showsBody({
-    page,
-  }): Promise<void> {
-    const { frame } = await openBodyProbe(page, BODY_TILES);
-    await frame.evaluate(countRenderedEvents);
+test.describe(
+  "The tile body element",
+  { tag: "@frames" },
+  function describeTileBodyElement(): void {
+    test("Show a body with no code", async function showsBody({
+      page,
+    }): Promise<void> {
+      const { frame } = await openBodyProbe(page, BODY_TILES);
+      await frame.evaluate(countRenderedEvents);
 
-    await frame.evaluate(showTileBodies, [0]);
+      await frame.evaluate(showTileBodies, [0]);
 
-    await expect(
-      frame.locator("ot-tile-body h1", { hasText: "Notes" }),
-    ).toBeVisible();
-    await expect(frame.locator("ot-tile-body em")).toHaveText("dystopian");
-    expect(await frame.evaluate(readRenderedCount)).toBe(1);
-  });
+      await expect(
+        frame.locator("ot-tile-body h1", { hasText: "Notes" }),
+      ).toBeVisible();
+      await expect(frame.locator("ot-tile-body em")).toHaveText("dystopian");
+      expect(await frame.evaluate(readRenderedCount)).toBe(1);
+    });
 
-  test("Tile that is not the mod's", async function showsError({
-    page,
-  }): Promise<void> {
-    const { frame } = await openBodyProbe(page, BODY_TILES);
+    test("Tile that is not the mod's", async function showsError({
+      page,
+    }): Promise<void> {
+      const { frame } = await openBodyProbe(page, BODY_TILES);
 
-    await frame.evaluate(showOtherTile);
+      await frame.evaluate(showOtherTile);
 
-    await expect(frame.locator('ot-tile-body [role="alert"]')).toHaveText(
-      "tiles.renderBody: the source https://example.org/other.md is not one of the mod's tiles",
-    );
-  });
-});
+      await expect(frame.locator('ot-tile-body [role="alert"]')).toHaveText(
+        "tiles.renderBody: the source https://example.org/other.md is not one of the mod's tiles",
+      );
+    });
+  },
+);
 
-test.describe("Links in bodies open through the app", function describeBodyLinks(): void {
-  test("Click on a body link", async function opensBodyLink({
-    page,
-  }): Promise<void> {
-    const { frame } = await showRichBody(page);
-    await markFrame(frame);
+test.describe(
+  "Links in bodies open through the app",
+  { tag: "@frames" },
+  function describeBodyLinks(): void {
+    test("Click on a body link", async function opensBodyLink({
+      page,
+    }): Promise<void> {
+      const { frame } = await showRichBody(page);
+      await markFrame(frame);
 
-    await frame.getByRole("link", { name: "Peach" }).click();
+      await frame.getByRole("link", { name: "Peach" }).click();
 
-    await expect(actionDialog(page)).toContainText("https://peach.blender.org");
-    expect(await isFrameMarked(frame)).toBe(true);
-  });
+      await expect(actionDialog(page)).toContainText(
+        "https://peach.blender.org",
+      );
+      expect(await isFrameMarked(frame)).toBe(true);
+    });
 
-  test("Mod handles the click itself", async function leavesHandledClick({
-    page,
-  }): Promise<void> {
-    const { frame } = await showRichBody(page);
-    await frame.evaluate(handleLinksInMod);
-    await markFrame(frame);
+    test("Mod handles the click itself", async function leavesHandledClick({
+      page,
+    }): Promise<void> {
+      const { frame } = await showRichBody(page);
+      await frame.evaluate(handleLinksInMod);
+      await markFrame(frame);
 
-    await frame.getByRole("link", { name: "Peach" }).click();
+      await frame.getByRole("link", { name: "Peach" }).click();
 
-    await expect(actionDialog(page)).toBeHidden();
-    expect(await isFrameMarked(frame)).toBe(true);
-  });
-});
+      await expect(actionDialog(page)).toBeHidden();
+      expect(await isFrameMarked(frame)).toBe(true);
+    });
+  },
+);
 
-test.describe("Heading anchors", function describeHeadingAnchors(): void {
-  test("Link to a heading", async function scrollsToOwnHeading({
-    page,
-  }): Promise<void> {
-    const { frame } = await openBodyProbe(page, BODY_TILES);
-    await frame.evaluate(showTileBodies, [1, 2]);
-    await markFrame(frame);
+test.describe(
+  "Heading anchors",
+  { tag: "@frames" },
+  function describeHeadingAnchors(): void {
+    test("Link to a heading", async function scrollsToOwnHeading({
+      page,
+    }): Promise<void> {
+      const { frame } = await openBodyProbe(page, BODY_TILES);
+      await frame.evaluate(showTileBodies, [1, 2]);
+      await markFrame(frame);
 
-    await frame.getByRole("link", { name: "See notes" }).click();
+      await frame.getByRole("link", { name: "See notes" }).click();
 
-    await expect
-      .poll(async function readSecondHeadingTop(): Promise<number> {
-        const tops = await frame.evaluate(readNotesHeadingTops);
-        return Math.abs(tops[1]);
-      })
-      .toBeLessThan(2);
-    const tops = await frame.evaluate(readNotesHeadingTops);
-    expect(Math.abs(tops[0])).toBeGreaterThan(100);
-    expect(await isFrameMarked(frame)).toBe(true);
-  });
-});
+      await expect
+        .poll(async function readSecondHeadingTop(): Promise<number> {
+          const tops = await frame.evaluate(readNotesHeadingTops);
+          return Math.abs(tops[1]);
+        })
+        .toBeLessThan(2);
+      const tops = await frame.evaluate(readNotesHeadingTops);
+      expect(Math.abs(tops[0])).toBeGreaterThan(100);
+      expect(await isFrameMarked(frame)).toBe(true);
+    });
+  },
+);
 
-test.describe("Players in bodies become placeholders", function describePlaceholders(): void {
-  test("Nothing requested before a click", async function requestsNothing({
-    page,
-  }): Promise<void> {
-    const playerRequests = await routePlayerSites(page);
-    const { frame } = await showRichBody(page);
+test.describe(
+  "Players in bodies become placeholders",
+  { tag: "@frames" },
+  function describePlaceholders(): void {
+    test("Nothing requested before a click", async function requestsNothing({
+      page,
+    }): Promise<void> {
+      const playerRequests = await routePlayerSites(page);
+      const { frame } = await showRichBody(page);
 
-    await expect(
-      frame.getByRole("button", { name: /Big Buck Bunny/ }),
-    ).toBeVisible();
-    await expect(frame.getByRole("button", { name: /Map/ })).toBeVisible();
-    await expect(frame.locator("iframe")).toHaveCount(0);
-    await page.waitForTimeout(500);
-    expect(playerRequests).toEqual([]);
-  });
-});
+      await expect(
+        frame.getByRole("button", { name: /Big Buck Bunny/ }),
+      ).toBeVisible();
+      await expect(frame.getByRole("button", { name: /Map/ })).toBeVisible();
+      await expect(frame.locator("iframe")).toHaveCount(0);
+      await page.waitForTimeout(500);
+      expect(playerRequests).toEqual([]);
+    });
+  },
+);
 
-test.describe("Pictures in bodies", function describePictures(): void {
-  test("Dark-mode picture", async function showsDarkPicture({
-    page,
-  }): Promise<void> {
-    await page.emulateMedia({ colorScheme: "dark" });
-    const { frame, mediaUrls } = await showRichBody(page);
+test.describe(
+  "Pictures in bodies",
+  { tag: "@frames" },
+  function describePictures(): void {
+    test("Dark-mode picture", async function showsDarkPicture({
+      page,
+    }): Promise<void> {
+      await page.emulateMedia({ colorScheme: "dark" });
+      const { frame, mediaUrls } = await showRichBody(page);
 
-    await expect
-      .poll(function readPictureSource(): Promise<string> {
-        return frame.evaluate(readLoadedPictureSource);
-      })
-      .toBe(`${MEDIA_HOST}/dark.png`);
-    expect(mediaUrls).toContain(`${MEDIA_HOST}/dark.png`);
-  });
-});
+      await expect
+        .poll(function readPictureSource(): Promise<string> {
+          return frame.evaluate(readLoadedPictureSource);
+        })
+        .toBe(`${MEDIA_HOST}/dark.png`);
+      expect(mediaUrls).toContain(`${MEDIA_HOST}/dark.png`);
+    });
+  },
+);
 
-test.describe("Rendered bodies follow the theme", function describeBodyTheme(): void {
-  test("Warning color", async function colorsWarning({ page }): Promise<void> {
-    const { frame } = await showRichBody(page);
+test.describe(
+  "Rendered bodies follow the theme",
+  { tag: "@frames" },
+  function describeBodyTheme(): void {
+    test("Warning color", async function colorsWarning({
+      page,
+    }): Promise<void> {
+      const { frame } = await showRichBody(page);
 
-    expect(
-      await frame.evaluate(readComputedProperty, [
-        'aside[data-ot-alert="warning"]',
-        "border-left-color",
-      ]),
-    ).toBe(await frame.evaluate(readWarningColor));
-  });
-});
+      expect(
+        await frame.evaluate(readComputedProperty, [
+          'aside[data-ot-alert="warning"]',
+          "border-left-color",
+        ]),
+      ).toBe(await frame.evaluate(readWarningColor));
+    });
+  },
+);
 
-test.describe("Placeholder box", function describePlaceholderBox(): void {
-  test("Placeholder shape", async function shapesPlaceholder({
-    page,
-  }): Promise<void> {
-    const { frame } = await showRichBody(page);
-    const shortPlaceholder = frame.getByRole("button", { name: /^Map/ });
-    const longPlaceholder = frame.getByRole("button", { name: /^A very long/ });
-    const shortBox = await shortPlaceholder.boundingBox();
-    const longBox = await longPlaceholder.boundingBox();
-    const bodyBox = await frame.locator("ot-tile-body").boundingBox();
+test.describe(
+  "Placeholder box",
+  { tag: "@frames" },
+  function describePlaceholderBox(): void {
+    test("Placeholder shape", async function shapesPlaceholder({
+      page,
+    }): Promise<void> {
+      const { frame } = await showRichBody(page);
+      const shortPlaceholder = frame.getByRole("button", { name: /^Map/ });
+      const longPlaceholder = frame.getByRole("button", {
+        name: /^A very long/,
+      });
+      const shortBox = await shortPlaceholder.boundingBox();
+      const longBox = await longPlaceholder.boundingBox();
+      const bodyBox = await frame.locator("ot-tile-body").boundingBox();
 
-    expect(longBox?.width).toBeCloseTo(shortBox?.width ?? 0, 1);
-    expect(longBox?.height).toBeCloseTo(shortBox?.height ?? 0, 1);
-    expect(shortBox?.height).toBeLessThan(96);
-    expect(shortBox?.width).toBeLessThan(bodyBox?.width ?? 0);
-  });
+      expect(longBox?.width).toBeCloseTo(shortBox?.width ?? 0, 1);
+      expect(longBox?.height).toBeCloseTo(shortBox?.height ?? 0, 1);
+      expect(shortBox?.height).toBeLessThan(96);
+      expect(shortBox?.width).toBeLessThan(bodyBox?.width ?? 0);
+    });
 
-  test("Long title on hover", async function expandsOnHover({
-    page,
-  }): Promise<void> {
-    const { frame } = await showRichBody(page);
-    const longPlaceholder = frame.getByRole("button", { name: /^A very long/ });
-    const visibleBox = longPlaceholder.locator("> span");
-    await longPlaceholder.scrollIntoViewIfNeeded();
-    const slotBefore = await longPlaceholder.boundingBox();
-    const boxBefore = await visibleBox.boundingBox();
+    test("Long title on hover", async function expandsOnHover({
+      page,
+    }): Promise<void> {
+      const { frame } = await showRichBody(page);
+      const longPlaceholder = frame.getByRole("button", {
+        name: /^A very long/,
+      });
+      const visibleBox = longPlaceholder.locator("> span");
+      await longPlaceholder.scrollIntoViewIfNeeded();
+      const slotBefore = await longPlaceholder.boundingBox();
+      const boxBefore = await visibleBox.boundingBox();
 
-    await longPlaceholder.hover();
+      await longPlaceholder.hover();
 
-    const slotAfter = await longPlaceholder.boundingBox();
-    const boxAfter = await visibleBox.boundingBox();
-    expect(slotAfter).toEqual(slotBefore);
-    expect(boxAfter?.height).toBeGreaterThan(boxBefore?.height ?? 0);
-  });
-});
+      const slotAfter = await longPlaceholder.boundingBox();
+      const boxAfter = await visibleBox.boundingBox();
+      expect(slotAfter).toEqual(slotBefore);
+      expect(boxAfter?.height).toBeGreaterThan(boxBefore?.height ?? 0);
+    });
+  },
+);
