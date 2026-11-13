@@ -10,16 +10,16 @@ Shows the visible sandbox's mod and its messages in one row above the mod's fram
 While a sandbox is visible, the stage bar SHALL be one row above its frame. Its left side SHALL hold, in order, the mod's name, its version in a capsule, an information button, a Share button and, for a sandbox opened with a collection, the "Reload tiles" button. Its right side SHALL hold, in order, the errors, warnings and notifications buttons, a separator, the theater mode button, the fullscreen button when the sandbox has a running mod frame and, when the sandbox has a close button, a separator and the close button. No list of messages SHALL be shown under the bar.
 
 #### Scenario: Sample mod with its collection
-- **WHEN** the sample book list mod runs with the sample collection
-- **THEN** the stage bar shows, from left to right, `Book List`, `1.1.0` in a capsule, the information button, the Share button, the "Reload tiles" button, the errors, warnings and notifications buttons, the theater mode button, the fullscreen button and the close button
+- **WHEN** a mod opened from a run link runs with a collection
+- **THEN** the stage bar shows, from left to right, the mod's name, its version in a capsule, the information button, the Share button, the "Reload tiles" button, the errors, warnings and notifications buttons, the theater mode button, the fullscreen button and the close button
 - **AND** the stage bar is a single row
 
 #### Scenario: No collection
-- **WHEN** the sample book list mod runs without a collection
+- **WHEN** a mod opened from a run link runs without a collection
 - **THEN** the stage bar has no "Reload tiles" button and its other items keep their order
 
 #### Scenario: Close button last
-- **WHEN** the sample book list mod runs
+- **WHEN** a mod opened from a run link runs
 - **THEN** the close button is the stage bar's rightmost item, after a separator
 
 #### Scenario: Home mod without a close button
@@ -30,12 +30,12 @@ While a sandbox is visible, the stage bar SHALL be one row above its frame. Its 
 Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place of the name and version. When the sandbox failed before its mod file was loaded, it SHALL show "Mod not loaded". Once the mod file is loaded, it SHALL show the mod's name and version, even when the sandbox failed later.
 
 #### Scenario: Missing mod file
-- **WHEN** the app is opened at `#/run?mod=./samples/mods/missing`
+- **WHEN** a run link names a mod folder whose mod file answers HTTP 404
 - **THEN** the stage bar shows "Mod not loaded" and no version capsule
 
 #### Scenario: Missing collection
-- **WHEN** the app is opened with the sample book list mod and a collection that answers HTTP 404
-- **THEN** the stage bar shows `Book List` and `1.1.0`
+- **WHEN** a mod is opened with a collection that answers HTTP 404
+- **THEN** the stage bar shows the mod's name and version
 
 #### Scenario: Cancelled API question
 - **WHEN** a mod with `api: "^0.2.0"` is opened and the user presses "Cancel"
@@ -45,7 +45,7 @@ Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place
 Each sandbox SHALL keep its own messages, each with a level (`error`, `warning` or `info`), a producer (the app or the mod), a source and a text. Messages SHALL be kept in the order they were found: mod file issues, collection issues, tile link issues, then the other messages as they arrive, such as permission issues, blocked requests, mount failures, a stopped mod, load failures, the app's notifications and the mod's own messages.
 
 #### Scenario: Issues stay with their sandbox
-- **WHEN** a mod with a blocked request is hidden by opening the sample book list mod
+- **WHEN** a mod with a blocked request is hidden by opening another mod that has no issues
 - **THEN** the stage bar shows no warnings, and going back shows the warning about the blocked request again
 
 #### Scenario: Missing range found first
@@ -104,7 +104,7 @@ The message buttons SHALL be the same size, whatever their counts, and a count c
 A message button whose level has no messages SHALL be dimmed, with no capsule, and SHALL stay focusable. Its popover SHALL say "No errors.", "No warnings." or "No notifications.".
 
 #### Scenario: Sample mod has no issues
-- **WHEN** the sample book list mod runs with the sample collection
+- **WHEN** a mod runs with a collection, and neither the mod file nor the collection has an issue
 - **THEN** the errors and warnings buttons are dimmed, and the errors popover says "No errors."
 
 #### Scenario: Keyboard reaches an empty level
@@ -225,11 +225,11 @@ A sandbox SHALL keep at most 100 messages from its mod for each level. When a ne
 The information button SHALL open a popover with the mod's source, the collection's location when the sandbox was opened with one, and the sandbox's run link, as text the user can select. The popover SHALL have no copy button: the Share menu copies the link.
 
 #### Scenario: Sample mod with its collection
-- **WHEN** the sample book list mod runs with the sample collection and the user presses the information button
+- **WHEN** a mod runs with a collection and the user presses the information button
 - **THEN** the popover shows the mod file's source, the collection's location and the run link, and no "Copy link" button
 
 #### Scenario: Mod that did not load
-- **WHEN** the app is opened at `#/run?mod=./samples/mods/missing` and the user presses the information button
+- **WHEN** a run link names a mod folder that does not exist and the user presses the information button
 - **THEN** the popover shows the run link's mod reference resolved against the app's address, and the run link
 
 ### Requirement: Share menu
@@ -251,7 +251,7 @@ The Share button SHALL open a menu of the ways to share the visible sandbox, whi
 When "Reload tiles" loads the collection again, the sandbox SHALL get an `info` message from the app whose source is the collection's location and whose text gives the number of tiles the mod received and the number of collection issues. A reload whose collection cannot be loaded SHALL give its error and no notification.
 
 #### Scenario: Reload done
-- **WHEN** the sample mod runs with a collection that now lists two books and the user presses "Reload tiles"
+- **WHEN** a mod runs with a collection that now lists two tiles and the user presses "Reload tiles"
 - **THEN** the notifications popover lists an item labeled "App" that names 2 tiles and 0 issues
 
 #### Scenario: Reload failed
@@ -262,11 +262,11 @@ When "Reload tiles" loads the collection again, the sandbox SHALL get an `info` 
 When a mod opened with a collection starts, the sandbox SHALL get an `info` message from the app whose source is the collection's location and whose text gives the number of tiles the mod received.
 
 #### Scenario: Sample collection
-- **WHEN** the sample book list mod starts with the sample collection
+- **WHEN** a mod starts with a collection of three tiles of its type
 - **THEN** the notifications popover lists an item labeled "App" that names 3 tiles
 
 #### Scenario: No collection
-- **WHEN** the sample book list mod starts without a collection
+- **WHEN** a mod starts without a collection
 - **THEN** the notifications button is dimmed
 
 ### Requirement: Notification of the site consent answer
@@ -284,7 +284,7 @@ When the user answers the site consent question of a sandbox, the sandbox SHALL 
 Each `ui.notify` the engine accepts SHALL add a message from the mod to the mod's sandbox, with the request's level and text, and with the request's `source` or, without one, the mod's source. A hidden sandbox SHALL keep the message and show it when it is visible again.
 
 #### Scenario: Default source
-- **WHEN** the sample book list mod sends `ui.notify` with `{ "message": "Saved" }`
+- **WHEN** a running mod sends `ui.notify` with `{ "message": "Saved" }`
 - **THEN** the notifications popover lists `Saved`, labeled "Mod", whose source is the mod's source
 
 #### Scenario: Hidden mod notifies
@@ -310,7 +310,7 @@ The stage bar SHALL have a theater mode toggle button whose accessible name and 
 The stage bar SHALL have an icon button whose accessible name and tooltip are "Fullscreen" while the visible sandbox has a running mod frame, and none while its mod loads, waits for an answer or failed. Pressing it SHALL show the visible mod fullscreen (see `stage-layout`).
 
 #### Scenario: Running mod
-- **WHEN** the sample book list mod runs
+- **WHEN** a mod runs
 - **THEN** the stage bar has a button named "Fullscreen"
 
 #### Scenario: Failed sandbox
