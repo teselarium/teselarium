@@ -10,7 +10,7 @@ Defines how a running mod talks to the core engine, which acts as the mod's back
 The engine SHALL talk to each running mod only through a message channel created for that mod when its frame starts. The engine SHALL ignore messages that a frame posts to the app's window.
 
 #### Scenario: Requests on the private channel are answered
-- **WHEN** the sample book list mod sends a `storage.get` request through its engine API object
+- **WHEN** a running mod sends a `storage.get` request through its engine API object
 - **THEN** it receives the answer
 
 #### Scenario: Window messages are ignored
@@ -179,7 +179,7 @@ Loading and running the opened mod SHALL NOT change the `mods.open` response: it
 The engine SHALL answer `mods.inspect` and `mods.open` with error code `-32002`, without requesting any file, unless the requesting mod has a granted `open` permission whose host is `"*"` or the origin of the target mod file. The message SHALL name the origin and say to add it to `permissions.open` in `mod_conf.yaml`, or that the declared permission was not granted.
 
 #### Scenario: Mod without the open permission
-- **WHEN** the sample book list mod sends `mods.inspect` with `{ "mod": "https://mods.example.net/clock/" }`
+- **WHEN** a mod without a granted `open` permission sends `mods.inspect` with `{ "mod": "https://mods.example.net/clock/" }`
 - **THEN** the response has an error with code `-32002` whose message names `https://mods.example.net` and `permissions.open`
 - **AND** nothing is requested from `https://mods.example.net`
 

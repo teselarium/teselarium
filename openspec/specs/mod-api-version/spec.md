@@ -51,8 +51,8 @@ A mod's `api` range SHALL match the app's mod API version by npm's semver range 
 A mod whose `api` range matches the app's mod API version SHALL start with no dialog and no issue about its API.
 
 #### Scenario: Sample mod
-- **WHEN** the app is opened at `#/run?mod=./samples/mods/book_list`
-- **THEN** no dialog is shown, the sample book list mod runs, and the stage bar shows no errors and no warnings
+- **WHEN** the app is opened at the run link of a mod whose `api` range matches the app's mod API version
+- **THEN** no dialog is shown, the mod runs, and the stage bar shows no errors and no warnings
 
 ### Requirement: Mods without a range start with a warning
 A mod without `api` SHALL start with no dialog. Its sandbox SHALL have a warning issue whose source is the mod file's source and whose message says that the mod declares no `api` range and names the app's mod API version.
@@ -113,9 +113,9 @@ The result of `mods.inspect` SHALL also have `api`, the mod's range or `null` wh
 - **WHEN** a mod with `open` granted for the app's origin inspects a mod file without `api`
 - **THEN** the result has `api` `null` and `apiCompatible` `null`
 
-### Requirement: Sample and default mods declare the API range
-The sample mod SHALL declare `api: "^0.1.5"`, the first mod API version with the `<ot-tile-body>` element, and every default mod SHALL declare `api: "^0.1.0"`.
+### Requirement: Default mods declare the API range
+Every default mod SHALL declare `api: "^0.1.0"`.
 
-#### Scenario: Shipped mods match
-- **WHEN** the sample book list mod, the mod explorer and the mod viewer are each opened
-- **THEN** none of them shows the dialog or has an issue about its API
+#### Scenario: Default mods match
+- **WHEN** the mod explorer and the mod viewer are each opened
+- **THEN** neither of them shows the dialog or has an issue about its API

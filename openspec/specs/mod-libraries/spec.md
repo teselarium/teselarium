@@ -39,7 +39,7 @@ The library's code SHALL come from the app's own host. Loading it SHALL send no 
 - **THEN** every request made for it goes to the app's origin
 
 #### Scenario: Not downloaded before a request
-- **WHEN** the app is opened and runs the sample book list mod, which does not load a library
+- **WHEN** the app is opened and runs a mod that does not load a library
 - **THEN** the mermaid code was not downloaded
 
 ### Requirement: Libraries run in the mod's frame

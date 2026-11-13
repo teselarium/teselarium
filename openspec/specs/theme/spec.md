@@ -33,7 +33,7 @@ The Settings page SHALL have a Theme control with the choices System, Light and 
 - **THEN** the Theme control shows System
 
 #### Scenario: Choose Dark
-- **WHEN** the operating system prefers light, the sample book list mod is running, and the user opens Settings and chooses Dark
+- **WHEN** the operating system prefers light, a mod is running, and the user opens Settings and chooses Dark
 - **THEN** the app switches to the dark color scheme, and going back shows the mod's frame in the dark color scheme
 - **AND** the mod's frame was not reloaded
 

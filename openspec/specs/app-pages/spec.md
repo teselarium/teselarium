@@ -86,8 +86,8 @@ A link from a page to a sibling markdown file (`<page>.md` or `./<page>.md`) SHA
 - **THEN** the address is `#/guides/first_steps`, and the browser's back button shows the Guides index page again
 
 #### Scenario: Run link
-- **WHEN** the Home page links to `#/run?mod=./samples/mods/book_list` and the user follows it
-- **THEN** the sample book list mod runs in the stage
+- **WHEN** a page links to the run link of a mod and the user follows it
+- **THEN** the linked mod runs in the stage
 
 #### Scenario: Other site
 - **WHEN** a page links to `https://example.com/` 

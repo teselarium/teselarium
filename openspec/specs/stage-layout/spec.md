@@ -10,15 +10,15 @@ Decides how wide each running mod lays out its content: centered at a readable w
 Each mod frame SHALL have exactly one layout: `fullscreen` while the frame is the app page's fullscreen element, whether the app or the mod asked for fullscreen; otherwise `theater` while theater mode is on; otherwise `contained`. The frames of mod checks and mod test cases SHALL always be `contained`.
 
 #### Scenario: Default layout
-- **WHEN** theater mode is off and the sample book list mod runs
+- **WHEN** theater mode is off and a mod runs
 - **THEN** its layout is `contained`
 
 #### Scenario: Theater layout
-- **WHEN** theater mode is on and the sample book list mod runs
+- **WHEN** theater mode is on and a mod runs
 - **THEN** its layout is `theater`
 
 #### Scenario: Fullscreen from the stage bar
-- **WHEN** theater mode is off and the user presses the stage bar's fullscreen button for the sample book list mod
+- **WHEN** theater mode is off and the user presses the stage bar's fullscreen button for a mod
 - **THEN** its layout is `fullscreen`
 
 #### Scenario: Fullscreen asked by the mod
@@ -30,7 +30,7 @@ Each mod frame SHALL have exactly one layout: `fullscreen` while the frame is th
 - **THEN** that mod's layout is `theater`
 
 #### Scenario: Check frames are contained
-- **WHEN** theater mode is on and the mod viewer runs a check of the sample book list mod
+- **WHEN** theater mode is on and the mod viewer runs a check of a mod
 - **THEN** the checked mod's mount context has `layout` `"contained"`
 
 ### Requirement: Theater mode applies to every running mod
@@ -50,7 +50,7 @@ The system SHALL keep the theater choice in the app's storage, under a key that 
 
 #### Scenario: Choice kept after a reload
 - **WHEN** the user turns theater mode on and the app page is reloaded
-- **THEN** theater mode is on and the sample book list mod's layout is `theater`
+- **THEN** theater mode is on and the mod's layout is `theater`
 
 #### Scenario: Unknown stored value
 - **WHEN** the stored theater choice is `"maybe"`
@@ -83,7 +83,7 @@ The `<html>` element of every mod frame SHALL have the attribute `data-ot-layout
 The mount context SHALL have `layout`, the frame's layout as a string. It SHALL be the layout current when the mod's frame connects.
 
 #### Scenario: Default mount context
-- **WHEN** theater mode is off and the sample book list mod is mounted
+- **WHEN** theater mode is off and a mod is mounted
 - **THEN** its mount context's `layout` is `"contained"`
 
 #### Scenario: Theater turned on while the mod loads
@@ -94,7 +94,7 @@ The mount context SHALL have `layout`, the frame's layout as a string. It SHALL 
 When a running mod's layout changes, the engine SHALL push `layout.changed` with `{ layout }` to that mod, visible or hidden, once per change. A change of theater mode that leaves a mod's layout the same SHALL push nothing to that mod.
 
 #### Scenario: Theater turned on
-- **WHEN** the sample book list mod runs and the user turns theater mode on
+- **WHEN** a mod runs and the user turns theater mode on
 - **THEN** its `layout.changed` handlers receive `{ layout: "theater" }` once
 
 #### Scenario: Fullscreen mod keeps its layout
@@ -132,7 +132,7 @@ In the frame of a mod that does not opt out of the theme styles, the base styles
 The frame of the visible mod SHALL fill the stage area in the `contained` and `theater` layouts alike, so the width limit leaves the space beside the content inside the frame, where it scrolls the mod's document.
 
 #### Scenario: Same frame in both layouts
-- **WHEN** the sample book list mod runs in a 2560×1080 viewport and the user turns theater mode on
+- **WHEN** a mod runs in a 2560×1080 viewport and the user turns theater mode on
 - **THEN** its frame's width and height are the same as before
 - **AND** the frame was not reloaded
 
@@ -144,11 +144,11 @@ The frame of the visible mod SHALL fill the stage area in the `contained` and `t
 Pressing the stage bar's fullscreen button SHALL show the visible sandbox's frame fullscreen, without its border and corner rounding, and without reloading it. Leaving fullscreen SHALL show the frame under the stage bar again. When the browser refuses fullscreen, the sandbox SHALL get a `warning` message from the app that says fullscreen is not available, with the browser's reason.
 
 #### Scenario: Frame fills the screen
-- **WHEN** the user presses the fullscreen button while the sample book list mod runs
+- **WHEN** the user presses the fullscreen button while a mod runs
 - **THEN** the app's `document.fullscreenElement` is the mod's frame and the frame was not reloaded
 
 #### Scenario: Escape leaves fullscreen
-- **WHEN** the sample book list mod is fullscreen and the user presses Escape
+- **WHEN** a mod is fullscreen and the user presses Escape
 - **THEN** the app's `document.fullscreenElement` is `null` and the stage bar is shown above the frame
 
 #### Scenario: Fullscreen refused

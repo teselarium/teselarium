@@ -10,7 +10,7 @@ Runs a loaded mod isolated from the app: in its own sandboxed frame with an opaq
 The system SHALL run each mod in its own frame whose sandbox allows scripts and nothing else. The frame document SHALL be built in memory, so running a mod needs no extra hosted file. The frame SHALL have an opaque origin. The app SHALL create every mod frame in its own page, also for a mod opened by another mod, so a mod frame is never inside another mod's frame.
 
 #### Scenario: Frame sandbox
-- **WHEN** the sample book list mod is running
+- **WHEN** a mod is running
 - **THEN** its frame has the sandbox value `allow-scripts` and no `src` attribute
 - **AND** the frame's origin, read inside the frame, is `"null"`
 
@@ -41,15 +41,15 @@ A running mod SHALL NOT be able to change the app's address or open new windows.
 The app SHALL fetch the mod's entrypoint and hand its code to the frame. The frame SHALL NOT request the entrypoint itself, so mods load with the same fetch rules as tiles.
 
 #### Scenario: Entrypoint requested by the app
-- **WHEN** the sample book list mod is opened
+- **WHEN** a mod is opened
 - **THEN** `main.js` is requested once, by the app page and not by the mod's frame
 
 ### Requirement: The mod entrypoint is mounted
 The entrypoint SHALL run as an ES module inside the frame. When its default export is a function, the system SHALL call it once with the engine API object and the mount context. Otherwise, or when the call throws or returns a rejected promise, the system SHALL report an error issue whose source is the mod's source.
 
 #### Scenario: Sample mod mounts
-- **WHEN** the sample book list mod is opened with the sample collection
-- **THEN** the frame shows the titles of the three sample books
+- **WHEN** a mod is opened with a collection of three tiles of its type
+- **THEN** its default export is called once in the frame, with the engine API object and a mount context that holds the three tiles
 
 #### Scenario: No default export function
 - **WHEN** a mod whose entrypoint has no default export is opened
@@ -82,7 +82,7 @@ Without granted permissions, a mod SHALL be able to run its own code and inline 
 The content hosts SHALL be the `http:` and `https:` origins of the files the engine read to start the mod: the mod file, its entrypoint, its tile type file, the collection file and each tile. A mod's content hosts SHALL be fixed when its frame starts.
 
 #### Scenario: Sample content hosts
-- **WHEN** the sample book list mod is opened with the sample collection from the app's own origin
+- **WHEN** a mod is opened with a collection, with every file it reads from the app's own origin
 - **THEN** the only content host is the app's origin
 
 #### Scenario: Tile from another host
@@ -93,8 +93,8 @@ The content hosts SHALL be the `http:` and `https:` origins of the files the eng
 When the mod file is served from the same origin as the app, the system SHALL grant every permission the mod declares: each host SHALL be allowed for the requests of its category. `show` covers images, video, audio, fonts and stylesheets. `connect` covers fetch, XMLHttpRequest, WebSocket and EventSource. `embed` covers frames. `code` covers scripts. `open` covers the mods the mod may inspect and open through the engine.
 
 #### Scenario: Sample covers are shown
-- **WHEN** the sample book list mod, served from the app's origin, shows the book covers from `https://upload.wikimedia.org`
-- **THEN** the covers load
+- **WHEN** a mod served from the app's origin declares `show` for `https://upload.wikimedia.org` and shows images from it
+- **THEN** the images load
 
 #### Scenario: Declared connection
 - **WHEN** a mod served from the app's origin declares `connect` for `https://api.example.net` and calls `fetch` on it

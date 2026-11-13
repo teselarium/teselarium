@@ -14,8 +14,8 @@ When a mod whose mod file is served from another origin than the app declares a 
 - **THEN** the site consent dialog is shown and the mod has no frame yet
 
 #### Scenario: Mod from the app's origin
-- **WHEN** the user opens the sample book list mod, served from the app's origin
-- **THEN** no site consent dialog is shown and the covers load
+- **WHEN** the user opens a mod served from the app's origin that declares `show` for a host
+- **THEN** no site consent dialog is shown and images from that host load
 
 #### Scenario: Foreign mod without permissions
 - **WHEN** the user opens a mod from another origin that declares no permission

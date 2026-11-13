@@ -104,20 +104,8 @@ The frame of a mod whose file sets `theme: "none"` SHALL have neither the theme 
 - **WHEN** the color scheme changes to `dark` while a mod with `theme: "none"` is running
 - **THEN** its `theme.changed` handlers receive `colorScheme` `"dark"` and its `<html>` attribute `data-ot-color-scheme` is `"dark"`
 
-### Requirement: Sample and default mods take the theme's look
-The sample mod `book_list` and the default mods `mod_explorer` and `mod_viewer` SHALL take their colors and fonts from the theme, and SHALL only add styles for what the base stylesheet does not cover: layout and, in the sample mod only, the corner shape of its books, taken from `--ot-radius`, and their shadow, taken from `--ot-shadow`.
-
-#### Scenario: Dark sample mod
-- **WHEN** the color scheme is `dark` and the sample book list mod runs with the sample collection
-- **THEN** the computed background color of its frame's `<body>` is the dark value of `--ot-background`
-
-#### Scenario: Raised book uses the theme's shadow
-- **WHEN** the pointer is over Kallocain's book in the sample book list mod
-- **THEN** Kallocain's button has the computed `box-shadow` of `--ot-shadow`
-
-#### Scenario: Sample mod's own styles
-- **WHEN** the sample book list mod runs with the sample collection
-- **THEN** the rules of its own styles set no background, color or font property, no shadow other than `var(--ot-shadow)`, and no border property other than corner radii
+### Requirement: Default mods take the theme's look
+The default mods `mod_explorer` and `mod_viewer` SHALL take their colors and fonts from the theme, and SHALL only add styles for layout, which the base stylesheet does not cover.
 
 #### Scenario: Dark default mods
 - **WHEN** the color scheme is `dark` and the mod explorer and the mod viewer are opened

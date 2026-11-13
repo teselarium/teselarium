@@ -10,16 +10,16 @@ Opens mods from shareable links, each in its own sandbox, and navigates between 
 The app SHALL open a mod for the address hash `#/run`, with the query parameter `mod` (a mod reference), the optional parameter `collection` (location of a collection file) and any other parameters, which the mod receives in its context. Relative references and locations SHALL be resolved against the app's address. Each run link SHALL open in a new sandbox, which becomes the visible one, and the stage bar SHALL show the mod's title and version.
 
 #### Scenario: Link with a mod and a collection
-- **WHEN** the app is opened at `#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml`
-- **THEN** the stage bar shows `Book List` and `1.1.0`, and the mod's frame lists the three sample books
+- **WHEN** the app is opened at a run link with a `mod` and a `collection` of three tiles of the mod's type
+- **THEN** the stage bar shows the mod's name and version, and the mod receives the three tiles
 
 #### Scenario: Link without a collection
-- **WHEN** the app is opened at `#/run?mod=./samples/mods/book_list`
-- **THEN** the sample book list mod runs with no tiles and no collection file is requested
+- **WHEN** the app is opened at a run link with a `mod` and no `collection`
+- **THEN** the mod runs with no tiles and no collection file is requested
 
 #### Scenario: Encoded values
-- **WHEN** the app is opened with a run link whose `mod` is the percent-encoded absolute URL of the sample book list mod file
-- **THEN** the sample book list mod runs
+- **WHEN** the app is opened with a run link whose `mod` is the percent-encoded absolute URL of a mod file
+- **THEN** the mod runs
 
 ### Requirement: Home
 The app SHALL show Home for an empty hash, for `#/`, and for any hash that is neither a run link with a non-empty `mod` nor the address of a page. Home SHALL be the target of the registry's Home section: a page in the vanilla app, or a mod that an instantiation chooses, which runs in a sandbox like any other mod. The app page SHALL keep the `OpenTesela` heading.
@@ -40,12 +40,12 @@ The app SHALL show Home for an empty hash, for `#/`, and for any hash that is ne
 Each sandbox SHALL have an id that the app gives it, unique in the page. Opening a link, whether the user followed it or a mod asked for it, SHALL create a new sandbox and hide the visible one without stopping it. Activating a sidebar section SHALL instead show an open sandbox when the section has one to show. At most one sandbox SHALL be visible at a time, and none while a page is shown. Hiding or showing a sandbox SHALL NOT reload its frame.
 
 #### Scenario: Second link hides the first mod
-- **WHEN** the sample book list mod is running and the user follows a run link to another mod
+- **WHEN** a mod is running and the user follows a run link to another mod
 - **THEN** two mod frames are in the page, only the second is visible, and the first is still running
 
 #### Scenario: A page hides the mods
-- **WHEN** the sample book list mod is running and the user opens Settings
-- **THEN** no mod frame is visible, the book list's frame is still in the page, and its mod is still running
+- **WHEN** a mod is running and the user opens Settings
+- **THEN** no mod frame is visible, the mod's frame is still in the page, and its mod is still running
 
 ### Requirement: Back and forward keep the sandbox state
 Each opened sandbox SHALL get its own browser history entry. Going back or forward to the entry of a sandbox that is still open SHALL show that sandbox in the state it was left in. Going to an entry whose sandbox was closed, or any entry after the page was reloaded, SHALL open its link again in a new sandbox.
@@ -92,17 +92,17 @@ The stage bar SHALL have a close button (×) for the visible sandbox, except for
 When the mod file, its entrypoint, its tile type file or the collection file cannot be loaded, the sandbox SHALL show an error naming the file that failed and the reason, and SHALL NOT start a mod frame. The same failure SHALL also be an error from the app in the stage bar, whose source is the address of the file that failed and whose text is the reason. The sandbox SHALL keep its history entry and its close button.
 
 #### Scenario: Missing mod file
-- **WHEN** the app is opened at `#/run?mod=./samples/mods/missing`
+- **WHEN** a run link names a mod folder whose mod file answers HTTP 404
 - **THEN** the stage shows an error that names the mod file's resolved address and `404`
 - **AND** no mod frame is shown
 
 #### Scenario: Missing collection
-- **WHEN** the app is opened at `#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/missing.yaml`
+- **WHEN** a run link names a mod and a collection that answers HTTP 404
 - **THEN** the stage shows an error that names the collection's resolved address
 - **AND** no mod frame is shown
 
 #### Scenario: Load failure in the errors popover
-- **WHEN** the app is opened at `#/run?mod=./samples/mods/missing` and the user opens the errors popover
+- **WHEN** a run link names a mod folder whose mod file answers HTTP 404, and the user opens the errors popover
 - **THEN** it lists one error labeled "App" whose source is the mod file's resolved address and whose text names `404`
 
 ### Requirement: Switched-off default mods are not opened
@@ -118,49 +118,38 @@ When a link names a default mod that is switched off, by name or by any other re
 For a sandbox opened with a collection, the stage bar SHALL have a "Reload tiles" icon button, with "Reload tiles" as its accessible name and tooltip, that loads and validates the collection again and pushes the result to the running mod as a `tiles.changed` event, without restarting the mod. New collection issues SHALL replace the previous collection issues in the sandbox's messages, and SHALL be unread. A sandbox opened without a collection SHALL have no "Reload tiles" button.
 
 #### Scenario: Reload after the collection changed
-- **WHEN** the sample mod is running with the sample collection, the collection file now lists two books, and the user presses "Reload tiles"
-- **THEN** the mod's frame lists two books and the frame was not reloaded
+- **WHEN** a mod is running with a collection, the collection file now lists two tiles, and the user presses "Reload tiles"
+- **THEN** the mod receives the two tiles and the frame was not reloaded
 
 #### Scenario: No collection, no reload
-- **WHEN** the sample book list mod runs without a collection
+- **WHEN** a mod runs without a collection
 - **THEN** the stage bar has no "Reload tiles" button
 
 #### Scenario: Reloaded issues are unread
 - **WHEN** the user read the warnings of a sandbox, the collection file now has a tile that does not match the mod's type, and the user presses "Reload tiles"
 - **THEN** the warnings popover lists the tile's issue and the warnings capsule is filled
 
-### Requirement: Sample book list mod
-The sample mod `book_list` SHALL show the tiles it receives with each book's title, authors and cover image, and SHALL declare the sample books as its sample collection. The number of books per row the user chooses SHALL be stored in the mod's storage slot and chosen again when the mod is opened later. What the sample shows and how the user works with it is described in `sample-book-list`.
-
-#### Scenario: Books with covers
-- **WHEN** the sample mod runs with the sample collection from the app's origin
-- **THEN** the frame shows the three books with their titles, authors and cover images
-
-#### Scenario: Selection is remembered
-- **WHEN** the user chooses 10 books per row in the sample mod and the app page is reloaded
-- **THEN** the sample mod's "Books per row" select shows 10
-
 ### Requirement: The visible frame fills the stage area
 The visible sandbox's frame SHALL fill the stage area: the page's width left beside the sidebar, and the viewport height left under the app header and the stage bar, following the window's size and the sidebar's width. The frame's size SHALL NOT depend on the mod's content: content taller than the frame SHALL scroll inside the frame, not the page. The frame SHALL be at least 16rem tall; when less room is left, the page scrolls.
 
 #### Scenario: Frame reaches the bottom of the viewport
-- **WHEN** the sample book list mod runs in a 1280×800 viewport
+- **WHEN** a mod runs in a 1280×800 viewport
 - **THEN** the page does not scroll and the frame's bottom edge is within 24 pixels of the viewport's bottom edge
 
 #### Scenario: Window resized
-- **WHEN** the viewport is resized from 1280×800 to 1024×600 while the sample book list mod runs
+- **WHEN** the viewport is resized from 1280×800 to 1024×600 while a mod runs
 - **THEN** the frame's bottom edge is within 24 pixels of the new viewport's bottom edge
 
 #### Scenario: Tall content scrolls inside the frame
 - **WHEN** a mod whose content is 3000 pixels tall runs in a 1280×800 viewport
-- **THEN** the frame's height is the same as for the sample book list mod, the frame's document can scroll, and the page does not scroll
+- **THEN** the frame's height is the same as for a mod with short content, the frame's document can scroll, and the page does not scroll
 
 #### Scenario: Small viewport
-- **WHEN** the sample book list mod runs in a 1280×300 viewport
+- **WHEN** a mod runs in a 1280×300 viewport
 - **THEN** the frame is 16rem tall and the page can scroll
 
 #### Scenario: Frame beside the sidebar
-- **WHEN** the sample book list mod runs in a 1280×800 viewport with the sidebar expanded
+- **WHEN** a mod runs in a 1280×800 viewport with the sidebar expanded
 - **THEN** the frame's left edge is right of the sidebar's right edge, and its right edge is within 24 pixels of the viewport's right edge
 
 ### Requirement: Pages in the history
