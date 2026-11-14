@@ -32,6 +32,7 @@ mod:
     mods:
       - "./samples/mods/book_list"
       - "./samples/mods/flashcards"
+      - "./samples/mods/country_map"
   permissions:
     open:
       - host: "*"
@@ -39,7 +40,7 @@ mod:
 ```
 
 - `viewer`: the mod reference opened for a selected mod. `mod_viewer` is the default mod name of the viewer.
-- `mods`: the mod references to list. Relative references are resolved against the app's address. The vanilla config lists the two sample mods the app ships, the book list and then the flashcards mod.
+- `mods`: the mod references to list. Relative references are resolved against the app's address. The vanilla config lists the three sample mods the app ships: the book list, the flashcards mod and the country map.
 - `open` for `"*"`: the explorer inspects and opens mods from any site. It is granted because the explorer is served from the app's origin.
 
 ## Tests

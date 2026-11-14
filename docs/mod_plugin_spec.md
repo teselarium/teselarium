@@ -18,59 +18,84 @@ A same tile could be compatible with multiple mods if they have the required fie
 
 A Mod can use a generic tile type in order to be compatible with any tile, for example defining only optional parameter like title or name. Furthermore, a mod may not need any tile to work, for example a mod for an alternative visualization of the home or the settings page
 
-Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. By default, a mod is a folder that bundles its mod_conf.yaml, its code, its tile type file, a sample collection and its tests, so it can be copied or shared as one folder. `type_path`, `sample_collection` and `test_path` are resolved against the mod_conf.yaml location, and they may also point outside the mod folder or to another site, for example to share one tile type between several mods. For example for a mod called "country_markers_map" that shows input tiles organized by country in a map:
+Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. By default, a mod is a folder that bundles its mod_conf.yaml, its code, its tile type file, a sample collection and its tests, so it can be copied or shared as one folder. `type_path`, `sample_collection` and `test_path` are resolved against the mod_conf.yaml location, and they may also point outside the mod folder or to another site, for example to share one tile type between several mods. For example, the sample country map mod the app ships, `public/samples/mods/country_map/`, shows the tiles of any collection organized by country on a world map. Its `sample_collection` points outside its folder, to the Nobel laureates' books, its `show` permissions let the cards show the books' covers, and its `libraries` are covered in [Declared libraries](#declared-libraries):
 
 ```yaml
 mod:
-  name: "country_markers_map"
-  title: "Country Markers Map"
+  name: "country_map"
+  title: "Country Map"
   version: "1.0.0"
-  api: "^0.1.0"
-  description: "An interactive world map that display tiles as markers organized by country."
+  api: "^0.1.10"
+  description: "Shows any collection on a world map, with a marker per country, a list of its tiles and a card for each one."
   entrypoint: "./main.js"
-  type_path: "./country_location.md"
-  sample_collection: "./sample_collection.yaml"
+  type_path: "./country_tile_type.md"
+  sample_collection: "../../tiles/literature_nobel_laureates_books/collection.yaml"
   test_path: "./test.js"
-  config:
-    map:
-      center: [0, 0.0] # [latitude, longitude]
-      zoom: 2
-      base_layer: "openstreetmap"
-    markers:
-      color: "#3366cc"
-      size: 12
-    popup:
-      show_image: true
-      show_body: false
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the book covers"
+      - host: "https://covers.openlibrary.org"
+        reason: "Shows the book covers"
+      - host: "https://*.archive.org"
+        reason: "Shows the book covers"
+      - host: "https://archive.org"
+        reason: "Shows the book covers"
+  libraries:
+    leaflet:
+      npm: "leaflet@1.9.4"
+      files: ["dist/leaflet.js", "dist/leaflet.css"]
+    topojson_client:
+      npm: "topojson-client@3.1.0"
+      files: ["dist/topojson-client.min.js"]
+    proj4:
+      npm: "proj4@2.23.0"
+      files: ["dist/proj4.js"]
+    world_atlas:
+      npm: "world-atlas@2.0.2"
+      files: ["countries-110m.json"]
 ```
 
 `api` is the range of mod API versions the mod was written for, in npm's semver range syntax. The mod API version is separate from the app's own version and covers what a mod relies on: the engine methods and events, the mount context, the mod file format and the test API (see [Mod tests](#mod-tests)). When the range does not match the app's mod API version, the app asks the user before starting the mod; a mod without `api` runs with a warning. A mod reads the version it runs on in its mount context, as `context.api.version`.
 
-The tile type is a markdown file whose frontmatter has a `schema` mapping, here `country_location.md` next to mod_conf.yaml:
+The tile type is a markdown file whose frontmatter has a `schema` mapping, here `country_tile_type.md` next to mod_conf.yaml. Its body tells the user what the type means:
 
-```markdown
+````markdown
 ---
 schema:
   definitions:
-    country_location:
+    country_tile:
       properties:
         title:
           type: string
         country:
           type: string
-      optionalProperties:
-        image:
-          type: string
-        date:
-          type: string
       additionalProperties: true
-  ref: country_location
+  ref: country_tile
 ---
 
-# Country Location
+# Country Tile Type
 
-Tiles with a title and the country they are located in.
-```
+Any tile with a string `title` and a string `country` is a country tile. Other
+keys are allowed, and the card shows them as labeled values.
+
+## Country names
+
+A tile belongs to a country of the map when its `country`, trimmed, is the
+country's name or one of its common names, ignoring case and accents. The map
+is Natural Earth's 1:110m countries (`countries-110m.json` of `world-atlas`),
+which writes some names short or formally, such as "United States of America",
+"Czechia", "Côte d'Ivoire" or "Dem. Rep. Congo". Their common names also
+match: "United States", "USA", "Czech Republic", "Ivory Coast", "DR Congo", and
+so on. A country is shown with the `country` of its first tile, as written.
+
+## Not on the map
+
+A tile whose country matches no country of the map is listed under "Not on the
+map": an empty or unknown name, a country too small for the 1:110m map, such
+as Singapore, or a country that no longer exists, such as the Soviet Union. No
+tile is left out.
+````
 
 ## Width and layout
 
@@ -207,19 +232,25 @@ export default async function mount(engine, context) {
 
 Any other library a mod uses can be declared under `libraries` in its `mod_conf.yaml`: an npm package at an exact version, with the files the mod needs, or files next to the mod. The mod then loads it by name with `libs.load`, and the app fetches the files and installs them in the frame. The mod needs no bundler, no `code` permission and no consent, and every dependency is written in the mod file, where `mods.inspect` lists it and a mod check fetches it.
 
-A map mod that uses Leaflet and the world's countries from npm:
+The sample country map mod, `public/samples/mods/country_map/`, is the complete example: its `main.js` holds only the mod's own logic, and Leaflet, topojson-client, proj4, which projects the map in Equal Earth, and the world's countries from npm come from its declarations. Its `libraries`, shortened here to what loading them needs:
 
 ```yaml
 mod:
   name: "country_map"
   title: "Country Map"
-  version: "0.1.0"
+  version: "1.0.0"
   api: "^0.1.10"
   entrypoint: "./main.js"
   libraries:
     leaflet:
       npm: "leaflet@1.9.4"
       files: ["dist/leaflet.js", "dist/leaflet.css"]
+    topojson_client:
+      npm: "topojson-client@3.1.0"
+      files: ["dist/topojson-client.min.js"]
+    proj4:
+      npm: "proj4@2.23.0"
+      files: ["dist/proj4.js"]
     world_atlas:
       npm: "world-atlas@2.0.2"
       files: ["countries-110m.json"]
@@ -228,13 +259,17 @@ mod:
 ```js
 export default async function mount(engine, context) {
   await engine.request("libs.load", { name: "leaflet" });
+  await engine.request("libs.load", { name: "topojson_client" });
+  await engine.request("libs.load", { name: "proj4" });
   const { files } = await engine.request("libs.load", { name: "world_atlas" });
   const world = JSON.parse(files["countries-110m.json"]);
   const container = document.createElement("div");
   container.style.height = "100vh";
   document.body.append(container);
-  const map = globalThis.L.map(container).setView([20, 0], 2);
-  // ... draw `world` and the tiles on `map`
+  const map = globalThis.L.map(container, { crs: globalThis.L.CRS.Simple });
+  const equalEarth = globalThis.proj4("EPSG:4326", "+proj=eqearth");
+  // ... project each position of `globalThis.topojson.feature(world, world.objects.countries)`
+  // with `equalEarth.forward([longitude, latitude])`, and draw it and the tiles on `map`
 }
 ```
 
@@ -284,6 +319,7 @@ The app's own default mods are the worked example (see the [default mods folder]
 ```yaml
 mod:
   name: "mod_viewer"
+  version: "0.1.0"
   entrypoint: "./main.js"
   test_path: "./test.js"
 ```
@@ -311,6 +347,7 @@ Declare the test file in mod_conf.yaml with `test_path`, resolved against mod_co
 ```yaml
 mod:
   name: "book_list"
+  version: "1.1.0"
   entrypoint: "./main.js"
   test_path: "./test.js"
 ```

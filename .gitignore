@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 dist
+# The npm files the e2e tests serve keep their packages' paths, such as dist/leaflet.js.
+!e2e/npm_files/*/dist/
 dist-ssr
 dist-e2e-*
 *.local

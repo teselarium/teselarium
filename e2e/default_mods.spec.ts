@@ -157,9 +157,28 @@ test.describe(
         await expect(cards.getByRole("heading")).toHaveText([
           "Book List",
           "Flashcards",
+          "Country Map",
         ]);
         await expect(cards.nth(1)).toContainText(
           "Explore any collection as a table, and study it as question and answer cards.",
+        );
+      },
+    );
+
+    test(
+      "Vanilla explorer lists the country map sample",
+      { tag: "@sample" },
+      async function listsCountryMapSample({ page }): Promise<void> {
+        await page.goto(EXPLORER_RUN_LINK);
+        const cards = vanillaExplorerCards(page);
+
+        await expect(cards.getByRole("heading")).toHaveText([
+          "Book List",
+          "Flashcards",
+          "Country Map",
+        ]);
+        await expect(cards.nth(2)).toContainText(
+          "Shows any collection on a world map, with a marker per country, a list of its tiles and a card for each one.",
         );
       },
     );

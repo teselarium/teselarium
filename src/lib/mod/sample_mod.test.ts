@@ -7,8 +7,9 @@ import {
 } from "../tile/index.ts";
 import type { Tile, TileCollection, TileValidator } from "../tile/index.ts";
 import type { Metadata } from "../files/index.ts";
+import { NPM_HOST } from "../../main/library_host.ts";
 import { loadMod, loadModTestCode } from "./index.ts";
-import type { LoadedMod } from "./index.ts";
+import type { LoadedLibrary, LoadedMod, ModPermission } from "./index.ts";
 
 /** A sample mod the app ships, read from `public/` like the built app serves it. */
 interface ShippedSample {
@@ -31,6 +32,99 @@ const SHIPPED_FLASHCARDS: ShippedSample = {
   api: "^0.1.9",
   caseNames: ["lists the sample tiles", "remembers the chosen fields"],
 };
+
+const SHIPPED_COUNTRY_MAP: ShippedSample = {
+  folder: `${APP_BASE_URL}samples/mods/country_map/`,
+  api: "^0.1.10",
+  caseNames: [
+    "shows a marker per country",
+    "opens a country",
+    "groups tiles not on the map",
+  ],
+};
+
+/** The libraries the country map declares, with their files on the vanilla npm host. */
+const COUNTRY_MAP_LIBRARIES: LoadedLibrary[] = [
+  {
+    name: "leaflet",
+    package: "leaflet",
+    version: "1.9.4",
+    files: [
+      {
+        path: "dist/leaflet.js",
+        source: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
+        kind: "script",
+      },
+      {
+        path: "dist/leaflet.css",
+        source: "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css",
+        kind: "style",
+      },
+    ],
+  },
+  {
+    name: "topojson_client",
+    package: "topojson-client",
+    version: "3.1.0",
+    files: [
+      {
+        path: "dist/topojson-client.min.js",
+        source:
+          "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js",
+        kind: "script",
+      },
+    ],
+  },
+  {
+    name: "proj4",
+    package: "proj4",
+    version: "2.23.0",
+    files: [
+      {
+        path: "dist/proj4.js",
+        source: "https://cdn.jsdelivr.net/npm/proj4@2.23.0/dist/proj4.js",
+        kind: "script",
+      },
+    ],
+  },
+  {
+    name: "world_atlas",
+    package: "world-atlas",
+    version: "2.0.2",
+    files: [
+      {
+        path: "countries-110m.json",
+        source:
+          "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json",
+        kind: "data",
+      },
+    ],
+  },
+];
+
+/** The `show` permissions of the country map: the hosts the sample books' covers load from, Open Library's redirects included. */
+const COUNTRY_MAP_PERMISSIONS: ModPermission[] = [
+  {
+    category: "show",
+    host: "https://upload.wikimedia.org",
+    reason: "Shows the book covers",
+  },
+  {
+    category: "show",
+    host: "https://covers.openlibrary.org",
+    reason: "Shows the book covers",
+  },
+  {
+    category: "show",
+    host: "https://*.archive.org",
+    reason: "Shows the book covers",
+  },
+  {
+    category: "show",
+    host: "https://archive.org",
+    reason: "Shows the book covers",
+  },
+];
 
 /** The Nobel laureates sample collection, whose tiles have no flashcard fields. */
 const NOBEL_LAUREATES_COLLECTION = `${APP_BASE_URL}samples/tiles/literature_nobel_laureates/collection.yaml`;
@@ -89,8 +183,12 @@ async function validateSampleCollection(
   return validatedSample;
 }
 
+/** Loads a shipped sample as the vanilla app does, with its npm host. */
 function loadShippedMod(sample: ShippedSample): Promise<LoadedMod> {
-  const loading = loadMod(sample.folder, { fetch: fetchAppFile });
+  const loading = loadMod(sample.folder, {
+    fetch: fetchAppFile,
+    npmHost: NPM_HOST,
+  });
   return loading;
 }
 
@@ -155,6 +253,43 @@ describe("shipped sample mod book_list", function describeBookList(): void {
 
 describe("shipped sample mod flashcards", function describeFlashcards(): void {
   describeShippedSample(SHIPPED_FLASHCARDS);
+});
+
+describe("shipped sample mod country_map", function describeCountryMap(): void {
+  describeShippedSample(SHIPPED_COUNTRY_MAP);
+
+  it("declares Leaflet, topojson-client and world-atlas from the npm host", async function declaresLibraries(): Promise<void> {
+    const sampleMod = await loadShippedMod(SHIPPED_COUNTRY_MAP);
+
+    expect(sampleMod.libraries).toEqual(COUNTRY_MAP_LIBRARIES);
+  });
+
+  it("declares show for the hosts of the book covers only", async function declaresCoverHosts(): Promise<void> {
+    const sampleMod = await loadShippedMod(SHIPPED_COUNTRY_MAP);
+
+    expect(sampleMod.permissions).toEqual(COUNTRY_MAP_PERMISSIONS);
+  });
+});
+
+describe("country tile type", function describeCountryTileType(): void {
+  it("is named country_tile, with the 51 sample books", async function namesCountryTileType(): Promise<void> {
+    const sampleMod = await loadShippedMod(SHIPPED_COUNTRY_MAP);
+
+    const { typeName, collection } = await validateSampleCollection(sampleMod);
+
+    expect(typeName).toBe("country_tile");
+    expect(collection.tiles.length).toBe(51);
+    expect(collection.issues).toEqual([]);
+  });
+
+  it("does not match a tile without a country", async function rejectsMissingCountry(): Promise<void> {
+    const sampleMod = await loadShippedMod(SHIPPED_COUNTRY_MAP);
+    const tileValidator = await buildSampleValidator(sampleMod);
+
+    const collection = validateOneTile(tileValidator, { title: "Kallocain" });
+
+    expect(collection.tiles[0].types).toEqual([]);
+  });
 });
 
 describe("flashcard tile type", function describeFlashcardType(): void {

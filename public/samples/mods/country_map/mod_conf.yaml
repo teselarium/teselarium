@@ -1,0 +1,33 @@
+mod:
+  name: "country_map"
+  title: "Country Map"
+  version: "1.0.0"
+  api: "^0.1.10"
+  description: "Shows any collection on a world map, with a marker per country, a list of its tiles and a card for each one."
+  entrypoint: "./main.js"
+  type_path: "./country_tile_type.md"
+  sample_collection: "../../tiles/literature_nobel_laureates_books/collection.yaml"
+  test_path: "./test.js"
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the book covers"
+      - host: "https://covers.openlibrary.org"
+        reason: "Shows the book covers"
+      - host: "https://*.archive.org"
+        reason: "Shows the book covers"
+      - host: "https://archive.org"
+        reason: "Shows the book covers"
+  libraries:
+    leaflet:
+      npm: "leaflet@1.9.4"
+      files: ["dist/leaflet.js", "dist/leaflet.css"]
+    topojson_client:
+      npm: "topojson-client@3.1.0"
+      files: ["dist/topojson-client.min.js"]
+    proj4:
+      npm: "proj4@2.23.0"
+      files: ["dist/proj4.js"]
+    world_atlas:
+      npm: "world-atlas@2.0.2"
+      files: ["countries-110m.json"]

@@ -9,3 +9,4 @@ public/samples/tiles/**/*.md
 src/test/fixtures/
 .claude/
 src/vendor/
+e2e/npm_files/
