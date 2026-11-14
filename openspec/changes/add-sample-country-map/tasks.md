@@ -10,7 +10,7 @@ Prerequisite: `add-mod-declared-libraries` is applied and archived, so `librarie
   - no permissions;
   - the three `libraries` of the spec's "Declared libraries".
 
-  Write `country_tile_type.md` with `ref: country_tile`, required string `title` and `country`, `additionalProperties: true`, and a body explaining the country names and "Not on the map". Extend `src/lib/mod/sample_mod.test.ts` with the shipped country map: the 51 books match `country_tile` with no issues, the range is `^0.1.10`, the test file names its cases, and the loaded mod has the three libraries with their jsDelivr sources. Verify with `npm test`.
+  Write `country_tile_type.md` with `ref: country_tile`, required string `title` and `country`, `additionalProperties: true`, and a body explaining the country names and "Not on the map". Extend `src/lib/mod/sample_mod.test.ts` with the shipped country map: the 51 books match `country_tile` with no issues, the range is `^0.1.10`, the test file names its cases, and the loaded mod has the three libraries with their jsDelivr sources. `loadShippedMod` passes the vanilla npm host (`NPM_HOST` from `src/main/library_host.ts`) as `npmHost`: without it, `loadMod` throws for a mod that declares an npm library. Verify with `npm test`.
 - [ ] 1.2 Copy the four library files from jsDelivr into `e2e/npm_files/<package>@<version>/<path>`, byte for byte, with each package's license file (`LICENSE` from Leaflet, topojson-client and world-atlas). Add `e2e/npm_files/` to `.prettierignore` and to `ignorePatterns` in `.oxlintrc.json`. Add a route helper to `e2e/sample_mod.ts` that answers `https://cdn.jsdelivr.net/npm/**` from that folder, with a 404 and jsDelivr's text for a missing file. Add the country map's paths and run hashes next to the flashcards'. Verify that `npm run lint` and `npm run format:check` pass, and that the copies' SHA-256 hashes match the files jsDelivr serves.
 
 ## 2. Map and libraries
@@ -75,7 +75,7 @@ Prerequisite: `add-mod-declared-libraries` is applied and archived, so `librarie
   - "Check mod" passing in the mod viewer.
 
   Verify with `npx playwright test e2e/sample_country_map.spec.ts --grep @sample` in Chromium, Firefox and WebKit.
-- [ ] 5.3 Mention the country map sample in `docs/modules/lib/mod/README.md` (the shipped samples, with its folder and what it shows as an example) and in `docs/modules/mods/explorer/README.md` (the vanilla `mods` list). Replace the made-up `country_markers_map` example in `docs/mod_plugin_spec.md` with the real `country_map` mod file and tile type. Verify that the documented files match `mod_conf.yaml` and `country_tile_type.md`.
+- [ ] 5.3 Mention the country map sample in `docs/modules/lib/mod/README.md` (the shipped samples, with its folder and what it shows as an example) and in `docs/modules/mods/explorer/README.md` (the vanilla `mods` list). Replace the made-up `country_markers_map` example in `docs/mod_plugin_spec.md` with the real `country_map` mod file and tile type. In its "Declared libraries" section, which `add-mod-declared-libraries` wrote with a shortened `country_map` example, point to the sample as the complete example and make the npm snippet declare the same libraries as the sample's mod file. The snippet of files next to the mod, and the `map_tools` example in "Library declarations" in `docs/modules/lib/mod/README.md`, stay as format examples. Verify that the documented files match `mod_conf.yaml` and `country_tile_type.md`, and that every `mod_conf.yaml` snippet in these docs passes the mod file's format rules.
 
 ## 6. Release
 

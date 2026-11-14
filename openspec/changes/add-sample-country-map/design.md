@@ -11,6 +11,7 @@ See proposal.md for the motivation. What the design builds on:
   - `topojson-client@3.1.0/dist/topojson-client.min.js` is 7 KB and sets `globalThis.topojson`;
   - `world-atlas@2.0.2/countries-110m.json` is a 108 KB TopoJSON with 177 countries. Each has only a `name` (Natural Earth's short name) and a numeric `id`. France is a MultiPolygon with French Guiana. Small states such as Singapore are not drawn.
 - **Short or formal map names**: `Bosnia and Herz.`, `Central African Rep.`, `Dem. Rep. Congo`, `Dominican Rep.`, `Eq. Guinea`, `Falkland Is.`, `Fr. S. Antarctic Lands`, `N. Cyprus`, `S. Sudan`, `Solomon Is.` and `W. Sahara`, plus `United States of America`, `Czechia`, `eSwatini`, `Côte d'Ivoire`, `Macedonia` and `Timor-Leste`.
+- **Leaflet's stylesheet** refers to images with relative `url()`s, which do not resolve in a declared stylesheet (out of scope in `add-mod-declared-libraries`). They belong only to the layers control and the default marker icon, which this mod doesn't use, so they lose nothing and cause no request.
 - **Sandbox**: a frame that navigates is stopped. Leaflet's attribution control renders ordinary `<a href>` links.
 
 ## Goals / Non-Goals

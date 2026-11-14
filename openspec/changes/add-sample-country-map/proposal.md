@@ -21,7 +21,7 @@ The samples show how to list tiles (the book list) and how to study them (flashc
 - **Tile type** `country_tile`: a string `title` and a string `country`, other keys allowed.
 - **Sample collection**: the existing Nobel laureates' books collection (`public/samples/tiles/literature_nobel_laureates_books/`), 51 books in 14 countries. The mod file points to it; nothing is copied.
 - The mod explorer's vanilla config lists the country map after the flashcards.
-- The mod guide's made-up `country_markers_map` example becomes this sample's real mod file.
+- The mod guide's made-up `country_markers_map` example becomes this sample's real mod file, and its "Declared libraries" section points to the sample.
 
 ## Capabilities
 
@@ -40,7 +40,7 @@ The samples show how to list tiles (the book list) and how to study them (flashc
 - **Tests**:
   - the shipped-sample checks in `src/lib/mod/sample_mod.test.ts`, extended to the new mod;
   - a new Playwright spec, `e2e/sample_country_map.spec.ts` (tagged `@sample`), with helpers in `e2e/sample_mod.ts`. It answers jsDelivr URLs with local copies of the three libraries' files under `e2e/npm_files/` (about 265 KB, with their licenses), so no test reaches the network. Formatting and lint skip those copies.
-- **Docs**: the samples in `docs/modules/lib/mod/README.md` and `docs/modules/mods/explorer/README.md`, and the example mod file in `docs/mod_plugin_spec.md`.
+- **Docs**: the samples in `docs/modules/lib/mod/README.md` and `docs/modules/mods/explorer/README.md`, and the example mod file in `docs/mod_plugin_spec.md` and its "Declared libraries" example.
 - **Network**: when the map opens, the app page fetches the three libraries' files from the npm host, jsDelivr by default, once per page. The mod declares no permission and its frame makes no request.
 - **Mod API version**: none. The sample uses only what `add-mod-declared-libraries` adds and changes no mod API spec. Its `api` range is `^0.1.10`.
 - **App version**: patch, for a new sample.
