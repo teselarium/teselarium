@@ -56,12 +56,16 @@ The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list e
 - **THEN** its frame lists `./samples/mods/missing` with a message that names `404`
 
 ### Requirement: Mod explorer vanilla config
-The mod explorer's vanilla config SHALL list the sample book list mod, then the sample flashcards mod, and use `mod_viewer` as viewer.
+The mod explorer's vanilla config SHALL list the sample book list mod, then the sample flashcards mod, then the sample country map mod, and use `mod_viewer` as viewer.
 
 #### Scenario: Select the flashcards sample
 - **WHEN** the user selects `Flashcards` in the mod explorer with its vanilla config
 - **THEN** the mod viewer is the visible mod and shows `Flashcards`
 - **AND** the app's address is a run link with `mod=mod_viewer` and the flashcards mod's source as `target`
+
+#### Scenario: Vanilla explorer lists the country map sample
+- **WHEN** the mod explorer runs with its vanilla config
+- **THEN** its frame lists `Country Map` after `Flashcards`, with the country map mod's description
 
 ### Requirement: Mod viewer
 The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the mod named by its `target` parameter, using `mods.inspect`: title, version, description, name, source, API range and whether it matches the app's mod API version, tile type, sample collection, config, and each declared permission with its reason and whether it would be granted. It SHALL NOT need a collection.
