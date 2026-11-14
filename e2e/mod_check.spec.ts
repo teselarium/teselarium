@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import type { Route } from "@playwright/test";
 import {
   buildAnimationFrameFiles,
   buildCheckerFiles,
   buildConfirmingFiles,
+  buildProbeFiles,
   buildSlotReporterFiles,
   buildNeverMountedFiles,
   buildTestModReference,
@@ -71,6 +73,63 @@ test.describe(
           findings: [],
         });
       }
+    });
+  },
+);
+
+/** The vanilla app's npm host, answered with a 404 so no test reaches the network. */
+const NPM_HOST = "https://cdn.jsdelivr.net/npm/";
+const MISSING_LIBRARY_FILE_URL = `${NPM_HOST}leaflet@1.9.4/dist/missing.js`;
+/** jsDelivr's text for a file a published version does not have. */
+const MISSING_LIBRARY_FILE_TEXT =
+  "Couldn't find the requested file /dist/missing.js in leaflet.";
+
+async function answerMissingNpmFile(route: Route): Promise<void> {
+  await route.fulfill({
+    status: 404,
+    headers: { "Access-Control-Allow-Origin": "*" },
+    contentType: "text/plain; charset=utf-8",
+    body: MISSING_LIBRARY_FILE_TEXT,
+  });
+}
+
+test.describe(
+  "Bundle check",
+  { tag: "@frames" },
+  function describeBundleCheck(): void {
+    test("Missing library file", async function reportsMissingLibraryFile({
+      page,
+    }): Promise<void> {
+      await page.route(`${NPM_HOST}**`, answerMissingNpmFile);
+      await openChecker(
+        page,
+        buildProbeFiles("missing_library", [
+          "  libraries:",
+          "    leaflet:",
+          '      npm: "leaflet@1.9.4"',
+          '      files: ["dist/missing.js"]',
+        ]),
+      );
+
+      const report = await checkFromChecker(
+        page,
+        buildTestModReference("missing_library"),
+      );
+
+      expect(report).toMatchObject({
+        source: readTestModSource(page, "missing_library"),
+        status: "fail",
+        mountChecked: false,
+      });
+      expect(report.findings).toHaveLength(1);
+      expect(report.findings[0]).toMatchObject({
+        step: "bundle",
+        level: "error",
+        source: MISSING_LIBRARY_FILE_URL,
+      });
+      expect(report.findings[0].message).toContain('"leaflet"');
+      expect(report.findings[0].message).toContain("404");
+      expect(report.findings[0].message).toContain(MISSING_LIBRARY_FILE_TEXT);
     });
   },
 );

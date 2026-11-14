@@ -1,6 +1,6 @@
 import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
 import { loadMod, resolveModReference } from "../../mod/index.ts";
-import type { LoadedMod, ModIssue } from "../../mod/index.ts";
+import type { LoadedMod, ModIssue, ModLoadOptions } from "../../mod/index.ts";
 import {
   buildTileValidator,
   loadTileCollection,
@@ -363,7 +363,7 @@ export function buildModTestDocument(launch: ModLaunch): string {
  */
 export async function loadLaunchMod(
   request: ModLaunchRequest,
-  options: FileFetchOptions,
+  options: ModLoadOptions,
 ): Promise<LoadedMod> {
   const source = resolveLaunchSource(request, options);
   return loadMod(source, options);

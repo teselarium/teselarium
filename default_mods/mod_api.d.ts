@@ -94,6 +94,21 @@ export interface ModContext {
 }
 
 /** What `mods.inspect` answers: a mod's metadata, without running it. */
+/** A file of a library a mod declares: its path as declared, its address and how the frame uses it. */
+export interface ModLibraryFile {
+  path: string;
+  source: string;
+  kind: "script" | "style" | "data";
+}
+
+/** A library a mod declares. `package` and `version` are `null` for files next to the mod. */
+export interface ModLibrary {
+  name: string;
+  package: string | null;
+  version: string | null;
+  files: ModLibraryFile[];
+}
+
 export interface ModInspection {
   source: string;
   name: string;
@@ -108,6 +123,8 @@ export interface ModInspection {
   sampleCollection: string | null;
   testSource: string | null;
   config: ModYamlMapping;
+  /** The libraries the mod declares, with the address of each file. */
+  libraries: ModLibrary[];
   /** What the mod would get if it were opened. */
   permissions: ModGrants;
 }

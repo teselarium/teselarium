@@ -6,7 +6,11 @@ import { createMemorySiteDecisions } from "./memory_site_decisions.ts";
 import type { MemorySiteDecisions } from "./memory_site_decisions.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
-import { APP_ORIGIN, SAMPLE_MOD_REFERENCE } from "./sample_mods.ts";
+import {
+  APP_ORIGIN,
+  SAMPLE_MOD_REFERENCE,
+  TEST_NPM_HOST,
+} from "./sample_mods.ts";
 import { fetchTestFile } from "./test_files.ts";
 
 /** Where a test stage reads and remembers its site decisions. */
@@ -59,6 +63,7 @@ export function buildTestStage(
     routing,
     appOrigin: APP_ORIGIN,
     baseUrl: APP_BASE_URL,
+    npmHost: TEST_NPM_HOST,
     storage: createMemoryStorage(),
     fetch: fetchTestFile,
     colorScheme: "light",

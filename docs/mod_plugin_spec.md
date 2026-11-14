@@ -162,7 +162,11 @@ export default async function mount(engine, context) {
 
 ## Libraries
 
-The app ships some large libraries that a mod can use without bundling them or loading code from another site: `libs.load` installs one in the mod's frame, from the app's own copy (see [Libraries](modules/lib/core/engine/README.md#libraries) in the engine's README). Today there is one, `mermaid` at major version `12`, ready as `globalThis.mermaid`. A mod asks for a major version, and the result gives the full version installed.
+`libs.load` installs a library in the mod's frame, without the mod bundling it or loading code from another site (see [Libraries](modules/lib/core/engine/README.md#libraries) in the engine's README). There are two kinds: the libraries the app ships, and the ones the mod declares in its `mod_conf.yaml`.
+
+### Libraries the app ships
+
+The app ships some large libraries, from its own copy. Today there is one, `mermaid` at major version `12`, ready as `globalThis.mermaid`. A mod asks for a major version, and the result gives the full version installed.
 
 This mod draws a diagram and draws it again in the new colors when the user switches between light and dark:
 
@@ -199,18 +203,81 @@ export default async function mount(engine, context) {
 - Load the library only when the mod needs it: it is about 5.5 MB, and each frame that loads it pays its install, a few tenths of a second.
 - A second `libs.load` resolves at once with the same result, so a mod can ask before each use.
 
-## Bundling a mod
+### Declared libraries
+
+Any other library a mod uses can be declared under `libraries` in its `mod_conf.yaml`: an npm package at an exact version, with the files the mod needs, or files next to the mod. The mod then loads it by name with `libs.load`, and the app fetches the files and installs them in the frame. The mod needs no bundler, no `code` permission and no consent, and every dependency is written in the mod file, where `mods.inspect` lists it and a mod check fetches it.
+
+A map mod that uses Leaflet and the world's countries from npm:
+
+```yaml
+mod:
+  name: "country_map"
+  title: "Country Map"
+  version: "0.1.0"
+  api: "^0.1.10"
+  entrypoint: "./main.js"
+  libraries:
+    leaflet:
+      npm: "leaflet@1.9.4"
+      files: ["dist/leaflet.js", "dist/leaflet.css"]
+    world_atlas:
+      npm: "world-atlas@2.0.2"
+      files: ["countries-110m.json"]
+```
+
+```js
+export default async function mount(engine, context) {
+  await engine.request("libs.load", { name: "leaflet" });
+  const { files } = await engine.request("libs.load", { name: "world_atlas" });
+  const world = JSON.parse(files["countries-110m.json"]);
+  const container = document.createElement("div");
+  container.style.height = "100vh";
+  document.body.append(container);
+  const map = globalThis.L.map(container).setView([20, 0], 2);
+  // ... draw `world` and the tiles on `map`
+}
+```
+
+The same mod with its own copy of the files, next to `mod_conf.yaml`:
+
+```yaml
+mod:
+  name: "country_map"
+  version: "0.1.0"
+  api: "^0.1.10"
+  entrypoint: "./main.js"
+  libraries:
+    leaflet:
+      files: ["./vendor/leaflet.js", "./vendor/leaflet.css"]
+    world_atlas:
+      files: ["./vendor/countries-110m.json"]
+```
+
+- `npm` is `"<package>@<exact version>"`, such as `leaflet@1.9.4` or `@turf/helpers@7.2.0`. A range (`^1.9.4`) or a tag (`latest`) is a mod format error: npm never replaces a published version, so the exact version pins the files. Without `npm`, the files are resolved against `mod_conf.yaml`, like `entrypoint`.
+- `files` lists the files the mod needs, in order: paths inside the package for an npm library. A `.js` file runs as a classic script, each one after the previous one, so a plugin goes after the library it extends; a `.css` file is added as a stylesheet, before the mod's own styles, so the mod's rules win at equal specificity; any other file, such as JSON, is data, which the result's `files` gives the mod as text, by path. A relative `url()` in a declared stylesheet does not resolve.
+- Pick the package's UMD or IIFE build, the one that sets a global such as `globalThis.L`. ES module builds are not supported: an `.mjs` file is a mod format error.
+- `version` may be left out of the request, or be the declared version. The result is `{ name, version, files }`, with the declared version, or `null` for files next to the mod.
+- In the vanilla app, npm files come from jsDelivr, at `https://cdn.jsdelivr.net/npm/<package>@<version>/<path>`. An instance can choose another npm host. The app's page fetches them, not the mod's frame, so jsDelivr sees the user's address and the package names, not the mod. A file is fetched the first time a mod loads its library, once per page, and two mods that declare the same files share the download.
+- A file that cannot be fetched fails the request with `-32001`, naming the library, the file and the host's reason, such as `Couldn't find the requested release version 9.9.9.`, and installs nothing. A mod check reports it too (see [Checking a mod](#checking-a-mod)).
+
+## Bundling a mod or declaring its libraries
 
 A mod can be written in TypeScript, split into modules, or use npm packages, as long as what it ships follows one rule: **each entry point is one self-contained ES module.** The frame loader fetches the entrypoint as text and imports it from a `blob:` URL, and a relative `import` cannot be resolved from a `blob:` URL. So a bundler must give the mod one file for `entrypoint`, and one for `test_path` if the mod has tests:
 
 - **One ESM file per entry point.** Output format `esm`, for the browser, with the entry's default export kept as the file's default export.
 - **Dependencies inlined.** Every module the entry imports, the mod's own and npm packages alike, goes into that file. Nothing is left external.
 - **No code splitting.** Dynamic `import()` calls are inlined too, so the bundle never loads a second chunk. With Rolldown, that is `output.codeSplitting: false`; with Rollup or Vite, `inlineDynamicImports: true`; with esbuild, `bundle: true` without `splitting`.
-- **Libraries through bundling, `libs.load` or `ot-tile-body`.** A small library is bundled like any dependency. A large one the app ships, such as mermaid, comes from `libs.load` (see [Libraries](#libraries)), and a tile's markdown from `ot-tile-body` (see [Showing a tile's body](#showing-a-tiles-body)), so the mod bundles neither. Loading code from another site needs a `code` permission and the user's consent: a bundle avoids both.
+- **Libraries through bundling, declaring, `libs.load` or `ot-tile-body`.** A small library is bundled like any dependency. A large one the app ships, such as mermaid, comes from `libs.load` (see [Libraries](#libraries)), and a tile's markdown from `ot-tile-body` (see [Showing a tile's body](#showing-a-tiles-body)), so the mod bundles neither. Any other large library, or one the author would rather not bundle, can be declared in `mod_conf.yaml` and loaded with `libs.load` too (see [Declared libraries](#declared-libraries)). Loading code from another site yourself needs a `code` permission and the user's consent: a bundle or a declaration avoids both.
 - **Test files bundled the same way.** The test file is fetched and imported like the entrypoint, so it is one self-contained ES module too. It may import the mod's helpers, which the bundle inlines, but it does not import the entrypoint: each case mounts the mod through its context (see [Mod tests](#mod-tests)).
 - **HTTP caching.** The app fetches `mod_conf.yaml`, the entrypoint and the test file with the browser's ordinary HTTP cache. Serve them so a new version is seen: either with revalidation (`Cache-Control: no-cache` and an `ETag`), or with bundles named after their content, such as `main.3f9a2c.js`, cached for long and named by a `mod_conf.yaml` that is always revalidated.
 
 Ship only what the bundler outputs, `mod_conf.yaml` and the mod's data files. The sources, the bundler's config and the `node_modules/` stay in your repository.
+
+A plain JavaScript mod needs no bundler at all: one `main.js` that imports nothing, plus its declared libraries. When to declare rather than bundle:
+
+- **Declare** a large library with a browser build, such as a map, chart or data library, or a data file from npm: the mod stays one plain file, the version shows in the mod file, and two mods share one download.
+- **Bundle** a library that only has an ES module build, small helpers, and anything the mod imports by name: the frame cannot resolve `import` statements, so they need the bundler either way.
+- **Vendor the files next to the mod** when the mod must work offline or on a network that blocks the npm host: download the package's files into the mod's folder and declare them without `npm`. The app then fetches them from the mod's own host.
 
 The app's own default mods are the worked example (see the [default mods folder](../default_mods/README.md)). Each is written in TypeScript, as `src/main.ts` and the modules it imports, with its tests in `test/test.ts`. The app's build bundles each entry point with Rolldown, in `build/default_mod_build.ts`: `src/main.ts` becomes `main.js` and `test/test.ts` becomes `test.js`, with ESM output, the browser as platform, dynamic imports inlined, no code splitting and no minifying, so the shipped code stays readable. A bundle that still holds an `import` statement or an `import(` call fails the build, and so does an import that leaves the mod's folder. The mods are typed with `default_mods/mod_api.d.ts`, imported with `import type` so it adds nothing to the bundle. Their `mod_conf.yaml` names the outputs, as any mod's does:
 
@@ -227,7 +294,7 @@ A mod can be checked before anyone runs it, with no code from its author. Open t
 
 The check has three steps:
 
-- **Bundle check**: the mod file, the entrypoint, the tile type and the collection must load, and the collection's tiles are validated against the tile type. A file that cannot be loaded or has the wrong format is an error naming that file. A tile that does not match the type is a warning naming the tile. A missing `api` range, or one that does not match the app's mod API version, is a warning: the check asks nothing.
+- **Bundle check**: the mod file, the entrypoint, every file of the declared libraries, the tile type and the collection must load, and the collection's tiles are validated against the tile type. A file that cannot be loaded or has the wrong format is an error naming that file; for a library file, the message names the library and ends with the host's reason, such as jsDelivr's `Couldn't find the requested file /dist/missing.js in leaflet.`, so a wrong version or path shows before anyone runs the mod. A tile that does not match the type is a warning naming the tile. A missing `api` range, or one that does not match the app's mod API version, is a warning: the check asks nothing.
 - **Mount check**: when the bundle check found no error, the mod is mounted in a hidden frame, with the permissions it would get if it were opened, the tiles of its type and an empty storage slot that is thrown away afterwards; the mod's real slot is never read nor written. The check records a `mount` that throws or rejects, a mod that left its page, blocked requests and blocked browser dialogs, every request answered with `-32600`, `-32601` or `-32602` (a message that is not a request, an unknown method, bad params), and the requests that would need the user (`links.open`, `files.save`, `ui.confirm` and `players.open` answer `false`, `mods.open` and `mods.check` are refused), without showing any dialog. `ui.notify` answers `null`, and each notification with level `"error"` or `"warning"` is a finding at that level, with the notification's source and message; an `"info"` one is none. A `mount` that has not finished after 10 seconds is an error. Only the start of the mod is watched: the mount check ends 1 second after `mount` finished, so timers and requests that start later are not recorded.
 - **Tests**: when the mod declares `test_path` and neither step found an error, the mod's own tests run, one case after another (see [Mod tests](#mod-tests)).
 

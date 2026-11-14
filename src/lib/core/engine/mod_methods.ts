@@ -1,5 +1,5 @@
-import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
-import type { LoadedMod } from "../../mod/index.ts";
+import type { YamlMapping } from "../../files/index.ts";
+import type { LoadedMod, ModLoadOptions } from "../../mod/index.ts";
 import type { IssueLevel } from "../../tile/index.ts";
 import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
@@ -36,7 +36,7 @@ export interface ModMethodContext {
   appOrigin: string;
   defaults: ResolvedDefaultModSettings;
   /** `baseUrl` is the app's address. */
-  fetchOptions: FileFetchOptions;
+  fetchOptions: ModLoadOptions;
   /** The bodies of the tiles the mod currently receives, replaced by "Reload tiles". */
   tileBodies: TileBodies;
   /** The remembered site decisions, read when `mods.inspect` grants a mod's permissions. */

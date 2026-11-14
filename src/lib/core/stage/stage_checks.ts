@@ -1,6 +1,5 @@
-import type { FileFetchOptions } from "../../files/index.ts";
 import { loadModTestCode } from "../../mod/index.ts";
-import type { ModIssue } from "../../mod/index.ts";
+import type { ModIssue, ModLoadOptions } from "../../mod/index.ts";
 import type { IssueLevel } from "../../tile/index.ts";
 import {
   buildModCheckReport,
@@ -112,7 +111,7 @@ export interface CheckServices {
   appOrigin: string;
   defaults: ResolvedDefaultModSettings;
   /** `baseUrl` is the app's address. */
-  fetchOptions: FileFetchOptions;
+  fetchOptions: ModLoadOptions;
   /** The stage's current theme, read when a check frame connects. */
   readTheme: () => Theme;
   /** Whether a sandbox is open and running, so a check whose requester left mounts and tests nothing. */

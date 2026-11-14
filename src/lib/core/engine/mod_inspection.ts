@@ -1,5 +1,6 @@
-import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
+import type { YamlMapping } from "../../files/index.ts";
 import { loadModFile } from "../../mod/index.ts";
+import type { LoadedLibrary, ModLoadOptions } from "../../mod/index.ts";
 import { grantModPermissions } from "../permissions/index.ts";
 import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import { matchModApiRange } from "./mod_api_version.ts";
@@ -20,11 +21,14 @@ export interface ModInspection {
   /** The resolved address of the mod's test file, or `null`. It is not fetched. */
   testSource: string | null;
   config: YamlMapping;
+  /** The declared libraries, with the address of each file. No file is fetched. */
+  libraries: LoadedLibrary[];
   permissions: ModGrants;
 }
 
 /**
- * Loads the mod file at `source` without fetching its entrypoint, and builds
+ * Loads the mod file at `source` without fetching its entrypoint or its
+ * library files, and builds
  * its inspection, with the permissions granted by `decisions` as a launch
  * would grant them. Load errors propagate.
  */
@@ -32,7 +36,7 @@ export async function inspectMod(
   source: string,
   appOrigin: string,
   decisions: readonly SiteDecision[],
-  options: FileFetchOptions,
+  options: ModLoadOptions,
 ): Promise<ModInspection> {
   const modFile = await loadModFile(source, options);
   const inspection: ModInspection = {
@@ -47,6 +51,7 @@ export async function inspectMod(
     sampleCollection: modFile.sampleCollection,
     testSource: modFile.testSource,
     config: structuredClone(modFile.config),
+    libraries: structuredClone(modFile.libraries),
     permissions: grantModPermissions(modFile, appOrigin, decisions),
   };
   return inspection;

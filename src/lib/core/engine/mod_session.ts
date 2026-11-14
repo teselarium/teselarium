@@ -1,5 +1,4 @@
-import type { FileFetchOptions } from "../../files/index.ts";
-import type { ModIssue } from "../../mod/index.ts";
+import type { ModIssue, ModLoadOptions } from "../../mod/index.ts";
 import type { Tile, TileIssue } from "../../tile/index.ts";
 import {
   describeBlockedDialog,
@@ -71,7 +70,7 @@ export interface ModSessionOptions {
   appOrigin: string;
   defaults: ResolvedDefaultModSettings;
   /** `baseUrl` is the app's address. */
-  fetchOptions: FileFetchOptions;
+  fetchOptions: ModLoadOptions;
   /** The remembered site decisions, read by `mods.inspect`. */
   readSiteDecisions: () => readonly SiteDecision[];
   onIssue: (issue: ModIssue) => void;

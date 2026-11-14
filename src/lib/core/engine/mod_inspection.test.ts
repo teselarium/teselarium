@@ -4,6 +4,10 @@ import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
   buildSampleCoversDecision,
+  HELPER_SCRIPT_SOURCE,
+  LEAFLET_SCRIPT_SOURCE,
+  LEAFLET_STYLE_SOURCE,
+  LIBRARY_MOD_SOURCE,
   MISSING_MOD_SOURCE,
   OTHER_API_MOD_SOURCE,
   OTHER_API_RANGE,
@@ -13,8 +17,10 @@ import {
   SAMPLE_ENTRYPOINT,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TYPE_SOURCE,
+  serveLibraryMod,
   serveOtherApiMod,
   serveUntypedMod,
+  TEST_NPM_HOST,
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
 import {
@@ -66,9 +72,53 @@ describe("inspectMod", function describeInspectMod(): void {
       sampleCollection: SAMPLE_COLLECTION_SOURCE,
       testSource: null,
       config: { show_covers: true },
+      libraries: [],
       permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
     });
     expect(listRequestedUrls(testFetch)).not.toContain(SAMPLE_ENTRYPOINT);
+  });
+
+  it("Inspect a mod with a library", async function inspectsModWithLibrary(): Promise<void> {
+    serveLibraryMod();
+    const testFetch = createTestFetch();
+
+    const inspection = await inspectMod(LIBRARY_MOD_SOURCE, APP_ORIGIN, [], {
+      fetch: testFetch,
+      npmHost: TEST_NPM_HOST,
+    });
+
+    expect(inspection.libraries).toEqual([
+      {
+        name: "leaflet",
+        package: "leaflet",
+        version: "1.9.4",
+        files: [
+          {
+            path: "dist/leaflet.js",
+            source: LEAFLET_SCRIPT_SOURCE,
+            kind: "script",
+          },
+          {
+            path: "dist/leaflet.css",
+            source: LEAFLET_STYLE_SOURCE,
+            kind: "style",
+          },
+        ],
+      },
+      {
+        name: "helper",
+        package: null,
+        version: null,
+        files: [
+          {
+            path: "./vendor/helper.js",
+            source: HELPER_SCRIPT_SOURCE,
+            kind: "script",
+          },
+        ],
+      },
+    ]);
+    expect(listRequestedUrls(testFetch)).toEqual([LIBRARY_MOD_SOURCE]);
   });
 
   it("Inspect a mod with tests", async function inspectsModWithTests(): Promise<void> {

@@ -26,7 +26,7 @@ export default function mount(engine, context) {
 }
 ```
 
-For a mod at `https://mods.example.net/probe/mod_conf.yaml`, the image loads from `https://mods.example.net/probe/icon.svg`. Scripts are different: loading code from the mod's folder still needs a granted `code` permission, because a mod is bundled into its one entrypoint, which the engine delivers over the channel.
+For a mod at `https://mods.example.net/probe/mod_conf.yaml`, the image loads from `https://mods.example.net/probe/icon.svg`. Scripts are different: loading code from the mod's folder with a `<script>` or `import` still needs a granted `code` permission, because the engine delivers a mod's code over the channel: its one entrypoint, and the scripts of the libraries it declares in its mod file, which `libs.load` fetches from the mod's folder or the npm host and installs from `blob:` addresses (see [Libraries](../engine/README.md#libraries)). A mod that needs a script next to it declares it as a library rather than asking for `code`.
 
 ### Images next to tiles
 

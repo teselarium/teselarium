@@ -15,6 +15,7 @@ import {
   APP_ORIGIN,
   TEST_DEFAULTS,
   TEST_MOD_API_RANGE,
+  TEST_NPM_HOST,
 } from "./sample_mods.ts";
 import { fetchTestFile } from "./test_files.ts";
 
@@ -46,6 +47,7 @@ export function buildRequestingMod(permissions: ModPermission[]): LoadedMod {
     config: {},
     permissions,
     theme: "default",
+    libraries: [],
     code: "",
   };
   return mod;
@@ -93,7 +95,7 @@ function ignoreNotification(): void {
 
 /**
  * A method context for a mod on the app's origin with the given granted
- * permissions, a `Map`-backed storage, `fetchTestFile` and no remembered
+ * permissions, a `Map`-backed storage, `fetchTestFile`, `TEST_NPM_HOST` and no remembered
  * site decision. The mod is
  * visible, and the user accepts every action.
  */
@@ -104,7 +106,11 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
     storage: createMemoryStorage(),
     appOrigin: APP_ORIGIN,
     defaults: TEST_DEFAULTS,
-    fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
+    fetchOptions: {
+      baseUrl: APP_BASE_URL,
+      fetch: fetchTestFile,
+      npmHost: TEST_NPM_HOST,
+    },
     tileBodies: buildTileBodies([]),
     readSiteDecisions: readNoSiteDecisions,
     onOpenLink: acceptOpenLink,

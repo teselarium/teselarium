@@ -78,6 +78,12 @@ export function buildSampleCoversDecision(allowed: boolean): SiteDecision {
   return decision;
 }
 
+/**
+ * The npm host of the test stages and method contexts. It is not the vanilla
+ * app's host, so tests show that the engine uses the host it is given.
+ */
+export const TEST_NPM_HOST = "https://npm.example.net/npm/";
+
 /** The vanilla default mod settings, resolved for the app at `APP_BASE_URL`. */
 export const TEST_DEFAULTS = {
   folder: `${APP_BASE_URL}default_mods/`,
@@ -382,4 +388,28 @@ export function serveTestedMod(
   if (testCode !== null) {
     testTexts.set(TESTED_MOD_TEST_SOURCE, testCode);
   }
+}
+
+/**
+ * A mod that declares `leaflet` (`npm: "leaflet@1.9.4"`, a script and a
+ * stylesheet) and `helper` (a script next to the mod), served by
+ * `fetchTestFile` once `serveLibraryMod` ran. Its library files are not served.
+ */
+export const LIBRARY_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/with_libraries/mod_conf.yaml`;
+export const LEAFLET_SCRIPT_SOURCE = `${TEST_NPM_HOST}leaflet@1.9.4/dist/leaflet.js`;
+export const LEAFLET_STYLE_SOURCE = `${TEST_NPM_HOST}leaflet@1.9.4/dist/leaflet.css`;
+export const HELPER_SCRIPT_SOURCE = `${FIXTURES_BASE_URL}mods/with_libraries/vendor/helper.js`;
+
+export function serveLibraryMod(): void {
+  serveTestMod(LIBRARY_MOD_SOURCE, [
+    '  name: "with_libraries"',
+    '  version: "0.1.0"',
+    '  entrypoint: "./main.js"',
+    "  libraries:",
+    "    leaflet:",
+    '      npm: "leaflet@1.9.4"',
+    '      files: ["dist/leaflet.js", "dist/leaflet.css"]',
+    "    helper:",
+    '      files: ["./vendor/helper.js"]',
+  ]);
 }

@@ -2,6 +2,8 @@ import { fetchFile, parseYaml, resolveLocation } from "../files/index.ts";
 import type { FileFetchOptions, YamlMapping } from "../files/index.ts";
 import { readModFormat } from "./mod_format.ts";
 import type { ModFormat, ModThemeSetting } from "./mod_format.ts";
+import { resolveModLibraries } from "./mod_libraries.ts";
+import type { LoadedLibrary } from "./mod_libraries.ts";
 import type { ModPermission } from "./mod_permissions.ts";
 import { resolveModReference } from "./mod_reference.ts";
 
@@ -26,6 +28,8 @@ export interface ModFile {
   config: YamlMapping;
   permissions: ModPermission[];
   theme: ModThemeSetting;
+  /** The declared libraries, with the address of each file. Their files are not fetched. */
+  libraries: LoadedLibrary[];
 }
 
 /** A mod file with the text of its entrypoint. */
@@ -36,6 +40,11 @@ export interface LoadedMod extends ModFile {
 export type ModLoadOptions = FileFetchOptions & {
   /** Absolute URL of the default mods folder, needed for default mod names. */
   defaultModsFolder?: string;
+  /**
+   * The address npm files are fetched from, ending in `/`, such as
+   * `https://cdn.jsdelivr.net/npm/`. Needed for mods that declare an npm library.
+   */
+  npmHost?: string;
 };
 
 function readDefaultBaseUrl(options: ModLoadOptions): string | undefined {
@@ -53,7 +62,11 @@ function resolveModPath(path: string | null, source: string): string | null {
   return url.href;
 }
 
-function buildModFile(source: string, modFormat: ModFormat): ModFile {
+function buildModFile(
+  source: string,
+  modFormat: ModFormat,
+  npmHost: string | undefined,
+): ModFile {
   const modFile: ModFile = {
     source,
     name: modFormat.name,
@@ -68,6 +81,7 @@ function buildModFile(source: string, modFormat: ModFormat): ModFile {
     config: modFormat.config,
     permissions: modFormat.permissions,
     theme: modFormat.theme,
+    libraries: resolveModLibraries(modFormat.libraries, source, npmHost),
   };
   return modFile;
 }
@@ -75,7 +89,9 @@ function buildModFile(source: string, modFormat: ModFormat): ModFile {
 /**
  * Loads a mod file from a mod reference (a default mod name, a folder or the
  * file itself) without fetching its entrypoint, its tile type, its sample
- * collection or its test file. Raises `FileFetchError`, `YamlParseError` or `ModFormatError`.
+ * collection, its test file or its library files. Raises `FileFetchError`,
+ * `YamlParseError` or `ModFormatError`, and an `Error` for a mod that declares
+ * an npm library when `options` has no `npmHost`.
  */
 export async function loadModFile(
   reference: string,
@@ -87,7 +103,7 @@ export async function loadModFile(
   });
   const fetchedFile = await fetchFile(source, options);
   const modFormat = readModFormat(parseYaml(fetchedFile));
-  const modFile = buildModFile(fetchedFile.source, modFormat);
+  const modFile = buildModFile(fetchedFile.source, modFormat, options.npmHost);
   return modFile;
 }
 

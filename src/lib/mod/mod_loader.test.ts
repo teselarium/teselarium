@@ -30,6 +30,8 @@ const MISSING_MOD_SOURCE = "https://example.org/mods/missing/mod_conf.yaml";
 const CLOCK_MOD_SOURCE = "https://example.org/mods/clock/mod_conf.yaml";
 const CLOCK_ENTRYPOINT = "https://example.org/mods/clock/main.js";
 const CLOCK_TEST_SOURCE = "https://example.org/mods/clock/test.js";
+const PROBE_MOD_SOURCE = "https://example.org/mods/probe/mod_conf.yaml";
+const TEST_NPM_HOST = "https://npm.example.net/npm/";
 
 const MINIMAL_MOD_TEXT = [
   "mod:",
@@ -44,6 +46,19 @@ const CLOCK_MOD_TEXT = [
   '  name: "clock"',
   '  version: "0.1.0"',
   '  entrypoint: "./main.js"',
+].join("\n");
+
+const PROBE_MOD_TEXT = [
+  "mod:",
+  '  name: "probe"',
+  '  version: "0.1.0"',
+  '  entrypoint: "./main.js"',
+  "  libraries:",
+  "    leaflet:",
+  '      npm: "leaflet@1.9.4"',
+  '      files: ["dist/leaflet.js", "dist/leaflet.css"]',
+  "    helper:",
+  '      files: ["./vendor/helper.js", "../shared/world.json"]',
 ].join("\n");
 
 afterEach(function clearTestTexts(): void {
@@ -358,6 +373,106 @@ describe("loadMod", function describeLoadMod(): void {
   });
 });
 
+describe("loadModFile libraries", function describeLoadLibraries(): void {
+  it("No libraries key", async function loadsNoLibraries(): Promise<void> {
+    testTexts.set(BROKEN_MOD_SOURCE, MINIMAL_MOD_TEXT);
+
+    const mod = await loadModFile(BROKEN_MOD_SOURCE, { fetch: fetchTestFile });
+
+    expect(mod.libraries).toEqual([]);
+  });
+
+  it("npm file", async function resolvesNpmFile(): Promise<void> {
+    testTexts.set(PROBE_MOD_SOURCE, PROBE_MOD_TEXT);
+
+    const mod = await loadModFile(PROBE_MOD_SOURCE, {
+      fetch: fetchTestFile,
+      npmHost: TEST_NPM_HOST,
+    });
+
+    expect(mod.libraries[0]).toEqual({
+      name: "leaflet",
+      package: "leaflet",
+      version: "1.9.4",
+      files: [
+        {
+          path: "dist/leaflet.js",
+          source: `${TEST_NPM_HOST}leaflet@1.9.4/dist/leaflet.js`,
+          kind: "script",
+        },
+        {
+          path: "dist/leaflet.css",
+          source: `${TEST_NPM_HOST}leaflet@1.9.4/dist/leaflet.css`,
+          kind: "style",
+        },
+      ],
+    });
+  });
+
+  it("File next to the mod", async function resolvesLocalFile(): Promise<void> {
+    testTexts.set(PROBE_MOD_SOURCE, PROBE_MOD_TEXT);
+
+    const mod = await loadModFile(PROBE_MOD_SOURCE, {
+      fetch: fetchTestFile,
+      npmHost: TEST_NPM_HOST,
+    });
+
+    expect(mod.libraries[1]).toEqual({
+      name: "helper",
+      package: null,
+      version: null,
+      files: [
+        {
+          path: "./vendor/helper.js",
+          source: "https://example.org/mods/probe/vendor/helper.js",
+          kind: "script",
+        },
+        {
+          path: "../shared/world.json",
+          source: "https://example.org/mods/shared/world.json",
+          kind: "data",
+        },
+      ],
+    });
+  });
+
+  it("does not request any library file", async function skipsLibraryFiles(): Promise<void> {
+    testTexts.set(PROBE_MOD_SOURCE, PROBE_MOD_TEXT);
+    const testFetch = createTestFetch();
+
+    await loadModFile(PROBE_MOD_SOURCE, {
+      fetch: testFetch,
+      npmHost: TEST_NPM_HOST,
+    });
+
+    expect(listRequestedUrls(testFetch)).toEqual([PROBE_MOD_SOURCE]);
+  });
+
+  it("refuses an npm library without an npm host", async function rejectsNoNpmHost(): Promise<void> {
+    testTexts.set(PROBE_MOD_SOURCE, PROBE_MOD_TEXT);
+
+    const error = await catchLoadError(
+      loadModFile(PROBE_MOD_SOURCE, { fetch: fetchTestFile }),
+    );
+
+    expect((error as Error).message).toBe(
+      `Cannot resolve the npm library "leaflet" of the mod "${PROBE_MOD_SOURCE}": no npm host was given`,
+    );
+  });
+
+  it("Structured clone of the libraries", async function clonesLibraries(): Promise<void> {
+    testTexts.set(PROBE_MOD_SOURCE, PROBE_MOD_TEXT);
+
+    const mod = await loadModFile(PROBE_MOD_SOURCE, {
+      fetch: fetchTestFile,
+      npmHost: TEST_NPM_HOST,
+    });
+
+    expect(mod.libraries).toHaveLength(2);
+    expect(structuredClone(mod.libraries)).toEqual(mod.libraries);
+  });
+});
+
 describe("loadModFile", function describeLoadModFile(): void {
   it("does not request the entrypoint", async function skipsEntrypoint(): Promise<void> {
     const testFetch = createTestFetch();
@@ -442,6 +557,7 @@ describe("mod module entry point", function describeEntryPoint(): void {
       "MOD_FILE_KEYS",
       "ModFormatError",
       "PERMISSION_CATEGORIES",
+      "SHIPPED_LIBRARY_NAMES",
       "loadMod",
       "loadModCode",
       "loadModFile",

@@ -1,9 +1,16 @@
 import type { FileFetchOptions } from "../../files/index.ts";
 import { loadModCode, loadModFile } from "../../mod/index.ts";
-import type { LoadedMod, ModFile } from "../../mod/index.ts";
+import type {
+  LoadedLibrary,
+  LoadedMod,
+  ModFile,
+  ModLoadOptions,
+} from "../../mod/index.ts";
 import { buildTileValidator, loadTileCollection } from "../../tile/index.ts";
 import type { TileIssue, TileValidator } from "../../tile/index.ts";
 import { describeEngineError } from "./engine_errors.ts";
+import { fetchLibraryFile, PAGE_LIBRARY_FILES } from "./library_files.ts";
+import type { LibraryFileCache } from "./library_files.ts";
 import {
   describeApiRangeMismatch,
   describeMissingApiRange,
@@ -75,7 +82,7 @@ function buildBundleWarning(source: string, message: string): ModCheckFinding {
 
 async function checkModFile(
   source: string,
-  options: FileFetchOptions,
+  options: ModLoadOptions,
 ): Promise<BundleStep<ModFile>> {
   try {
     const modFile = await loadModFile(source, options);
@@ -111,6 +118,43 @@ async function checkEntrypoint(
   } catch (error) {
     return buildFailedStep(error, modFile.entrypoint);
   }
+}
+
+/** One library file: no finding when it arrives, else an error whose source is the file. */
+async function checkLibraryFile(
+  libraryFiles: LibraryFileCache,
+  library: LoadedLibrary,
+  fileIndex: number,
+  options: ModLoadOptions,
+): Promise<ModCheckFinding[]> {
+  try {
+    await fetchLibraryFile(libraryFiles, library, fileIndex, options);
+    const noFindings: ModCheckFinding[] = [];
+    return noFindings;
+  } catch (error) {
+    const step = buildFailedStep(error, library.files[fileIndex].source);
+    return step.findings;
+  }
+}
+
+/**
+ * Fetches every file of the mod's declared libraries through `libraryFiles`,
+ * so the mount check's `libs.load` reuses them. The findings follow the
+ * order of the declarations.
+ */
+async function checkLibraryFiles(
+  modFile: ModFile,
+  libraryFiles: LibraryFileCache,
+  options: ModLoadOptions,
+): Promise<ModCheckFinding[]> {
+  const checks: Promise<ModCheckFinding[]>[] = [];
+  for (const library of modFile.libraries) {
+    for (let fileIndex = 0; fileIndex < library.files.length; fileIndex++) {
+      checks.push(checkLibraryFile(libraryFiles, library, fileIndex, options));
+    }
+  }
+  const fileFindings = await Promise.all(checks);
+  return fileFindings.flat();
 }
 
 /** Builds the tile validator of the mod's type. Without a type, the step passes with no validator. */
@@ -181,14 +225,16 @@ function buildBundleCheck(
 
 /**
  * Checks the files of the mod at `source` (a resolved mod file address):
- * the mod file, its `api` range, its entrypoint, its tile type and the
+ * the mod file, its `api` range, its entrypoint, the files of its declared
+ * libraries, fetched through `libraryFiles`, its tile type and the
  * collection at `collectionLocation`, or else the mod's sample collection.
  * Never throws for a file: each failing file is an error finding. Needs no DOM.
  */
 export async function checkModBundle(
   source: string,
   collectionLocation: string | null,
-  options: FileFetchOptions = {},
+  options: ModLoadOptions = {},
+  libraryFiles: LibraryFileCache = PAGE_LIBRARY_FILES,
 ): Promise<ModBundleCheck> {
   const modFileStep = await checkModFile(source, options);
   if (modFileStep.value === null) {
@@ -196,6 +242,11 @@ export async function checkModBundle(
   }
   const modFile = modFileStep.value;
   const entrypointStep = await checkEntrypoint(modFile, options);
+  const libraryFindings = await checkLibraryFiles(
+    modFile,
+    libraryFiles,
+    options,
+  );
   const tileTypeStep = await checkTileType(modFile, options);
   const collectionStep = await checkCollectionStep(
     collectionLocation ?? modFile.sampleCollection,
@@ -205,6 +256,7 @@ export async function checkModBundle(
   const findings = [
     ...checkApiRange(modFile),
     ...entrypointStep.findings,
+    ...libraryFindings,
     ...tileTypeStep.findings,
     ...collectionStep.findings,
   ];

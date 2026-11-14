@@ -1,6 +1,8 @@
 import { isYamlMapping } from "../files/index.ts";
 import type { ParsedYaml, YamlMapping, YamlValue } from "../files/index.ts";
 import { ModFormatError } from "./mod_errors.ts";
+import { readModLibraries } from "./mod_libraries.ts";
+import type { LibraryFormat } from "./mod_libraries.ts";
 import { readModPermissions } from "./mod_permissions.ts";
 import type { ModPermission } from "./mod_permissions.ts";
 import validRange from "semver/ranges/valid.js";
@@ -22,6 +24,7 @@ export const MOD_FILE_KEYS: readonly string[] = [
   "config",
   "permissions",
   "theme",
+  "libraries",
 ];
 
 /** The checked content of a mod file. Paths are not resolved yet. */
@@ -39,6 +42,8 @@ export interface ModFormat {
   config: YamlMapping;
   permissions: ModPermission[];
   theme: ModThemeSetting;
+  /** The declared libraries, in the order of the file. */
+  libraries: LibraryFormat[];
 }
 
 function readModMapping(parsedYaml: ParsedYaml): YamlMapping {
@@ -156,8 +161,8 @@ function checkNoInlineSchema(mod: YamlMapping, source: string): void {
  * string `name`, `version` and `entrypoint`, optional string `title` (defaults
  * to `name`) and `description` (defaults to `""`), an optional `api` semver
  * range, optional non-empty `type_path`, `sample_collection` and `test_path`, an optional
- * `config` mapping, optional `permissions` and an optional `theme`
- * (`"default"` or `"none"`). These keys are listed in `MOD_FILE_KEYS`. Other
+ * `config` mapping, optional `permissions`, an optional `theme`
+ * (`"default"` or `"none"`) and optional `libraries`. These keys are listed in `MOD_FILE_KEYS`. Other
  * keys are ignored, and an inline `schema` is rejected. Raises
  * `ModFormatError` at the first failure.
  */
@@ -188,6 +193,7 @@ export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
     config,
     permissions: readModPermissions(mod.permissions, source),
     theme: readModTheme(mod, source),
+    libraries: readModLibraries(mod.libraries, source),
   };
   return modFormat;
 }

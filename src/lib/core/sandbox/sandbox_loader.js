@@ -50,6 +50,19 @@ const MERMAID_SECURE_OPTION = "htmlLabels";
 // The prefix of the ids of a rendered body, which its `#…` links leave out.
 const HEADING_ID_PREFIX = "user-content-";
 
+// Where library stylesheets go: after the theme styles, or after the
+// `<meta>` elements of a mod without them. Read when the loader starts,
+// before the mod can add any stylesheet, so the mod's styles always follow
+// the libraries' and win at equal specificity.
+function findLibraryStyleAnchor() {
+  const themeStyle = document.head.querySelector("style");
+  if (themeStyle !== null) {
+    return themeStyle;
+  }
+  const metas = document.head.querySelectorAll("meta");
+  return metas.item(metas.length - 1);
+}
+
 const loader = {
   port: null,
   pendingReports: [],
@@ -63,6 +76,12 @@ const loader = {
   theme: null,
   // The libraries installed or being installed in this frame, by name and version.
   libraries: new Map(),
+  // The declared libraries installed or being installed in this frame, by
+  // name: `{ version, installing }`. Requests that name the same library
+  // share one install, whatever version spelling they use.
+  declaredLibraries: new Map(),
+  // The element the next library stylesheet goes after.
+  lastLibraryStyle: findLibraryStyleAnchor(),
   // The diagram state of each connected tile body element, redrawn on a theme change.
   tileBodies: new Set(),
 };
@@ -152,21 +171,73 @@ function forgetLibrary(libraryKey, error) {
   throw error;
 }
 
+// The install of a declared library this request names: absent, `null` or
+// the declared version all name it. Any other version goes to the engine,
+// which refuses it.
+function findDeclaredInstall(params) {
+  const declared = loader.declaredLibraries.get(params?.name);
+  if (declared === undefined) {
+    return undefined;
+  }
+  const version = params?.version;
+  if (
+    version === undefined ||
+    version === null ||
+    version === declared.version
+  ) {
+    return declared.installing;
+  }
+  return undefined;
+}
+
 // A frame receives a library once: a second request shares the first one's
 // promise. A failed request is forgotten, so a later one asks again.
 function requestLibrary(params) {
+  const declaredInstall = findDeclaredInstall(params);
+  if (declaredInstall !== undefined) {
+    return declaredInstall;
+  }
   const libraryKey = buildLibraryKey(params);
   const pendingLibrary = loader.libraries.get(libraryKey);
   if (pendingLibrary !== undefined) {
     return pendingLibrary;
   }
   const library = sendEngineRequest(LOAD_LIBRARY_METHOD, params)
-    .then(installLibrary)
+    .then(installLibraryAnswer)
     .catch(forgetLibrary.bind(undefined, libraryKey));
   loader.libraries.set(libraryKey, library);
   return library;
 }
 
+// A shipped library answers its `code`, a declared one its `files`.
+function installLibraryAnswer(result) {
+  if (Array.isArray(result?.files)) {
+    return installDeclaredLibraryOnce(result);
+  }
+  return installLibrary(result);
+}
+
+function forgetDeclaredLibrary(name, error) {
+  loader.declaredLibraries.delete(name);
+  throw error;
+}
+
+// Two requests sent before either was answered get one install: the second
+// answer shares the install of the first.
+function installDeclaredLibraryOnce(result) {
+  const declared = loader.declaredLibraries.get(result.name);
+  if (declared !== undefined) {
+    return declared.installing;
+  }
+  const installing = installDeclaredLibrary(result).catch(
+    forgetDeclaredLibrary.bind(undefined, result.name),
+  );
+  loader.declaredLibraries.set(result.name, {
+    version: result.version,
+    installing,
+  });
+  return installing;
+}
 // The script could not be loaded, or threw while it ran. Errors of other scripts are ignored.
 function rejectLibraryScript(installing, libraryName, codeUrl, event) {
   if (event instanceof ErrorEvent && event.filename !== codeUrl) {
@@ -205,16 +276,70 @@ function runClassicScript(codeUrl, libraryName) {
   );
 }
 
-// The mod receives the name and version, never the code.
-async function installLibrary(result) {
-  const codeBlob = new Blob([result.code], { type: "text/javascript" });
+async function installScriptText(code, libraryName) {
+  const codeBlob = new Blob([code], { type: "text/javascript" });
   const codeUrl = URL.createObjectURL(codeBlob);
   try {
-    await runClassicScript(codeUrl, result.name);
+    await runClassicScript(codeUrl, libraryName);
   } finally {
     URL.revokeObjectURL(codeUrl);
   }
+}
+
+// The mod receives the name and version, never the code.
+async function installLibrary(result) {
+  await installScriptText(result.code, result.name);
   const library = { name: result.name, version: result.version };
+  return library;
+}
+
+// After the theme styles and the stylesheets of earlier libraries, so the
+// libraries keep their order and every stylesheet the mod added follows them.
+function installStyleText(text) {
+  const style = document.createElement("style");
+  style.textContent = text;
+  if (loader.lastLibraryStyle?.isConnected === true) {
+    loader.lastLibraryStyle.after(style);
+  } else {
+    document.head.prepend(style);
+  }
+  loader.lastLibraryStyle = style;
+}
+
+function listFilesOfKind(files, kind) {
+  const filesOfKind = [];
+  for (const file of files) {
+    if (file.kind === kind) {
+      filesOfKind.push(file);
+    }
+  }
+  return filesOfKind;
+}
+
+// The data files as a mapping from path to text, with own properties only.
+function buildDataFiles(files) {
+  const entries = [];
+  for (const file of listFilesOfKind(files, "data")) {
+    entries.push([file.path, file.text]);
+  }
+  return Object.fromEntries(entries);
+}
+
+// The scripts in order, each run before the next, then the stylesheets.
+// The mod receives the name, the version and the data files, never the
+// text of a script or a stylesheet.
+async function installDeclaredLibrary(result) {
+  for (const file of listFilesOfKind(result.files, "script")) {
+    await installScriptText(file.text, result.name);
+  }
+  for (const file of listFilesOfKind(result.files, "style")) {
+    installStyleText(file.text);
+  }
+  const library = {
+    name: result.name,
+    version: result.version,
+    files: buildDataFiles(result.files),
+  };
   return library;
 }
 

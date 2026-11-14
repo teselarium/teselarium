@@ -1,5 +1,4 @@
-import type { FileFetchOptions } from "../../files/index.ts";
-import type { ModPermission } from "../../mod/index.ts";
+import type { ModLoadOptions, ModPermission } from "../../mod/index.ts";
 import { MOD_API_VERSION, resolveDefaultModSettings } from "../engine/index.ts";
 import type {
   AppAction,
@@ -112,6 +111,11 @@ export interface StageOptions {
   baseUrl: string;
   storage: ModStorage;
   fetch?: typeof globalThis.fetch;
+  /**
+   * The address the files of mods' npm libraries are fetched from, ending in
+   * `/`, such as `https://cdn.jsdelivr.net/npm/`. The instantiation chooses it.
+   */
+  npmHost: string;
   /** The color scheme the app starts with. */
   colorScheme: ColorScheme;
   /** Whether "Load media linked by tiles" is on as the app starts. */
@@ -224,7 +228,7 @@ export interface Stage {
   /** Where each section was left, for section navigation. */
   sections: SectionMemory;
   appOrigin: string;
-  fetchOptions: FileFetchOptions;
+  fetchOptions: ModLoadOptions;
   storage: ModStorage;
   /** The current theme: new sessions connect with it, and running ones are told when it changes. */
   theme: Theme;
@@ -561,7 +565,11 @@ export function createStage(options: StageOptions): Stage {
     routing: options.routing,
     sections: createSectionMemory(),
     appOrigin: options.appOrigin,
-    fetchOptions: { baseUrl: options.baseUrl, fetch: options.fetch },
+    fetchOptions: {
+      baseUrl: options.baseUrl,
+      fetch: options.fetch,
+      npmHost: options.npmHost,
+    },
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
     loadsTileLinkedMedia: options.loadsTileLinkedMedia,

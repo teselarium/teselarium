@@ -7,6 +7,7 @@ import { createStage, followHistory } from "./lib/core/stage/index.ts";
 import type { Stage } from "./lib/core/stage/index.ts";
 import { buildThemeTokenStyles } from "./lib/core/theme/index.ts";
 import { DEFAULT_MODS } from "./main/default_mods.ts";
+import { NPM_HOST } from "./main/library_host.ts";
 import { RegistryErrorScreen } from "./main/sections/RegistryErrorScreen.tsx";
 import {
   availableSections,
@@ -81,6 +82,7 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
     appOrigin: window.location.origin,
     baseUrl: document.baseURI,
     storage: window.localStorage,
+    npmHost: NPM_HOST,
     colorScheme: readStartColorScheme(window.localStorage, systemQuery),
     loadsTileLinkedMedia: readStartTileLinkedMedia(window.localStorage),
     theaterMode: readStartTheaterMode(window.localStorage),

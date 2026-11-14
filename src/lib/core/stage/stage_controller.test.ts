@@ -14,6 +14,8 @@ import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
   APP_ORIGIN,
   buildProbeDecision,
+  LEAFLET_SCRIPT_SOURCE,
+  LIBRARY_MOD_SOURCE,
   OTHER_API_MOD_SOURCE,
   OTHER_API_RANGE,
   PROBE_CONNECT_PERMISSION,
@@ -24,9 +26,11 @@ import {
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   SAMPLE_RUN_HASH,
+  serveLibraryMod,
   serveOtherApiMod,
   serveProbeMod,
   serveUntypedMod,
+  TEST_NPM_HOST,
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
@@ -133,6 +137,7 @@ function buildStage(
     routing,
     appOrigin: APP_ORIGIN,
     baseUrl: APP_BASE_URL,
+    npmHost: TEST_NPM_HOST,
     storage: createMemoryStorage(),
     fetch: fetchTestFile,
     colorScheme,
@@ -695,6 +700,24 @@ describe("active section", function describeActiveSection(): void {
     const stage = await startPageStage(history);
 
     expect(readStageSnapshot(stage).activeSection).toBe("mods");
+  });
+});
+
+describe("npm host", function describeNpmHost(): void {
+  it("resolves a launched mod's npm files on the stage's npm host", async function resolvesNpmFiles(): Promise<void> {
+    serveLibraryMod();
+    const history = new FakeHistory(
+      `#/run?mod=${encodeURIComponent(LIBRARY_MOD_SOURCE)}`,
+    );
+    const stage = buildStage(history, "light", PAGE_HOME_ROUTING);
+
+    await follow(stage, history.readNavigation());
+    const runtime = stage.runtimes.get(readVisible(stage).id);
+
+    expect(runtime?.status).toBe("running");
+    const libraries = runtime?.loadedMod?.libraries ?? [];
+    expect(libraries[0].files[0].source).toBe(LEAFLET_SCRIPT_SOURCE);
+    expect(LEAFLET_SCRIPT_SOURCE.startsWith(TEST_NPM_HOST)).toBe(true);
   });
 });
 

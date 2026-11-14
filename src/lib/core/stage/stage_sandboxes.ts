@@ -1,7 +1,11 @@
 import { resolveLocation } from "../../files/index.ts";
-import type { FileFetchOptions } from "../../files/index.ts";
 import { resolveModReference } from "../../mod/index.ts";
-import type { LoadedMod, ModIssue, ModPermission } from "../../mod/index.ts";
+import type {
+  LoadedMod,
+  ModIssue,
+  ModLoadOptions,
+  ModPermission,
+} from "../../mod/index.ts";
 import { describeNewTileLinks } from "../sandbox/index.ts";
 import type { TileIssue } from "../../tile/index.ts";
 import {
@@ -66,7 +70,7 @@ export interface SandboxServices {
   defaults: ResolvedDefaultModSettings;
   appOrigin: string;
   /** `baseUrl` is the app's address. */
-  fetchOptions: FileFetchOptions;
+  fetchOptions: ModLoadOptions;
   storage: ModStorage;
   /** Called when a runtime changed on its own, so the stage publishes a snapshot. */
   onChange: () => void;

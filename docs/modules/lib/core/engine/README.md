@@ -42,7 +42,7 @@ Data that is not a valid request but has a string or number `id` is answered wit
 | `-32601` | Unknown method. The message names the method. |
 | `-32602` | Wrong params. The message names the method and the problem. |
 | `-32000` | The browser storage failed. The message is the storage error's message. |
-| `-32001` | A mod file could not be loaded. The message is the load error's message. |
+| `-32001` | A mod file, or a file of a declared library, could not be loaded. The message is the load error's message, after `libs.load: ` for a library file (see [Libraries](#libraries)). |
 | `-32002` | Permission denied. The message says which permission is missing. |
 | `-32003` | The requested default mod is switched off. The message names the mod. |
 | `-32603` | An error the method did not expect, such as a tile body whose library cannot be loaded. The message is the method's name, `: ` and the error's message, as in `tiles.renderBody: Failed to fetch dynamically imported module: …`. |
@@ -68,7 +68,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `ui.notify` | `{ message, level?, source? }` | `null`, once the message is in the mod's stage bar (see [Telling the user something](#telling-the-user-something)). Added in mod API `0.1.8`. |
 | `tiles.renderBody` | `{ source }`, the `source` of one of the mod's tiles | `{ html }`: the tile's body rendered to safe HTML (see [Tile bodies](#tile-bodies)). Added in mod API `0.1.5`; formulas as MathML, highlighted code and emoji since `0.1.7`. |
 | `players.open` | `{ url }`, a player address of the mod's tiles | `true` once the player was shown and closed, `false` if the user cancelled (see [Players](#players)). Added in mod API `0.1.5`. |
-| `libs.load` | `{ name, version }`, a library the app ships and its major version, such as `{ name: "mermaid", version: "12" }` | `{ name, version }`, with the full version installed, once the library is ready in the mod's frame (see [Libraries](#libraries)). Added in mod API `0.1.6`. |
+| `libs.load` | `{ name, version }`, a library the app ships and its major version, such as `{ name: "mermaid", version: "12" }`, or `{ name, version? }`, a library the mod declares in its mod file, such as `{ name: "leaflet" }` | `{ name, version }`, with the full version installed, once the library is ready in the mod's frame; for a declared library, `{ name, version, files }`, with the declared version or `null` and the data files' texts by path (see [Libraries](#libraries)). Added in mod API `0.1.6`, declared libraries in `0.1.10`. |
 
 | Event | Params |
 |---|---|
@@ -95,7 +95,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.9"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.10"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -162,11 +162,11 @@ Before any file is requested, the engine checks:
 
 Then:
 
-- `mods.inspect` loads the mod file, without its entrypoint, and answers `source`, `name`, `title`, `version`, `description`, `api` (the mod's `api` range as written, or `null` when it declares none), `apiCompatible` (`true` when the range matches the mod API version, `false` when it does not, `null` without a range), `typeSource`, `sampleCollection`, `testSource` (the resolved address of the mod's test file, or `null` when it declares none; the test file is not requested), `config` and `permissions` (the `granted` and `denied` lists that mod would get if it were opened without being asked: for a mod from another origin, what the user allowed and remembered). Inspecting a mod for another API asks the user nothing. A load failure is `-32001` with the load error's message.
+- `mods.inspect` loads the mod file, without its entrypoint, and answers `source`, `name`, `title`, `version`, `description`, `api` (the mod's `api` range as written, or `null` when it declares none), `apiCompatible` (`true` when the range matches the mod API version, `false` when it does not, `null` without a range), `typeSource`, `sampleCollection`, `testSource` (the resolved address of the mod's test file, or `null` when it declares none; the test file is not requested), `config`, `libraries` (the mod's declared libraries, each `{ name, package, version, files }` with every file's `path`, `source` and `kind`; no library file is requested; added in mod API `0.1.10`) and `permissions` (the `granted` and `denied` lists that mod would get if it were opened without being asked: for a mod from another origin, what the user allowed and remembered). Inspecting a mod for another API asks the user nothing. A load failure is `-32001` with the load error's message.
 - `mods.open` asks the stage to open the link in a new sandbox, with the requesting sandbox as its opener, and answers `null`. Only the visible mod can open mods: a hidden one gets `-32002` with `mods.open: only the visible mod can open mods`. The new mod's load failures belong to its own sandbox, not to the response.
 - `mods.check` asks the stage to check the mod without running it for the user, and answers the report once the check is done. `collection`, resolved against the app's address, gives the tiles to mount; without it, the mod's sample collection does, and a mod without one is mounted with no tiles. Only the visible mod can check mods: a hidden one gets `-32002` with `mods.check: only the visible mod can check mods`. A mod file that cannot be loaded is a report with status `"fail"`, not an error response. Checking a mod for another API asks the user nothing.
 
-The check has three steps. The bundle check loads the mod file, the entrypoint, the tile type and the collection, and validates the tiles (see [Mod check](#mod-check)). When it found no error, the mount check mounts the mod in a hidden frame, with the content policy and permissions it would get if it were opened, the tiles of its type and a throwaway storage slot, and records what happens until 1 second after `mount` finished (see the [stage module](../stage/README.md#mod-checks)). When the mod declares `test_path` and the mount check found no error either, the test step fetches the test file and runs each of its cases in a fresh hidden frame of its own (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). The report is plain data:
+The check has three steps. The bundle check loads the mod file, the entrypoint, the files of the declared libraries, the tile type and the collection, and validates the tiles (see [Mod check](#mod-check)). When it found no error, the mount check mounts the mod in a hidden frame, with the content policy and permissions it would get if it were opened, the tiles of its type and a throwaway storage slot, and records what happens until 1 second after `mount` finished (see the [stage module](../stage/README.md#mod-checks)). When the mod declares `test_path` and the mount check found no error either, the test step fetches the test file and runs each of its cases in a fresh hidden frame of its own (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). The report is plain data:
 
 ```json
 {
@@ -183,7 +183,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.9"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.10"
     }
   ]
 }
@@ -286,13 +286,15 @@ A mod rarely sends it itself: a click on a placeholder of a rendered body sends 
 
 ### Libraries
 
-Some libraries are too large for a mod to bundle, and loading them from another site needs the `code` permission. The app ships a vetted copy of them and installs one in the frame of a mod that asks, from the app's own host.
+`libs.load` installs a library in the frame of the mod that asks. It knows two kinds of libraries: the ones the app ships, and the ones the mod declares in its mod file.
+
+**Shipped libraries.** Some libraries are too large for a mod to bundle. The app ships a vetted copy of them and installs one in the frame of a mod that asks, from the app's own host.
 
 | Name | Major version | Global |
 |---|---|---|
 | `mermaid` | `12` | `globalThis.mermaid` |
 
-**`libs.load { name, version }`** installs the library `name` at the major version `version` in the mod's frame, and resolves with `{ name, version }`, where `version` is the full version installed, such as `"12.2.0"`, once the library is ready to use:
+`libs.load { name, version }` installs the shipped library `name` at the major version `version`, and resolves with `{ name, version }`, where `version` is the full version installed, such as `"12.2.0"`, once the library is ready to use:
 
 ```js
 const { version } = await engine.request("libs.load", {
@@ -302,13 +304,51 @@ const { version } = await engine.request("libs.load", {
 ```
 
 - `version` is a major version, as a string: `"12"`, not `"12.2"` nor `12`.
-- A library the app does not ship is `-32602` (`libs.load: the app has no library "katex" (it has mermaid)`), and so is another major version (`libs.load: the app has mermaid 12, not mermaid "11"`) or a `version` that is not a string. Nothing is installed.
-- A frame receives a library once: a second `libs.load` resolves with the same result and leaves the library's object as it was. A failed request is not kept, so a later one tries again.
-- The library runs only in the frame that asked, under its sandbox and content policy, not in the app's page nor in another mod's frame. It works in the frames of a check's tests too, and a case's `requests` record `{ name, version }`, never the code.
+- Another major version is `-32602` (`libs.load: the app has mermaid 12, not mermaid "11"`), and so is a `version` that is not a string. Nothing is installed.
 
-How it works: the engine's handler (`libs_methods.ts`) answers the library's code, and the frame loader installs it as a classic `<script>` from a `blob:` address, which the frame's policy allows, before it resolves the mod's request without the code. The app downloads a library on the first request in a page, not before, and keeps it for the page; a page that runs no mod asking for one never downloads it.
+**Declared libraries.** A mod lists the other libraries it uses under `libraries` in its mod file: npm packages at an exact version, or files next to the mod (see the [mod module](../../mod/README.md#library-declarations)):
 
-**Size.** Mermaid's single-file build is about 5.5 MB, 1.6 MB gzipped, in a chunk of its own, `assets/mermaid.min-<hash>.js`, which an instantiation serves with the rest of the build. The app's first load does not include it. Each frame that loads it pays its install, 0.2 to 0.6 s on a desktop, a first diagram slower than the next ones, up to about 0.25 s on a desktop and close to 1 s on a slower CPU, and its memory: two mods that draw diagrams each install their own copy.
+```yaml
+  libraries:
+    leaflet:
+      npm: "leaflet@1.9.4"
+      files: ["dist/leaflet.js", "dist/leaflet.css"]
+    world_atlas:
+      npm: "world-atlas@2.0.2"
+      files: ["countries-110m.json"]
+```
+
+`libs.load { name }` installs the declared library `name`, and resolves with `{ name, version, files }` once all of its files are installed:
+
+```js
+await engine.request("libs.load", { name: "leaflet" });
+// { name: "leaflet", version: "1.9.4", files: {} }, and globalThis.L is ready
+const { files } = await engine.request("libs.load", { name: "world_atlas" });
+const world = JSON.parse(files["countries-110m.json"]);
+```
+
+- Each file's kind follows its extension. `.js` files are installed as classic scripts, in the order of `files`, each one after the previous one ran, so a plugin can follow the library it extends. `.css` files are installed as stylesheets, after the scripts. Any other file is data: it is not installed, and `files` maps its path, as declared, to its text. The mod never receives the text of a script or a stylesheet.
+- A library's stylesheets go before every stylesheet the mod added, right after the theme styles (or after the `<meta>` elements with `theme: "none"`). At equal specificity, the mod's rules win over the library's, whatever the order in which the mod added its styles and loaded the library. A relative `url()` in a library stylesheet does not resolve, since the stylesheet is inline text.
+- `version` is the declared npm version, or `null` for files next to the mod. A request may leave `version` out, give `null` or give the declared version: all three name the same library and share one install. Any other version is `-32602` (`libs.load: the mod declares leaflet 1.9.4, not leaflet "1"`, or `libs.load: the library "helper" has no npm version, so "version" must be absent or null, not "1.0.0"`).
+- A mod only loads the libraries it declares: another mod's declarations do not count.
+- Declared libraries need no permission, add no line to the site consent dialog and leave the frame's content policy as it is: the app's page fetches the files, not the frame, from a host the instance chose and from a list fixed in the mod file. That works for mods from other origins too.
+- Only classic scripts are supported: a mod file that lists an `.mjs` file is rejected, and a `.js` file that is an ES module fails to install with `libs.load: the library "…" could not be installed: …`. Pick a package's UMD or IIFE build.
+
+**Where the files come from.** The app fetches an npm file from its [npm host](#npm-host), at `<npm host><package>@<version>/<path>`, which is `https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js` in the vanilla app, and a file next to the mod from its address resolved against the mod file. The app's page makes these requests, so the npm host sees the user's address and the names and versions of the packages, not the mod. A mod that must work offline, or on a network that blocks the npm host, declares files next to the mod instead.
+
+**Errors.** A name that is neither a library the app ships nor one the mod declares is `-32602`, as in `libs.load: the app has no library "katex" (it has mermaid), and the mod declares none of that name`, followed by ` (it declares leaflet, world_atlas)` when the mod declares some. When a file of a declared library cannot be fetched, the request is `-32001` and none of the library's files is installed. The message names the library, the file's address and the HTTP status or the network error, and ends with the host's answer when it is short plain text, as jsDelivr's 404 reasons are:
+
+```text
+libs.load: the library "leaflet" could not be loaded: Cannot load file "https://cdn.jsdelivr.net/npm/leaflet@9.9.9/dist/leaflet.js": HTTP 404 Not Found: Couldn't find the requested release version 9.9.9.
+```
+
+**Once per frame, once per page.** A frame receives a library once: a second `libs.load` resolves with the same result and leaves the library's globals as they were. A failed request is not kept, so a later one tries again. The app downloads a shipped library on the first request in a page, and fetches each declared file address on the first request for a library that lists it, never before: a mod that declares a library it never loads costs no request. It keeps what it fetched for the page, so two mods that declare the same files download them once, and each frame still installs its own copy. A file that failed is fetched again by the next request.
+
+The libraries run only in the frame that asked, under its sandbox and content policy, not in the app's page nor in another mod's frame. They work in the frames of a check's tests too, and a case's `requests` record what the mod received: `{ name, version }` for a shipped library, and `{ name, version, files }` with the data files for a declared one, never the code.
+
+How it works: the engine's handler (`libs_methods.ts`) answers a shipped library's code, or a declared library's files with their texts and kinds, once all of them arrived. The frame loader installs each script as a classic `<script>` from a `blob:` address and each stylesheet as a `<style>` element, which the frame's policy allows, before it resolves the mod's request.
+
+**Size.** Mermaid's single-file build is about 5.5 MB, 1.6 MB gzipped, in a chunk of its own, `assets/mermaid.min-<hash>.js`, which an instantiation serves with the rest of the build. The app's first load does not include it. Each frame that loads it pays its install, 0.2 to 0.6 s on a desktop, a first diagram slower than the next ones, up to about 0.25 s on a desktop and close to 1 s on a slower CPU, and its memory: two mods that draw diagrams each install their own copy. Data files travel to the frame as text and are recorded in test cases' `requests`, which suits files of a few hundred kilobytes.
 
 ### Default mod settings
 
@@ -322,6 +362,16 @@ export const DEFAULT_MODS: DefaultModSettings = {
 ```
 
 The folder is resolved against the app's address, and each switched-off name to the source of its mod file, so a switched-off mod is refused whatever reference names it.
+
+### npm host
+
+The app also has an npm host: the address it fetches the files of the npm libraries mods declare from (see [Libraries](#libraries)), as `<npm host><package>@<version>/<path>`. Like the default mod settings, it is the instantiation's choice, and the engine has no default of its own. The vanilla app (`src/main/library_host.ts`) uses jsDelivr:
+
+```ts
+export const NPM_HOST = "https://cdn.jsdelivr.net/npm/";
+```
+
+`main.tsx` passes it to the stage as `npmHost`, and the stage gives it to every mod load: opening a mod, `mods.inspect` and `mods.check`. An instantiation can point it at another npm CDN or at a mirror on its own network. The host must end in `/`, serve each file at that address and answer with `access-control-allow-origin`, since the app's page, not the mod's frame, fetches the files.
 
 ### The mod entrypoint: `mount(engine, context)`
 
@@ -436,7 +486,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.9` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.10` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -456,7 +506,7 @@ An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-lo
 
 ### Hosting note
 
-Mods run in `srcdoc` frames, which inherit the Content-Security-Policy of the page that embeds them. The app sends none on static hosts. A page that embeds OpenTesela with its own Content-Security-Policy must allow inline scripts in frames (`script-src 'unsafe-inline' blob:`), or no mod can start. The app also needs `unsafe-eval` to build tile validators (see the [tile module](../../tile/README.md)). A policy with `frame-src` (or `child-src`) must also allow the player sites, such as `https://www.youtube-nocookie.com https://player.vimeo.com https://w.soundcloud.com`, and the sites of the iframes tile bodies hold, or players stay blank.
+Mods run in `srcdoc` frames, which inherit the Content-Security-Policy of the page that embeds them. The app sends none on static hosts. A page that embeds OpenTesela with its own Content-Security-Policy must allow inline scripts in frames (`script-src 'unsafe-inline' blob:`), or no mod can start. The app also needs `unsafe-eval` to build tile validators (see the [tile module](../../tile/README.md)). A policy with `frame-src` (or `child-src`) must also allow the player sites, such as `https://www.youtube-nocookie.com https://player.vimeo.com https://w.soundcloud.com`, and the sites of the iframes tile bodies hold, or players stay blank. A policy with `connect-src` (or `default-src`) must also allow the [npm host](#npm-host), `https://cdn.jsdelivr.net` in the vanilla app, or `libs.load` fails for declared npm libraries.
 
 ## Module Details
 
@@ -527,8 +577,8 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.9"`, the app's mod API version.
-- `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.9` but not `0.2.0`.
+- `MOD_API_VERSION`: `"0.1.10"`, the app's mod API version.
+- `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.10` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
 - `describeApiRangeMismatch(range)`: the message of the bundle check's warning for a range that does not match, naming the range and `MOD_API_VERSION`. Used inside the engine, not exported by `index.ts`.
@@ -579,12 +629,13 @@ Implemented in `mod_tile_bodies.ts`, with the renderer of the [tile bodies modul
 
 The bundle check and the report of `mods.check`. Neither needs a DOM, so a Node script can import them.
 
-- `checkModBundle(source, collectionLocation, options?)`: checks the files of the mod at `source`, a resolved mod file address. `options` are `FileFetchOptions`. Returns a `ModBundleCheck`: `findings`, `mod` (the `LoadedMod`, or `null` when the mod file or the entrypoint failed) and `modTiles` (the `ModTiles` to mount, or `null` without a collection). It never throws for a file. The steps run in this order, and the findings follow it:
+- `checkModBundle(source, collectionLocation, options?, libraryFiles?)`: checks the files of the mod at `source`, a resolved mod file address. `options` are the mod module's `ModLoadOptions`, whose `npmHost` resolves the mod's npm files. `libraryFiles` is the cache the library files go through, by default the page's (`PAGE_LIBRARY_FILES`), so the mount check's `libs.load` reuses what the bundle check fetched. Returns a `ModBundleCheck`: `findings`, `mod` (the `LoadedMod`, or `null` when the mod file or the entrypoint failed) and `modTiles` (the `ModTiles` to mount, or `null` without a collection). It never throws for a file. The steps run in this order, and the findings follow it:
   1. The mod file (`loadModFile`). An error here ends the check, with this one finding.
   2. The `api` range (`matchModApiRange`): a missing range is a warning with the text of `describeMissingApiRange`, the warning the stage bar shows, and a range that does not match is a warning naming the range and `MOD_API_VERSION`. Both have the mod file as their source. So the range finding comes right after the mod file's, as in the stage bar.
   3. The entrypoint (`loadModCode`).
-  4. The tile type (`buildTileValidator`), when the mod has a `type_path`.
-  5. The collection: `collectionLocation`, or else the mod's `sampleCollection`, or none. It is loaded and its tiles are selected with `selectModTiles`. Each of its issues becomes a finding with the issue's level and source. When the tile type failed, the collection is not loaded, since it could not be validated.
+  4. The files of the declared libraries, each fetched through `libraryFiles`. Each file that cannot be fetched is an error whose source is the file's address, and whose message names the library and ends with the host's reason when it is short plain text, as `libs.load`'s does (see [Libraries](#libraries)): `the library "leaflet" could not be loaded: Cannot load file "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/missing.js": HTTP 404 Not Found: Couldn't find the requested file /dist/missing.js in leaflet.`
+  5. The tile type (`buildTileValidator`), when the mod has a `type_path`.
+  6. The collection: `collectionLocation`, or else the mod's `sampleCollection`, or none. It is loaded and its tiles are selected with `selectModTiles`. Each of its issues becomes a finding with the issue's level and source. When the tile type failed, the collection is not loaded, since it could not be validated.
 
   A file that cannot be loaded, or has the wrong format, is an error finding whose source is the error's `source` (the failing file) and whose message is the error's message.
 - `buildModCheckReport(source, findings, mountChecked, tests)`: the `ModCheckReport` of a check. `tests` is the list of `ModTestResult`, or `null` when the cases did not run, which gives `testsChecked` `false` and an empty `tests`. Its `status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none: it is read from the findings alone, which already hold an error for each failed case. The findings and the test results are copied.
@@ -599,6 +650,14 @@ const bundleCheck = await checkModBundle(source, null, { baseUrl: "https://examp
 const report = buildModCheckReport(source, bundleCheck.findings, false, null);
 // report.status === "pass" and report.testsChecked === false
 ```
+
+### Library files
+
+Implemented in `library_files.ts`, and used by `libs.load` and the bundle check, not exported by `index.ts`.
+
+- `fetchLibraryFiles(cache, library, options)`: fetches every file of a `LoadedLibrary` in parallel and resolves with `{ path, kind, text }` for each, in the order of the declaration, once all arrived. `fetchLibraryFile(cache, library, fileIndex, options)` fetches one. A failure rejects with a `LibraryFileError`, whose `source` is the file's address and whose message names the library.
+- Each file address is fetched once per `LibraryFileCache`: later requests share the first one's promise, and a failed fetch leaves the cache. `PAGE_LIBRARY_FILES` is the page's cache, shared by every mod's `libs.load` and by `mods.check`; tests pass their own from `createLibraryFileCache()`.
+- The files are fetched with the shared fetcher of the files module, whose messages stay as they are for other files. Only for library files, a failed answer whose `content-type` is `text/plain` and whose body is at most 200 characters adds that body after the fetcher's message.
 
 ### Request handlers
 
