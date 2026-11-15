@@ -13,7 +13,7 @@ The Settings section SHALL show, at `#/settings`, an Appearance group holding th
 - **WHEN** the vanilla app is opened at `#/settings`
 - **THEN** the page shows the Theme control, and switches labeled Tiles, Mods, Mosaics and Guides, all on
 - **AND** Home, Settings and About are listed as always shown, without a switch
-- **AND** Tiles and Mosaics say `Coming soon`
+- **AND** Mosaics says `Coming soon`, and Tiles does not
 - **AND** the Privacy group shows a switch labeled `Load media linked by tiles`, on
 - **AND** the Mod permissions group, after the Privacy group, says that no decision is remembered
 
@@ -25,8 +25,12 @@ Switching an optional section off SHALL remove its item from the sidebar at once
 - **THEN** the sidebar has no Guides item, and no frame was reloaded
 
 #### Scenario: Hide a coming-soon section
+- **WHEN** the user switches Mosaics off
+- **THEN** the sidebar has no Mosaics item
+
+#### Scenario: Hide Tiles
 - **WHEN** the user switches Tiles off
-- **THEN** the sidebar has no Tiles item
+- **THEN** the sidebar has no Tiles item, and `#/run?mod=collection_explorer` still runs the collection explorer
 
 #### Scenario: Show it again
 - **WHEN** the user switches Guides off and then on again
