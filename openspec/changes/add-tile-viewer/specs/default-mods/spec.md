@@ -106,9 +106,9 @@ Each tile of the collection viewer's list SHALL be a button named after its labe
 - **AND** the app's address is a run link with `mod=tile_viewer`, the tile's address as `tile` and the collection's source as `from`
 - **AND** the Tiles item is still the current one when the viewer was opened from Tiles
 
-#### Scenario: Tile viewer switched off
-- **WHEN** `tile_viewer` is switched off and the user selects a tile in the collection viewer
-- **THEN** the collection viewer stays visible and shows an error that names `tile_viewer`
+#### Scenario: Opening a tile fails
+- **WHEN** the user selects a tile in the collection viewer and its `mods.open` is answered with an error
+- **THEN** the collection viewer stays visible and shows the error's message
 
 ### Requirement: Tile viewer cases
 The tile viewer's cases SHALL cover the heading with and without `title`, the metadata with nested values, links and thumbnails, a file without metadata, the body, no tile, the place in a fixture collection with Previous and Next sending `mods.open` with `replace` `true`, a tile not in `from`, a `from` that cannot be inspected, and a click on a link to a tile sending `mods.open`.
@@ -135,7 +135,7 @@ Each tile of the collection viewer's list SHALL be labeled by the file name of i
 - **THEN** they are labeled `a/index.md` and `b/index.md`
 
 ### Requirement: Collection viewer cases
-The collection viewer's cases SHALL cover showing the name, description, source and tiles of the collection named by its `target` parameter, entry issues, labels of tiles that share a file name, the filter, a missing, empty or failing `target`, and selecting a tile: the case answers `mods.open` with `null`, and `requests` shows a `mods.open` for the mod in its config's `tile_viewer` with the tile's address as `tile` and the collection's source as `params.from`.
+The collection viewer's cases SHALL cover showing the name, description, source and tiles of the collection named by its `target` parameter, entry issues, labels of tiles that share a file name, the filter, a missing, empty or failing `target`, and selecting a tile: the case answers `mods.open` with `null`, and `requests` shows a `mods.open` for the mod in its config's `tile_viewer` with the tile's address as `tile` and the collection's source as `params.from`. They SHALL also cover selecting a tile whose `mods.open` is not answered, whose refusal the viewer shows.
 
 #### Scenario: Shared file names in a case
 - **WHEN** a case of the collection viewer mounts it with a fixture collection as `params.target` that lists two tiles named `index.md` in two folders
@@ -144,6 +144,10 @@ The collection viewer's cases SHALL cover showing the name, description, source 
 #### Scenario: Selecting a tile in a case
 - **WHEN** a case of the collection viewer mounts it with a fixture collection as `params.target`, answers `mods.open` with `null`, and selects the collection's first tile
 - **THEN** the case's `requests` holds a `mods.open` with `mod` `tile_viewer`, that tile's address as `tile` and `params.from` the collection's source
+
+#### Scenario: Refused open in a case
+- **WHEN** a case of the collection viewer mounts it with a fixture collection as `params.target` and selects a tile without answering `mods.open`
+- **THEN** the viewer still shows the collection, and its `role="status"` region holds the `-32002` refusal's message
 
 ### Requirement: Default mods show how to get the app's look
 The default mods SHALL get their look only from the theme: semantic HTML, the color scheme, and the `data-ot-variant` attribute. Their own styles SHALL set layout only (display, grid, flex, gaps, widths, alignment, overflow) and SHALL NOT set colors, borders, backgrounds, fonts, radii or shadows. No class or `style` attribute in them SHALL exist to change the look.

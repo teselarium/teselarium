@@ -69,7 +69,7 @@
   - `open` for `"*"` with a reason;
   - `config: { tile_viewer: "tile_viewer", collection_viewer: "collection_viewer" }`.
 
-  Add the `src/` modules of design.md, decision 5, with layout-only CSS. Write the pure modules (`tile_heading.ts`, `metadata_addresses.ts`) test-first through the cases of 3.2: title or file name, a decoded name, web, image and tile addresses with query and letter case. Verify that `npm run build` emits `dist/default_mods/tile_viewer/main.js` with no `import`.
+  Add the `src/` modules of design.md, decision 5, with layout-only CSS in which no rule that sets `display` matches a `[hidden]` element, and a `role="status"` region that stays empty until an error. Write the pure modules (`tile_heading.ts`, `metadata_addresses.ts`) test-first through the cases of 3.2: title or file name, a decoded name, web, image and tile addresses with query and letter case. Verify that `npm run build` emits `dist/default_mods/tile_viewer/main.js` with no `import`.
 - [ ] 3.2 Add `test/test.ts` and fixture tiles and a fixture collection in `default_mods/tile_viewer/fixtures/`, covering "Tile viewer cases":
   - the heading;
   - nested metadata, links and thumbnails (including a hidden thumbnail after an error);
@@ -99,13 +99,19 @@
 
 ## 4. Collection viewer opens tiles
 
-- [ ] 4.1 Make the label in the first cell of each row of the collection viewer's tile table a button that opens the tile viewer (design.md, decision 6), and add `config: { tile_viewer: "tile_viewer" }` to its `mod_conf.yaml`. Add a `role="status"` region for `mods.open` errors, apart from the tile count. Add the case "Selecting a tile in a case", and keep the filter cases passing with buttons. Verify that "Check mod" for `collection_viewer` passes.
+- [ ] 4.1 Make the label in the first cell of each row of the collection viewer's tile table a button that opens the tile viewer (design.md, decision 6), and add `config: { tile_viewer: "tile_viewer" }` to its `mod_conf.yaml`. Change its `open` reason to "Shows the collection you are viewing and opens the tiles you pick". Drop "Selecting it does nothing yet." from the comment of `buildTileRow` in `tile_list.ts`. Add a `role="status"` region for `mods.open` errors, apart from the tile count. Add the cases "Selecting a tile in a case" and "Refused open in a case", and keep the filter cases passing with buttons. Verify that "Check mod" for `collection_viewer` passes.
 - [ ] 4.2 Add the e2e tests in `e2e/default_mods.spec.ts`:
   - "Open a tile from the list" (the address carries `tile` and `from`, the viewer shows `1 of <n>`, and Tiles stays current);
   - "Open the collection" from the breadcrumb.
 
-  For "Tile viewer switched off", add `tile_viewer` to the switched-off list of `src/test/registries/explorer_off_mods.ts`, test it in the `e2e-explorer-off` project, check that the tests already there still pass, and update the comment in `e2e/app_servers.ts`. Verify with `npx playwright test e2e/default_mods.spec.ts`.
-- [ ] 4.3 Update `docs/modules/tiles/explorer/README.md`: the collection viewer's tiles now open the tile viewer with `from`, and its config. Verify that its links and config keys match `mod_conf.yaml`.
+  A refused open is covered by the case of 4.1, not here (design.md, decision 6), so `src/test/registries/explorer_off_mods.ts` is unchanged. Verify with `npx playwright test e2e/default_mods.spec.ts`.
+- [ ] 4.3 Update `docs/modules/tiles/explorer/README.md`:
+  - the collection viewer's tiles now open the tile viewer with `from`;
+  - its config and its new `open` reason;
+  - the introduction says that both mods use `mods.open`, and drops "Tiles do not open yet: the viewer lists a collection's tiles, and selecting one does nothing.";
+  - the viewer's list drops "and selecting a tile does nothing".
+
+  Verify that its links, config keys and reasons match `mod_conf.yaml`, and that `grep -n -i "does nothing\|do not open" docs/modules/tiles/explorer/README.md` finds nothing.
 
 ## 5. Release
 

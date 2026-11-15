@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md for the motivation. It builds on `add-collection-explorer` (`collections.inspect`, `collection_viewer`, mod API `0.1.11`), which is applied first. What the code does today:
+See proposal.md for the motivation. It builds on `add-collection-explorer` (`collections.inspect`, `collection_viewer`, mod API `0.1.11`), which is applied and archived in `openspec/changes/archive/2026-11-15-add-collection-explorer/`. References to its decisions below point to that design.md. What the code does today:
 
 - **Run links.** `src/lib/core/stage/run_links.ts`:
   - `readAppRoute` reads `mod`, `collection` and the other params into a `RunLink { mod, collection, params }`, treating `mod` and `collection` as reserved;
@@ -109,7 +109,7 @@ Alternative considered:
 | `tile_card.ts` | an `<article>` with the `<h1>`, the source in `<small>`, and the metadata |
 | `metadata_list.ts` | the recursive `<dl>`: mappings give a nested `<dl>`, lists a `<ul>`, strings a text node or a link, other scalars `String(value)` |
 | `metadata_addresses.ts` | pure: `isWebAddress`, `isImageAddress` (the extension list, on `URL.pathname`, lower-cased) and `isTileAddress` (`.md`) |
-| `metadata_link.ts` | `<a href data-ot-link>` holding the address. An image address also gets an `<img loading="lazy" decoding="async" alt="">` with an `error` listener that sets `hidden`. The thumbnail's size comes from layout-only CSS (`max-block-size`, `max-inline-size`). |
+| `metadata_link.ts` | `<a href data-ot-link>` holding the address. An image address also gets an `<img loading="lazy" decoding="async" alt="">` with an `error` listener that sets `hidden`. The thumbnail's size comes from layout-only CSS (`max-block-size`, `max-inline-size`). The mod's own rules are outside the theme's layer and win over its `[hidden]` rule, so no rule that sets `display` may match a hidden thumbnail (`add-collection-explorer`, decision 7). |
 | `tile_body.ts` | an `<ot-tile-body>` whose `tile` is the tile |
 | `collection_place.ts` | `collections.inspect(from)`, the tile's index in `tiles`, the breadcrumb `<nav aria-label="Collection">` with the name as a button and `<i> of <n>`, and Previous (outline) and Next (primary) |
 | `tile_links.ts` | one `click` listener on `document`: for `closest("a[data-ot-link]")` whose address is a tile address, it calls `preventDefault()` and sends `mods.open` |
@@ -119,7 +119,7 @@ How the viewer opens other views:
 - **The collection's name** sends `{ mod: config.collection_viewer, params: { target: from } }`.
 - **A link to a tile** sends `{ mod: config.tile_viewer, tile: href, params }`, where `params` holds `from` only when `href` is in the inspected `tiles`. Until the inspection settles, the link has no `from`.
 
-Errors are shown in a `role="status"` region, as the other default mods do. A failed `from` sends `ui.notify` with level `"warning"` and source `from`.
+Errors of `mods.open` are shown in a `role="status"` region, as the explorers do. It stays empty until an error, because the theme draws a non-empty `role="status"` as an alert box. So the position (`3 of 16`) is plain text, not that region. A failed `from` sends `ui.notify` with level `"warning"` and source `from`.
 
 The `.md` check is on the path only, so `https://example.org/a.md?raw=1` is a tile address and `https://example.org/readme.md.html` is not. The viewer has no tile type, so any text file opens: without frontmatter, the whole text is the body.
 
@@ -130,7 +130,9 @@ Alternatives considered:
 
 ### 6. Collection viewer rows become buttons
 
-`tile_list.ts` of `collection_viewer` draws the tiles as rows of a table in a card ("Tile" and "Address" columns, see `add-collection-explorer`, design.md, decision 7). The "Tile" cell of each row holds the label as a `<button type="button">` whose accessible name is the label, and the "Address" cell keeps the full address in muted text. Its click sends `{ mod: config.tile_viewer, tile: source, params: { from: inspection.source } }`. Errors, such as `-32003`, go to a `role="status"` region that the viewer adds for them, as the explorers have, and which draws nothing while it is empty. It is not the tile count under the filter, which stays an `aria-live` line. `mod_conf.yaml` gets `config: { tile_viewer: "tile_viewer" }`. The filter keeps hiding rows with `hidden`, so hidden buttons leave the tab order.
+`tile_list.ts` of `collection_viewer` draws the tiles as rows of a table in a card ("Tile" and "Address" columns, see `add-collection-explorer`, design.md, decision 7). The "Tile" cell of each row holds the label as a `<button type="button">` whose accessible name is the label, and the "Address" cell keeps the full address in muted text. Its click sends `{ mod: config.tile_viewer, tile: source, params: { from: inspection.source } }`. Errors, such as `-32003`, go to a `role="status"` region that the viewer adds for them, as the explorers have, and which draws nothing while it is empty. It is not the tile count under the filter, which stays an `aria-live` line. `mod_conf.yaml` gets `config: { tile_viewer: "tile_viewer" }`. The reason of its `open` permission, today "Shows the collection you are viewing", becomes "Shows the collection you are viewing and opens the tiles you pick", because `mods.open` is checked against `open` just as `collections.inspect` is. The filter keeps hiding rows with `hidden`, so hidden buttons leave the tab order.
+
+A refused open is covered by a case, not end to end. With no queued answer, a case's `mods.open` is refused with `-32002`, which the region shows. The `e2e-explorer-off` build can't test a switched-off tile viewer, because `add-collection-explorer` switched off `collection_viewer` there too. Switching off a default mod is already tested end to end by the collection explorer's "Viewer switched off". A build mode just for this would add a full build and server to every e2e run.
 
 ### 7. Mod API `0.1.12`
 
