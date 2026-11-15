@@ -6,6 +6,7 @@ import { buildTileBodies } from "../lib/core/engine/mod_tile_bodies.ts";
 import type {
   ModCheckRequest,
   ModMethodContext,
+  OpenLinkOutcome,
 } from "../lib/core/engine/mod_methods.ts";
 import type { SiteDecision } from "../lib/core/permissions/index.ts";
 import type { LoadedMod, ModPermission } from "../lib/mod/index.ts";
@@ -74,8 +75,8 @@ export function readNoSiteDecisions(): SiteDecision[] {
   return decisions;
 }
 
-function acceptOpenLink(): boolean {
-  return true;
+function acceptOpenLink(): OpenLinkOutcome {
+  return "opened";
 }
 
 function acceptAction(): Promise<boolean> {

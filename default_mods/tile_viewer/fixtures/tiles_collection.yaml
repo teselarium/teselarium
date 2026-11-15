@@ -1,0 +1,8 @@
+# The tile viewer's sample collection and the fixture its tests view (test/), so that the check's tiles are these and `tiles.renderBody` renders their bodies.
+collection:
+  name: "Viewer tiles"
+  description: "A fixture collection that the tile viewer's tests show."
+  tiles:
+    - path: "./tiles/kallocain.md"
+    - path: "./tiles/fahrenheit_451.md"
+    - path: "./tiles/reading_list.md"

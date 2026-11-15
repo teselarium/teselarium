@@ -10,6 +10,7 @@ import {
   buildSampleCoversDecision,
   COVER_BOOK_COLLECTION_SOURCE,
   COVER_BOOK_IMAGE_URL,
+  COVER_BOOK_TILE_SOURCE,
   FOUR_BOOKS_SOURCE,
   MISSING_MOD_REFERENCE,
   NO_COUNTRY_TILE_SOURCE,
@@ -37,7 +38,11 @@ import {
   testTexts,
 } from "../../../test/test_files.ts";
 import { launchTestMod } from "../../../test/test_launches.ts";
-import { FileFetchError, YamlParseError } from "../../files/index.ts";
+import {
+  FileFetchError,
+  MarkdownParseError,
+  YamlParseError,
+} from "../../files/index.ts";
 import { ModFormatError } from "../../mod/index.ts";
 import {
   buildTileValidator,
@@ -48,7 +53,7 @@ import {
 import type { Tile } from "../../tile/index.ts";
 import { grantModPermissions } from "../permissions/index.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
-import { ModSwitchedOffError } from "./engine_errors.ts";
+import { ModSwitchedOffError, RunLinkConflictError } from "./engine_errors.ts";
 import { MOD_API_VERSION } from "./mod_api_version.ts";
 import {
   buildSandboxDocument,
@@ -58,6 +63,7 @@ import {
   buildModLaunch,
   buildModTestDocument,
   loadModLaunchInputs,
+  loadModTile,
   loadModTiles,
   selectModTiles,
 } from "./mod_launch.ts";
@@ -181,9 +187,7 @@ describe("loadModLaunchInputs", function describeLoadModLaunchInputs(): void {
 
     expect(inputs.mod.source).toBe(SAMPLE_MOD_SOURCE);
     expect(inputs.link).toEqual(SAMPLE_LINK);
-    expect(readModTiles(inputs).collectionSource).toBe(
-      SAMPLE_COLLECTION_SOURCE,
-    );
+    expect(readModTiles(inputs).tilesSource).toBe(SAMPLE_COLLECTION_SOURCE);
     expect(listTileTypes(readModTiles(inputs).tiles)).toEqual([
       ["book"],
       ["book"],
@@ -332,6 +336,183 @@ describe("loadModLaunchInputs", function describeLoadModLaunchInputs(): void {
   });
 });
 
+const KALLOCAIN_TILE_SOURCE = SAMPLE_TILE_SOURCES[1];
+const KALLOCAIN_TILE_REFERENCE = `${FIXTURES_REFERENCE}tiles/books/kallocain.md`;
+const FOREIGN_TILE_SOURCE = "https://tiles.example.net/books/foreign.md";
+const FOREIGN_IMAGE_URL = "https://media.example.net/covers/foreign.jpg";
+
+function buildTileLink(mod: string, tile: string): RunLink {
+  const link: RunLink = { mod, collection: null, tile, params: {} };
+  return link;
+}
+
+function serveForeignTile(): void {
+  testTexts.set(
+    FOREIGN_TILE_SOURCE,
+    buildTypeText(['title: "Foreign"', `image: "${FOREIGN_IMAGE_URL}"`]),
+  );
+}
+
+describe("Links with a tile", function describeTileLinks(): void {
+  it("Mount context of a tile", async function loadsUntypedTile(): Promise<void> {
+    serveUntypedMod();
+    const testFetch = createTestFetch();
+
+    const inputs = await loadInputs(
+      buildTileLink(UNTYPED_MOD_SOURCE, KALLOCAIN_TILE_SOURCE),
+      testFetch,
+    );
+
+    const modTiles = readModTiles(inputs);
+    expect(modTiles.tilesSource).toBe(KALLOCAIN_TILE_SOURCE);
+    expect(modTiles.tiles).toHaveLength(1);
+    expect(modTiles.tiles[0].source).toBe(KALLOCAIN_TILE_SOURCE);
+    expect(modTiles.tiles[0].metadata.title).toBe("Kallocain");
+    expect(listTileTypes(modTiles.tiles)).toEqual([[]]);
+    expect(modTiles.issues).toEqual([]);
+    expect(listRequestedUrls(testFetch)).not.toContain(
+      SAMPLE_COLLECTION_SOURCE,
+    );
+  });
+
+  it("Relative tile location", async function resolvesTileLocation(): Promise<void> {
+    serveUntypedMod();
+
+    const inputs = await loadInputs(
+      buildTileLink(UNTYPED_MOD_SOURCE, KALLOCAIN_TILE_REFERENCE),
+    );
+
+    expect(readModTiles(inputs).tilesSource).toBe(KALLOCAIN_TILE_SOURCE);
+    expect(readModTiles(inputs).tiles[0].source).toBe(KALLOCAIN_TILE_SOURCE);
+  });
+
+  it("gives a tile of the mod's type with its type", async function givesTypedTile(): Promise<void> {
+    const inputs = await loadInputs(
+      buildTileLink(SAMPLE_MOD_REFERENCE, KALLOCAIN_TILE_SOURCE),
+    );
+
+    expect(listTileTypes(readModTiles(inputs).tiles)).toEqual([["book"]]);
+    expect(readModTiles(inputs).issues).toEqual([]);
+  });
+
+  it("Single tile of another type", async function leavesOutOtherTypeTile(): Promise<void> {
+    serveFourBooks();
+
+    const inputs = await loadInputs(
+      buildTileLink(SAMPLE_MOD_REFERENCE, NO_COUNTRY_TILE_SOURCE),
+    );
+
+    expect(readModTiles(inputs).tiles).toEqual([]);
+    expect(readModTiles(inputs).issues).toHaveLength(1);
+    expect(readModTiles(inputs).issues[0].level).toBe("warning");
+    expect(readModTiles(inputs).issues[0].source).toBe(NO_COUNTRY_TILE_SOURCE);
+  });
+
+  it("Missing tile", async function failsMissingTile(): Promise<void> {
+    serveUntypedMod();
+    const missingSource = `${FIXTURES_BASE_URL}tiles/books/missing.md`;
+
+    const launching = loadInputs(
+      buildTileLink(UNTYPED_MOD_SOURCE, missingSource),
+    );
+
+    await expect(launching).rejects.toThrow(FileFetchError);
+    await expect(launching).rejects.toThrow(
+      `Cannot load file "${missingSource}": HTTP 404`,
+    );
+    await expect(launching).rejects.toHaveProperty("source", missingSource);
+  });
+
+  it("Tile that cannot be parsed", async function failsUnparsedTile(): Promise<void> {
+    serveUntypedMod();
+    const brokenSource = `${FIXTURES_BASE_URL}tiles/books/broken.md`;
+    testTexts.set(brokenSource, "---\ntitle: [unclosed\n---\nBody\n");
+
+    const launching = loadInputs(
+      buildTileLink(UNTYPED_MOD_SOURCE, brokenSource),
+    );
+
+    await expect(launching).rejects.toThrow(MarkdownParseError);
+    await expect(launching).rejects.toHaveProperty("source", brokenSource);
+  });
+
+  it("resolves the relative paths of the tile", async function resolvesTilePaths(): Promise<void> {
+    serveCoverBook();
+
+    const inputs = await loadInputs(
+      buildTileLink(SAMPLE_MOD_REFERENCE, COVER_BOOK_TILE_SOURCE),
+    );
+
+    expect(readModTiles(inputs).tiles[0].metadata.image).toBe(
+      COVER_BOOK_IMAGE_URL,
+    );
+  });
+
+  it("Media of the tile", async function collectsTileMedia(): Promise<void> {
+    serveUntypedMod();
+    serveForeignTile();
+
+    const launch = await launchMod(
+      buildTileLink(UNTYPED_MOD_SOURCE, FOREIGN_TILE_SOURCE),
+    );
+
+    expect(launch.tilesSource).toBe(FOREIGN_TILE_SOURCE);
+    expect(launch.tilesKind).toBe("tile");
+    expect(launch.contentHosts).toContain("https://tiles.example.net");
+    expect(launch.tileLinks?.sources).toContain(FOREIGN_IMAGE_URL);
+    expect(readDirective(launch.policy, "img-src")).toContain(
+      FOREIGN_IMAGE_URL,
+    );
+  });
+
+  it("Both in a link", async function refusesConflictingLink(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const launching = loadInputs(
+      {
+        mod: SAMPLE_MOD_REFERENCE,
+        collection: SAMPLE_COLLECTION_REFERENCE,
+        tile: KALLOCAIN_TILE_REFERENCE,
+        params: {},
+      },
+      testFetch,
+    );
+
+    await expect(launching).rejects.toThrow(RunLinkConflictError);
+    await expect(launching).rejects.toThrow(
+      "A link cannot have both a collection and a tile.",
+    );
+    await expect(launching).rejects.toHaveProperty("source", SAMPLE_MOD_SOURCE);
+    expect(testFetch).not.toHaveBeenCalled();
+  });
+
+  it("gives the kind of a collection link and of a link without tiles", async function readsTilesKind(): Promise<void> {
+    const collectionLaunch = await launchMod(SAMPLE_LINK);
+    const noTilesLaunch = await launchMod({ ...SAMPLE_LINK, collection: null });
+
+    expect(collectionLaunch.tilesKind).toBe("collection");
+    expect(noTilesLaunch.tilesKind).toBeNull();
+    expect(noTilesLaunch.tilesSource).toBeNull();
+  });
+});
+
+describe("loadModTile", function describeLoadModTile(): void {
+  it("gives the same tile as the launch when called again", async function reloadsTile(): Promise<void> {
+    serveUntypedMod();
+    const launch = await launchMod(
+      buildTileLink(UNTYPED_MOD_SOURCE, KALLOCAIN_TILE_SOURCE),
+    );
+
+    const modTiles = await loadModTile(launch.mod, KALLOCAIN_TILE_SOURCE, {
+      baseUrl: APP_BASE_URL,
+      fetch: fetchTestFile,
+    });
+
+    expect(modTiles.tilesSource).toBe(KALLOCAIN_TILE_SOURCE);
+    expect(modTiles.tiles).toEqual(launch.context.tiles);
+  });
+});
+
 describe("buildModLaunch", function describeBuildModLaunch(): void {
   it("Sample mount context", async function buildsSampleContext(): Promise<void> {
     const launch = await launchMod(SAMPLE_LINK);
@@ -350,7 +531,7 @@ describe("buildModLaunch", function describeBuildModLaunch(): void {
       denied: [],
     });
     expect(launch.contentHosts).toEqual(["https://example.org"]);
-    expect(launch.collectionSource).toBe(SAMPLE_COLLECTION_SOURCE);
+    expect(launch.tilesSource).toBe(SAMPLE_COLLECTION_SOURCE);
     expect(launch.issues).toEqual([]);
   });
 
@@ -679,7 +860,7 @@ describe("loadModTiles", function describeLoadModTiles(): void {
     );
 
     expect(firstTiles).toEqual(secondTiles);
-    expect(firstTiles.collectionSource).toBe(SAMPLE_COLLECTION_SOURCE);
+    expect(firstTiles.tilesSource).toBe(SAMPLE_COLLECTION_SOURCE);
     expect(firstTiles.tiles).toEqual(launch.context.tiles);
     expect(firstTiles.issues).toEqual([]);
   });

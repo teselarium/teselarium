@@ -55,6 +55,8 @@ import type {
   FrameLayout,
   ModCheckReport,
   ModCheckRequest,
+  OpenLinkOptions,
+  OpenLinkOutcome,
   RunLink,
 } from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
@@ -169,7 +171,13 @@ interface SpiedServices {
   services: SandboxServices;
   siteDecisions: MemorySiteDecisions;
   onChange: Mock<() => void>;
-  onOpenLink: Mock<(openerId: string, link: RunLink) => boolean>;
+  onOpenLink: Mock<
+    (
+      openerId: string,
+      link: RunLink,
+      options: OpenLinkOptions,
+    ) => OpenLinkOutcome
+  >;
   onRequestAction: Mock<
     (sandboxId: string, action: AppAction) => Promise<boolean> | null
   >;
@@ -188,8 +196,15 @@ function buildServices(
   siteDecisions: MemorySiteDecisions = createMemorySiteDecisions(),
 ): SpiedServices {
   const onChange = vi.fn<() => void>();
-  const onOpenLink = vi.fn<(openerId: string, link: RunLink) => boolean>();
-  onOpenLink.mockReturnValue(true);
+  const onOpenLink =
+    vi.fn<
+      (
+        openerId: string,
+        link: RunLink,
+        options: OpenLinkOptions,
+      ) => OpenLinkOutcome
+    >();
+  onOpenLink.mockReturnValue("opened");
   const onRequestAction =
     vi.fn<(sandboxId: string, action: AppAction) => Promise<boolean> | null>();
   onRequestAction.mockResolvedValue(true);
@@ -234,6 +249,14 @@ function buildSandbox(mod: string, collection: string | null): StageSandbox {
     openerId: null,
     section: null,
     isHomeMod: false,
+  };
+  return sandbox;
+}
+
+function buildTileSandbox(mod: string, tile: string): StageSandbox {
+  const sandbox: StageSandbox = {
+    ...buildSandbox(mod, null),
+    link: { mod, collection: null, tile, params: {} },
   };
   return sandbox;
 }
@@ -321,7 +344,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
       text: "Loaded the collection: the mod received 3 tiles.",
     });
     expect(runtime.launch?.context.issues).toEqual([]);
-    expect(runtime.collectionLocation).toBe(SAMPLE_COLLECTION_SOURCE);
+    expect(runtime.tilesLocation).toBe(SAMPLE_COLLECTION_SOURCE);
   });
 
   it("No collection", async function notifiesNothingWithoutCollection(): Promise<void> {
@@ -333,7 +356,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
     );
 
     expect(readNotifications(runtime)).toEqual([]);
-    expect(runtime.collectionLocation).toBeNull();
+    expect(runtime.tilesLocation).toBeNull();
   });
 
   it("sends no info in the mount context's issues", async function keepsInfoFromMount(): Promise<void> {
@@ -435,7 +458,7 @@ describe("launchSandbox", function describeLaunchSandbox(): void {
 
     expect(runtime.status).toBe("failed");
     expect(runtime.loadedMod?.title).toBe("Book List");
-    expect(runtime.collectionLocation).toBe(MISSING_COLLECTION_SOURCE);
+    expect(runtime.tilesLocation).toBe(MISSING_COLLECTION_SOURCE);
     expect(readSandboxMessages(runtime)).toEqual([
       {
         id: 1,
@@ -945,11 +968,11 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
     });
     await waitForMessages();
 
-    expect(spied.onOpenLink).toHaveBeenCalledExactlyOnceWith("sandbox-1", {
-      mod: "mod_viewer",
-      collection: null,
-      params: {},
-    });
+    expect(spied.onOpenLink).toHaveBeenCalledExactlyOnceWith(
+      "sandbox-1",
+      { mod: "mod_viewer", collection: null, tile: null, params: {} },
+      { replace: false },
+    );
     expect(received).toEqual([{ jsonrpc: "2.0", id: 1, result: null }]);
   });
 
@@ -1140,6 +1163,66 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     ]);
   });
 
+  it("Reload a tile", async function reloadsTile(): Promise<void> {
+    serveUntypedMod();
+    testTexts.set(LINKED_TILE_SOURCE, buildTypeText(['title: "First"']));
+    const spied = buildServices();
+    const { runtime, received } = await startSandbox(
+      buildTileSandbox(UNTYPED_MOD_SOURCE, LINKED_TILE_SOURCE),
+      spied,
+    );
+    testTexts.set(LINKED_TILE_SOURCE, buildTypeText(['title: "Second"']));
+
+    await reloadSandboxTiles(runtime, spied.services);
+    await waitForMessages();
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      method: "tiles.changed",
+      params: {
+        tiles: [{ source: LINKED_TILE_SOURCE, metadata: { title: "Second" } }],
+        issues: [],
+      },
+    });
+    const notifications = readNotifications(runtime);
+    expect(notifications).toHaveLength(2);
+    expect(notifications[0]).toMatchObject({
+      producer: "app",
+      source: LINKED_TILE_SOURCE,
+      text: "Loaded the collection: the mod received 1 tile.",
+    });
+    expect(notifications[1]).toMatchObject({
+      producer: "app",
+      source: LINKED_TILE_SOURCE,
+      text: "Reloaded the tiles: the mod received 1 tile, with 0 collection issues.",
+    });
+  });
+
+  it("Tile reload failed", async function keepsTileOnFailure(): Promise<void> {
+    serveUntypedMod();
+    testTexts.set(LINKED_TILE_SOURCE, buildTypeText(['title: "First"']));
+    const spied = buildServices();
+    const { runtime, received } = await startSandbox(
+      buildTileSandbox(UNTYPED_MOD_SOURCE, LINKED_TILE_SOURCE),
+      spied,
+    );
+    testTexts.delete(LINKED_TILE_SOURCE);
+
+    await reloadSandboxTiles(runtime, spied.services);
+    await waitForMessages();
+
+    expect(received).toEqual([]);
+    expect(readNotifications(runtime)).toHaveLength(1);
+    expect(readIssues(runtime)).toEqual([
+      {
+        level: "error",
+        source: LINKED_TILE_SOURCE,
+        message: `Cannot load file "${LINKED_TILE_SOURCE}": HTTP 404 Not Found`,
+      },
+    ]);
+    expect(runtime.launch?.context.tiles[0].metadata.title).toBe("First");
+  });
+
   it("does nothing without a collection", async function skipsWithoutCollection(): Promise<void> {
     const spied = buildServices();
     const fetchSpy = vi.fn<typeof fetch>(fetchTestFile);
@@ -1152,7 +1235,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     await reloadSandboxTiles(runtime, spied.services);
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(runtime.launch?.collectionSource).toBeNull();
+    expect(runtime.launch?.tilesSource).toBeNull();
   });
 });
 

@@ -16,7 +16,7 @@ import {
   describeCancelledApiMismatch,
   loadLaunchMod,
   loadLaunchTiles,
-  loadModTiles,
+  loadModTilesOfKind,
   matchModApiRange,
   pushLayoutChanged,
   pushThemeChanged,
@@ -32,9 +32,12 @@ import type {
   ModLaunchInputs,
   ModSession,
   ModTiles,
+  OpenLinkOptions,
+  OpenLinkOutcome,
   ResolvedDefaultModSettings,
   RunLink,
   TileBodies,
+  TilesKind,
   UserNotification,
 } from "../engine/index.ts";
 import { grantModPermissions, listConsentLines } from "../permissions/index.ts";
@@ -74,7 +77,12 @@ export interface SandboxServices {
   storage: ModStorage;
   /** Called when a runtime changed on its own, so the stage publishes a snapshot. */
   onChange: () => void;
-  onOpenLink: (openerId: string, link: RunLink) => boolean;
+  /** Opens a link a sandbox's mod asked for (see the engine's `ModMethodContext.onOpenLink`). */
+  onOpenLink: (
+    openerId: string,
+    link: RunLink,
+    options: OpenLinkOptions,
+  ) => OpenLinkOutcome;
   /** Queues an action for the user. `null` when the sandbox is not the visible one. */
   onRequestAction: (
     sandboxId: string,
@@ -134,8 +142,11 @@ export interface SandboxRuntime {
    * reference as written when it cannot be resolved.
    */
   modReference: string;
-  /** The link's collection resolved against the app's address, as written when it cannot be resolved, or `null` without one. */
-  collectionLocation: string | null;
+  /**
+   * The link's collection or tile resolved against the app's address, as
+   * written when it cannot be resolved, or `null` without either.
+   */
+  tilesLocation: string | null;
   /** The issues of the mod file itself, such as a missing `api` range. */
   fileIssues: SandboxMessage[];
   /** The issues of the collection, replaced with new ids when the tiles are reloaded. */
@@ -205,15 +216,15 @@ function appendRuntimeMessage(
   runtime.messages.push(...takeRuntimeMessages(runtime, [content]));
 }
 
-/** The notification of a mod started with a collection, or `null` without one. */
+/** The notification of a mod started with a collection or a tile, or `null` without either. */
 function buildLoadedCollectionNotification(
   launch: ModLaunch,
 ): MessageContent | null {
-  if (launch.collectionSource === null) {
+  if (launch.tilesSource === null) {
     return null;
   }
   return buildAppNotification(
-    launch.collectionSource,
+    launch.tilesSource,
     describeLoadedCollection(launch.context.tiles.length),
   );
 }
@@ -489,19 +500,22 @@ function resolveLinkModReference(
   }
 }
 
-/** The link's collection resolved against the app's address, or as written when it cannot be resolved. */
-function resolveLinkCollection(
+/**
+ * The link's collection, or else its tile, resolved against the app's
+ * address, or as written when it cannot be resolved.
+ */
+function resolveLinkTiles(
   sandbox: StageSandbox,
   services: SandboxServices,
 ): string | null {
-  const collection = sandbox.link.collection;
-  if (collection === null) {
+  const location = sandbox.link.collection ?? sandbox.link.tile ?? null;
+  if (location === null) {
     return null;
   }
   try {
-    return resolveLocation(collection, services.fetchOptions.baseUrl).href;
+    return resolveLocation(location, services.fetchOptions.baseUrl).href;
   } catch {
-    return collection;
+    return location;
   }
 }
 
@@ -533,7 +547,7 @@ export function launchSandbox(
     launch: null,
     session: null,
     modReference: resolveLinkModReference(sandbox, services),
-    collectionLocation: resolveLinkCollection(sandbox, services),
+    tilesLocation: resolveLinkTiles(sandbox, services),
     fileIssues: [],
     collectionIssues: [],
     tileLinkIssues: [],
@@ -747,7 +761,7 @@ function readReloadedTileLinkIssues(
   launch: ModLaunch,
   modTiles: ModTiles,
   tileBodies: TileBodies,
-  collectionSource: string,
+  tilesSource: string,
 ): ModIssue[] | null {
   if (launch.tileLinks === null) {
     return null;
@@ -764,7 +778,7 @@ function readReloadedTileLinkIssues(
   );
   const issues: ModIssue[] = [];
   if (newSourceCount > 0) {
-    issues.push(describeNewTileLinks(newSourceCount, collectionSource));
+    issues.push(describeNewTileLinks(newSourceCount, tilesSource));
   }
   issues.push(...reloadedLinks.issues);
   return issues;
@@ -773,13 +787,15 @@ function readReloadedTileLinkIssues(
 async function readReloadedIssues(
   runtime: SandboxRuntime,
   launch: ModLaunch,
-  collectionSource: string,
+  tilesKind: TilesKind,
+  tilesSource: string,
   services: SandboxServices,
 ): Promise<ReloadedIssues> {
   try {
-    const modTiles = await loadModTiles(
+    const modTiles = await loadModTilesOfKind(
       launch.mod,
-      collectionSource,
+      tilesKind,
+      tilesSource,
       services.fetchOptions,
     );
     const tileBodies = buildTileBodies(modTiles.tiles);
@@ -798,14 +814,14 @@ async function readReloadedIssues(
         launch,
         modTiles,
         tileBodies,
-        collectionSource,
+        tilesSource,
       ),
     };
     return reloadedIssues;
   } catch (error) {
     const reloadIssue: TileIssue = {
       level: "error",
-      source: collectionSource,
+      source: tilesSource,
       message: describeError(error),
     };
     const failedIssues: ReloadedIssues = {
@@ -818,8 +834,8 @@ async function readReloadedIssues(
 }
 
 /**
- * Loads and validates the sandbox's collection again, pushes `tiles.changed`
- * to the running mod and replaces the collection issues. With tile links on,
+ * Loads and validates the sandbox's collection or tile again, pushes
+ * `tiles.changed` to the running mod and replaces the collection issues. With tile links on,
  * it also replaces the tile link issues with those of the reloaded tiles,
  * led by a notice when they link files the frame does not allow yet. A
  * collection that cannot be loaded becomes the only collection issue, and
@@ -831,13 +847,19 @@ export async function reloadSandboxTiles(
   services: SandboxServices,
 ): Promise<void> {
   const launch = runtime.launch;
-  if (launch === null || launch.collectionSource === null) {
+  if (
+    launch === null ||
+    launch.tilesKind === null ||
+    launch.tilesSource === null
+  ) {
     return;
   }
+  const tilesSource = launch.tilesSource;
   const issues = await readReloadedIssues(
     runtime,
     launch,
-    launch.collectionSource,
+    launch.tilesKind,
+    tilesSource,
     services,
   );
   if (runtime.status === "stopped") {
@@ -854,7 +876,7 @@ export async function reloadSandboxTiles(
     appendRuntimeMessage(
       runtime,
       buildAppNotification(
-        launch.collectionSource,
+        tilesSource,
         describeReloadedTiles(issues.tileCount, issues.collectionIssues.length),
       ),
     );

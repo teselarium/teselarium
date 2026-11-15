@@ -11,6 +11,18 @@ import type { RunLink } from "./mod_launch.ts";
 import type { TileBodies } from "./mod_tile_bodies.ts";
 import { INVALID_PARAMS, PERMISSION_DENIED } from "./mod_messages.ts";
 
+/** How the stage opens a link a mod asked for: in a new sandbox, or in place of the requester. */
+export interface OpenLinkOptions {
+  replace: boolean;
+}
+
+/**
+ * What came of a mod's request to open a link: opened, refused because the
+ * requester is not the visible sandbox, or refused because the requester is
+ * the Home mod at `#/`, which cannot be replaced.
+ */
+export type OpenLinkOutcome = "opened" | "not-visible" | "home-mod";
+
 /** What `mods.check` asks the stage: the resolved mod file and the collection as the request gave it. */
 export interface ModCheckRequest {
   source: string;
@@ -41,8 +53,11 @@ export interface ModMethodContext {
   tileBodies: TileBodies;
   /** The remembered site decisions, read when `mods.inspect` grants a mod's permissions. */
   readSiteDecisions: () => readonly SiteDecision[];
-  /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */
-  onOpenLink: (link: RunLink) => boolean;
+  /**
+   * Asks the stage to open a link, in a new sandbox or, with `replace`, in
+   * place of the requesting one. Gives what came of it.
+   */
+  onOpenLink: (link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome;
   /**
    * Asks the stage to show an action to the user. Resolves with the user's
    * answer, or is `null` when the sandbox is not the visible one.

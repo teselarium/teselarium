@@ -25,7 +25,12 @@ import { readNoSiteDecisions } from "../../../test/method_contexts.ts";
 import { launchTestMod } from "../../../test/test_launches.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModContext, ModLaunch, RunLink } from "./mod_launch.ts";
-import type { ModCheckRequest, UserNotification } from "./mod_methods.ts";
+import type {
+  ModCheckRequest,
+  OpenLinkOptions,
+  OpenLinkOutcome,
+  UserNotification,
+} from "./mod_methods.ts";
 import { buildTileBodies } from "./mod_tile_bodies.ts";
 import {
   connectModSession,
@@ -70,7 +75,9 @@ interface PlayedSession {
   modPort: MessagePort;
   received: unknown[];
   onIssue: Mock<(issue: ModIssue) => void>;
-  onOpenLink: Mock<(link: RunLink) => boolean>;
+  onOpenLink: Mock<
+    (link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome
+  >;
   onRequestAction: Mock<(action: AppAction) => Promise<boolean> | null>;
   launch: ModLaunch;
 }
@@ -126,8 +133,9 @@ async function playSession(
   };
   const fakeFrame = createFakeFrame();
   const onIssue = vi.fn<(issue: ModIssue) => void>();
-  const onOpenLink = vi.fn<(link: RunLink) => boolean>();
-  onOpenLink.mockReturnValue(true);
+  const onOpenLink =
+    vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>();
+  onOpenLink.mockReturnValue("opened");
   const onRequestAction =
     vi.fn<(action: AppAction) => Promise<boolean> | null>();
   onRequestAction.mockResolvedValue(true);
@@ -170,7 +178,8 @@ function buildPlainOptions(): ModSessionOptions {
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     readSiteDecisions: readNoSiteDecisions,
     onIssue: vi.fn<(issue: ModIssue) => void>(),
-    onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+    onOpenLink:
+      vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
     onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
     onCheckMod:
       vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
@@ -262,7 +271,8 @@ describe("connectModSession", function describeConnectModSession(): void {
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       readSiteDecisions: readNoSiteDecisions,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
-      onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      onOpenLink:
+        vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       onCheckMod:
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
@@ -298,7 +308,8 @@ describe("connectModSession", function describeConnectModSession(): void {
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       readSiteDecisions: readNoSiteDecisions,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
-      onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      onOpenLink:
+        vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       onCheckMod:
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
@@ -324,7 +335,8 @@ describe("connectModSession", function describeConnectModSession(): void {
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       readSiteDecisions: readNoSiteDecisions,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
-      onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+      onOpenLink:
+        vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
       onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
       onCheckMod:
         vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
@@ -387,11 +399,15 @@ describe("connectModSession", function describeConnectModSession(): void {
     });
     await waitForReceived(played, 1);
 
-    expect(played.onOpenLink).toHaveBeenCalledExactlyOnceWith({
-      mod: "mod_viewer",
-      collection: null,
-      params: { target: SAMPLE_MOD_SOURCE },
-    });
+    expect(played.onOpenLink).toHaveBeenCalledExactlyOnceWith(
+      {
+        mod: "mod_viewer",
+        collection: null,
+        tile: null,
+        params: { target: SAMPLE_MOD_SOURCE },
+      },
+      { replace: false },
+    );
     expect(played.received).toEqual([{ jsonrpc: "2.0", id: 3, result: null }]);
   });
 

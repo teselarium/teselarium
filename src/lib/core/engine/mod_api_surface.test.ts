@@ -19,7 +19,12 @@ import type { ModCheckReport } from "./mod_check_report.ts";
 import { readNoSiteDecisions } from "../../../test/method_contexts.ts";
 import { launchTestMod } from "../../../test/test_launches.ts";
 import type { RunLink } from "./mod_launch.ts";
-import type { ModCheckRequest, UserNotification } from "./mod_methods.ts";
+import type {
+  ModCheckRequest,
+  OpenLinkOptions,
+  OpenLinkOutcome,
+  UserNotification,
+} from "./mod_methods.ts";
 import {
   connectModSession,
   ENGINE_METHODS,
@@ -608,6 +613,57 @@ const SURFACE_BY_VERSION: Record<string, ModApiSurface> = {
     ],
     permissionCategories: ["code", "connect", "embed", "open", "show"],
   },
+  "0.1.12": {
+    methods: [
+      "collections.inspect",
+      "files.save",
+      "libs.load",
+      "links.open",
+      "mods.check",
+      "mods.inspect",
+      "mods.open",
+      "players.open",
+      "storage.get",
+      "storage.set",
+      "tiles.renderBody",
+      "ui.confirm",
+      "ui.notify",
+    ],
+    events: ["layout.changed", "theme.changed", "tiles.changed"],
+    contextKeys: [
+      "api",
+      "config",
+      "issues",
+      "layout",
+      "mod",
+      "params",
+      "permissions",
+      "theme",
+      "tiles",
+    ],
+    contextMappingKeys: {
+      mod: ["description", "name", "source", "title", "version"],
+      api: ["version"],
+      permissions: ["denied", "granted"],
+      theme: ["colorScheme", "tokens"],
+    },
+    modFileKeys: [
+      "api",
+      "config",
+      "description",
+      "entrypoint",
+      "libraries",
+      "name",
+      "permissions",
+      "sample_collection",
+      "test_path",
+      "theme",
+      "title",
+      "type_path",
+      "version",
+    ],
+    permissionCategories: ["code", "connect", "embed", "open", "show"],
+  },
 };
 
 const BUMP_RULE = `The mod API surface does not match the entry of MOD_API_VERSION (${MOD_API_VERSION}). Bump MOD_API_VERSION in mod_api_version.ts as "Mod API version" in docs/modules/lib/core/engine/README.md says (while it is 0.x, a breaking change bumps the minor version, an addition or a fix the patch version), and add an entry for the new version to SURFACE_BY_VERSION`;
@@ -641,7 +697,8 @@ async function readSampleMountContext(): Promise<Record<string, object>> {
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     readSiteDecisions: readNoSiteDecisions,
     onIssue: vi.fn<(issue: ModIssue) => void>(),
-    onOpenLink: vi.fn<(link: RunLink) => boolean>(),
+    onOpenLink:
+      vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
     onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
     onCheckMod:
       vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),

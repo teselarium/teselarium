@@ -36,7 +36,12 @@ import {
   MOD_SWITCHED_OFF,
   PERMISSION_DENIED,
 } from "./mod_messages.ts";
-import type { ModCheckRequest, ModMethodContext } from "./mod_methods.ts";
+import type {
+  ModCheckRequest,
+  ModMethodContext,
+  OpenLinkOptions,
+  OpenLinkOutcome,
+} from "./mod_methods.ts";
 import { MODS_METHODS } from "./mods_methods.ts";
 
 const VIEWER_TARGET = SAMPLE_MOD_SOURCE;
@@ -73,14 +78,18 @@ async function catchMethodError(
   throw new Error("Expected the request to fail, but it passed");
 }
 
-/** A context whose fetch and `onOpenLink` are spies. */
+type OpenLinkSpy = Mock<
+  (link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome
+>;
+
+/** A context whose fetch and `onOpenLink` are spies. `onOpenLink` gives `outcome`. */
 function buildSpiedContext(
   hosts: string[],
-  isVisible: boolean = true,
+  outcome: OpenLinkOutcome = "opened",
 ): {
   context: ModMethodContext;
   fetchSpy: Mock<typeof fetch>;
-  openLinkSpy: Mock<(link: RunLink) => boolean>;
+  openLinkSpy: OpenLinkSpy;
 } {
   const permissions = [];
   for (const host of hosts) {
@@ -88,8 +97,9 @@ function buildSpiedContext(
   }
   const context = buildMethodContext(permissions);
   const fetchSpy = vi.fn<typeof fetch>(fetchTestFile);
-  const openLinkSpy = vi.fn<(link: RunLink) => boolean>();
-  openLinkSpy.mockReturnValue(isVisible);
+  const openLinkSpy: OpenLinkSpy =
+    vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>();
+  openLinkSpy.mockReturnValue(outcome);
   context.fetchOptions = { baseUrl: APP_BASE_URL, fetch: fetchSpy };
   context.onOpenLink = openLinkSpy;
   const spiedContext = { context, fetchSpy, openLinkSpy };
@@ -344,23 +354,146 @@ describe("mods.open", function describeModsOpen(): void {
     });
 
     expect(result).toBeNull();
-    expect(openLinkSpy).toHaveBeenCalledExactlyOnceWith({
-      mod: "mod_viewer",
-      collection: SAMPLE_COLLECTION_REFERENCE,
-      params: { target: VIEWER_TARGET },
-    });
+    expect(openLinkSpy).toHaveBeenCalledExactlyOnceWith(
+      {
+        mod: "mod_viewer",
+        collection: SAMPLE_COLLECTION_REFERENCE,
+        tile: null,
+        params: { target: VIEWER_TARGET },
+      },
+      { replace: false },
+    );
   });
 
-  it("defaults the collection to null and the params to {}", async function defaultsLink(): Promise<void> {
+  it("defaults the collection and the tile to null, the params to {} and replace to false", async function defaultsLink(): Promise<void> {
     const { context, openLinkSpy } = buildSpiedContext(["*"]);
 
     await open(context, { mod: SAMPLE_MOD_REFERENCE });
 
-    expect(openLinkSpy).toHaveBeenCalledExactlyOnceWith({
-      mod: SAMPLE_MOD_REFERENCE,
-      collection: null,
-      params: {},
+    expect(openLinkSpy).toHaveBeenCalledExactlyOnceWith(
+      { mod: SAMPLE_MOD_REFERENCE, collection: null, tile: null, params: {} },
+      { replace: false },
+    );
+  });
+
+  it("Collection viewer opens a tile", async function opensTile(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["*"]);
+
+    const result = await open(context, {
+      mod: "tile_viewer",
+      tile: "https://example.org/fixtures/tiles/books/kallocain.md",
+      params: { from: SAMPLE_COLLECTION_SOURCE },
     });
+
+    expect(result).toBeNull();
+    expect(openLinkSpy).toHaveBeenCalledExactlyOnceWith(
+      {
+        mod: "tile_viewer",
+        collection: null,
+        tile: "https://example.org/fixtures/tiles/books/kallocain.md",
+        params: { from: SAMPLE_COLLECTION_SOURCE },
+      },
+      { replace: false },
+    );
+  });
+
+  it("passes replace to onOpenLink", async function passesReplace(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["*"]);
+
+    await open(context, { mod: "tile_viewer", tile: "./a.md", replace: true });
+
+    expect(openLinkSpy).toHaveBeenCalledExactlyOnceWith(
+      { mod: "tile_viewer", collection: null, tile: "./a.md", params: {} },
+      { replace: true },
+    );
+  });
+
+  it("accepts an explicit null tile and replace false", async function acceptsNullTile(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["*"]);
+
+    await open(context, { mod: "mod_viewer", tile: null, replace: false });
+
+    expect(openLinkSpy.mock.calls[0][0].tile).toBeNull();
+    expect(openLinkSpy.mock.calls[0][1]).toEqual({ replace: false });
+  });
+
+  it("Collection and tile", async function rejectsCollectionAndTile(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["*"]);
+
+    const error = await catchMethodError(
+      open(context, {
+        mod: "tile_viewer",
+        collection: SAMPLE_COLLECTION_REFERENCE,
+        tile: "./a.md",
+      }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'mods.open: a link cannot have both "collection" and "tile"',
+    );
+    expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+
+  it("Reserved parameter", async function rejectsReservedParams(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["*"]);
+
+    for (const name of ["mod", "collection", "tile"]) {
+      const error = await catchMethodError(
+        open(context, { mod: "tile_viewer", params: { [name]: "./a.md" } }),
+      );
+
+      expect(error.code).toBe(INVALID_PARAMS);
+      expect(error.message).toBe(`mods.open: "params.${name}" is reserved`);
+    }
+    expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+
+  it("Replace that is not a boolean", async function rejectsReplaceText(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["*"]);
+
+    const error = await catchMethodError(
+      open(context, { mod: "tile_viewer", replace: "yes" }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe('mods.open: "replace" must be a boolean');
+    expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty tile", async function rejectsEmptyTile(): Promise<void> {
+    const { context } = buildSpiedContext(["*"]);
+
+    const error = await catchMethodError(
+      open(context, { mod: "tile_viewer", tile: "" }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'mods.open: "tile" must be null or a non-empty string',
+    );
+  });
+
+  it("Home mod cannot be replaced", async function refusesHomeMod(): Promise<void> {
+    const { context } = buildSpiedContext(["*"], "home-mod");
+
+    const error = await catchMethodError(
+      open(context, { mod: "tile_viewer", replace: true }),
+    );
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toBe("mods.open: the home mod cannot be replaced");
+  });
+
+  it("Hidden mod cannot replace itself", async function refusesHiddenReplace(): Promise<void> {
+    const { context } = buildSpiedContext(["*"], "not-visible");
+
+    const error = await catchMethodError(
+      open(context, { mod: "tile_viewer", replace: true }),
+    );
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toBe("mods.open: only the visible mod can open mods");
   });
 
   it("accepts an explicit null collection", async function acceptsNullCollection(): Promise<void> {
@@ -427,7 +560,7 @@ describe("mods.open", function describeModsOpen(): void {
   });
 
   it("Hidden mod tries to open a mod", async function refusesHiddenMod(): Promise<void> {
-    const { context } = buildSpiedContext(["*"], false);
+    const { context } = buildSpiedContext(["*"], "not-visible");
 
     const error = await catchMethodError(open(context, { mod: "mod_viewer" }));
 

@@ -205,6 +205,29 @@ showCollection(inspection.name, inspection.description, inspection.tiles);
 
 The location is resolved against the app's address. A collection that cannot be loaded answers `-32001` with the load error's message, and one whose site the mod's `open` does not cover answers `-32002`, before anything is requested.
 
+## Opening a tile
+
+A mod opens another mod with `mods.open`, which needs the same `open` permission. With `tile`, the location of one tile file, the opened mod receives that tile as `context.tiles`, loaded and validated before its frame starts, with its media allowed as for the tiles of a collection (see [Inspecting and opening mods](modules/lib/core/engine/README.md#inspecting-and-opening-mods) in the engine's README). A link has a collection or a tile, not both, and `mod`, `collection` and `tile` cannot be passed in `params`:
+
+```js
+await engine.request("mods.open", {
+  mod: context.config.tile_viewer,
+  tile: inspection.tiles[0],
+  params: { from: inspection.source },
+});
+```
+
+With `replace: true`, the opened mod takes the place of the requesting one in the same history entry, so stepping through tiles does not pile up entries or frames. The requesting mod is stopped and gets no answer, so it sends this last. The Home mod at `#/` cannot be replaced:
+
+```js
+await engine.request("mods.open", {
+  mod: context.config.tile_viewer,
+  tile: nextTile,
+  params: { from },
+  replace: true,
+});
+```
+
 ## Libraries
 
 `libs.load` installs a library in the mod's frame, without the mod bundling it or loading code from another site (see [Libraries](modules/lib/core/engine/README.md#libraries) in the engine's README). There are two kinds: the libraries the app ships, and the ones the mod declares in its `mod_conf.yaml`.

@@ -6,7 +6,9 @@ mod:
   description: "Shows a tile collection's name, description, entry issues and tiles, without loading them."
   entrypoint: "./main.js"
   test_path: "./test.js"
+  config:
+    tile_viewer: "tile_viewer"
   permissions:
     open:
       - host: "*"
-        reason: "Shows the collection you are viewing"
+        reason: "Shows the collection you are viewing and opens the tiles you pick"

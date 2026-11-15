@@ -140,11 +140,15 @@ function haveSameParams(
   return true;
 }
 
-/** Whether two links are the same: same mod reference, collection and params. */
+/**
+ * Whether two links are the same: same mod reference, collection, tile and
+ * params. An absent tile is the same as a `null` one.
+ */
 export function areSameLinks(first: RunLink, second: RunLink): boolean {
   return (
     first.mod === second.mod &&
     first.collection === second.collection &&
+    (first.tile ?? null) === (second.tile ?? null) &&
     haveSameParams(first.params, second.params)
   );
 }

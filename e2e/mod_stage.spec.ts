@@ -13,10 +13,15 @@ import {
   followLink,
   FOREIGN_HOST,
   isFrameMarked,
+  LINKED_COVER_URL,
+  LINKED_TILE_URL,
   markFrame,
+  MEDIA_HOST,
   readMessages,
+  routeImages,
   serveAppOriginMod,
   serveForeignMod,
+  serveLinkedTiles,
   showImage,
   stageBar,
   visibleSandbox,
@@ -24,6 +29,7 @@ import {
 } from "./mod_routes.ts";
 import {
   buildNoteCollection,
+  buildNoteTile,
   buildTypedProbeFiles,
   MISSING_TEST_MOD_FILE_PATH,
   MISSING_TEST_MOD_REFERENCE,
@@ -45,6 +51,12 @@ const VIEWER_LINK = "#/run?mod=mod_viewer";
 const EXPLORER_LINK = "#/run?mod=mod_explorer";
 /** `#/run?mod=./test-mods/probe/`: the probe's run link, as a hash to follow. */
 const PROBE_HASH = PROBE_LINK.slice(1);
+
+/** `./test-mods/tiles/items/second.md`: the second item of the tiles mod, as a run link names it. */
+const SECOND_ITEM_REFERENCE = "./test-mods/tiles/items/second.md";
+
+/** The tiles mod opened with its second item as the link's `tile`. */
+const TILES_TILE_RUN_HASH = `${TILES_RUN_HASH}&tile=${SECOND_ITEM_REFERENCE}`;
 
 /** `#/run?mod=./test-mods/other/`: the run link of a second probe, `other`. */
 const OTHER_PROBE_HASH = "#/run?mod=./test-mods/other/";
@@ -123,6 +135,78 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
 
     await expect(stageBar(page)).toContainText(TILES_TITLE);
     await expectModInfo(page, source);
+  });
+});
+
+test.describe("Open a single tile", function describeSingleTile(): void {
+  test("Link with a tile", async function opensWithTile({
+    page,
+  }): Promise<void> {
+    const requestedUrls = collectRequestedUrls(page);
+    await serveTilesMod(page);
+
+    await page.goto(`/${TILES_TILE_RUN_HASH}`);
+
+    const frame = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
+    await expect(frame.getByRole("listitem")).toHaveText(["Second item"]);
+    for (const url of requestedUrls) {
+      expect(url).not.toContain("item_collection.yaml");
+    }
+  });
+
+  test("Media of the tile", async function loadsTileMedia({
+    page,
+  }): Promise<void> {
+    await serveLinkedTiles(page, [`image: "${LINKED_COVER_URL}"`]);
+    const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+    await serveAppOriginMod(page, buildProbeFiles("probe"));
+    await page.goto(
+      `${PROBE_LINK}&tile=${encodeURIComponent(LINKED_TILE_URL)}`,
+    );
+    const frame = await findModFrame(page, "probe");
+    await waitForProbe(frame);
+
+    expect(await frame.evaluate(showImage, LINKED_COVER_URL)).toBe(true);
+    expect(seenUrls).toEqual([LINKED_COVER_URL]);
+    await expectNoIssues(page);
+  });
+
+  test("Shared tile link after a reload", async function opensSharedTileLink({
+    page,
+    context,
+  }): Promise<void> {
+    await serveTilesMod(page);
+    await page.goto(`/${TILES_TILE_RUN_HASH}`);
+    const frame = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
+    await expect(frame.getByRole("listitem")).toHaveText(["Second item"]);
+    const sharedLink = page.url();
+
+    const newPage = await context.newPage();
+    await serveTilesMod(newPage);
+    await newPage.goto(sharedLink);
+
+    const newFrame = newPage.frameLocator(`iframe[title="${TILES_TITLE}"]`);
+    await expect(newFrame.getByRole("listitem")).toHaveText(["Second item"]);
+  });
+});
+
+test.describe("A link has a collection or a tile", function describeConflict(): void {
+  test("Both in a link", async function refusesBoth({ page }): Promise<void> {
+    const requestedUrls = collectRequestedUrls(page);
+    await serveTilesMod(page);
+
+    await page.goto(
+      `/${TILES_COLLECTION_RUN_HASH}&tile=${SECOND_ITEM_REFERENCE}`,
+    );
+
+    await expect(page.getByRole("alert")).toContainText(
+      "A link cannot have both a collection and a tile.",
+    );
+    await expect(page.locator("iframe")).toHaveCount(0);
+    for (const url of requestedUrls) {
+      expect(url).not.toContain("item_collection.yaml");
+      expect(url).not.toContain("second.md");
+    }
   });
 });
 
@@ -413,6 +497,23 @@ test.describe("Show load failures", function describeLoadFailures(): void {
     expect(errors[0].source).toBe(missingSource);
     expect(errors[0].text).toContain("404");
   });
+
+  test("Missing tile", async function showsMissingTile({
+    page,
+  }): Promise<void> {
+    await serveTilesMod(page);
+    await page.goto(
+      `/${TILES_RUN_HASH}&tile=./test-mods/tiles/items/missing.md`,
+    );
+    const missingSource = new URL(
+      "/test-mods/tiles/items/missing.md",
+      page.url(),
+    ).href;
+
+    await expect(page.getByRole("alert")).toContainText(missingSource);
+    await expect(page.getByRole("alert")).toContainText("404");
+    await expect(page.locator("iframe")).toHaveCount(0);
+  });
 });
 
 interface ChangedTilesGlobal {
@@ -461,6 +562,24 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
     await expect
       .poll(frame.evaluate.bind(frame, readChangedTitles))
       .toEqual([["First note", "Second note"]]);
+    expect(await isFrameMarked(frame)).toBe(true);
+  });
+
+  test("Reload a tile", async function reloadsTile({ page }): Promise<void> {
+    const files = buildTypedProbeFiles();
+    await serveAppOriginMod(page, files);
+    await page.goto(`${PROBE_LINK}&tile=./test-mods/first.md`);
+    const frame = await findModFrame(page, "probe");
+    await waitForProbe(frame);
+    await markFrame(frame);
+    await frame.evaluate(recordChangedTiles);
+    files["first.md"] = buildNoteTile("Changed note");
+
+    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+
+    await expect
+      .poll(frame.evaluate.bind(frame, readChangedTitles))
+      .toEqual([["Changed note"]]);
     expect(await isFrameMarked(frame)).toBe(true);
   });
 });

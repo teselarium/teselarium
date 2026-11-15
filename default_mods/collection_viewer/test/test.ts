@@ -23,6 +23,7 @@ import {
   keepsFilterNarrow,
   keepsOwnStylesToLayout,
 } from "./look_cases.ts";
+import { opensSelectedTile, showsRefusedOpen } from "./open_cases.ts";
 import {
   clearsFilter,
   filtersTiles,
@@ -62,6 +63,8 @@ export default function registerViewerTests(t: ModTestRegistration): void {
   t.test("labels its filter field", labelsFilterField);
   t.test("filters the tiles and says how many are shown", filtersTiles);
   t.test("shows every tile once the filter is empty", clearsFilter);
+  t.test("opens the selected tile in the tile viewer", opensSelectedTile);
+  t.test("shows a refused open", showsRefusedOpen);
   t.test("says no collection was given without a target", saysNoTarget);
   t.test("says no collection was given for an empty target", saysEmptyTarget);
   t.test(

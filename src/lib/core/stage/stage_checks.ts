@@ -18,6 +18,7 @@ import type {
   ModSession,
   ModSessionOptions,
   ModTestResult,
+  OpenLinkOutcome,
   ResolvedDefaultModSettings,
   ResponseError,
   RunLink,
@@ -343,9 +344,9 @@ function cancelCheckedAction(
 }
 
 /** `mods.open` of a checked mod: refused, so the handler answers `-32002`. */
-function refuseCheckedOpen(check: StageCheck): boolean {
+function refuseCheckedOpen(check: StageCheck): OpenLinkOutcome {
   addMountFinding(check, "warning", describeRefusedRequest("mods.open"));
-  return false;
+  return "not-visible";
 }
 
 /** `mods.check` of a checked mod: refused, so the handler answers `-32002`. */

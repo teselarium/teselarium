@@ -56,6 +56,8 @@ import type {
   ModCheckRequest,
   ModMethodContext,
   ModMethodTable,
+  OpenLinkOptions,
+  OpenLinkOutcome,
   UserNotification,
 } from "./mod_methods.ts";
 import type { TileBodies } from "./mod_tile_bodies.ts";
@@ -75,8 +77,8 @@ export interface ModSessionOptions {
   /** The remembered site decisions, read by `mods.inspect`. */
   readSiteDecisions: () => readonly SiteDecision[];
   onIssue: (issue: ModIssue) => void;
-  /** Asks the stage to open a link. `false` when the sandbox is not the visible one. */
-  onOpenLink: (link: RunLink) => boolean;
+  /** Asks the stage to open a link (see `ModMethodContext.onOpenLink`). */
+  onOpenLink: (link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome;
   /**
    * Asks the stage to show an action to the user. Resolves with the user's
    * answer, or is `null` when the sandbox is not the visible one.

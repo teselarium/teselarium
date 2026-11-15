@@ -386,3 +386,48 @@ export function closeStageSandbox(
   };
   return buildClosingChange(openerState, null, id);
 }
+
+/**
+ * Replaces the visible sandbox, `requesterId`, with a new sandbox for
+ * `opening`: the new sandbox gets the requester's opener and the current
+ * entry's section, the current entry points to it at the same position, and
+ * the requester is closed. No entry is added and forward entries are kept.
+ * Other entries that pointed to the requester stay, and are restored when
+ * visited. Throws when the requester is not the visible sandbox.
+ */
+export function replaceStageEntry(
+  state: StageState,
+  opening: SandboxOpening,
+  requesterId: string,
+): StageChange {
+  const visibleEntry = readVisibleEntry(state);
+  const requester = readVisibleSandbox(state);
+  if (visibleEntry === null || requester?.id !== requesterId) {
+    throw new Error(
+      `Cannot replace sandbox "${requesterId}": the visible sandbox is "${requester?.id ?? "none"}".`,
+    );
+  }
+  const replacingOpening: SandboxOpening = {
+    ...opening,
+    openerId: requester.openerId,
+  };
+  const sandbox = buildSandbox(state, replacingOpening, visibleEntry.section);
+  const entry: StageEntry = {
+    position: state.position,
+    view: buildSandboxView(sandbox),
+    section: visibleEntry.section,
+  };
+  const remainingState = removeSandbox(state, requesterId);
+  const replacedState: StageState = {
+    sandboxes: [...remainingState.sandboxes, sandbox],
+    entries: placeEntry(remainingState.entries, entry),
+    position: state.position,
+    nextNumber: state.nextNumber + 1,
+  };
+  const change: StageChange = {
+    state: replacedState,
+    opened: sandbox,
+    closedIds: [requesterId],
+  };
+  return change;
+}

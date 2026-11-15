@@ -123,7 +123,7 @@ describe("Check a mod", function describeCheckMod(): void {
     );
 
     expect(bundleCheck.findings).toEqual([]);
-    expect(bundleCheck.modTiles?.collectionSource).toBe(TWO_BOOKS_SOURCE);
+    expect(bundleCheck.modTiles?.tilesSource).toBe(TWO_BOOKS_SOURCE);
     expect(listTileSources(bundleCheck)).toEqual([
       SAMPLE_TILE_SOURCES[1],
       SAMPLE_TILE_SOURCES[2],
@@ -175,9 +175,7 @@ describe("Bundle check", function describeBundleCheck(): void {
 
     expect(bundleCheck.findings).toEqual([]);
     expect(bundleCheck.mod?.entrypoint).toBe(SAMPLE_ENTRYPOINT);
-    expect(bundleCheck.modTiles?.collectionSource).toBe(
-      SAMPLE_COLLECTION_SOURCE,
-    );
+    expect(bundleCheck.modTiles?.tilesSource).toBe(SAMPLE_COLLECTION_SOURCE);
     expect(listTileSources(bundleCheck)).toEqual(SAMPLE_TILE_SOURCES);
   });
 

@@ -4,6 +4,7 @@ import type {
   ModCheckFinding,
   ModSessionOptions,
   ModTestResult,
+  OpenLinkOutcome,
   ResponseError,
 } from "../engine/index.ts";
 import type { AnswerMethod, SandboxTestReport } from "../sandbox/index.ts";
@@ -86,8 +87,8 @@ export function buildTestFileError(
   return finding;
 }
 
-function refuseCheckOpen(): boolean {
-  return false;
+function refuseCheckOpen(): OpenLinkOutcome {
+  return "not-visible";
 }
 
 function refuseCheckRequest(): null {
@@ -222,8 +223,10 @@ function answerCaseAction(
  * `mods.open` of a case: `true` with a queued answer, so the handler answers
  * `null` and nothing opens, and `false` without one, so it answers `-32002`.
  */
-function answerCaseOpen(checkCase: CheckCase): boolean {
-  return takeCaseAnswer(checkCase, "mods.open") !== undefined;
+/** A case's `mods.open`: opened when the case queued an answer, otherwise refused as from a hidden mod. */
+function answerCaseOpen(checkCase: CheckCase): OpenLinkOutcome {
+  const isAnswered = takeCaseAnswer(checkCase, "mods.open") !== undefined;
+  return isAnswered ? "opened" : "not-visible";
 }
 
 function readCaseReport(

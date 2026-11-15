@@ -17,7 +17,7 @@ import {
   LOAD_FAILED,
   PERMISSION_DENIED,
 } from "./mod_messages.ts";
-import type { ModMethodContext } from "./mod_methods.ts";
+import type { ModMethodContext, OpenLinkOutcome } from "./mod_methods.ts";
 
 const SAMPLE_COLLECTION_REFERENCE = "./fixtures/tiles/books_collection.yaml";
 const SAMPLE_COLLECTION_SOURCE = `${FIXTURES_BASE_URL}tiles/books_collection.yaml`;
@@ -67,8 +67,8 @@ function returnNotVisible(): null {
   return null;
 }
 
-function refuseOpenLink(): boolean {
-  return false;
+function refuseOpenLink(): OpenLinkOutcome {
+  return "not-visible";
 }
 
 describe("collections.inspect", function describeCollectionsInspect(): void {

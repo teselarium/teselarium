@@ -22,11 +22,15 @@ A run link's address hash is:
 
 ```
 #/run?mod=<reference>&collection=<location>&<params>
+#/run?mod=<reference>&tile=<location>&<params>
 ```
 
 - `mod` is a mod reference (see the [mod module](../../mod/README.md)): a default mod name such as `mod_viewer`, a folder or a mod file.
-- `collection` is the optional location of a collection file. Without it, the mod gets no tiles.
-- Every other parameter is passed to the mod as `context.params`, in link order, with the first value of a repeated key.
+- `collection` is the optional location of a collection file.
+- `tile` is the optional location of one tile file. The mod gets it as the tiles of a collection holding only that tile, validated with the mod's tile type as a collection's tiles are, and no collection file is requested. A tile opens the same way whether collections list it or not.
+- Without a `collection` or a `tile`, the mod gets no tiles. An empty `collection` or `tile` is the same as none.
+- A link has a collection or a tile, not both. A link with both opens a sandbox that shows `A link cannot have both a collection and a tile.`, requests no file and starts no frame (`RunLinkConflictError`, see [Messages and load failures](#messages-and-load-failures)).
+- Every other parameter is passed to the mod as `context.params`, in link order, with the first value of a repeated key. `mod`, `collection` and `tile` are reserved: they are never in `params`.
 - Values are percent-encoded, and relative ones are resolved against the app's address when the mod is launched. So a link means the same in the address bar, in a `mods.open` request and after a reload, also under a sub-path such as GitHub Pages' `/<repo>/`.
 
 Examples, for an app at `https://example.org/`:
@@ -38,9 +42,10 @@ Examples, for an app at `https://example.org/`:
 | `#/run?mod=mod_explorer` | the mod explorer |
 | `#/run?mod=./samples/mods/book_list&collection=./samples/mods/book_list/book_collection.yaml` | the sample mod with the sample books |
 | `#/run?mod=./samples/mods/book_list` | the sample mod without tiles |
+| `#/run?mod=./samples/mods/book_list&tile=./samples/mods/book_list/books/kallocain.md` | the sample mod with the one book `kallocain.md` |
 | `#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml` | the mod viewer, showing the sample mod |
 
-Mods never build these addresses. A mod sends `mods.open` with `{ mod, collection, params }`, and the stage turns it into the run link.
+`buildRunLink` writes `mod`, then `collection` and `tile` when present, then the params. Mods never build these addresses. A mod sends `mods.open` with `{ mod, collection, tile, params, replace }`, and the stage turns it into the run link.
 
 ### Sandboxes and their ids
 
@@ -50,7 +55,7 @@ Each sandbox records its link, its hash, its section, whether it is the Home mod
 
 ### What is visible
 
-Opening a link, whether the user followed it or a mod asked for it, creates a new sandbox and hides the visible one without stopping it. Showing a page hides the visible sandbox the same way. At most one sandbox is visible, and none while a page is shown. Only the visible mod can open mods or ask the user for an action: a mod hidden behind a page can do neither.
+Opening a link, whether the user followed it or a mod asked for it, creates a new sandbox and hides the visible one without stopping it, unless the mod asked to replace itself (see [Replacing a sandbox](#replacing-a-sandbox)). Showing a page hides the visible sandbox the same way. At most one sandbox is visible, and none while a page is shown. Only the visible mod can open mods or ask the user for an action: a mod hidden behind a page can do neither.
 
 ### History entries and positions
 
@@ -58,7 +63,7 @@ Each entry points to a view: a sandbox, or a page of a page section. Pages and s
 
 - **First load, a typed address, or a link followed in the page**: the entry has no stage state. Its page is shown, or its link opens in a new sandbox, at the next position, and the entry is replaced with the position and section in its state, and with the canonical address (`#/` for Home). On the very first load the position is `0`.
 - **Back and forward**: the entry has a position. When its view is a page, or a sandbox that is still open, it is shown again, the sandbox in the state it was left in. Otherwise (after a reload, or when its sandbox was closed) the address's page is shown, or its link opens in a new sandbox that takes the entry, with the stored section.
-- **`mods.open`**: a new sandbox at the next position, in the opener's section, with a pushed entry whose address is the run link.
+- **`mods.open`**: a new sandbox at the next position, in the opener's section, with a pushed entry whose address is the run link. With `replace`, the new sandbox takes the current entry instead, whose address becomes the run link (see below).
 - **A section** (`openStageSection`): a pushed entry, see below.
 
 ### Opening after going back
@@ -71,7 +76,7 @@ Every entry belongs to one section or to none, and the snapshot's `activeSection
 
 - A section opened with `openStageSection` sets it.
 - `mods.open` copies the opener's section, so a viewer opened by the explorer stays in Mods.
-- A typed address or a followed link: a page belongs to its section, the Home mod to the Home section, and a run link to the first section whose mod link it exactly equals (same `mod`, `collection` and params), or to none. `#/run?mod=mod_explorer` is in Mods; `#/run?mod=./samples/mods/book_list` is in no section.
+- A typed address or a followed link: a page belongs to its section, the Home mod to the Home section, and a run link to the first section whose mod link it exactly equals (same `mod`, `collection`, `tile` and params, with a section link written without `tile` equal to a link whose `tile` is `null`), or to none. `#/run?mod=mod_explorer` is in Mods; `#/run?mod=./samples/mods/book_list` is in no section.
 - An entry with stage state keeps its stored section, so membership survives a reload.
 
 `openStageSection(stage, section)` works like a tab bar. The stage remembers, for each section, its **root** (the sandbox of the section's own mod link that no mod opened: the one the section opened, or after a reload the restored one with that link) and its **last** view (the view of the latest entry shown in the section). This memory is derived from what is shown and never stored. A closed sandbox is cleared from it. Activating a section pushes an entry, in that section, that shows:
@@ -80,6 +85,20 @@ Every entry belongs to one section or to none, and the snapshot's `activeSection
 - otherwise the section's start: the index page of a page section; for a mod section, its root while it is open, or a new sandbox for its link, which becomes the root. The Home section's mod opens at `#/` as the Home mod.
 
 So repeated visits to Mods keep one explorer, Mods shows the viewer where the user left it, and activating Mods while in Mods returns to the explorer. No frame is reloaded: the new entry points to the open sandbox. After a reload the memory is empty, so the worst case is the section's start.
+
+### Replacing a sandbox
+
+`mods.open` with `replace: true` opens the link in place of the requesting sandbox, so that stepping through tiles turns pages instead of piling up history entries and frames. `openStageLink(stage, link, openerId, { replace: true })` applies `replaceStageEntry`, one pure transition of `stage_state.ts`:
+
+1. the new sandbox gets the requester's opener and the current entry's section;
+2. the current entry, at the same position and with the same section, points to it, and is written with `writeStageEntry("replace")` and the new run link;
+3. the requester is closed, as `closeSandbox` closes one: its session is stopped, its frame removed, its actions dropped without acting and its checks ended.
+
+No entry is added and forward entries are kept. Other entries that pointed to the requester stay, and open their link again when visited, as after any close. Back goes to what was shown before the requester, and closing the new sandbox shows the requester's opener when it is still open, or Home.
+
+The section memory needs no rule of its own: the closed requester is cleared from it, then the new sandbox becomes the section's last view, so coming back to the section shows it. A replaced root leaves the section without a root, so its start opens again, as after closing a root.
+
+The requester's session is stopped before `onOpenLink` returns, so its request gets no answer. Replacing is refused with `"home-mod"` for the Home mod at `#/` (the engine answers `-32002`), and with `"not-visible"`, like any `mods.open`, for a sandbox that is not the visible one. Nothing is opened then.
 
 ### Closing
 
@@ -99,28 +118,28 @@ Each sandbox keeps its own messages, which the stage bar shows for the visible s
 
 Every message stays in memory only: a page reload or a new sandbox starts again with none.
 
-When the mod file, its entrypoint, its tile type file or the collection cannot be loaded, or a link names a switched-off default mod, the sandbox shows the error and no frame, and keeps its history entry and its ×. The same error is an `error` message from the app, whose text is the error's message. Its source is:
+When the mod file, its entrypoint, its tile type file, the collection or the tile cannot be loaded, a link names a switched-off default mod, or a link has both a collection and a tile, the sandbox shows the error and no frame, and keeps its history entry and its ×. The same error is an `error` message from the app, whose text is the error's message. Its source is:
 
-- the file that failed, for the errors that name one (`FileFetchError`, `MarkdownParseError`, `YamlParseError`, `ModFormatError`, `CollectionFormatError`, `TileTypeError`): the mod file, the entrypoint, the tile type file or the collection;
-- otherwise the loaded mod's source, for a cancelled mod API question, or the link's mod reference resolved against the app's address, for a switched-off default mod.
+- the file that failed, for the errors that name one (`FileFetchError`, `MarkdownParseError`, `YamlParseError`, `ModFormatError`, `CollectionFormatError`, `TileTypeError`): the mod file, the entrypoint, the tile type file, the collection or the tile;
+- otherwise the loaded mod's source, for a cancelled mod API question, or the link's mod reference resolved against the app's address, for a switched-off default mod or a link with both a collection and a tile.
 
-The runtime keeps the mod once its mod file is loaded (`loadLaunchMod`, then `loadLaunchTiles` for the collection, see the [engine module](../engine/README.md#launch)), so the snapshot's `mod` is set after a later failure, such as a missing collection or a cancelled mod API question. It stays `null` when the mod file itself did not load.
+The runtime keeps the mod once its mod file is loaded (`loadLaunchMod`, then `loadLaunchTiles` for the collection or the tile, see the [engine module](../engine/README.md#launch)), so the snapshot's `mod` is set after a later failure, such as a missing collection or a cancelled mod API question. It stays `null` when the mod file itself did not load.
 
 The app adds three notifications, each an `info` message from the app:
 
 | When | Source | Text |
 |---|---|---|
-| A mod opened with a collection starts | The collection | `Loaded the collection: the mod received 3 tiles.` |
-| "Reload tiles" loaded the collection again | The collection | `Reloaded the tiles: the mod received 2 tiles, with 0 collection issues.` |
+| A mod opened with a collection or a tile starts | The collection or the tile | `Loaded the collection: the mod received 3 tiles.` |
+| "Reload tiles" loaded the collection or the tile again | The collection or the tile | `Reloaded the tiles: the mod received 2 tiles, with 0 collection issues.` |
 | The user answered the site consent question | The mod's source | `Allowed the mod to show content from https://upload.wikimedia.org. Refused to let the mod exchange data with https://api.example.net. The answer is remembered.` |
 
-The counts say `1 tile` and `1 collection issue` in the singular. The site consent notification lists the allowed lines, then the refused ones, each as its category's verb and its host, leaves out a part with no line, and ends with `The answer is remembered.` or `The answer is not remembered.`. Escape refuses every line and is not remembered. The site consent notification is built with the answer and passed to the start, because the start resets the arrival list to the launch's issues.
+The counts say `1 tile` and `1 collection issue` in the singular, so a mod opened with a tile gets `1 tile`, or `0 tiles` when the tile is not of its type. The site consent notification lists the allowed lines, then the refused ones, each as its category's verb and its host, leaves out a part with no line, and ends with `The answer is remembered.` or `The answer is not remembered.`. Escape refuses every line and is not remembered. The site consent notification is built with the answer and passed to the start, because the start resets the arrival list to the launch's issues.
 
-"Reload tiles", for a sandbox opened with a collection, loads and validates the collection again, pushes `tiles.changed` to the running mod and replaces the collection issues. The mod file issues stay. A reload whose collection cannot be loaded makes that error the only collection issue, and adds no notification.
+"Reload tiles", for a sandbox opened with a collection or a tile, loads and validates the collection or the tile again, pushes `tiles.changed` to the running mod and replaces the collection issues. The launch's `tilesKind` and `tilesSource` say which file to load. The mod file issues stay. A reload whose collection or tile cannot be loaded makes that error the only collection issue, adds no notification and pushes nothing, so the mod keeps its tiles. A sandbox opened without a collection or a tile has no "Reload tiles" (`canReloadTiles` is `false`).
 
 The files the tiles link are fixed in the frame's policy when the mod starts. When "Load media linked by tiles" was on as the mod started, a reload also replaces the tile link issues: it collects the links of the reloaded tiles against the launch's content hosts and granted permissions, and lists, in order:
 
-1. when the reloaded tiles link files the launch's policy does not allow, one warning whose source is the collection: `The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.`, or `The reloaded tiles link 3 files that this mod does not allow yet. Open the mod again to show them.`;
+1. when the reloaded tiles link files the launch's policy does not allow, one warning whose source is the collection or the tile: `The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.`, or `The reloaded tiles link 3 files that this mod does not allow yet. Open the mod again to show them.`;
 2. the left-out links of the reloaded tiles, so a link no longer in the tiles stops being reported.
 
 Each reload compares against the launch, not the previous reload, since the frame keeps the launch's policy. When the collection cannot be loaded, the tile link issues stay as they were. Opening the mod again builds a new policy with the new links.
@@ -239,7 +258,7 @@ The work behind the public API is split so each file has one reason to change:
 - `createStage(options)`: builds a stage. `StageOptions` are `history` (the `state`, `pushState` and `replaceState` of `History`), `defaults` (`DefaultModSettings`), `routing` (below), `appOrigin`, `baseUrl` (the app's address), `storage` (`localStorage`), an optional `fetch`, `colorScheme`, the color scheme the app starts with, `loadsTileLinkedMedia`, whether "Load media linked by tiles" is on as the app starts, `theaterMode`, whether theater mode is on as the app starts, `readSiteDecisions()`, which returns the remembered `SiteDecision` list and is read before each site consent question, each mod start, each mod check and each `mods.inspect`, and `rememberSiteDecisions(decisions)`, which keeps the decisions of an answer whose Remember was checked. The stage never touches `localStorage` for them.
 - `followHistory(stage, hash, historyState)`: follows the current entry, on start and on each `popstate`.
 - `openStageSection(stage, section)`: activates a section, as the sidebar does. Returns `false`, and does nothing, for an id that is neither a page section nor a mod section.
-- `openStageLink(stage, link, openerId)`: opens a `RunLink` a mod asked for. Returns `false` when the opener is not the visible sandbox. The sessions call it through their `onOpenLink`.
+- `openStageLink(stage, link, openerId, options?)`: opens a `RunLink` a mod asked for, in a new sandbox, or with `options.replace` in place of the opener (see [Replacing a sandbox](#replacing-a-sandbox)). Returns the engine's `OpenLinkOutcome`: `"opened"`, `"not-visible"` when the opener is not the visible sandbox, or `"home-mod"` when it asks to replace the Home mod. The sessions call it through their `onOpenLink`.
 - `closeSandbox(stage, id)`: the × button.
 - `reloadTiles(stage, id)`: the "Reload tiles" button.
 - `markMessagesRead(stage, sandboxId, level)`: marks every message of a level of a sandbox read, when its popover opens and when it closes. Does nothing for an unknown sandbox.

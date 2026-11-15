@@ -11,6 +11,20 @@ export class ModSwitchedOffError extends Error {
   }
 }
 
+/**
+ * A run link names both a collection and a tile. `source` is the link's mod
+ * reference, resolved. It is thrown before any file is requested.
+ */
+export class RunLinkConflictError extends Error {
+  readonly source: string;
+
+  constructor(source: string, options?: ErrorOptions) {
+    super("A link cannot have both a collection and a tile.", options);
+    this.name = "RunLinkConflictError";
+    this.source = source;
+  }
+}
+
 /** A request handler failed. The session sends `code` and `message` as the error response. */
 export class ModMethodError extends Error {
   readonly code: number;

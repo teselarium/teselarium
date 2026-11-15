@@ -12,11 +12,18 @@ import {
   buildSlowMountFiles,
   buildTestedProbeFiles,
   coverPermissionRow,
+  expectMessageCount,
   FAILING_CASE_TEST_CODE,
   findModFrame,
+  followLink,
+  LINKED_TILE_URL,
+  MEDIA_HOST,
+  readMessages,
   readParentDocumentError,
   recordHost,
+  routeImages,
   serveAppOriginMod,
+  serveLinkedTiles,
   stageBar,
   visibleSandbox,
 } from "./mod_routes.ts";
@@ -579,6 +586,8 @@ const COLLECTION_VIEWER_CASES = [
   "labels its filter field",
   "filters the tiles and says how many are shown",
   "shows every tile once the filter is empty",
+  "opens the selected tile in the tile viewer",
+  "shows a refused open",
   "says no collection was given without a target",
   "says no collection was given for an empty target",
   "shows why a missing target cannot be inspected",
@@ -590,10 +599,69 @@ const COLLECTION_VIEWER_CASES = [
   "keeps the filter field to a readable width",
 ];
 
+/** The cases of the tile viewer's test file (default_mods/tile_viewer/test/test.ts), in order. */
+const TILE_VIEWER_CASES = [
+  "heads a tile with its title",
+  "heads a tile without a title with its file name",
+  "heads with the file name when the title is empty or not text",
+  "heads with the decoded file name",
+  "tells web addresses",
+  "tells image addresses by their path",
+  "tells tile addresses by their path",
+  "counts the lines of each value",
+  "keeps short metadata whole",
+  "keeps metadata of six lines whole",
+  "cuts the list that does not fit",
+  "hides the fields after the first that does not fit",
+  "hides a list with no room for an item",
+  "cuts a long first list",
+  "shows a large first mapping whole",
+  "shows the tile's heading, source and body",
+  "puts the body in the card, after a separator",
+  "heads a fixture without a title with its file name",
+  "shows nested metadata in frontmatter order",
+  "lays a value beside its key and list items one per line",
+  "links the web addresses of the metadata",
+  "shows a thumbnail for an image address",
+  "draws thumbnails two lines high",
+  "starts long metadata collapsed",
+  "shows all the fields, then fewer again",
+  "draws the metadata button as a button no taller than its heading",
+  "shows short metadata without a button",
+  "cuts a long first list in the view",
+  "hides a thumbnail that fails to load",
+  "says that a file has no metadata",
+  "renders no empty body",
+  "says no tile was given without tiles",
+  "shows the tile's place in its collection",
+  "disables Previous on the first tile",
+  "disables Next on the last tile",
+  "replaces itself with the next tile",
+  "replaces itself with the previous tile",
+  "opens the collection from its name",
+  "shows a refused open",
+  "shows no place for a tile not in from",
+  "warns about a from it cannot read",
+  "opens a linked tile of from with from",
+  "opens a linked tile outside from without from",
+  "opens a linked tile without from when it has none",
+  "opens a tile linked by the metadata",
+  "leaves the other links to the app",
+  "keeps its own styles to layout",
+  "draws the tile as a card, with Next primary",
+];
+
 /** Answers like a site that ships no `samples/`. */
 async function answerNotFound(route: Route): Promise<void> {
   await route.fulfill({ status: 404, body: "Not Found" });
 }
+
+/**
+ * How long a default mod's check may take, in milliseconds. A check runs
+ * each case in a fresh frame, one after another, so it grows with the
+ * cases: the tile viewer's take several seconds in a busy run.
+ */
+const DEFAULT_MOD_CHECK_TIMEOUT = 15000;
 
 /**
  * Checks a default mod in the visible mod viewer, as a user would, and gives
@@ -607,7 +675,9 @@ async function checkDefaultMod(page: Page, modName: string): Promise<Locator> {
   );
   await viewer.getByRole("button", { name: "Check mod" }).click();
   const report = checkReport(viewer);
-  await expect(report.getByRole("heading")).toBeVisible();
+  await expect(report.getByRole("heading")).toBeVisible({
+    timeout: DEFAULT_MOD_CHECK_TIMEOUT,
+  });
   return report;
 }
 
@@ -663,6 +733,14 @@ test.describe(
       await expectEveryCasePassed(report, COLLECTION_VIEWER_CASES);
     });
 
+    test("Tile viewer passes its check", async function checksTileViewer({
+      page,
+    }): Promise<void> {
+      const report = await checkDefaultMod(page, "tile_viewer");
+
+      await expectEveryCasePassed(report, TILE_VIEWER_CASES);
+    });
+
     test("Cases without the samples", async function checksWithoutSamples({
       page,
     }): Promise<void> {
@@ -688,6 +766,8 @@ test.describe(
         collectionExplorerReport,
         COLLECTION_EXPLORER_CASES,
       );
+      const tileViewerReport = await checkDefaultMod(page, "tile_viewer");
+      await expectEveryCasePassed(tileViewerReport, TILE_VIEWER_CASES);
     });
   },
 );
@@ -942,6 +1022,13 @@ test.describe(
       ).toBeVisible();
       const viewer = await findModFrame(page, "Collection Viewer");
       expect(await viewer.evaluate(listOwnLookDeclarations)).toEqual([]);
+
+      await openFixtureTile(page, "tiles/kallocain.md");
+      await expect(
+        tileViewerFrame(page).getByRole("navigation", { name: "Collection" }),
+      ).toBeVisible();
+      const tileViewer = await findModFrame(page, "Tile Viewer");
+      expect(await tileViewer.evaluate(listOwnLookDeclarations)).toEqual([]);
     });
 
     test("Viewer switched off", async function showsSwitchedOffViewer({
@@ -964,6 +1051,272 @@ test.describe(
       await expect(
         page.locator('iframe[title="Collection Viewer"]'),
       ).toHaveCount(0);
+    });
+  },
+);
+
+/** The tile viewer's fixtures, which every built app serves with it. */
+const TILE_FIXTURES_PATH = "/default_mods/tile_viewer/fixtures/";
+
+/** A fixture of the tile viewer, by its path under its fixtures folder, on the page's origin. */
+function readTileFixtureUrl(page: Page, path: string): string {
+  const url = new URL(`${TILE_FIXTURES_PATH}${path}`, page.url()).href;
+  return url;
+}
+
+/** The run link of the tile viewer for `tile`, with `from` when it is given. */
+function buildTileViewerLink(tile: string, from: string | null = null): string {
+  let link = `#/run?mod=tile_viewer&tile=${encodeURIComponent(tile)}`;
+  if (from !== null) {
+    link += `&from=${encodeURIComponent(from)}`;
+  }
+  return link;
+}
+
+function tileViewerFrame(page: Page): FrameLocator {
+  return visibleSandbox(page).frameLocator('iframe[title="Tile Viewer"]');
+}
+
+/** Opens Home, then follows the tile viewer's link for a fixture tile, with the fixture collection as `from` unless `withFrom` is false. */
+async function openFixtureTile(
+  page: Page,
+  tilePath: string,
+  withFrom: boolean = true,
+): Promise<void> {
+  await page.goto("/");
+  const tile = readTileFixtureUrl(page, tilePath);
+  const from = withFrom
+    ? readTileFixtureUrl(page, "tiles_collection.yaml")
+    : null;
+  await followLink(page, buildTileViewerLink(tile, from));
+}
+
+async function answerTileViewerNotFound(route: Route): Promise<void> {
+  await route.fulfill({ status: 404, body: "Not Found" });
+}
+
+/** Runs in the tile viewer's frame: whether the thumbnail of the `image` value loaded. */
+function isThumbnailLoaded(): boolean {
+  const thumbnail = document.querySelector("dd a > img");
+  return (
+    thumbnail instanceof HTMLImageElement &&
+    thumbnail.complete &&
+    thumbnail.naturalWidth > 0
+  );
+}
+
+/** The cover the routed tile of the thumbnail tests links, with a query and upper-case extension. */
+const ROUTED_COVER_URL = `${MEDIA_HOST}/covers/Kallocain.JPG?w=200`;
+
+test.describe(
+  "Tile viewer",
+  { tag: "@frames" },
+  function describeTileViewer(): void {
+    test("View a tile", async function viewsTile({ page }): Promise<void> {
+      await page.goto("/");
+      const tile = readTileFixtureUrl(page, "tiles/kallocain.md");
+
+      await followLink(page, buildTileViewerLink(tile));
+
+      const viewer = tileViewerFrame(page);
+      await expect(viewer.getByRole("heading", { level: 1 })).toHaveText(
+        "Kallocain",
+      );
+      await expect(viewer.locator("article > small")).toHaveText(tile);
+      await expect(viewer.locator("ot-tile-body")).toContainText(
+        "A fixture tile of the tile viewer's tests.",
+      );
+      await expect(stageBar(page)).toContainText("Tile Viewer");
+    });
+
+    test("Image thumbnail", async function showsThumbnail({
+      page,
+    }): Promise<void> {
+      await serveLinkedTiles(page, [`image: "${ROUTED_COVER_URL}"`]);
+      const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+      await page.goto(`/${buildTileViewerLink(LINKED_TILE_URL)}`);
+      const viewer = tileViewerFrame(page);
+
+      const link = viewer.getByRole("link", { name: ROUTED_COVER_URL });
+      await expect(link).toBeVisible();
+      await expect(link.locator("img")).toBeVisible();
+      const frame = await findModFrame(page, "Tile Viewer");
+      await expect
+        .poll(frame.evaluate.bind(frame, isThumbnailLoaded))
+        .toBe(true);
+      expect(seenUrls).toEqual([ROUTED_COVER_URL]);
+    });
+
+    test("Image that fails", async function hidesBrokenThumbnail({
+      page,
+    }): Promise<void> {
+      const missingCover = `${MEDIA_HOST}/covers/missing.jpg`;
+      await serveLinkedTiles(page, [`image: "${missingCover}"`]);
+      await page.route(`${MEDIA_HOST}/**`, answerTileViewerNotFound);
+      await page.goto(`/${buildTileViewerLink(LINKED_TILE_URL)}`);
+      const viewer = tileViewerFrame(page);
+
+      const link = viewer.getByRole("link", { name: missingCover });
+      await expect(link).toBeVisible();
+      await expect(link.locator("img")).toBeHidden();
+      await expect(link.locator("img")).toHaveAttribute("hidden");
+    });
+
+    test("Link to another tile in the body", async function opensLinkedTile({
+      page,
+    }): Promise<void> {
+      await openFixtureTile(page, "tiles/kallocain.md", false);
+      const viewer = tileViewerFrame(page);
+
+      await viewer
+        .locator("ot-tile-body")
+        .getByRole("link", { name: "Fahrenheit 451" })
+        .click();
+
+      await expect(
+        tileViewerFrame(page).getByRole("heading", { level: 1 }),
+      ).toHaveText("Fahrenheit 451");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(page.locator('iframe[title="Tile Viewer"]')).toHaveCount(2);
+
+      await page.goBack();
+
+      await expect(
+        tileViewerFrame(page).getByRole("heading", { level: 1 }),
+      ).toHaveText("Kallocain");
+    });
+
+    test("Next tile", async function turnsToNextTile({ page }): Promise<void> {
+      await openFixtureTile(page, "tiles/kallocain.md");
+      const viewer = tileViewerFrame(page);
+      await expect(
+        viewer.getByRole("navigation", { name: "Collection" }),
+      ).toContainText("1 of 3");
+
+      await viewer.getByRole("button", { name: "Next" }).click();
+
+      const nextViewer = tileViewerFrame(page);
+      await expect(nextViewer.getByRole("heading", { level: 1 })).toHaveText(
+        "Fahrenheit 451",
+      );
+      await expect(
+        nextViewer.getByRole("navigation", { name: "Collection" }),
+      ).toContainText("2 of 3");
+      await expect(page.locator('iframe[title="Tile Viewer"]')).toHaveCount(1);
+      expect(new URL(page.url()).hash).toBe(
+        buildTileViewerLink(
+          readTileFixtureUrl(page, "tiles/fahrenheit_451.md"),
+          readTileFixtureUrl(page, "tiles_collection.yaml"),
+        ),
+      );
+
+      await page.goBack();
+
+      await expect(page.locator("[data-sandbox-id]:not([hidden])")).toHaveCount(
+        0,
+      );
+      await expect(currentItem(page)).toHaveText("Home");
+    });
+
+    test("Missing from collection", async function warnsMissingFrom({
+      page,
+    }): Promise<void> {
+      await page.goto("/");
+      const missingFrom = readTileFixtureUrl(page, "missing_collection.yaml");
+      await followLink(
+        page,
+        buildTileViewerLink(
+          readTileFixtureUrl(page, "tiles/kallocain.md"),
+          missingFrom,
+        ),
+      );
+
+      await expect(
+        tileViewerFrame(page).getByRole("heading", { level: 1 }),
+      ).toHaveText("Kallocain");
+      await expectMessageCount(page, "Warnings", 1);
+      const warnings = await readMessages(page, "Warnings");
+      expect(warnings[0].producer).toBe("Mod");
+      expect(warnings[0].source).toBe(missingFrom);
+      expect(warnings[0].text).toContain("404");
+    });
+  },
+);
+
+/** The name of the collection the tile tests serve in place of the laureates. */
+const ROUTED_TILES_NAME = "Routed tiles";
+
+/** Serves, at the laureates' collection, a collection of the tile viewer's first two fixture tiles, by address. */
+async function serveRoutedTiles(route: Route): Promise<void> {
+  const origin = new URL(route.request().url()).origin;
+  const body = [
+    "collection:",
+    `  name: "${ROUTED_TILES_NAME}"`,
+    "  tiles:",
+    `    - url: "${origin}${TILE_FIXTURES_PATH}tiles/kallocain.md"`,
+    `    - url: "${origin}${TILE_FIXTURES_PATH}tiles/fahrenheit_451.md"`,
+  ].join("\n");
+  await route.fulfill({ status: 200, body });
+}
+
+test.describe(
+  "Collection viewer opens tiles",
+  { tag: "@frames" },
+  function describeCollectionViewerTiles(): void {
+    test("Open a tile from the list", async function opensTileFromList({
+      page,
+    }): Promise<void> {
+      await page.route(LAUREATES_COLLECTION_GLOB, serveRoutedTiles);
+      await page.goto("/");
+      await openSection(page, "Tiles");
+      await collectionExplorerFrame(page)
+        .getByRole("button", { name: `View ${ROUTED_TILES_NAME}` })
+        .click();
+
+      await collectionViewerFrame(page)
+        .getByRole("button", { name: "kallocain.md" })
+        .click();
+
+      const viewer = tileViewerFrame(page);
+      await expect(viewer.getByRole("heading", { level: 1 })).toHaveText(
+        "Kallocain",
+      );
+      await expect(
+        viewer.getByRole("navigation", { name: "Collection" }),
+      ).toContainText("1 of 2");
+      const collectionSource = new URL(
+        "./samples/tiles/literature_nobel_laureates/collection.yaml",
+        page.url(),
+      ).href;
+      expect(new URL(page.url()).hash).toBe(
+        buildTileViewerLink(
+          readTileFixtureUrl(page, "tiles/kallocain.md"),
+          collectionSource,
+        ),
+      );
+      await expect(currentItem(page)).toHaveText("Tiles");
+    });
+
+    test("Open the collection", async function opensCollectionFromBreadcrumb({
+      page,
+    }): Promise<void> {
+      await openFixtureTile(page, "tiles/fahrenheit_451.md");
+      const viewer = tileViewerFrame(page);
+
+      await viewer
+        .getByRole("navigation", { name: "Collection" })
+        .getByRole("button", { name: "Viewer tiles" })
+        .click();
+
+      await expect(stageBar(page)).toContainText("Collection Viewer");
+      await expect(
+        collectionViewerFrame(page).getByRole("heading", {
+          name: "Viewer tiles",
+        }),
+      ).toBeVisible();
+      expect(new URL(page.url()).hash).toBe(
+        `#/run?mod=collection_viewer&target=${encodeURIComponent(readTileFixtureUrl(page, "tiles_collection.yaml"))}`,
+      );
     });
   },
 );

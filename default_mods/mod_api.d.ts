@@ -172,8 +172,14 @@ export interface ModCheckReport {
 /** The params of `mods.open`. A missing `collection` runs the mod without tiles. */
 export interface ModOpenParams {
   mod: string;
+  /** A collection location. A link has a collection or a tile, not both. */
   collection?: string;
+  /** The location of one tile file, which the opened mod receives as its tiles. */
+  tile?: string;
+  /** Parameters other than `mod`, `collection` and `tile`, which are reserved. */
   params?: Record<string, string>;
+  /** Opens the mod in place of the requesting sandbox, which is closed and gets no answer. */
+  replace?: boolean;
 }
 
 /** The params of `mods.check`. A missing `collection` checks with the mod's sample collection. */

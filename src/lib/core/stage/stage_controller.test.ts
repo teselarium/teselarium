@@ -29,6 +29,7 @@ import {
   serveLibraryMod,
   serveOtherApiMod,
   serveProbeMod,
+  serveTestMod,
   serveUntypedMod,
   TEST_NPM_HOST,
   UNTYPED_MOD_SOURCE,
@@ -741,13 +742,38 @@ describe("openStageLink", function describeOpenStageLink(): void {
     });
   });
 
+  it("can reload the tiles of a sandbox opened with a tile", async function reloadsTileSandbox(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    openStageLink(
+      stage,
+      {
+        mod: SAMPLE_MOD_REFERENCE,
+        collection: null,
+        tile: "./fixtures/tiles/books/kallocain.md",
+        params: {},
+      },
+      "sandbox-1",
+    );
+    await settleStage(stage);
+
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-2",
+      status: "running",
+      canReloadTiles: true,
+      collection: null,
+    });
+  });
+
   it("Hidden mod tries to open a mod", async function refusesHidden(): Promise<void> {
     const history = new FakeHistory("");
     const stage = await openViewerFromHome(history);
 
-    const isOpened = openStageLink(stage, VIEWER_LINK, "sandbox-1");
+    const outcome = openStageLink(stage, VIEWER_LINK, "sandbox-1");
 
-    expect(isOpened).toBe(false);
+    expect(outcome).toBe("not-visible");
     expect(history.entries).toHaveLength(2);
     expect(readVisible(stage).id).toBe("sandbox-2");
   });
@@ -757,7 +783,184 @@ describe("openStageLink", function describeOpenStageLink(): void {
     const stage = await startPageStage(history);
     await openSection(stage, "settings");
 
-    expect(openStageLink(stage, VIEWER_LINK, "sandbox-1")).toBe(false);
+    expect(openStageLink(stage, VIEWER_LINK, "sandbox-1")).toBe("not-visible");
+    expect(history.entries).toHaveLength(2);
+  });
+});
+
+/** The sample mod without a collection, which a replace opens in place of the viewer. */
+const REPLACING_LINK = {
+  mod: SAMPLE_MOD_REFERENCE,
+  collection: null,
+  params: { step: "next" },
+};
+
+const REPLACING_HASH = `${SAMPLE_RUN_HASH}&step=next`;
+
+/** On the page stage: opens Mods, the viewer from the explorer, then replaces the viewer. */
+async function replaceViewerFromMods(history: FakeHistory): Promise<Stage> {
+  const stage = await openViewerFromMods(history);
+  openStageLink(stage, REPLACING_LINK, "sandbox-2", { replace: true });
+  await settleStage(stage);
+  return stage;
+}
+
+/** A mod on the app's origin that may open any mod, so it can send `mods.open`. */
+const OPENER_MOD_SOURCE = `${APP_BASE_URL}test-mods/opener/mod_conf.yaml`;
+
+function serveOpenerMod(): void {
+  serveTestMod(OPENER_MOD_SOURCE, [
+    '  name: "opener"',
+    '  version: "0.1.0"',
+    '  entrypoint: "./main.js"',
+    "  permissions:",
+    "    open:",
+    '      - host: "*"',
+    '        reason: "Opens mods"',
+  ]);
+}
+
+/** On the page stage: runs the opener from a typed link, attaches its frame and sends `mods.open` with `params`. */
+async function sendOpenFromOpener(
+  params: object,
+): Promise<{ stage: Stage; history: FakeHistory; received: unknown[] }> {
+  serveOpenerMod();
+  const history = new FakeHistory(
+    `#/run?mod=${encodeURIComponent(OPENER_MOD_SOURCE)}`,
+  );
+  const stage = await startPageStage(history);
+  const { modPort, received } = attachCollectingFrame(stage, "sandbox-1");
+  postRequest(modPort, 1, "mods.open", params);
+  await waitForMessages();
+  await settleStage(stage);
+  const sent = { stage, history, received };
+  return sent;
+}
+
+describe("Replace the visible sandbox", function describeReplace(): void {
+  it("Next tile replaces the current one", async function replacesViewer(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromMods(history);
+    const viewerRuntime = stage.runtimes.get("sandbox-2");
+
+    const outcome = openStageLink(stage, REPLACING_LINK, "sandbox-2", {
+      replace: true,
+    });
+    await settleStage(stage);
+
+    expect(outcome).toBe("opened");
+    expect(viewerRuntime?.status).toBe("stopped");
+    expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-3"]);
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-3",
+      hash: REPLACING_HASH,
+      status: "running",
+    });
+    expect(stage.state.sandboxes[1]).toMatchObject({
+      openerId: "sandbox-1",
+      section: "mods",
+    });
+    expect(history.entries).toHaveLength(3);
+    expect(history.entries[2]).toEqual({
+      state: stageState(2, "mods"),
+      hash: REPLACING_HASH,
+    });
+    expect(readStageSnapshot(stage).activeSection).toBe("mods");
+  });
+
+  it("goes back to the opener with one step back", async function goesBackToOpener(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await replaceViewerFromMods(history);
+
+    await follow(stage, history.goBack());
+
+    expect(readVisible(stage).id).toBe("sandbox-1");
+  });
+
+  it("Close after a replace", async function closesReplacing(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await replaceViewerFromMods(history);
+
+    closeSandbox(stage, "sandbox-3");
+
+    expect(listIds(stage)).toEqual(["sandbox-1"]);
+    expect(readVisible(stage).id).toBe("sandbox-1");
+    expect(readStageSnapshot(stage).activeSection).toBe("mods");
+  });
+
+  it("Section after a replace", async function remembersReplacing(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await replaceViewerFromMods(history);
+    await openSection(stage, "home");
+
+    await openSection(stage, "mods");
+
+    expect(readVisible(stage).id).toBe("sandbox-3");
+    expect(readStageSnapshot(stage).activeSection).toBe("mods");
+    expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-3"]);
+  });
+
+  it("keeps the forward entries", async function keepsForward(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromMods(history);
+    await openSection(stage, "guides");
+    await follow(stage, history.goBack());
+
+    openStageLink(stage, REPLACING_LINK, "sandbox-2", { replace: true });
+    await settleStage(stage);
+
+    expect(history.entries).toHaveLength(4);
+    expect(history.entries[2].hash).toBe(REPLACING_HASH);
+    expect(history.entries[3].hash).toBe("#/guides");
+  });
+
+  it("Home mod cannot be replaced", async function refusesHomeMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    const outcome = openStageLink(stage, REPLACING_LINK, "sandbox-1", {
+      replace: true,
+    });
+
+    expect(outcome).toBe("home-mod");
+    expect(listIds(stage)).toEqual(["sandbox-1"]);
+    expect(history.entries).toEqual([
+      { state: stageState(0, "home"), hash: "#/" },
+    ]);
+  });
+
+  it("Hidden mod cannot replace itself", async function refusesHidden(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+
+    const outcome = openStageLink(stage, REPLACING_LINK, "sandbox-1", {
+      replace: true,
+    });
+
+    expect(outcome).toBe("not-visible");
+    expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-2"]);
+  });
+
+  it("stops the requester before the handler answers, so no response reaches it", async function answersNothing(): Promise<void> {
+    const { stage, history, received } = await sendOpenFromOpener({
+      mod: SAMPLE_MOD_REFERENCE,
+      replace: true,
+    });
+
+    expect(received).toEqual([]);
+    expect(listIds(stage)).toEqual(["sandbox-2"]);
+    expect(readVisible(stage).hash).toBe(SAMPLE_RUN_HASH);
+    expect(history.entries).toHaveLength(1);
+  });
+
+  it("answers null to a request without replace", async function answersPush(): Promise<void> {
+    const { stage, history, received } = await sendOpenFromOpener({
+      mod: SAMPLE_MOD_REFERENCE,
+    });
+
+    expect(received).toEqual([{ jsonrpc: "2.0", id: 1, result: null }]);
+    expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-2"]);
     expect(history.entries).toHaveLength(2);
   });
 });

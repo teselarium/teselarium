@@ -18,7 +18,11 @@ import {
   PERMISSION_DENIED,
 } from "./mod_messages.ts";
 import { readRequiredText, throwInvalidParams } from "./mod_methods.ts";
-import type { ModMethodContext, ModMethodTable } from "./mod_methods.ts";
+import type {
+  ModMethodContext,
+  ModMethodTable,
+  OpenLinkOutcome,
+} from "./mod_methods.ts";
 
 /** Resolves a reference against the app's address and the default mods folder. */
 function resolveRequestedMod(
@@ -77,23 +81,24 @@ async function inspectRequestedMod(
   }
 }
 
-/** Reads an optional collection location, or raises `INVALID_PARAMS` naming `method`. */
-function readOpenCollection(
+/** Reads an optional location, `collection` or `tile`, or raises `INVALID_PARAMS` naming `method`. */
+function readOpenLocation(
   params: YamlMapping,
+  name: "collection" | "tile",
   method: string,
 ): string | null {
-  const collection: YamlValue | undefined = params.collection;
-  if (collection === undefined || collection === null) {
+  const location: YamlValue | undefined = params[name];
+  if (location === undefined || location === null) {
     return null;
   }
-  if (typeof collection !== "string" || collection === "") {
-    throwInvalidParams(
-      method,
-      '"collection" must be null or a non-empty string',
-    );
+  if (typeof location !== "string" || location === "") {
+    throwInvalidParams(method, `"${name}" must be null or a non-empty string`);
   }
-  return collection;
+  return location;
 }
+
+/** The link names the stage reads itself, which a mod cannot pass in `params`. */
+const RESERVED_PARAM_NAMES: readonly string[] = ["mod", "collection", "tile"];
 
 function readLinkParams(params: YamlMapping): Record<string, string> {
   const linkParams: Record<string, string> = {};
@@ -104,6 +109,9 @@ function readLinkParams(params: YamlMapping): Record<string, string> {
     throwInvalidParams("mods.open", '"params" must be a mapping');
   }
   for (const [name, value] of Object.entries(params.params)) {
+    if (RESERVED_PARAM_NAMES.includes(name)) {
+      throwInvalidParams("mods.open", `"params.${name}" is reserved`);
+    }
     if (typeof value !== "string") {
       throwInvalidParams("mods.open", `"params.${name}" must be a string`);
     }
@@ -112,33 +120,71 @@ function readLinkParams(params: YamlMapping): Record<string, string> {
   return linkParams;
 }
 
-/** Reads the params of `mods.open` into a run link. Raises `INVALID_PARAMS`. */
-export function readOpenParams(params: YamlMapping): RunLink {
-  const link: RunLink = {
-    mod: readRequiredText(params, "mod", "mods.open"),
-    collection: readOpenCollection(params, "mods.open"),
-    params: readLinkParams(params),
-  };
-  return link;
+/** Reads the optional `replace` of `mods.open`, `false` when absent. Raises `INVALID_PARAMS`. */
+function readOpenReplace(params: YamlMapping): boolean {
+  const replace: YamlValue | undefined = params.replace;
+  if (replace === undefined) {
+    return false;
+  }
+  if (typeof replace !== "boolean") {
+    throwInvalidParams("mods.open", '"replace" must be a boolean');
+  }
+  return replace;
+}
+
+/** What `mods.open` asks for: the run link, and whether it replaces the requester. */
+export interface OpenRequest {
+  link: RunLink;
+  replace: boolean;
 }
 
 /**
- * `mods.open { mod, collection?, params? }`: asks the stage to open the mod
- * in a new sandbox, and answers `null`. The new mod's load errors belong to
- * its own sandbox.
+ * Reads the params of `mods.open` into a run link and the replace mode.
+ * Raises `INVALID_PARAMS`, also for a link with both a collection and a tile
+ * and for `params` that hold a reserved name.
+ */
+export function readOpenParams(params: YamlMapping): OpenRequest {
+  const link: RunLink = {
+    mod: readRequiredText(params, "mod", "mods.open"),
+    collection: readOpenLocation(params, "collection", "mods.open"),
+    tile: readOpenLocation(params, "tile", "mods.open"),
+    params: readLinkParams(params),
+  };
+  if (link.collection !== null && link.tile !== null) {
+    throwInvalidParams(
+      "mods.open",
+      'a link cannot have both "collection" and "tile"',
+    );
+  }
+  const request: OpenRequest = { link, replace: readOpenReplace(params) };
+  return request;
+}
+
+/** The message of a refused `mods.open`, for each refusal the stage gives. */
+const OPEN_REFUSALS: Record<Exclude<OpenLinkOutcome, "opened">, string> = {
+  "not-visible": "mods.open: only the visible mod can open mods",
+  "home-mod": "mods.open: the home mod cannot be replaced",
+};
+
+/**
+ * `mods.open { mod, collection?, tile?, params?, replace? }`: asks the stage
+ * to open the mod in a new sandbox, or with `replace` in place of the
+ * requester, and answers `null`. The new mod's load errors belong to its
+ * own sandbox. A replaced requester is stopped before this returns, so it
+ * gets no answer.
  */
 async function openRequestedMod(
   context: ModMethodContext,
   params: YamlMapping,
 ): Promise<null> {
-  const link = readOpenParams(params);
-  const source = resolveRequestedMod(context, link.mod, "mods.open");
+  const request = readOpenParams(params);
+  const source = resolveRequestedMod(context, request.link.mod, "mods.open");
   checkModAccess(context, source);
-  if (!context.onOpenLink(link)) {
-    throw new ModMethodError(
-      PERMISSION_DENIED,
-      "mods.open: only the visible mod can open mods",
-    );
+  const outcome = context.onOpenLink(request.link, {
+    replace: request.replace,
+  });
+  if (outcome !== "opened") {
+    throw new ModMethodError(PERMISSION_DENIED, OPEN_REFUSALS[outcome]);
   }
   return null;
 }
@@ -152,7 +198,7 @@ async function checkRequestedMod(
   params: YamlMapping,
 ): Promise<ModCheckReport> {
   const reference = readRequiredText(params, "mod", "mods.check");
-  const collection = readOpenCollection(params, "mods.check");
+  const collection = readOpenLocation(params, "collection", "mods.check");
   const source = resolveRequestedMod(context, reference, "mods.check");
   checkModAccess(context, source);
   const report = context.onCheckMod({ source, collection });

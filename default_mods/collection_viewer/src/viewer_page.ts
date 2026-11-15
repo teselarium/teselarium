@@ -2,6 +2,7 @@ import type { CollectionInspection } from "../../mod_api.d.ts";
 import { buildCollectionCard } from "./collection_card.ts";
 import { buildEntryIssues } from "./entry_issues.ts";
 import { buildTileList } from "./tile_list.ts";
+import type { ViewerView } from "./viewer_view.ts";
 
 // Layout only: the colors, borders and fonts come from the theme. These rules
 // are outside the theme's layer, so they win over its `[hidden]` rule: a rule
@@ -17,6 +18,7 @@ const VIEWER_STYLE = `
   section[aria-label="Tiles"] article { padding: var(--ot-space-2) var(--ot-space-4); }
   section[aria-label="Tiles"] table { margin: 0; }
   td { overflow-wrap: anywhere; }
+  td > button { white-space: normal; text-align: start; overflow-wrap: anywhere; }
 `;
 
 export function addViewerStyle(): void {
@@ -40,11 +42,18 @@ export function renderLoading(title: string): void {
   renderMessage(title, loading);
 }
 
-/** The viewed collection: its card, its entry issues, if any, and its tiles. */
-export function renderCollection(inspection: CollectionInspection): void {
+/**
+ * The viewed collection: its card, its entry issues, if any, its tiles, and
+ * the status region for errors from opening a tile, empty until one.
+ */
+export function renderCollection(
+  view: ViewerView,
+  inspection: CollectionInspection,
+): void {
   document.body.replaceChildren(
     buildCollectionCard(inspection),
     ...buildEntryIssues(inspection.issues),
-    buildTileList(inspection.tiles),
+    buildTileList(view, inspection),
+    view.status,
   );
 }

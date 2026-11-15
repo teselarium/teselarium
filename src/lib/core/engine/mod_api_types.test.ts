@@ -5,11 +5,12 @@ import type {
   ModContext as DeclaredModContext,
   ModInspection as DeclaredModInspection,
   ModLayoutChangedParams as DeclaredLayoutChangedParams,
+  ModOpenParams as DeclaredModOpenParams,
 } from "../../../../default_mods/mod_api.d.ts";
 import type { TileCollectionIndex } from "../../tile/index.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModInspection } from "./mod_inspection.ts";
-import type { ModContext } from "./mod_launch.ts";
+import type { ModContext, RunLink } from "./mod_launch.ts";
 import type { LayoutChangedParams } from "./mod_session.ts";
 
 // A compile-time guard: `tsc -b` fails when the engine's types no longer fit
@@ -34,5 +35,14 @@ describe("default_mods/mod_api.d.ts", function describeModApiTypes(): void {
 
   it("declares a collection inspection the engine's index fits", function checksCollectionInspection(): void {
     expectTypeOf<TileCollectionIndex>().toExtend<DeclaredCollectionInspection>();
+  });
+
+  it("declares the mods.open params the engine reads: the link's fields and replace", function checksModOpenParams(): void {
+    expectTypeOf<keyof DeclaredModOpenParams>().toEqualTypeOf<
+      keyof RunLink | "replace"
+    >();
+    expectTypeOf<DeclaredModOpenParams["replace"]>().toEqualTypeOf<
+      boolean | undefined
+    >();
   });
 });

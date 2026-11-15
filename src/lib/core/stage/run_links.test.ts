@@ -9,6 +9,8 @@ import {
 import type { RunLink } from "../engine/index.ts";
 import { buildRunLink, readAppRoute } from "./run_links.ts";
 
+const TILE_SOURCE = "https://example.org/fixtures/tiles/books/kallocain.md";
+
 describe("readAppRoute", function describeReadAppRoute(): void {
   it("Link with a mod and a collection", function readsModAndCollection(): void {
     const route = readAppRoute(
@@ -20,6 +22,7 @@ describe("readAppRoute", function describeReadAppRoute(): void {
       link: {
         mod: SAMPLE_MOD_REFERENCE,
         collection: SAMPLE_COLLECTION_REFERENCE,
+        tile: null,
         params: {},
       },
     });
@@ -30,7 +33,58 @@ describe("readAppRoute", function describeReadAppRoute(): void {
 
     expect(route).toEqual({
       page: "run",
-      link: { mod: SAMPLE_MOD_REFERENCE, collection: null, params: {} },
+      link: {
+        mod: SAMPLE_MOD_REFERENCE,
+        collection: null,
+        tile: null,
+        params: {},
+      },
+    });
+  });
+
+  it("Link with a tile", function readsTile(): void {
+    const route = readAppRoute(
+      `#/run?mod=tile_viewer&tile=${encodeURIComponent(TILE_SOURCE)}`,
+    );
+
+    expect(route).toEqual({
+      page: "run",
+      link: {
+        mod: "tile_viewer",
+        collection: null,
+        tile: TILE_SOURCE,
+        params: {},
+      },
+    });
+  });
+
+  it("Tile is not a parameter of the mod", function reservesTile(): void {
+    const route = readAppRoute("#/run?mod=tile_viewer&tile=./a.md&from=x");
+
+    expect(route).toEqual({
+      page: "run",
+      link: {
+        mod: "tile_viewer",
+        collection: null,
+        tile: "./a.md",
+        params: { from: "x" },
+      },
+    });
+  });
+
+  it("reads a link with both a collection and a tile as written", function readsBoth(): void {
+    const route = readAppRoute(
+      "#/run?mod=tile_viewer&collection=./c.yaml&tile=./a.md",
+    );
+
+    expect(route).toEqual({
+      page: "run",
+      link: {
+        mod: "tile_viewer",
+        collection: "./c.yaml",
+        tile: "./a.md",
+        params: {},
+      },
     });
   });
 
@@ -44,6 +98,7 @@ describe("readAppRoute", function describeReadAppRoute(): void {
       link: {
         mod: "mod_viewer",
         collection: "./c.yaml",
+        tile: null,
         params: { zeta: "1", alpha: "2" },
       },
     });
@@ -62,17 +117,18 @@ describe("readAppRoute", function describeReadAppRoute(): void {
       link: {
         mod: "mod_viewer",
         collection: null,
+        tile: null,
         params: { target: SAMPLE_MOD_SOURCE },
       },
     });
   });
 
-  it("reads an empty collection as no collection", function readsEmptyCollection(): void {
-    const route = readAppRoute("#/run?mod=mod_viewer&collection=");
+  it("reads an empty collection or tile as none", function readsEmptyCollection(): void {
+    const route = readAppRoute("#/run?mod=mod_viewer&collection=&tile=");
 
     expect(route).toEqual({
       page: "run",
-      link: { mod: "mod_viewer", collection: null, params: {} },
+      link: { mod: "mod_viewer", collection: null, tile: null, params: {} },
     });
   });
 
@@ -115,13 +171,44 @@ describe("buildRunLink", function describeBuildRunLink(): void {
     expect(runLink).toBe(SAMPLE_COLLECTION_RUN_HASH);
   });
 
+  it("writes the tile after the collection, before the params", function buildsTile(): void {
+    const runLink = buildRunLink({
+      mod: "tile_viewer",
+      collection: "./c.yaml",
+      tile: "./a.md",
+      params: { from: "x" },
+    });
+
+    expect(runLink).toBe(
+      "#/run?mod=tile_viewer&collection=.%2Fc.yaml&tile=.%2Fa.md&from=x",
+    );
+  });
+
+  it("writes no tile for a null tile", function buildsNullTile(): void {
+    const runLink = buildRunLink({
+      mod: "mod_viewer",
+      collection: null,
+      tile: null,
+      params: { target: SAMPLE_MOD_SOURCE },
+    });
+
+    expect(runLink).toBe(SAMPLE_VIEWER_RUN_HASH);
+  });
+
   it("gives the link back when read", function roundTrips(): void {
     const links: RunLink[] = [
-      { mod: "mod_viewer", collection: null, params: {} },
+      { mod: "mod_viewer", collection: null, tile: null, params: {} },
       {
         mod: SAMPLE_MOD_SOURCE,
         collection: "https://example.org/a b&c.yaml",
+        tile: null,
         params: { target: "x=y&z", "odd key": "é" },
+      },
+      {
+        mod: "tile_viewer",
+        collection: null,
+        tile: "https://example.org/a b&c.md",
+        params: { from: "https://example.org/c.yaml" },
       },
     ];
 

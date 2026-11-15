@@ -6,9 +6,15 @@ import {
   openStageEntry,
   readVisibleEntry,
   readVisibleSandbox,
+  replaceStageEntry,
   restoreStageEntry,
 } from "./stage_state.ts";
-import type { EntryTarget, HomeFallback, StageState } from "./stage_state.ts";
+import type {
+  EntryTarget,
+  HomeFallback,
+  SandboxOpening,
+  StageState,
+} from "./stage_state.ts";
 
 const HOME_LINK: RunLink = {
   mod: "mod_explorer",
@@ -459,5 +465,136 @@ describe("closeStageSandbox", function describeCloseStageSandbox(): void {
       kind: "sandbox",
       sandboxId: "sandbox-1",
     });
+  });
+});
+
+function buildOpening(mod: string): SandboxOpening {
+  const opening: SandboxOpening = {
+    hash: `#/run?mod=${mod}`,
+    link: buildLink(mod),
+    openerId: null,
+    isHomeMod: false,
+  };
+  return opening;
+}
+
+describe("replaceStageEntry", function describeReplaceStageEntry(): void {
+  it("points the current entry to the new sandbox at the same position and section", function replacesEntry(): void {
+    const state = openInTurn(["a"]);
+
+    const change = replaceStageEntry(state, buildOpening("b"), "sandbox-2");
+
+    expect(change.opened).toMatchObject({
+      id: "sandbox-3",
+      hash: "#/run?mod=b",
+      link: buildLink("b"),
+      section: "home",
+      isHomeMod: false,
+    });
+    expect(change.state.position).toBe(1);
+    expect(change.state.entries).toEqual([
+      {
+        position: 0,
+        view: { kind: "sandbox", sandboxId: "sandbox-1" },
+        section: "home",
+      },
+      {
+        position: 1,
+        view: { kind: "sandbox", sandboxId: "sandbox-3" },
+        section: "home",
+      },
+    ]);
+    expect(readVisibleSandbox(change.state)?.id).toBe("sandbox-3");
+    expect(change.state.nextNumber).toBe(4);
+  });
+
+  it("gives the new sandbox the requester's opener", function keepsOpener(): void {
+    const state = openInTurn(["a"]);
+
+    const change = replaceStageEntry(
+      state,
+      { ...buildOpening("b"), openerId: "sandbox-2" },
+      "sandbox-2",
+    );
+
+    expect(change.opened?.openerId).toBe("sandbox-1");
+  });
+
+  it("keeps the forward entries", function keepsForwardEntries(): void {
+    const state = restoreSandbox(openInTurn(["a", "b"]), 1, "a");
+
+    const change = replaceStageEntry(state, buildOpening("c"), "sandbox-2");
+
+    expect(change.state.entries).toHaveLength(3);
+    expect(change.state.entries[2].view).toEqual({
+      kind: "sandbox",
+      sandboxId: "sandbox-3",
+    });
+    expect(listSandboxIds(change.state)).toEqual([
+      "sandbox-1",
+      "sandbox-3",
+      "sandbox-4",
+    ]);
+  });
+
+  it("closes the requester", function closesRequester(): void {
+    const state = openInTurn(["a"]);
+
+    const change = replaceStageEntry(state, buildOpening("b"), "sandbox-2");
+
+    expect(change.closedIds).toEqual(["sandbox-2"]);
+    expect(listSandboxIds(change.state)).toEqual(["sandbox-1", "sandbox-3"]);
+  });
+
+  it("restores by link another entry that pointed to the requester", function restoresOtherEntry(): void {
+    const opened = openInTurn(["a"]);
+    const onPage = openStageEntry(opened, pageView("guides"), null).state;
+    const backToA = openStageEntry(
+      onPage,
+      { kind: "sandbox", sandboxId: "sandbox-2" },
+      "home",
+    ).state;
+    const replaced = replaceStageEntry(
+      backToA,
+      buildOpening("b"),
+      "sandbox-2",
+    ).state;
+
+    expect(replaced.entries[1].view).toEqual({
+      kind: "sandbox",
+      sandboxId: "sandbox-2",
+    });
+    const change = restoreStageEntry(
+      replaced,
+      1,
+      {
+        kind: "sandbox",
+        hash: "#/run?mod=a",
+        link: buildLink("a"),
+        isHomeMod: false,
+      },
+      "home",
+    );
+    expect(change.opened?.id).toBe("sandbox-4");
+    expect(change.opened?.link).toEqual(buildLink("a"));
+  });
+
+  it("does not change the input state", function keepsInput(): void {
+    const state = openInTurn(["a"]);
+    const copy = structuredClone(state);
+
+    replaceStageEntry(state, buildOpening("b"), "sandbox-2");
+
+    expect(state).toEqual(copy);
+  });
+
+  it("refuses a requester that is not the visible sandbox", function refusesHidden(): void {
+    const state = openInTurn(["a"]);
+
+    expect(function replaceHidden(): void {
+      replaceStageEntry(state, buildOpening("b"), "sandbox-1");
+    }).toThrow(
+      'Cannot replace sandbox "sandbox-1": the visible sandbox is "sandbox-2".',
+    );
   });
 });

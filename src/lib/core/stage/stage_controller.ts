@@ -6,6 +6,8 @@ import type {
   FrameLayout,
   ModCheckReport,
   ModCheckRequest,
+  OpenLinkOptions,
+  OpenLinkOutcome,
   ResolvedDefaultModSettings,
   RunLink,
 } from "../engine/index.ts";
@@ -90,12 +92,14 @@ import {
   openStageEntry,
   readVisibleEntry,
   readVisibleSandbox,
+  replaceStageEntry,
   restoreStageEntry,
 } from "./stage_state.ts";
 import type {
   EntryTarget,
   EntryView,
   HomeFallback,
+  SandboxOpening,
   StageChange,
   StageSandbox,
   StageState,
@@ -263,8 +267,9 @@ function openLinkFromSandbox(
   stage: Stage,
   openerId: string,
   link: RunLink,
-): boolean {
-  return openStageLink(stage, link, openerId);
+  options: OpenLinkOptions,
+): OpenLinkOutcome {
+  return openStageLink(stage, link, openerId, options);
 }
 
 function readStageTheme(stage: Stage): Theme {
@@ -393,6 +398,17 @@ function buildSiteConsent(
   return Object.freeze(siteConsent);
 }
 
+/** The link's collection, resolved once the sandbox is launched, or `null` without one. */
+function readSnapshotCollection(
+  sandbox: StageSandbox,
+  runtime: SandboxRuntime | undefined,
+): string | null {
+  if (runtime === undefined || sandbox.link.collection === null) {
+    return sandbox.link.collection;
+  }
+  return runtime.tilesLocation;
+}
+
 function buildSandboxSnapshot(
   sandbox: StageSandbox,
   runtime: SandboxRuntime | undefined,
@@ -409,14 +425,11 @@ function buildSandboxSnapshot(
     status,
     mod: buildModSummary(runtime),
     sandboxDocument: isRunning ? launch.sandboxDocument : null,
-    canReloadTiles: isRunning && launch.collectionSource !== null,
+    canReloadTiles: isRunning && launch.tilesSource !== null,
     messages: buildMessageSnapshots(runtime),
     droppedModMessages: buildDroppedModMessages(runtime),
     modReference: runtime?.modReference ?? sandbox.link.mod,
-    collection:
-      runtime === undefined
-        ? sandbox.link.collection
-        : runtime.collectionLocation,
+    collection: readSnapshotCollection(sandbox, runtime),
     errorMessage: runtime?.errorMessage ?? null,
     apiMismatch: buildApiMismatch(runtime),
     siteConsent: buildSiteConsent(runtime),
@@ -688,28 +701,63 @@ export function followHistory(
   publishStage(stage);
 }
 
+const PUSH_OPENING: OpenLinkOptions = Object.freeze({ replace: false });
+
 /**
- * Opens a link a mod asked for, in a new sandbox with a new history entry,
- * in the opener's section. Returns `false`, and opens nothing, when the
- * opener is not the visible sandbox.
+ * Replaces the visible sandbox, the requester, with a new sandbox for
+ * `link` in the current history entry, whose address becomes the link's.
+ * Closing the requester stops its session before this returns, so its
+ * request gets no answer, and drops its actions.
+ */
+function replaceWithLink(
+  stage: Stage,
+  link: RunLink,
+  requesterId: string,
+): void {
+  const route = routeForLink(link);
+  const opening: SandboxOpening = {
+    hash: route.hash,
+    link: structuredClone(link),
+    openerId: null,
+    isHomeMod: false,
+  };
+  applyStageChange(stage, replaceStageEntry(stage.state, opening, requesterId));
+  writeCurrentEntry(stage, "replace");
+}
+
+/**
+ * Opens a link a mod asked for, in the opener's section: in a new sandbox
+ * with a new history entry, or with `replace` in place of the opener, in its
+ * entry. Gives `"not-visible"`, and opens nothing, when the opener is not
+ * the visible sandbox, and `"home-mod"` when it asks to replace the Home mod
+ * at `#/`.
  */
 export function openStageLink(
   stage: Stage,
   link: RunLink,
   openerId: string,
-): boolean {
-  if (readVisibleSandbox(stage.state)?.id !== openerId) {
-    return false;
+  options: OpenLinkOptions = PUSH_OPENING,
+): OpenLinkOutcome {
+  const opener = readVisibleSandbox(stage.state);
+  if (opener?.id !== openerId) {
+    return "not-visible";
   }
-  const change = openStageEntry(
-    stage.state,
-    buildRouteTarget(routeForLink(link), openerId),
-    readVisibleEntry(stage.state)?.section ?? null,
-  );
-  applyStageChange(stage, change);
-  writeCurrentEntry(stage, "push");
+  if (options.replace && opener.isHomeMod) {
+    return "home-mod";
+  }
+  if (options.replace) {
+    replaceWithLink(stage, link, openerId);
+  } else {
+    const change = openStageEntry(
+      stage.state,
+      buildRouteTarget(routeForLink(link), openerId),
+      readVisibleEntry(stage.state)?.section ?? null,
+    );
+    applyStageChange(stage, change);
+    writeCurrentEntry(stage, "push");
+  }
   publishStage(stage);
-  return true;
+  return "opened";
 }
 
 /** A new sandbox for a mod section's link. The Home section's mod opens at `#/`. */

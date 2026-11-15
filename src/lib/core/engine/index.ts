@@ -14,7 +14,11 @@ export type {
   ResolvedDefaultModSettings,
   SwitchedOffMod,
 } from "./default_mod_settings.ts";
-export { ModMethodError, ModSwitchedOffError } from "./engine_errors.ts";
+export {
+  ModMethodError,
+  ModSwitchedOffError,
+  RunLinkConflictError,
+} from "./engine_errors.ts";
 export {
   describeCancelledApiMismatch,
   describeMissingApiRange,
@@ -39,7 +43,9 @@ export {
   loadLaunchMod,
   loadLaunchTiles,
   loadModLaunchInputs,
+  loadModTile,
   loadModTiles,
+  loadModTilesOfKind,
   selectModTiles,
 } from "./mod_launch.ts";
 export type {
@@ -51,6 +57,7 @@ export type {
   ModLaunchRequest,
   ModTiles,
   RunLink,
+  TilesKind,
 } from "./mod_launch.ts";
 export type { ResponseError } from "./mod_messages.ts";
 export type {
@@ -58,6 +65,8 @@ export type {
   ModMethod,
   ModMethodContext,
   ModMethodTable,
+  OpenLinkOptions,
+  OpenLinkOutcome,
   UserNotification,
   UserNotificationLevel,
 } from "./mod_methods.ts";

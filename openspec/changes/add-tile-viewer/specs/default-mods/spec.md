@@ -17,27 +17,85 @@ The tile viewer `tile_viewer` SHALL declare `open` for `"*"` and have no tile ty
 - **WHEN** the app is opened at `#/run?mod=tile_viewer`
 - **THEN** the viewer's frame says that no tile was given
 
+### Requirement: Tile viewer draws the tile as one card
+The tile viewer SHALL draw the tile as one card: the heading and the source, then a separator and the metadata, then another separator and the body. A tile with an empty body SHALL show neither the second separator nor a body.
+
+#### Scenario: Body in the card
+- **WHEN** the viewer shows a tile with metadata and a body
+- **THEN** one `<article>` holds the heading, the source, an `<hr>`, the metadata, another `<hr>` and the body, in that order
+
+#### Scenario: Empty body
+- **WHEN** the viewer shows a tile whose body is empty
+- **THEN** its card ends with the metadata, without a second `<hr>`
+
 ### Requirement: Tile viewer shows the metadata
-The tile viewer SHALL show the metadata as a description list in frontmatter order: each key with its value, lists as lists, mappings as nested description lists, and other values as written. A tile with empty metadata SHALL show that the file has no metadata instead.
+The tile viewer SHALL show the metadata as a description list in frontmatter order, laid out in two columns: each key, with its value beside it. A value that is not a list or a mapping SHALL be shown as written, on the key's row. A list SHALL be a list without bullets, one item per line, in the value column. A mapping SHALL be a nested description list, laid out the same way, in the value column. A tile with empty metadata SHALL show that the file has no metadata instead.
 
 #### Scenario: Nested values
 - **WHEN** the viewer shows a tile with `authors: ["Karin Boye"]`, `pages: 156`, `read: true` and `edition: { year: 1940 }`
 - **THEN** the metadata lists `authors` with a list holding `Karin Boye`, `pages` with `156`, `read` with `true`, and `edition` with a nested list holding `year` and `1940`, in that order
 
+#### Scenario: Value beside its key
+- **WHEN** the viewer shows a tile with `pages: 156` and `genres: ["Dystopian", "Political"]`
+- **THEN** `156` is on the same line as `pages`, right of it
+- **AND** `Dystopian` and `Political` are on two lines, each right of the key column and without a bullet
+
 #### Scenario: File without metadata
 - **WHEN** the viewer shows a markdown file without frontmatter
 - **THEN** its frame says that the file has no metadata, and shows the file's text as the body
 
+### Requirement: Tile viewer counts metadata lines
+The tile viewer SHALL count the lines of the metadata from its values: a value that is not a list or a mapping takes 1 line, and an image address 2. A list takes the lines of its items, and a mapping those of its values. An empty list or mapping takes 1 line.
+
+#### Scenario: Line counts
+- **WHEN** the viewer counts `pages: 156`, `cover: "https://example.org/cover.png"`, `genres: ["Dystopian", "Political"]` and `edition: { year: 1940, place: "Stockholm" }`
+- **THEN** they take 1, 2, 2 and 2 lines
+
+### Requirement: Tile viewer collapses long metadata
+The tile viewer SHALL show a "Metadata" heading above the metadata. Metadata that takes more than 6 lines SHALL start collapsed, with a button next to the heading that shows all the fields, then shows fewer again. Collapsed, the fields SHALL show in frontmatter order while they fit in 6 lines, and the fields after the first that does not fit SHALL be hidden. Each viewer SHALL start collapsed, also after Previous or Next. Metadata that fits in 6 lines SHALL have no button.
+
+#### Scenario: Long metadata starts collapsed
+- **WHEN** the viewer shows a tile with `pages: 156`, `read: true`, `year: 1940`, `language: "Swedish"`, `genres` with 5 items and `source: "https://example.org/books/kallocain"`
+- **THEN** it shows `pages`, `read`, `year`, `language`, the first item of `genres` and a line saying `and 4 more`, and hides `source`
+- **AND** a button next to the "Metadata" heading says `Show all 6 fields`
+
+#### Scenario: Show all the fields
+- **WHEN** the user activates `Show all 6 fields`
+- **THEN** every field and every item of `genres` is shown, the `and 4 more` line is hidden, and the button says `Show fewer fields`
+- **AND** activating it again shows the collapsed metadata
+
+#### Scenario: Short metadata
+- **WHEN** the viewer shows a tile with `title`, `pages` and `read`
+- **THEN** every field is shown and there is no button
+
+### Requirement: Tile viewer metadata button looks like a button
+The button next to the "Metadata" heading SHALL look like a button without a pointer over it, as the theme's outline button, and SHALL be no taller than the heading.
+
+#### Scenario: Button shape
+- **WHEN** the viewer shows a tile whose metadata starts collapsed
+- **THEN** the button next to the "Metadata" heading has a visible border and the background of the theme's outline button, `--ot-background`, without a pointer over it
+- **AND** it is no taller than the heading
+
+### Requirement: Tile viewer cuts a long list
+When collapsed, a list that does not fit SHALL show its first items that fit, followed by a line that says how many more items it has, which counts as one of the 6 lines. The first field SHALL always show, a list at least with its first item.
+
+#### Scenario: Long first list
+- **WHEN** the viewer shows a tile whose first field is a list of 20 short items
+- **THEN** it shows the first 5 items and a line saying `and 15 more`
+
 ### Requirement: Tile viewer links metadata addresses
-Each metadata string that is an absolute `http:` or `https:` address SHALL be shown as a link to it with `data-ot-link`, so that following it asks the user as any link of a body does. When the address's path ends with an image extension (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.avif` or `.svg`, in any letter case, without its query or fragment), the link SHALL also show a small thumbnail of the image, loaded lazily, which SHALL be hidden when it fails to load, leaving the link.
+Each metadata string that is an absolute `http:` or `https:` address SHALL be shown as a link to it with `data-ot-link`, so that following it asks the user as any link of a body does.
 
 #### Scenario: Web address
 - **WHEN** the viewer shows a tile with `source: "https://example.org/books/kallocain"`
 - **THEN** the value is a link to that address with `data-ot-link`, and clicking it sends `links.open` with that address
 
+### Requirement: Tile viewer shows image thumbnails
+When a metadata address's path ends with an image extension (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.avif` or `.svg`, in any letter case, without its query or fragment), its link SHALL also show a thumbnail of the image, two lines of text high, before the address, loaded lazily. A thumbnail that fails to load SHALL be hidden, leaving the link.
+
 #### Scenario: Image thumbnail
 - **WHEN** the viewer shows a tile with `image: "https://media.example.net/covers/Kallocain.JPG?w=200"`, and the image loads
-- **THEN** the value is a link to that address that shows a thumbnail of the image
+- **THEN** the value is a link to that address that shows a thumbnail of the image, two lines of text high
 
 #### Scenario: Image that fails
 - **WHEN** the viewer shows a tile whose `image` ends with `.jpg` and answers HTTP 404
@@ -111,7 +169,7 @@ Each tile of the collection viewer's list SHALL be a button named after its labe
 - **THEN** the collection viewer stays visible and shows the error's message
 
 ### Requirement: Tile viewer cases
-The tile viewer's cases SHALL cover the heading with and without `title`, the metadata with nested values, links and thumbnails, a file without metadata, the body, no tile, the place in a fixture collection with Previous and Next sending `mods.open` with `replace` `true`, a tile not in `from`, a `from` that cannot be inspected, and a click on a link to a tile sending `mods.open`.
+The tile viewer's cases SHALL cover the heading with and without `title`, the metadata with nested values, links and thumbnails, the collapsed metadata with its line count, the button and a long list, a file without metadata, the body, no tile, the place in a fixture collection with Previous and Next sending `mods.open` with `replace` `true`, a tile not in `from`, a `from` that cannot be inspected, and a click on a link to a tile sending `mods.open`.
 
 #### Scenario: Next in a case
 - **WHEN** a case of the tile viewer mounts it with the second tile of a fixture collection as its tile and that collection as `params.from`, answers `mods.open` with `null`, and presses Next
@@ -184,7 +242,7 @@ The default mods SHALL get their look only from the theme: semantic HTML, the co
 
 #### Scenario: Tile viewer draws the tile as a card
 - **WHEN** the tile viewer shows a tile
-- **THEN** the heading, source and metadata are in an `<article>` whose computed background color is the value of `--ot-card`, and the Next button's computed background color is the value of `--ot-primary` when it is shown
+- **THEN** the heading, source, metadata and body are in an `<article>` whose computed background color is the value of `--ot-card`, with an `<hr>` between the source and the metadata and another between the metadata and the body, and the Next button's computed background color is the value of `--ot-primary` when it is shown
 
 ### Requirement: Default mods ship their tests
 Each default mod SHALL declare `test_path` and ship a test file whose cases check its behavior from inside its own sandbox. Checking a default mod with `mods.check` SHALL give a report with status `"pass"`, `testsChecked` `true` and every case passed.

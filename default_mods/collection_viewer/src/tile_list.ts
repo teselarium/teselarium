@@ -1,5 +1,8 @@
+import type { CollectionInspection } from "../../mod_api.d.ts";
 import { filterTileIndexes } from "./tile_filter.ts";
 import { labelTiles } from "./tile_labels.ts";
+import { openTile } from "./viewer_view.ts";
+import type { ViewerView } from "./viewer_view.ts";
 
 /** The column headings of the tile table. */
 const TILE_COLUMNS = ["Tile", "Address"];
@@ -22,12 +25,28 @@ function buildCell(tagName: "td" | "th", content: string | Node): HTMLElement {
   return cell;
 }
 
-/** A tile: its label, then its full address in muted text. Selecting it does nothing yet. */
-function buildTileRow(label: string, address: string): HTMLElement {
+/**
+ * A tile: its label, as a button named after it that opens the tile in the
+ * tile viewer, then its full address in muted text.
+ */
+function buildTileRow(
+  view: ViewerView,
+  collectionSource: string,
+  label: string,
+  address: string,
+): HTMLElement {
   const row = document.createElement("tr");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.otVariant = "ghost";
+  button.textContent = label;
+  button.addEventListener(
+    "click",
+    openTile.bind(undefined, view, collectionSource, address),
+  );
   const addressElement = document.createElement("small");
   addressElement.textContent = address;
-  row.append(buildCell("td", label), buildCell("td", addressElement));
+  row.append(buildCell("td", button), buildCell("td", addressElement));
   return row;
 }
 
@@ -84,15 +103,22 @@ function buildTileCard(rows: HTMLElement[]): HTMLElement {
  * The collection's tiles as a section: a heading, the filter, the count under
  * it and the card of tiles. The count is muted text that screen readers
  * announce (`aria-live`), not `role="status"`, which the theme draws as a box.
+ * Hidden rows keep their buttons out of the tab order.
  */
-export function buildTileList(addresses: string[]): HTMLElement {
+export function buildTileList(
+  view: ViewerView,
+  inspection: CollectionInspection,
+): HTMLElement {
+  const addresses = inspection.tiles;
   const tileList: TileList = {
     rows: [],
     labels: labelTiles(addresses),
     count: document.createElement("small"),
   };
   for (const [index, address] of addresses.entries()) {
-    tileList.rows.push(buildTileRow(tileList.labels[index], address));
+    tileList.rows.push(
+      buildTileRow(view, inspection.source, tileList.labels[index], address),
+    );
   }
   tileList.count.setAttribute("aria-live", "polite");
   tileList.count.textContent = describeCount(

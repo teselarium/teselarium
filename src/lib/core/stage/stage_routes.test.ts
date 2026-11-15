@@ -53,6 +53,7 @@ describe("readStageRoute", function describeReadStageRoute(): void {
       link: {
         mod: SAMPLE_MOD_REFERENCE,
         collection: null,
+        tile: null,
         params: { extra: "1" },
       },
       isHomeMod: false,
@@ -161,10 +162,22 @@ describe("findLinkSection", function describeFindLinkSection(): void {
     expect(findLinkSection(MOD_ROUTING, EXPLORER_LINK)).toBe("home");
   });
 
+  it("Section link without a tile equals a typed link without a tile", function findsTypedLink(): void {
+    const typedLink: RunLink = {
+      mod: "mod_explorer",
+      collection: null,
+      tile: null,
+      params: {},
+    };
+
+    expect(findLinkSection(PAGE_ROUTING, typedLink)).toBe("mods");
+  });
+
   it("Link to another mod", function findsNone(): void {
     const otherLinks: RunLink[] = [
       { mod: SAMPLE_MOD_REFERENCE, collection: null, params: {} },
       { mod: "mod_explorer", collection: "./c.yaml", params: {} },
+      { mod: "mod_explorer", collection: null, tile: "./a.md", params: {} },
       { mod: "mod_explorer", collection: null, params: { from: "home" } },
     ];
 
