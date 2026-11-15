@@ -446,6 +446,19 @@ test.describe("Hidden sections keep working", function describeHidden(): void {
     await expect(currentItem(page)).toHaveCount(0);
   });
 
+  test("Hide Tiles", async function opensHiddenTiles({ page }): Promise<void> {
+    await page.goto("/#/settings");
+    await switchSectionTo(page, "Tiles", false);
+    await expect(sectionItem(page, "Tiles")).toHaveCount(0);
+
+    await page.goto("/#/run?mod=collection_explorer");
+    await page.reload();
+
+    await expect(stageBar(page)).toContainText("Tiles");
+    await expect(page.locator('iframe[title="Tiles"]')).toBeVisible();
+    await expect(currentItem(page)).toHaveCount(0);
+  });
+
   test("Guides page while Guides is hidden", async function opensHiddenGuides({
     page,
   }): Promise<void> {

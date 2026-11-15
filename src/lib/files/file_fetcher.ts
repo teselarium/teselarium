@@ -4,6 +4,14 @@ import type { LocalFiles } from "./local_files.ts";
 
 const LOCAL_FILE_PROTOCOL = "file:";
 
+/**
+ * Added to the message of a rejected request: the browser rejects a request
+ * to a site that is down and to one that does not allow the app's origin
+ * (CORS) alike, and tells the page nothing more.
+ */
+const REJECTED_REQUEST_HINT =
+  "The site may be unreachable or may not allow this app to read its files.";
+
 /** A file loaded in memory. `source` is the resolved absolute URL it was read from. */
 export interface FetchedFile {
   source: string;
@@ -67,7 +75,7 @@ async function requestRemoteFile(
   } catch (error) {
     throw new FileFetchError(
       url.href,
-      `the request failed: ${describeErrorCause(error)}`,
+      `the request failed: ${describeErrorCause(error)}. ${REJECTED_REQUEST_HINT}`,
       { cause: error },
     );
   }

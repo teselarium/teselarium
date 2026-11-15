@@ -29,7 +29,10 @@ Implemented in `src/lib/files/`. Other modules import only from the public entry
 - `resolveLocation(location, baseUrl)`: resolves a path or URL to an absolute `URL`. Raises `FileFetchError` when it cannot.
 - `indexLocalFiles(pickedFiles)`: turns the files the user picked (`PickedFile`: `path` inside the picked folder and `content` as a `Blob`) into `LocalFiles`, keyed by their virtual `file:///` URL.
 - `FileFetchOptions`: `baseUrl` for relative locations, `fetch` to replace `globalThis.fetch`, `localFiles` for `file:` locations.
-- Errors: `FileFetchError` (file cannot be fetched or read). It exposes the failing `source`.
+- Errors: `FileFetchError` (file cannot be fetched or read). It exposes the failing `source`. Its message is `Cannot load file "<source>": <reason>`, where the reason is:
+  - `HTTP <status> <status text>` when the server answers outside 200–299, for example `HTTP 404 Not Found`;
+  - `the request failed: <cause>. The site may be unreachable or may not allow this app to read its files.` when the request is rejected, for example by a network failure or a CORS block, with the original error kept as `cause`. The browser does not tell the page which one it was, so the hint names both;
+  - `the response body cannot be read: <cause>` when the body cannot be read.
 - Types: `FetchedFile`, `FileFetchOptions`, `PickedFile`, `LocalFiles`.
 
 Example:
@@ -44,7 +47,7 @@ const file = await fetchFile("./book_collection.yaml", {
 // file.content starts with "collection:"
 ```
 
-Hosting note: files loaded from another origin are fetched by the browser with CORS. If the host does not send CORS headers (`Access-Control-Allow-Origin`), loading fails with a `FileFetchError`. Shared files must be hosted with CORS enabled.
+Hosting note: files loaded from another origin are fetched by the browser with CORS. If the host does not send CORS headers (`Access-Control-Allow-Origin`), loading fails with a `FileFetchError` for a rejected request, whose message says that the site may not allow this app to read its files. Shared files must be hosted with CORS enabled.
 
 ### Md parser
 

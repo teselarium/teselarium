@@ -29,10 +29,12 @@ export const VANILLA_SECTIONS: readonly SectionDefinition[] = [
     id: "tiles",
     label: "Tiles",
     icon: { lucide: LayoutGrid },
-    target: { page: true },
+    target: {
+      mod: { mod: "collection_explorer", collection: null, params: {} },
+    },
     group: "main",
     optional: true,
-    comingSoon: true,
+    comingSoon: false,
   },
   {
     id: "mods",

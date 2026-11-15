@@ -130,7 +130,7 @@ Alternatives considered:
 
 ### 6. Collection viewer rows become buttons
 
-`tile_list.ts` of `collection_viewer` draws each item's label as a `<button type="button">` whose accessible name is the label, with the address under it. Its click sends `{ mod: config.tile_viewer, tile: source, params: { from: inspection.source } }`. Errors, such as `-32003`, go to the viewer's `role="status"` region. `mod_conf.yaml` gets `config: { tile_viewer: "tile_viewer" }`. The filter keeps hiding items with `hidden`, so hidden buttons leave the tab order.
+`tile_list.ts` of `collection_viewer` draws the tiles as rows of a table in a card ("Tile" and "Address" columns, see `add-collection-explorer`, design.md, decision 7). The "Tile" cell of each row holds the label as a `<button type="button">` whose accessible name is the label, and the "Address" cell keeps the full address in muted text. Its click sends `{ mod: config.tile_viewer, tile: source, params: { from: inspection.source } }`. Errors, such as `-32003`, go to a `role="status"` region that the viewer adds for them, as the explorers have, and which draws nothing while it is empty. It is not the tile count under the filter, which stays an `aria-live` line. `mod_conf.yaml` gets `config: { tile_viewer: "tile_viewer" }`. The filter keeps hiding rows with `hidden`, so hidden buttons leave the tab order.
 
 ### 7. Mod API `0.1.12`
 

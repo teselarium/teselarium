@@ -1,0 +1,12 @@
+mod:
+  name: "collection_viewer"
+  title: "Collection Viewer"
+  version: "0.1.0"
+  api: "^0.1.0"
+  description: "Shows a tile collection's name, description, entry issues and tiles, without loading them."
+  entrypoint: "./main.js"
+  test_path: "./test.js"
+  permissions:
+    open:
+      - host: "*"
+        reason: "Shows the collection you are viewing"

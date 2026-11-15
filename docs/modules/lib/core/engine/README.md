@@ -42,7 +42,7 @@ Data that is not a valid request but has a string or number `id` is answered wit
 | `-32601` | Unknown method. The message names the method. |
 | `-32602` | Wrong params. The message names the method and the problem. |
 | `-32000` | The browser storage failed. The message is the storage error's message. |
-| `-32001` | A mod file, or a file of a declared library, could not be loaded. The message is the load error's message, after `libs.load: ` for a library file (see [Libraries](#libraries)). |
+| `-32001` | A mod file, a collection file (see [Inspecting collections](#inspecting-collections)), or a file of a declared library, could not be loaded. The message is the load error's message, after `libs.load: ` for a library file (see [Libraries](#libraries)). |
 | `-32002` | Permission denied. The message says which permission is missing. |
 | `-32003` | The requested default mod is switched off. The message names the mod. |
 | `-32603` | An error the method did not expect, such as a tile body whose library cannot be loaded. The message is the method's name, `: ` and the error's message, as in `tiles.renderBody: Failed to fetch dynamically imported module: …`. |
@@ -62,6 +62,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `mods.inspect` | `{ mod }`, a mod reference | The mod's metadata, without running it (see below). |
 | `mods.open` | `{ mod, collection?, params? }` | `null`, once the stage opened the mod in a new sandbox. |
 | `mods.check` | `{ mod, collection? }` | The check report of the mod, once the check is done (see below). Added in mod API `0.1.1`. |
+| `collections.inspect` | `{ collection }`, a collection location | The collection's index, without loading any tile (see [Inspecting collections](#inspecting-collections)). Added in mod API `0.1.11`. |
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
@@ -95,7 +96,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.10"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.11"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. |
 | `params` | The link's parameters other than `mod` and `collection`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -183,7 +184,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
       "step": "bundle",
       "level": "warning",
       "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
-      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.10"
+      "message": "the mod declares no \"api\" range, so it may not work with mod API 0.1.11"
     }
   ]
 }
@@ -192,6 +193,36 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
 `status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none. `mountChecked` is `false` when a bundle error skipped the mount. `testsChecked` is `true` when the mod's cases ran, and `false` for a mod without `test_path`, when a bundle or mount error skipped the tests, or when the test file could not be loaded. `tests` lists each case the test file registers, in order, as `{ name, status, message }`, with `status` `"pass"` or `"fail"` and `message` `null` for a passing case and the failure's message otherwise; it is empty when the cases did not run. Findings are in the order they were found, and `step` is `"bundle"`, `"mount"` or `"test"`. A `test` finding comes from the tests: a test file that cannot be loaded or registers no valid case, a failed case (`The test "<name>" failed: <message>`, whose source is the test file), or what a case's mod did that the mount check would record, with the message prefixed by `In the test "<name>": `.
 
 Mods never build app addresses: they send what to run, and only the stage turns it into a run link and a history entry (see the [stage module](../stage/README.md)).
+
+### Inspecting collections
+
+`collections.inspect { collection }` reads a tile collection's file alone, without requesting any of its tiles, and answers its index. A mod uses it to list collections, or to show what one holds, without being opened with it.
+
+Before any file is requested, the engine checks:
+
+1. The params: `collection` must be a non-empty string (`-32602`, `collections.inspect: "collection" must be a non-empty string`). It is resolved against the app's address, as the references of `mods.*` are, and a location that cannot be resolved is `-32602` too.
+2. The `open` permission: the requesting mod needs a **granted** `open` permission for `"*"` or the origin of the collection file. Otherwise `-32002`, with `Inspecting collections from <origin> is not allowed. Add it to permissions.open in mod_conf.yaml.`, or `Inspecting collections from <origin>: the mod declares it in permissions.open, but the permission was not granted.` for a mod from another origin whose `open` the user did not allow. The request never shows a dialog.
+
+Collections are not default mods, so there is no switched-off check. Hidden mods may inspect collections, as they may inspect mods.
+
+Then the engine reads the index (see the [tile module](../../tile/README.md#collection-index)) and answers it as plain data:
+
+- `source`: the resolved address of the collection file;
+- `name` and `description` (`""` when the file has none);
+- `tiles`: the resolved address of each tile entry that loading the collection would request, in entry order, with a repeated tile listed once;
+- `issues`: the entry issues, each `{ level, source, message }` with level `"warning"` or `"error"`: malformed entries, relative `url`s, local files in a remote collection, and repeated tiles. A tile that would fail to load is listed with no issue, since it is never requested.
+
+A collection file that cannot be fetched or read, is not plain YAML, or does not have the collection structure is `-32001`, with the load error's message, which names the collection's source, such as `Cannot load file "https://example.org/samples/tiles/missing.yaml": HTTP 404 Not Found`.
+
+```js
+const inspection = await engine.request("collections.inspect", {
+  collection: "./samples/tiles/literature_nobel_laureates/collection.yaml",
+});
+// inspection.source === "https://example.org/samples/tiles/literature_nobel_laureates/collection.yaml"
+// inspection.name === "Nobel Prize in Literature laureates"
+// inspection.tiles[0] === "https://example.org/samples/tiles/literature_nobel_laureates/2010__mario_vargas_llosa.md"
+// inspection.issues is []
+```
 
 ### Asking the user: links, files and confirmations
 
@@ -486,7 +517,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.10` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.11` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -577,7 +608,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.10"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.11"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.10` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -661,7 +692,7 @@ Implemented in `library_files.ts`, and used by `libs.load` and the bundle check,
 
 ### Request handlers
 
-Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`), `ui_methods.ts` (`UI_METHODS`), `tiles_methods.ts` (`TILES_METHODS`), `players_methods.ts` (`PLAYERS_METHODS`) and `libs_methods.ts` (`LIBS_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `tileBodies`, `readSiteDecisions`, `onOpenLink`, `onRequestAction`, `onCheckMod`). `tileBodies` is the session's current `TileBodies`, which `pushTilesChanged` replaces.
+Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `collections_methods.ts` (`COLLECTIONS_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`), `ui_methods.ts` (`UI_METHODS`), `tiles_methods.ts` (`TILES_METHODS`), `players_methods.ts` (`PLAYERS_METHODS`) and `libs_methods.ts` (`LIBS_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `tileBodies`, `readSiteDecisions`, `onOpenLink`, `onRequestAction`, `onCheckMod`). `tileBodies` is the session's current `TileBodies`, which `pushTilesChanged` replaces.
 
 The `links.*`, `files.*`, `ui.*` and `players.*` handlers check their params into an `AppAction` (`app_actions.ts`), data the app can perform with no more checks:
 

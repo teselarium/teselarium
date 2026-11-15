@@ -81,6 +81,19 @@ function readTextColor(element: Element): string {
 }
 
 test.describe("Vanilla sections", function describeVanilla(): void {
+  test("Tiles opens the collection explorer", async function opensTiles({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+
+    await openSection(page, "Tiles");
+
+    await expect(stageBar(page)).toContainText("Tiles");
+    await expect(page.locator('iframe[title="Tiles"]')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe("#/run?mod=collection_explorer");
+    await expect(currentItem(page)).toHaveText("Tiles");
+  });
+
   test("Tinted image follows the color scheme", async function tintsImage({
     page,
   }): Promise<void> {

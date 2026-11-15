@@ -185,6 +185,26 @@ export default async function mount(engine, context) {
 
 `level` is `"info"` (the default), `"warning"` or `"error"`, and `source`, by default the mod's source, says what the message is about, such as a tile's `source`. The message is plain text of at most 1000 characters. It needs no permission and no dialog, and hidden mods can send it too. The app keeps the last 100 messages of each level from the mod in its sandbox and says how many older ones it dropped, so notifications never push out the mod's errors or warnings. A check records the mod's errors and warnings as findings, and a test case reads the request from `requests` (see [Checking a mod](#checking-a-mod) and [What a case records](#what-a-case-records)).
 
+## Inspecting collections
+
+A mod can read what a tile collection holds without being opened with it: `collections.inspect` reads the collection file alone and answers its `source`, `name`, `description`, `tiles` (the address of each tile it lists) and `issues` (its entry issues), with no tile requested (see [Inspecting collections](modules/lib/core/engine/README.md#inspecting-collections) in the engine's README). It needs an `open` permission for the collection's site, or for `"*"`, as inspecting a mod does:
+
+```yaml
+  permissions:
+    open:
+      - host: "*"
+        reason: "Lists the collections you pick"
+```
+
+```js
+const inspection = await engine.request("collections.inspect", {
+  collection: "./samples/tiles/literature_nobel_laureates/collection.yaml",
+});
+showCollection(inspection.name, inspection.description, inspection.tiles);
+```
+
+The location is resolved against the app's address. A collection that cannot be loaded answers `-32001` with the load error's message, and one whose site the mod's `open` does not cover answers `-32002`, before anything is requested.
+
 ## Libraries
 
 `libs.load` installs a library in the mod's frame, without the mod bundling it or loading code from another site (see [Libraries](modules/lib/core/engine/README.md#libraries) in the engine's README). There are two kinds: the libraries the app ships, and the ones the mod declares in its `mod_conf.yaml`.

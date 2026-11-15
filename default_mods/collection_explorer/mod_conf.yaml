@@ -1,0 +1,17 @@
+mod:
+  name: "collection_explorer"
+  title: "Tiles"
+  version: "0.1.0"
+  api: "^0.1.0"
+  description: "Lists tile collections and opens them in the collection viewer."
+  entrypoint: "./main.js"
+  test_path: "./test.js"
+  config:
+    viewer: "collection_viewer"
+    collections:
+      - "./samples/tiles/literature_nobel_laureates/collection.yaml"
+      - "./samples/tiles/literature_nobel_laureates_books/collection.yaml"
+  permissions:
+    open:
+      - host: "*"
+        reason: "Lists the collections of its config and opens the one you pick"

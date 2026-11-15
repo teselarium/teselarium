@@ -73,7 +73,7 @@ describe("Sidebar", function describeSidebar(): void {
     expect(lists).toHaveLength(2);
     expect(readItemNames(lists[0])).toEqual([
       "Home",
-      "TilesComing soon",
+      "Tiles",
       "Mods",
       "MosaicsComing soon",
       "Guides",
@@ -114,17 +114,17 @@ describe("Sidebar", function describeSidebar(): void {
     expect(icon.style.maskImage).toContain("./icons/guides.svg");
   });
 
-  it("Tiles is coming soon", async function disablesTiles(): Promise<void> {
+  it("Mosaics is coming soon", async function disablesMosaics(): Promise<void> {
     const fixture = await startTestApp("");
     renderSidebar(fixture);
-    const tiles = findItem(/Tiles/);
+    const mosaics = findItem(/Mosaics/);
     const visibleBefore = readStageSnapshot(fixture.stage).visible;
 
-    fireEvent.click(tiles);
+    fireEvent.click(mosaics);
 
-    expect(tiles).toHaveAttribute("aria-disabled", "true");
-    expect(tiles).not.toHaveAttribute("href");
-    expect(tiles).toHaveTextContent("Coming soon");
+    expect(mosaics).toHaveAttribute("aria-disabled", "true");
+    expect(mosaics).not.toHaveAttribute("href");
+    expect(mosaics).toHaveTextContent("Coming soon");
     expect(fixture.history.entries).toHaveLength(1);
     expect(readStageSnapshot(fixture.stage).visible).toEqual(visibleBefore);
   });
@@ -133,6 +133,10 @@ describe("Sidebar", function describeSidebar(): void {
     renderSidebar(await startTestApp(""));
 
     expect(findItem("Home")).toHaveAttribute("href", "#/");
+    expect(findItem("Tiles")).toHaveAttribute(
+      "href",
+      "#/run?mod=collection_explorer",
+    );
     expect(findItem("Mods")).toHaveAttribute("href", "#/run?mod=mod_explorer");
     expect(findItem("Guides")).toHaveAttribute("href", "#/guides");
   });

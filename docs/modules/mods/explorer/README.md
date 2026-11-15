@@ -7,7 +7,7 @@ It is an ordinary sandboxed mod. It uses only the engine API: `mods.inspect` to 
 ## What it does
 
 - While the mods load, its list region is busy (`aria-busy="true"`) and says "Loading mods…".
-- For each reference in its config's `mods`, in order, it sends `mods.inspect` and lists the mod as a card with its title, its description and a "View <title>" button. A reference that cannot be inspected is listed as an alert with the reference and the error message (for example a missing mod file and `404`).
+- For each reference in its config's `mods`, in order, it sends `mods.inspect` and lists the mod as a card with its title, its description and a "View" button, whose accessible name is "View <title>" so a screen reader still names the mod. A reference that cannot be inspected is listed as an alert with the reference and the error message (for example a missing mod file and `404`).
 - When the user selects a mod, it sends `mods.open` for the mod in its config's `viewer`, with the selected mod's source as the `target` parameter. The stage opens the viewer in a new sandbox, and the explorer stays open behind it, so back returns to it as it was left.
 
 ## An example of the app's look

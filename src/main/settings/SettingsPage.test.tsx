@@ -171,7 +171,7 @@ describe("SettingsPage", function describeSettingsPage(): void {
       expect(findRow(name)).toHaveTextContent("Always shown");
       expect(within(findRow(name)).queryByRole("switch")).toBeNull();
     }
-    expect(findRow("Tiles")).toHaveTextContent("Coming soon");
+    expect(findRow("Tiles")).not.toHaveTextContent("Coming soon");
     expect(findRow("Mosaics")).toHaveTextContent("Coming soon");
     expect(findRow("Mods")).not.toHaveTextContent("Coming soon");
     expect(
@@ -541,11 +541,20 @@ describe("SettingsPage", function describeSettingsPage(): void {
     expect(readSidebarNames()).not.toContain("Guides");
   });
 
-  it("Hide a coming-soon section", async function hidesTiles(): Promise<void> {
+  it("Hide a coming-soon section", async function hidesMosaics(): Promise<void> {
+    renderApp(await startTestApp("#/settings"));
+
+    fireEvent.click(screen.getByRole("switch", { name: "Mosaics" }));
+
+    expect(readSidebarNames()).not.toContain("Mosaics");
+  });
+
+  it("Hide Tiles", async function hidesTiles(): Promise<void> {
     renderApp(await startTestApp("#/settings"));
 
     fireEvent.click(screen.getByRole("switch", { name: "Tiles" }));
 
+    expect(screen.getByRole("switch", { name: "Tiles" })).not.toBeChecked();
     expect(readSidebarNames()).not.toContain("Tiles");
   });
 

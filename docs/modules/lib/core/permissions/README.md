@@ -36,14 +36,18 @@ The site consent dialog, the denial messages and Settings use the same verbs:
 | `code` | load code from |
 | `open` | open mods from |
 
+The `open` verb names mods, but `open` also covers the collections a mod may inspect (see [The `open` check](#the-open-check)).
+
 The host `"*"` reads as "any site".
 
 ### The `open` check
 
-`open` is not part of the content policy: the engine checks it before `mods.inspect` and `mods.open` request any file. A mod may inspect or open a mod when it has a **granted** `open` permission whose host is `"*"` or the origin of the target mod file. Otherwise the request is refused with code `-32002` and one of these messages:
+`open` is not part of the content policy: it covers the mods and collections a mod may reach through the engine. The engine checks it before `mods.inspect`, `mods.open`, `mods.check` and `collections.inspect` request any file. A mod may inspect or open a mod, or inspect a collection, when it has a **granted** `open` permission whose host is `"*"` or the origin of the target mod file or collection file. Otherwise the request is refused with code `-32002` and one of these messages, worded for the request's subject:
 
-- Not declared: `Opening mods from https://mods.example.net is not allowed. Add it to permissions.open in mod_conf.yaml.`
-- Declared but not granted: `Opening mods from https://mods.example.net: the mod declares it in permissions.open, but the permission was not granted.`
+- Not declared: `Opening mods from https://mods.example.net is not allowed. Add it to permissions.open in mod_conf.yaml.`, or `Inspecting collections from https://tiles.example.net is not allowed. Add it to permissions.open in mod_conf.yaml.`
+- Declared but not granted: `Opening mods from https://mods.example.net: the mod declares it in permissions.open, but the permission was not granted.`, or `Inspecting collections from https://tiles.example.net: the mod declares it in permissions.open, but the permission was not granted.`
+
+`collections.inspect` never shows the site consent dialog: a foreign mod gets it only when the user allowed its `open` permission before it started.
 
 ## Module Details
 
@@ -53,8 +57,8 @@ Implemented in `src/lib/core/permissions/`. Other modules import only from the p
 - `listConsentLines(mod, appOrigin, decisions)`: the declared permissions the site consent dialog asks about, one per category and host, in the order declared. Empty for a mod from the app's origin.
 - `describePermissionLine(permission)`: the category's verb and the host, such as `show content from https://upload.wikimedia.org`.
 - `describeDeniedPermission(permission)`: the warning text for a declared permission that was not granted.
-- `checkOpenGrant(grants, targetSource)`: `null` when the mod may inspect or open the mod at `targetSource`, otherwise the denial message.
-- Types: `ModGrants`, `SiteDecision`.
+- `checkOpenGrant(grants, targetSource, subject?)`: `null` when the mod may reach the mod or collection file at `targetSource`, otherwise the denial message. `subject` (`OpenSubject`) is `"mods"` (the default) or `"collections"`, and words the message.
+- Types: `ModGrants`, `OpenSubject`, `SiteDecision`.
 
 Example:
 

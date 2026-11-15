@@ -97,7 +97,7 @@ mod:
 | `connect` | exchange data with the host: `fetch`, XMLHttpRequest, WebSocket, EventSource |
 | `embed` | embed pages from the host in frames |
 | `code` | load scripts from the host at runtime |
-| `open` | inspect and open mods from the host through the engine |
+| `open` | inspect and open mods, and inspect collections, from the host through the engine |
 
 Host rules:
 

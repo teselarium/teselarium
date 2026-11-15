@@ -194,23 +194,35 @@ function hasOpenPermission(
   return false;
 }
 
+/** What a request reaches through the `open` permission. */
+export type OpenSubject = "mods" | "collections";
+
+/** How the denial messages name a request on each subject, before the origin. */
+const OPEN_SUBJECT_ACTIONS: Record<OpenSubject, string> = {
+  mods: "Opening mods from",
+  collections: "Inspecting collections from",
+};
+
 /**
- * Checks that a mod may inspect or open the mod at `targetSource`: it needs a
- * granted `open` permission for `"*"` or the target's origin. Returns `null`
- * when it may, and otherwise the message of the denial.
+ * Checks that a mod may reach the mod or collection file at `targetSource`
+ * through the engine: it needs a granted `open` permission for `"*"` or the
+ * target's origin. Returns `null` when it may, and otherwise the message of
+ * the denial, worded for `subject`.
  */
 export function checkOpenGrant(
   grants: ModGrants,
   targetSource: string,
+  subject: OpenSubject = "mods",
 ): string | null {
   const targetOrigin = new URL(targetSource).origin;
   if (hasOpenPermission(grants.granted, targetOrigin)) {
     return null;
   }
+  const action = OPEN_SUBJECT_ACTIONS[subject];
   if (hasOpenPermission(grants.denied, targetOrigin)) {
-    const deniedMessage = `Opening mods from ${targetOrigin}: the mod declares it in permissions.open, but the permission was not granted.`;
+    const deniedMessage = `${action} ${targetOrigin}: the mod declares it in permissions.open, but the permission was not granted.`;
     return deniedMessage;
   }
-  const undeclaredMessage = `Opening mods from ${targetOrigin} is not allowed. Add it to permissions.open in mod_conf.yaml.`;
+  const undeclaredMessage = `${action} ${targetOrigin} is not allowed. Add it to permissions.open in mod_conf.yaml.`;
   return undeclaredMessage;
 }

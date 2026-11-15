@@ -28,6 +28,7 @@ A mod cannot do this today. The only way for it to learn anything about a collec
   - A missing, empty or failing `target` is shown as an error.
   - Tiles are not opened yet.
 - **Clearer fetch errors**: when the browser rejects a request, which is how a site that does not allow the app shows up, the fetch error's message adds that the site may be unreachable or may not allow this app to read its files. This holds for every collection, tile and mod file the app loads, so the collection viewer, the stage bar and the mod viewer all show the hint.
+- **The explorers' buttons say "View".** The mod explorer's "View <title>" button and the collection explorer's become "View", with the title kept in the accessible name, so the card does not repeat its heading.
 - **Both mods are ordinary default mods.** Each ships its tests and fixtures and passes `mods.check`, and each gets its look only from the theme.
 - **The Tiles section becomes the mod link `collection_explorer`** and stops being coming soon. Mosaics is now the only coming-soon section. The viewer that the explorer opens stays in Tiles, through the existing opener rule.
 - **The mod API version goes from `0.1.10` to `0.1.11`.**
@@ -71,6 +72,7 @@ None. The two mods are default mods and belong to `default-mods`, beside the mod
   - `MOD_API_VERSION`.
   - `src/main/sections/vanilla_sections.ts`.
   - `default_mods/mod_api.d.ts`, which types the new method.
+  - `default_mods/mod_explorer/src/mod_cards.ts`: the button's visible text.
 - **New default mods**: `default_mods/collection_explorer/` and `default_mods/collection_viewer/`, in TypeScript, with `test/`, `fixtures/` and `mod_conf.yaml`. The default-mods build picks the new folders up with no change.
 - **Tests**:
   - unit tests of the index step and of `collections.inspect`;

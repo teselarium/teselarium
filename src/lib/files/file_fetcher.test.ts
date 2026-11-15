@@ -13,6 +13,13 @@ import type { LocalFiles } from "./local_files.ts";
 const KALLOCAIN_PATH = "tiles/books/kallocain.md";
 const KALLOCAIN_URL = `${FIXTURES_BASE_URL}${KALLOCAIN_PATH}`;
 
+const REJECTED_REQUEST_HINT =
+  "The site may be unreachable or may not allow this app to read its files.";
+
+function returnFetchError(error: unknown): unknown {
+  return error;
+}
+
 function createSampleFetch(): Mock<typeof fetch> {
   const sampleFetch = vi.fn<typeof fetch>(fetchFixture);
   return sampleFetch;
@@ -205,6 +212,31 @@ describe("fetchFile", function describeFetchFile(): void {
       message: expect.stringContaining(KALLOCAIN_URL),
       cause: networkError,
     });
+  });
+
+  it("Hint for a rejected request", async function hintsRejectedRequest(): Promise<void> {
+    const collectionUrl = "https://tiles.example.net/books.yaml";
+    const corsError = new TypeError("Failed to fetch");
+    const failingFetch = vi.fn<typeof fetch>().mockRejectedValue(corsError);
+
+    const fetching = fetchFile(collectionUrl, { fetch: failingFetch });
+
+    await expect(fetching).rejects.toThrowError(
+      `Cannot load file "${collectionUrl}": the request failed: Failed to fetch. ${REJECTED_REQUEST_HINT}`,
+    );
+  });
+
+  it("No hint for an HTTP status", async function omitsHintForHttpStatus(): Promise<void> {
+    const missingUrl = `${FIXTURES_BASE_URL}tiles/missing.md`;
+
+    const error = await fetchFile(missingUrl, { fetch: fetchFixture }).catch(
+      returnFetchError,
+    );
+
+    expect(String(error)).toContain("404");
+    expect(String(error)).not.toContain(
+      "may not allow this app to read its files",
+    );
   });
 
   it("wraps a failure while reading the response body", async function rejectsUnreadableBody(): Promise<void> {

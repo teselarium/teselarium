@@ -654,7 +654,7 @@ describe("Declared files that cannot be fetched", function describeFetchFailures
 
     expect(error.code).toBe(LOAD_FAILED);
     expect(error.message).toBe(
-      `libs.load: the library "leaflet" could not be loaded: Cannot load file "${LEAFLET_SCRIPT}": the request failed: Failed to fetch`,
+      `libs.load: the library "leaflet" could not be loaded: Cannot load file "${LEAFLET_SCRIPT}": the request failed: Failed to fetch. The site may be unreachable or may not allow this app to read its files.`,
     );
     expect(result.name).toBe("leaflet");
     expect(fetchSpy).toHaveBeenCalledTimes(4);

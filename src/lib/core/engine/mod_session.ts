@@ -22,6 +22,7 @@ import type { SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
+import { COLLECTIONS_METHODS } from "./collections_methods.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { describeEngineError, ModMethodError } from "./engine_errors.ts";
 import { FILES_METHODS } from "./files_methods.ts";
@@ -148,6 +149,7 @@ const INTERNAL_ERROR = -32603;
 export const ENGINE_METHODS: ModMethodTable = {
   ...STORAGE_METHODS,
   ...MODS_METHODS,
+  ...COLLECTIONS_METHODS,
   ...LINKS_METHODS,
   ...FILES_METHODS,
   ...UI_METHODS,

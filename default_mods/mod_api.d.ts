@@ -129,6 +129,21 @@ export interface ModInspection {
   permissions: ModGrants;
 }
 
+/**
+ * What `collections.inspect` answers: a collection's index, read without
+ * loading any tile.
+ */
+export interface CollectionInspection {
+  source: string;
+  name: string;
+  /** Empty when the collection file has none. */
+  description: string;
+  /** The resolved address of each tile entry, in entry order, a repeated tile once. */
+  tiles: string[];
+  /** The entry issues, found before any tile request. */
+  issues: ModTileIssue[];
+}
+
 /** A problem found by a mod check. */
 export interface ModCheckFinding {
   step: "bundle" | "mount" | "test";
@@ -172,6 +187,10 @@ export interface ModApiMethods {
   "mods.inspect": { params: { mod: string }; result: ModInspection };
   "mods.open": { params: ModOpenParams; result: null };
   "mods.check": { params: ModCheckParams; result: ModCheckReport };
+  "collections.inspect": {
+    params: { collection: string };
+    result: CollectionInspection;
+  };
 }
 
 /** The engine events this file types: the params each one pushes. */

@@ -11,6 +11,11 @@ import type { SectionDefinition } from "./section_registry.ts";
 import { VANILLA_SECTIONS } from "./vanilla_sections.ts";
 
 const EXPLORER_LINK = { mod: "mod_explorer", collection: null, params: {} };
+const COLLECTION_EXPLORER_LINK = {
+  mod: "collection_explorer",
+  collection: null,
+  params: {},
+};
 
 function buildPageSection(
   id: string,
@@ -159,6 +164,33 @@ describe("availableSections", function describeAvailableSections(): void {
     expect(sections).toHaveLength(VANILLA_SECTIONS.length - 1);
   });
 
+  it("Collection explorer switched off", function dropsTiles(): void {
+    const sections = availableSections(
+      VANILLA_SECTIONS,
+      resolveDefaults(["collection_explorer"]),
+      APP_BASE_URL,
+    );
+
+    expect(listIds(sections)).toEqual([
+      "home",
+      "mods",
+      "mosaics",
+      "guides",
+      "settings",
+      "about",
+    ]);
+  });
+
+  it("keeps Tiles when only the collection viewer is switched off", function keepsTiles(): void {
+    const sections = availableSections(
+      VANILLA_SECTIONS,
+      resolveDefaults(["collection_viewer"]),
+      APP_BASE_URL,
+    );
+
+    expect(listIds(sections)).toContain("tiles");
+  });
+
   it("finds a switched-off mod whatever reference names it", function comparesSources(): void {
     const registry = [
       ...buildBaseRegistry(),
@@ -188,7 +220,10 @@ describe("buildStageRouting", function describeBuildStageRouting(): void {
     expect(buildStageRouting(VANILLA_SECTIONS)).toEqual({
       pageSections: ["home", "guides", "settings", "about"],
       home: { kind: "page", section: "home" },
-      sectionLinks: [{ section: "mods", link: EXPLORER_LINK }],
+      sectionLinks: [
+        { section: "tiles", link: COLLECTION_EXPLORER_LINK },
+        { section: "mods", link: EXPLORER_LINK },
+      ],
     });
   });
 

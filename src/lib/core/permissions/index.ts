@@ -5,4 +5,4 @@ export {
   grantModPermissions,
   listConsentLines,
 } from "./mod_grants.ts";
-export type { ModGrants, SiteDecision } from "./mod_grants.ts";
+export type { ModGrants, OpenSubject, SiteDecision } from "./mod_grants.ts";

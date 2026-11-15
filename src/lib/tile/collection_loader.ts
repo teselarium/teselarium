@@ -1,22 +1,13 @@
+import { FileFetchError, MarkdownParseError } from "../files/index.ts";
+import type { FileFetchOptions } from "../files/index.ts";
+import type { CollectionFormat } from "./collection_format.ts";
 import {
-  fetchFile,
-  FileFetchError,
-  MarkdownParseError,
-  parseYaml,
-  resolveLocation,
-} from "../files/index.ts";
-import type { FileFetchOptions, YamlValue } from "../files/index.ts";
-import {
-  buildMalformedTileEntry,
-  readCollectionFormat,
-  readTileEntry,
-} from "./collection_format.ts";
-import type {
-  CollectionFormat,
-  MalformedTileEntry,
-  TileEntry,
-} from "./collection_format.ts";
-import type { IssueLevel, TileIssue } from "./tile_issues.ts";
+  buildIssueSlot,
+  LOCAL_FILE_PROTOCOL,
+  planTileCollection,
+} from "./collection_plan.ts";
+import type { PlannedSlot } from "./collection_plan.ts";
+import type { TileIssue } from "./tile_issues.ts";
 import { loadTile } from "./tile_loader.ts";
 import type { Tile } from "./tile_loader.ts";
 
@@ -34,13 +25,8 @@ export interface TileCollection {
 /** Over HTTP/1.1, browsers open at most 6 connections per host. */
 const MAX_PARALLEL_TILE_LOADS = 6;
 
-const LOCAL_FILE_PROTOCOL = "file:";
-
-/** One tile entry of the collection: an issue, a tile href still to load, or a loaded tile. */
-type CollectionSlot =
-  | { kind: "issue"; issue: TileIssue }
-  | { kind: "load"; href: string }
-  | { kind: "tile"; tile: Tile };
+/** One tile entry of the collection: a planned slot, or a loaded tile. */
+type CollectionSlot = PlannedSlot | { kind: "tile"; tile: Tile };
 
 interface TileLoad {
   slotIndex: number;
@@ -52,168 +38,6 @@ interface TileLoadQueue {
   loads: TileLoad[];
   next: number;
   results: CollectionSlot[];
-}
-
-function buildIssueSlot(
-  level: IssueLevel,
-  source: string,
-  message: string,
-): CollectionSlot {
-  const issueSlot: CollectionSlot = {
-    kind: "issue",
-    issue: { level, source, message },
-  };
-  return issueSlot;
-}
-
-function describeTileEntry(
-  collectionUrl: URL,
-  position: number,
-  reason: string,
-): string {
-  const description = `Tile entry ${position} in collection "${collectionUrl.href}": ${reason}`;
-  return description;
-}
-
-function buildMalformedEntrySlot(
-  collectionUrl: URL,
-  malformedTileEntry: MalformedTileEntry,
-): CollectionSlot {
-  return buildIssueSlot(
-    "error",
-    collectionUrl.href,
-    describeTileEntry(
-      collectionUrl,
-      malformedTileEntry.position,
-      malformedTileEntry.reason,
-    ),
-  );
-}
-
-function readAbsoluteTileUrl(
-  location: string,
-  position: number,
-): URL | MalformedTileEntry {
-  if (!URL.canParse(location)) {
-    return buildMalformedTileEntry(
-      position,
-      `"url" must be an absolute URL, found "${location}"`,
-    );
-  }
-  const tileUrl = new URL(location);
-  return tileUrl;
-}
-
-function resolveTilePath(
-  location: string,
-  position: number,
-  collectionUrl: URL,
-): URL | MalformedTileEntry {
-  try {
-    const tileUrl = resolveLocation(location, collectionUrl.href);
-    return tileUrl;
-  } catch (error) {
-    if (!(error instanceof FileFetchError)) {
-      throw error;
-    }
-    return buildMalformedTileEntry(position, error.message);
-  }
-}
-
-/** A `path` is resolved against the collection's source. A `url` must be absolute. */
-function resolveTileEntry(
-  tileEntry: TileEntry,
-  position: number,
-  collectionUrl: URL,
-): URL | MalformedTileEntry {
-  if (tileEntry.kind === "url") {
-    return readAbsoluteTileUrl(tileEntry.location, position);
-  }
-  return resolveTilePath(tileEntry.location, position, collectionUrl);
-}
-
-function isLocalTileInRemoteCollection(
-  tileUrl: URL,
-  collectionUrl: URL,
-): boolean {
-  return (
-    tileUrl.protocol === LOCAL_FILE_PROTOCOL &&
-    collectionUrl.protocol !== LOCAL_FILE_PROTOCOL
-  );
-}
-
-function planEntrySlot(
-  entry: YamlValue,
-  position: number,
-  collectionUrl: URL,
-): CollectionSlot {
-  const tileEntry = readTileEntry(entry, position);
-  if (tileEntry.kind === "malformed") {
-    return buildMalformedEntrySlot(collectionUrl, tileEntry);
-  }
-  const tileUrl = resolveTileEntry(tileEntry, position, collectionUrl);
-  if (!(tileUrl instanceof URL)) {
-    return buildMalformedEntrySlot(collectionUrl, tileUrl);
-  }
-  if (isLocalTileInRemoteCollection(tileUrl, collectionUrl)) {
-    return buildIssueSlot(
-      "error",
-      tileUrl.href,
-      describeTileEntry(
-        collectionUrl,
-        position,
-        "a remote collection cannot list local files",
-      ),
-    );
-  }
-  const loadSlot: CollectionSlot = { kind: "load", href: tileUrl.href };
-  return loadSlot;
-}
-
-/**
- * Turns a repeated load into a warning. `firstPositions` maps each tile href
- * to the position of the first entry that loads it, and is updated here.
- */
-function checkRepeatedTile(
-  slot: CollectionSlot,
-  position: number,
-  collectionUrl: URL,
-  firstPositions: Map<string, number>,
-): CollectionSlot {
-  if (slot.kind !== "load") {
-    return slot;
-  }
-  const firstPosition = firstPositions.get(slot.href);
-  if (firstPosition === undefined) {
-    firstPositions.set(slot.href, position);
-    return slot;
-  }
-  return buildIssueSlot(
-    "warning",
-    slot.href,
-    describeTileEntry(
-      collectionUrl,
-      position,
-      `repeats the tile of entry ${firstPosition}, so it is loaded once`,
-    ),
-  );
-}
-
-/** Plans every entry in order, before any tile request. Positions count from 1. */
-function planCollectionSlots(
-  collectionFormat: CollectionFormat,
-  collectionUrl: URL,
-): CollectionSlot[] {
-  const slots: CollectionSlot[] = [];
-  const firstPositions = new Map<string, number>();
-  for (const [index, entry] of collectionFormat.entries.entries()) {
-    const position = index + 1;
-    const slot = planEntrySlot(entry, position, collectionUrl);
-    slots.push(
-      checkRepeatedTile(slot, position, collectionUrl, firstPositions),
-    );
-  }
-  return slots;
 }
 
 /** Picked files are only given to the tiles of a collection that is itself local. */
@@ -267,7 +91,7 @@ async function runTileLoadWorker(
   }
 }
 
-function listTileLoads(slots: CollectionSlot[]): TileLoad[] {
+function listTileLoads(slots: PlannedSlot[]): TileLoad[] {
   const tileLoads: TileLoad[] = [];
   for (const [slotIndex, slot] of slots.entries()) {
     if (slot.kind === "load") {
@@ -279,7 +103,7 @@ function listTileLoads(slots: CollectionSlot[]): TileLoad[] {
 
 /** Loads the planned tiles with at most `MAX_PARALLEL_TILE_LOADS` in progress. */
 async function loadPlannedTiles(
-  slots: CollectionSlot[],
+  slots: PlannedSlot[],
   tileOptions: FileFetchOptions,
 ): Promise<CollectionSlot[]> {
   const loadQueue: TileLoadQueue = {
@@ -331,17 +155,14 @@ export async function loadTileCollection(
   location: string,
   options: FileFetchOptions = {},
 ): Promise<TileCollection> {
-  const collectionFile = await fetchFile(location, options);
-  const collectionFormat = readCollectionFormat(parseYaml(collectionFile));
-  const collectionUrl = new URL(collectionFile.source);
-  const slots = planCollectionSlots(collectionFormat, collectionUrl);
+  const collectionPlan = await planTileCollection(location, options);
   const loadedSlots = await loadPlannedTiles(
-    slots,
-    buildTileOptions(collectionUrl, options),
+    collectionPlan.slots,
+    buildTileOptions(collectionPlan.collectionUrl, options),
   );
   const tileCollection = assembleTileCollection(
-    collectionUrl,
-    collectionFormat,
+    collectionPlan.collectionUrl,
+    collectionPlan.collectionFormat,
     loadedSlots,
   );
   return tileCollection;

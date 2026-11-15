@@ -24,6 +24,11 @@ This library implements the following components based on [tesela_spec.md](../..
   - When several entries resolve to the same tile, it is loaded once at the first entry's position, and each repeat adds a warning issue.
   - Tiles load in parallel, at most 6 at a time. The limit does not change the result or its order.
   - Local files stay local: only a collection loaded from a picked `file:` location can list `file:` tiles. In a remote collection, such entries become error issues and are never read.
+- A collection index reader that takes as input a path or URL and reads the collection file alone: it chains the file fetcher and the yaml parser, and plans the entries as the collection loader does, but requests no tile. The index and a loaded collection never disagree about which tiles a collection lists or which entry issues it has. Output properties:
+  - Source, name and description, as for a loaded collection.
+  - Tiles is the list of resolved addresses of the tiles that loading the collection would request, in the order of the entries, with a repeated tile listed once.
+  - Issues holds the entry issues found before any tile request: malformed entries, relative `url`s, local files in a remote collection and repeated tiles. A tile that would fail to load is still listed, with no issue, since it is never requested.
+  - The collection file fails as for the collection loader.
 - A collection validator. It takes a tile collection and a tile validator as input, and produces a tile collection with the types assigned to each tile and the collection's issues property updated if validation issues were found. Tiles that are not validated are still kept in the collection but without the type updated. This validator should follow idempotency so validating the same collection twice does not create duplicates.
   - The type name is added at the end of each matching tile's types, after the names it already has.
   - A tile that does not match keeps its position and its types, and adds a `warning` issue whose source is the tile's source and whose message is the tile validator's error message. A mismatch is a warning, not an error: the tile is still a valid tile.
@@ -90,7 +95,7 @@ const tile = await loadTile("./books/kallocain.md", {
 // tile.types is []
 ```
 
-Hosting note: tiles loaded from another origin are fetched by the browser with CORS. If the host does not send CORS headers (`Access-Control-Allow-Origin`), loading fails with a `FileFetchError`. Shared tiles must be hosted with CORS enabled (see the [files module](../files/README.md)).
+Hosting note: tiles loaded from another origin are fetched by the browser with CORS. If the host does not send CORS headers (`Access-Control-Allow-Origin`), loading fails with a `FileFetchError` whose message says that the site may be unreachable or may not allow this app to read its files. Shared tiles must be hosted with CORS enabled (see the [files module](../files/README.md)).
 
 ### Collection loader
 
@@ -112,6 +117,30 @@ const collection = await loadTileCollection("./book_collection.yaml", {
 // collection.name === "Science fiction books"
 // collection.tiles[1].source === "https://example.org/samples/mods/book_list/books/kallocain.md"
 // collection.issues is []
+```
+
+### Collection index
+
+Also exported from `src/lib/tile/index.ts`:
+
+- `readTileCollectionIndex(location, options?)`: fetches and parses a collection file and plans its entries, without requesting any tile. Takes the same `FileFetchOptions` as `loadTile`. Returns a `TileCollectionIndex` (`source`, `name`, `description`, `tiles`, `issues`), where `tiles` is a list of addresses (strings), not of tile objects. The result is plain data.
+- It reads only the collection file: it never requests a tile, and so never reports a tile that cannot be fetched or parsed.
+- Errors: the same as `loadTileCollection` for the collection file itself, `FileFetchError`, `YamlParseError` or `CollectionFormatError`, each with the collection's `source`.
+- Types: `TileCollectionIndex`.
+
+Example:
+
+```ts
+import { readTileCollectionIndex } from "./lib/tile/index.ts";
+
+const collectionIndex = await readTileCollectionIndex(
+  "./book_collection.yaml",
+  { baseUrl: "https://example.org/samples/mods/book_list/" },
+);
+// collectionIndex.name === "Science fiction books"
+// collectionIndex.tiles[1] === "https://example.org/samples/mods/book_list/books/kallocain.md"
+// collectionIndex.issues is []
+// no tile file was requested
 ```
 
 ### Tile validator

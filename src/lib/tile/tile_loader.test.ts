@@ -131,6 +131,7 @@ describe("tile module entry point", function describeEntryPoint(): void {
       "buildTileValidator",
       "loadTile",
       "loadTileCollection",
+      "readTileCollectionIndex",
       "validateTile",
       "validateTileCollection",
     ]);

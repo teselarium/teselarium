@@ -99,7 +99,7 @@
 
 ## 4. Collection viewer opens tiles
 
-- [ ] 4.1 Make the collection viewer's items buttons that open the tile viewer (design.md, decision 6), and add `config: { tile_viewer: "tile_viewer" }` to its `mod_conf.yaml`. Show `mods.open` errors in its `role="status"` region. Add the case "Selecting a tile in a case", and keep the filter cases passing with buttons. Verify that "Check mod" for `collection_viewer` passes.
+- [ ] 4.1 Make the label in the first cell of each row of the collection viewer's tile table a button that opens the tile viewer (design.md, decision 6), and add `config: { tile_viewer: "tile_viewer" }` to its `mod_conf.yaml`. Add a `role="status"` region for `mods.open` errors, apart from the tile count. Add the case "Selecting a tile in a case", and keep the filter cases passing with buttons. Verify that "Check mod" for `collection_viewer` passes.
 - [ ] 4.2 Add the e2e tests in `e2e/default_mods.spec.ts`:
   - "Open a tile from the list" (the address carries `tile` and `from`, the viewer shows `1 of <n>`, and Tiles stays current);
   - "Open the collection" from the breadcrumb.

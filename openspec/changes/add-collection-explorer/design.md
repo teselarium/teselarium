@@ -98,7 +98,7 @@ Modules in `default_mods/collection_explorer/src/`:
 |---|---|
 | `main.ts` | mounts the page |
 | `collection_entries.ts` | reads `collections` from the config, then inspects each location one after another, so the list keeps the config's order, giving an entry with its inspection or its error |
-| `collection_cards.ts` | one `<article>` per collection: an `<h2>` name, the description, "N tiles", and a button named after the collection that opens it; a failed entry is a `role="alert"` with the location and the message |
+| `collection_cards.ts` | one `<article>` per collection: an `<h2>` name, the description, "N tiles", and a "View" button whose accessible name is "View <name>" (`aria-label`), so the visible text does not repeat the heading and a screen reader still names the collection; a failed entry is a `role="alert"` with the location and the message |
 | `explorer_page.ts`, `explorer_view.ts` | the page: `aria-busy` while inspecting, and a `role="status"` region for `mods.open` errors such as `-32003` |
 | `error_messages.ts` | describes a request error |
 
@@ -128,8 +128,8 @@ How `tile_labels.ts` builds a label:
 3. Labels that still clash are kept as they are: the full address under each one tells them apart. That only happens for the same parent folder name in two places, which is rare enough not to need a third rule.
 
 How the list and filter are built:
-- **The list** is a `<ul>`. Each `<li>` holds the label and, under it, the full address in `<small>`. The items are not buttons, because selecting one does nothing until `add-tile-viewer`.
-- **The filter** is an `<input type="search">` labeled "Filter tiles", outside any form, since the sandbox has no `allow-forms`. A `role="status"` paragraph says "Showing 3 of 16 tiles". Hidden items get the `hidden` attribute rather than being rebuilt.
+- **The list** is a `<table>` inside an `<article>`, so the tiles are in a card and the theme gives the rows their separators, a muted header and a hover highlight, with no look CSS. Its columns are "Tile", the label, and "Address", the full address in `<small>`. The rows are not buttons yet, because selecting one does nothing until `add-tile-viewer`, which puts a button in the first cell.
+- **The filter** is an `<input type="search">` labeled "Filter by file name", since it matches the labels and not the addresses, at most 24rem wide, outside any form, since the sandbox has no `allow-forms`. Under it, outside the card, a `<small aria-live="polite">` line says "Showing 3 of 16 tiles": muted text that screen readers announce. It is not `role="status"`, which the theme draws as an alert box and would make the count look more important than the list. Hidden rows get the `hidden` attribute rather than being rebuilt. A rule of the mod's own CSS that sets `display` must skip `[hidden]` elements, since it wins over the theme's layer.
 
 ### 8. Tiles in the registry
 
@@ -158,4 +158,4 @@ Nothing to migrate:
 
 ## Open Questions
 
-- The cards' and the viewer's wording ("N tiles", "Filter tiles", "No collection was given.") can be tuned during implementation without changing the specs, as long as the scenarios' observable facts hold.
+- The cards' and the viewer's wording ("N tiles", "Filter by file name", "No collection was given.") can be tuned during implementation without changing the specs, as long as the scenarios' observable facts hold.

@@ -61,9 +61,9 @@ export async function listsModsAsCards(context: CaseContext): Promise<void> {
   context
     .expect(card.querySelector("p")?.textContent)
     .toBe("A fixture mod that the explorer's tests list.");
-  context
-    .expect(card.querySelector("button")?.textContent)
-    .toBe("View Listed Mod");
+  const viewButton = card.querySelector("button");
+  context.expect(viewButton?.textContent).toBe("View");
+  context.expect(viewButton?.ariaLabel).toBe("View Listed Mod");
   context
     .expect(findElement(context, 'section[aria-label="Mods"]').ariaBusy)
     .toBe(null);

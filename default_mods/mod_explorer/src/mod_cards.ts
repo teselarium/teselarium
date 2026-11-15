@@ -15,7 +15,10 @@ function buildModCard(
   description.textContent = inspection.description;
   const viewButton = document.createElement("button");
   viewButton.type = "button";
-  viewButton.textContent = `View ${inspection.title}`;
+  // The card's heading names the mod, so the visible text does not repeat
+  // it. The accessible name keeps it, for a screen reader moving between buttons.
+  viewButton.textContent = "View";
+  viewButton.ariaLabel = `View ${inspection.title}`;
   viewButton.addEventListener(
     "click",
     openViewer.bind(undefined, view, inspection),

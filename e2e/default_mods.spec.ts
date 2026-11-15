@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import type { FrameLocator, Locator, Page, Route } from "@playwright/test";
+import type {
+  FrameLocator,
+  Locator,
+  Page,
+  Request,
+  Route,
+} from "@playwright/test";
 import type { ModFiles } from "./mod_routes.ts";
 import {
   buildMissingEntrypointFiles,
@@ -23,7 +29,14 @@ import {
   TILES_MOD_REFERENCE,
   TILES_TITLE,
 } from "./test_mods.ts";
-import { openModsSection, pageBody } from "./app_layout.ts";
+import {
+  currentItem,
+  openModsSection,
+  openSection,
+  pageBody,
+} from "./app_layout.ts";
+import { EXPLORER_OFF_PREVIEW_URL } from "./app_servers.ts";
+import { listOwnLookDeclarations, readTokenAs } from "./theme_probes.ts";
 
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
@@ -538,6 +551,45 @@ const VIEWER_CASES = [
   "keeps its own styles to layout",
 ];
 
+/** The cases of the collection explorer's test file (default_mods/collection_explorer/test/test.ts), in order. */
+const COLLECTION_EXPLORER_CASES = [
+  "lists the collections of its config as cards",
+  "lists a collection that cannot be inspected as an alert",
+  "opens the viewer for the selected collection",
+  "keeps its own styles to layout",
+  "draws each collection on the card background",
+  "draws a failure with the destructive border",
+];
+
+/** The cases of the collection viewer's test file (default_mods/collection_viewer/test/test.ts), in order. */
+const COLLECTION_VIEWER_CASES = [
+  "labels tiles by file name",
+  "decodes file names",
+  "keeps a file name that cannot be decoded",
+  "adds the parent folder to shared file names",
+  "keeps labels that still clash",
+  "filters labels ignoring letter case",
+  "keeps every tile for an empty filter",
+  "shows the collection of its target",
+  "shows each tile's address",
+  "labels tiles that share a file name",
+  "labels an encoded file name decoded",
+  "shows the entry issues",
+  "shows no issue list without issues",
+  "labels its filter field",
+  "filters the tiles and says how many are shown",
+  "shows every tile once the filter is empty",
+  "says no collection was given without a target",
+  "says no collection was given for an empty target",
+  "shows why a missing target cannot be inspected",
+  "shows the format error of its target",
+  "keeps its own styles to layout",
+  "draws the collection on the card background",
+  "draws issue levels as badges",
+  "draws the tiles in a card, with the count under the filter",
+  "keeps the filter field to a readable width",
+];
+
 /** Answers like a site that ships no `samples/`. */
 async function answerNotFound(route: Route): Promise<void> {
   await route.fulfill({ status: 404, body: "Not Found" });
@@ -595,6 +647,22 @@ test.describe(
       await expectEveryCasePassed(report, VIEWER_CASES);
     });
 
+    test("Collection explorer passes its check", async function checksCollectionExplorer({
+      page,
+    }): Promise<void> {
+      const report = await checkDefaultMod(page, "collection_explorer");
+
+      await expectEveryCasePassed(report, COLLECTION_EXPLORER_CASES);
+    });
+
+    test("Collection viewer passes its check", async function checksCollectionViewer({
+      page,
+    }): Promise<void> {
+      const report = await checkDefaultMod(page, "collection_viewer");
+
+      await expectEveryCasePassed(report, COLLECTION_VIEWER_CASES);
+    });
+
     test("Cases without the samples", async function checksWithoutSamples({
       page,
     }): Promise<void> {
@@ -604,6 +672,298 @@ test.describe(
       await expectEveryCasePassed(viewerReport, VIEWER_CASES);
       const explorerReport = await checkDefaultMod(page, "mod_explorer");
       await expectEveryCasePassed(explorerReport, EXPLORER_CASES);
+      const collectionViewerReport = await checkDefaultMod(
+        page,
+        "collection_viewer",
+      );
+      await expectEveryCasePassed(
+        collectionViewerReport,
+        COLLECTION_VIEWER_CASES,
+      );
+      const collectionExplorerReport = await checkDefaultMod(
+        page,
+        "collection_explorer",
+      );
+      await expectEveryCasePassed(
+        collectionExplorerReport,
+        COLLECTION_EXPLORER_CASES,
+      );
+    });
+  },
+);
+
+/** The sample collection of Nobel laureates, as the vanilla collection explorer lists it. */
+const LAUREATES_COLLECTION_REFERENCE =
+  "./samples/tiles/literature_nobel_laureates/collection.yaml";
+
+/** A collection on a site that does not allow the app's origin. */
+const REFUSING_COLLECTION_SOURCE = "https://tiles.example.net/books.yaml";
+
+function recordTileRequest(tileUrls: string[], request: Request): void {
+  if (new URL(request.url()).pathname.endsWith(".md")) {
+    tileUrls.push(request.url());
+  }
+}
+
+/** The tile files the page requests from now on, by address. */
+function recordTileRequests(page: Page): string[] {
+  const tileUrls: string[] = [];
+  page.on("request", recordTileRequest.bind(undefined, tileUrls));
+  return tileUrls;
+}
+
+function buildCollectionViewerLink(target: string): string {
+  const link = `/#/run?mod=collection_viewer&target=${encodeURIComponent(target)}`;
+  return link;
+}
+
+function collectionViewerFrame(page: Page): FrameLocator {
+  return visibleSandbox(page).frameLocator('iframe[title="Collection Viewer"]');
+}
+
+async function refuseRequest(route: Route): Promise<void> {
+  await route.abort("failed");
+}
+
+test.describe(
+  "Collection viewer",
+  { tag: "@frames" },
+  function describeCollectionViewer(): void {
+    test(
+      "View a sample collection",
+      { tag: "@sample" },
+      async function viewsSampleCollection({ page }): Promise<void> {
+        const tileUrls = recordTileRequests(page);
+        await page.goto(
+          buildCollectionViewerLink(LAUREATES_COLLECTION_REFERENCE),
+        );
+        const viewer = collectionViewerFrame(page);
+
+        await expect(
+          viewer.getByRole("heading", {
+            name: "Nobel Prize in Literature laureates",
+          }),
+        ).toBeVisible();
+        await expect(viewer.locator("article").first()).toContainText(
+          "Nobel Prize in Literature laureates from 2010 to 2026, ordered by award year.",
+        );
+        await expect(viewer.locator("article dd")).toHaveText(
+          new URL(LAUREATES_COLLECTION_REFERENCE, page.url()).href,
+        );
+        await expect(
+          viewer.getByRole("region", { name: "Tiles" }).locator("tbody tr"),
+        ).toHaveCount(17);
+        expect(tileUrls).toEqual([]);
+      },
+    );
+
+    test("Collection whose site refuses the app", async function showsRefusedSite({
+      page,
+    }): Promise<void> {
+      await page.route(REFUSING_COLLECTION_SOURCE, refuseRequest);
+      await page.goto(buildCollectionViewerLink(REFUSING_COLLECTION_SOURCE));
+
+      const alert = collectionViewerFrame(page).getByRole("alert");
+      await expect(alert).toContainText(REFUSING_COLLECTION_SOURCE);
+      await expect(alert).toContainText(
+        "The site may be unreachable or may not allow this app to read its files.",
+      );
+    });
+  },
+);
+
+const COLLECTION_EXPLORER_RUN_LINK = "/#/run?mod=collection_explorer";
+
+/** The first collection of the vanilla explorer's config, wherever the app is served. */
+const LAUREATES_COLLECTION_GLOB =
+  "**/samples/tiles/literature_nobel_laureates/collection.yaml";
+
+/** What the tests serve at the first collection of the vanilla config, so they need no samples. */
+const ROUTED_COLLECTION_TEXT = `collection:
+  name: "Routed collection"
+  description: "A collection the e2e tests serve."
+  tiles:
+    - path: "./first.md"
+    - path: "./second.md"
+`;
+
+const LAUREATES_NAME = "Nobel Prize in Literature laureates";
+
+/** A fixture collection of the collection viewer, which every built app serves. */
+const VIEWER_FIXTURE_REFERENCE =
+  "./default_mods/collection_viewer/fixtures/issues_collection.yaml";
+
+async function serveRoutedCollection(route: Route): Promise<void> {
+  await route.fulfill({ status: 200, body: ROUTED_COLLECTION_TEXT });
+}
+
+function collectionExplorerFrame(page: Page): FrameLocator {
+  return visibleSandbox(page).frameLocator('iframe[title="Tiles"]');
+}
+
+function vanillaCollectionCards(page: Page): Locator {
+  return collectionExplorerFrame(page).locator("li > article");
+}
+
+/** Waits until the explorer listed its collections. */
+async function waitForCollectionList(page: Page): Promise<void> {
+  const list = collectionExplorerFrame(page).getByRole("region", {
+    name: "Collections",
+  });
+  await expect(list.getByRole("listitem").first()).toBeVisible();
+  await expect(list).not.toHaveAttribute("aria-busy");
+}
+
+test.describe(
+  "Collection explorer",
+  { tag: "@frames" },
+  function describeCollectionExplorer(): void {
+    test(
+      "Vanilla explorer lists the Nobel laureates",
+      { tag: "@sample" },
+      async function listsLaureates({ page }): Promise<void> {
+        await page.goto(COLLECTION_EXPLORER_RUN_LINK);
+        const cards = vanillaCollectionCards(page);
+
+        await expect(cards.nth(0).getByRole("heading")).toHaveText(
+          LAUREATES_NAME,
+        );
+        await expect(cards.nth(0)).toContainText(
+          "Nobel Prize in Literature laureates from 2010 to 2026, ordered by award year.",
+        );
+        await expect(cards.nth(0)).toContainText("17 tiles");
+      },
+    );
+
+    test(
+      "Vanilla explorer lists the books after the laureates",
+      { tag: "@sample" },
+      async function listsBooksAfterLaureates({ page }): Promise<void> {
+        await page.goto(COLLECTION_EXPLORER_RUN_LINK);
+
+        await expect(
+          vanillaCollectionCards(page).getByRole("heading"),
+        ).toHaveText([
+          LAUREATES_NAME,
+          "Nobel Prize in Literature laureates books",
+        ]);
+      },
+    );
+
+    test("Explorer requests no tile", async function requestsNoTile({
+      page,
+    }): Promise<void> {
+      const tileUrls = recordTileRequests(page);
+
+      await page.goto(COLLECTION_EXPLORER_RUN_LINK);
+      await waitForCollectionList(page);
+
+      expect(tileUrls).toEqual([]);
+    });
+
+    test("Select a collection", async function selectsCollection({
+      page,
+    }): Promise<void> {
+      await page.route(LAUREATES_COLLECTION_GLOB, serveRoutedCollection);
+      await page.goto("/");
+      await openSection(page, "Tiles");
+
+      await collectionExplorerFrame(page)
+        .getByRole("button", { name: "View Routed collection" })
+        .click();
+
+      await expect(stageBar(page)).toContainText("Collection Viewer");
+      await expect(
+        collectionViewerFrame(page).getByRole("heading", {
+          name: "Routed collection",
+        }),
+      ).toBeVisible();
+      const source = new URL(
+        "./samples/tiles/literature_nobel_laureates/collection.yaml",
+        page.url(),
+      ).href;
+      expect(new URL(page.url()).hash).toBe(
+        `#/run?mod=collection_viewer&target=${encodeURIComponent(source)}`,
+      );
+      await expect(currentItem(page)).toHaveText("Tiles");
+    });
+
+    test(
+      "Collection explorer lists collections as cards",
+      { tag: "@sample" },
+      async function drawsCollectionCards({ page }): Promise<void> {
+        await page.goto(COLLECTION_EXPLORER_RUN_LINK);
+        const card = vanillaCollectionCards(page).nth(0);
+        await expect(card.getByRole("heading")).toHaveText(LAUREATES_NAME);
+        const explorer = await findModFrame(page, "Tiles");
+
+        await expect(card).toHaveCSS(
+          "background-color",
+          await explorer.evaluate(readTokenAs, ["--ot-card", "color"]),
+        );
+        await expect(
+          card.getByRole("button", { name: new RegExp(LAUREATES_NAME) }),
+        ).toBeVisible();
+      },
+    );
+
+    test("Collection explorer shows a failure as an alert", async function drawsFailureAlert({
+      page,
+    }): Promise<void> {
+      await page.route(LAUREATES_COLLECTION_GLOB, answerNotFound);
+      await page.goto(COLLECTION_EXPLORER_RUN_LINK);
+      const alert = collectionExplorerFrame(page).getByRole("alert").first();
+
+      await expect(alert).toContainText(
+        "./samples/tiles/literature_nobel_laureates/collection.yaml",
+      );
+      await expect(alert).toContainText("404");
+      const explorer = await findModFrame(page, "Tiles");
+      await expect(alert).toHaveCSS(
+        "border-top-color",
+        await explorer.evaluate(readTokenAs, [
+          "--ot-destructive",
+          "border-top-color",
+        ]),
+      );
+    });
+
+    test("Own styles are layout only", async function keepsLayoutOnly({
+      page,
+    }): Promise<void> {
+      await page.goto(COLLECTION_EXPLORER_RUN_LINK);
+      await waitForCollectionList(page);
+      const explorer = await findModFrame(page, "Tiles");
+      expect(await explorer.evaluate(listOwnLookDeclarations)).toEqual([]);
+
+      await page.goto(buildCollectionViewerLink(VIEWER_FIXTURE_REFERENCE));
+      await expect(
+        collectionViewerFrame(page).getByRole("region", { name: "Tiles" }),
+      ).toBeVisible();
+      const viewer = await findModFrame(page, "Collection Viewer");
+      expect(await viewer.evaluate(listOwnLookDeclarations)).toEqual([]);
+    });
+
+    test("Viewer switched off", async function showsSwitchedOffViewer({
+      page,
+    }): Promise<void> {
+      await page.route(LAUREATES_COLLECTION_GLOB, serveRoutedCollection);
+      await page.goto(
+        `${EXPLORER_OFF_PREVIEW_URL}${COLLECTION_EXPLORER_RUN_LINK}`,
+      );
+      const explorer = collectionExplorerFrame(page);
+
+      await explorer
+        .getByRole("button", { name: "View Routed collection" })
+        .click();
+
+      await expect(explorer.getByRole("status")).toContainText(
+        "collection_viewer",
+      );
+      await expect(stageBar(page)).toContainText("Tiles");
+      await expect(
+        page.locator('iframe[title="Collection Viewer"]'),
+      ).toHaveCount(0);
     });
   },
 );

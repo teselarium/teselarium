@@ -79,7 +79,7 @@ Unless the mod opts out, its frame gets the tokens and a base stylesheet before 
 - lists, description lists, tables (full width, row separators, headers in `muted-foreground`, a `muted` row on hover);
 - `img`, `video`, `canvas`, `svg`: never wider than their container;
 - `<dialog>` (`popover`, border, radius, shadow, padding) and its backdrop;
-- `[hidden]`: still hidden, whatever else styles the element;
+- `[hidden]`: still hidden, whatever else the base stylesheet gives the element, but not against a mod's own rule that sets `display` (see [The layer](#the-layer-your-css-always-wins));
 - short color transitions, none when the user prefers reduced motion.
 
 It sets no layout beyond spacing and the body's width in the `contained` layout. Checkboxes, radio buttons and range inputs take the primary color through `accent-color`, and the browser's own controls and scrollbars follow the color scheme through `color-scheme`.
@@ -227,6 +227,15 @@ The tokens and the base stylesheet are in the cascade layer `opentesela`. Any st
 /* Wins over the base stylesheet's button rule. */
 button {
   color: rgb(0, 0, 255);
+}
+```
+
+This includes the base stylesheet's `[hidden] { display: none; }`. A mod's own rule that sets `display` on an element shows it even while it has the `hidden` attribute. So a rule for elements the mod hides and shows should skip the hidden ones:
+
+```css
+/* An item with `hidden` stays hidden: the rule does not apply to it. */
+li:not([hidden]) {
+  display: grid;
 }
 ```
 

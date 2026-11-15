@@ -1,10 +1,12 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type {
+  CollectionInspection as DeclaredCollectionInspection,
   ModCheckReport as DeclaredModCheckReport,
   ModContext as DeclaredModContext,
   ModInspection as DeclaredModInspection,
   ModLayoutChangedParams as DeclaredLayoutChangedParams,
 } from "../../../../default_mods/mod_api.d.ts";
+import type { TileCollectionIndex } from "../../tile/index.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModInspection } from "./mod_inspection.ts";
 import type { ModContext } from "./mod_launch.ts";
@@ -28,5 +30,9 @@ describe("default_mods/mod_api.d.ts", function describeModApiTypes(): void {
 
   it("declares a check report the engine's fits", function checksModCheckReport(): void {
     expectTypeOf<ModCheckReport>().toExtend<DeclaredModCheckReport>();
+  });
+
+  it("declares a collection inspection the engine's index fits", function checksCollectionInspection(): void {
+    expectTypeOf<TileCollectionIndex>().toExtend<DeclaredCollectionInspection>();
   });
 });

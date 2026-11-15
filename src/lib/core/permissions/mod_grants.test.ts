@@ -286,6 +286,52 @@ describe("checkOpenGrant", function describeCheckOpenGrant(): void {
       "Opening mods from https://mods.example.net: the mod declares it in permissions.open, but the permission was not granted.",
     );
   });
+
+  it("refuses collections from an origin that is not declared", function refusesUndeclaredCollections(): void {
+    const grants = buildGrants(
+      [buildOpenPermission("https://example.org")],
+      [],
+    );
+
+    expect(
+      checkOpenGrant(
+        grants,
+        "https://tiles.example.net/books.yaml",
+        "collections",
+      ),
+    ).toBe(
+      "Inspecting collections from https://tiles.example.net is not allowed. Add it to permissions.open in mod_conf.yaml.",
+    );
+  });
+
+  it("refuses collections when the declared permission was not granted", function refusesDeniedCollections(): void {
+    const grants = grantModPermissions(FOREIGN_MOD, APP_ORIGIN, []);
+
+    expect(
+      checkOpenGrant(
+        grants,
+        "https://tiles.example.net/books.yaml",
+        "collections",
+      ),
+    ).toBe(
+      "Inspecting collections from https://tiles.example.net: the mod declares it in permissions.open, but the permission was not granted.",
+    );
+  });
+
+  it("allows collections from a granted origin", function allowsCollections(): void {
+    const grants = buildGrants(
+      [buildOpenPermission("https://tiles.example.net")],
+      [],
+    );
+
+    expect(
+      checkOpenGrant(
+        grants,
+        "https://tiles.example.net/books.yaml",
+        "collections",
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("permissions module entry point", function describeEntryPoint(): void {
