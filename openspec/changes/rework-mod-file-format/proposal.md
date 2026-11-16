@@ -76,7 +76,7 @@ None.
 - `mod-check`: default mosaic checks; `mosaics.check` and its findings; the report's `mosaic`.
 - `mod-api-version`: version `0.1.14`.
 - `default-mods`: the mod viewer's metadata, run choices and cases; collection titles in the explorer, the viewer and the tile viewer; the default mods folder text.
-- `sample-book-list`, `sample-country-map`, `sample-flashcards`: their mod files, default mosaics and API ranges.
+- `sample-book-list`, `sample-country-map`, `sample-flashcards`: their mod files, default mosaics and API ranges; `book_list`'s books per row and `flashcards`' study fields remembered per mosaic or collection.
 
 ## Impact
 
@@ -88,8 +88,9 @@ None.
 - **Tests:** the fixtures in `src/test/fixtures/` and `e2e/test_mods/`, and the mod and collection files tests build inline. Test API ranges (`TEST_MOD_API_RANGE`) are unchanged.
 - **Docs:**
   - `docs/opentesela_spec.md` and `docs/mod_plugin_spec.md`;
-  - the READMEs of the mod, tile, storage, engine and mosaic libraries;
+  - the READMEs of the mod, tile, storage, engine, sandbox and mosaic libraries;
+  - the mosaics overview, `docs/modules/mosaics/README.md`;
   - the docs of the mod viewer, mod explorer, collection explorer and tile viewer;
   - `default_mods/README.md`.
-- **Depends on `add-mosaics`,** which must be archived first: its specs are the base of the `mod-engine-api` mount context, `mod-api-version` and `mosaic-loading` text this change builds on.
+- **Depends on `add-mosaics`,** archived on 2026-11-16: its specs are the base of the `mod-engine-api` mount context, `mod-api-version` and `mosaic-loading` text this change builds on.
 - **Stored values start over once:** values mods stored before this change are no longer read. Today that is `book_list`'s `columns` and `flashcards`' `study_fields`, in the browsers of the people working on the project.

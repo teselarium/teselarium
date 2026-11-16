@@ -112,7 +112,7 @@ The engine SHALL answer `mosaics.check` with error code `-32002`, without reques
 
 #### Scenario: Foreign mosaic without decisions
 - **WHEN** a mosaic from another origin that declares `show` for `https://covers.example.net` is checked with no remembered decision
-- **THEN** no dialog is shown, and images from `https://covers.example.net` are blocked in the mount check and reported as a `mount` warning
+- **THEN** no dialog is shown, and images from `https://covers.example.net` are blocked in the mount check and reported as a `mount` warning that says the mosaic declares the host in `permissions.show` but the permission was not granted
 
 ### Requirement: Mosaic findings
 When a check uses a mosaic, the bundle check SHALL report a warning, whose source is the mosaic file, for each field of `aliases` that the mod's tile type does not declare, and for each key of the mosaic's config, at any depth of nested mappings, that the mod's config does not have. Each message SHALL name the field or the key path.

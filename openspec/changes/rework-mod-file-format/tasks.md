@@ -11,14 +11,14 @@
 
 ## 3. Checks through mosaics
 
-- [ ] 3.1 Refactor `runModBundleCheck` (`src/lib/core/engine/mod_bundle_check.ts`) to take a check target, `{ mod, collection }`, `{ mod }` or `{ mosaic }` (design D3):
-  - load the mosaic and check that a default mosaic names its own mod;
+- [ ] 3.1 Refactor `checkModBundle` (`src/lib/core/engine/mod_bundle_check.ts`) to take a check target, `{ mod, collection }`, `{ mod }` or `{ mosaic }`, and make `ModCheckRequest` carry it (design D3):
+  - load the mosaic, resolve its mod with `expandMosaicRequest`, and check that a default mosaic names its own mod;
   - refuse a switched-off mod as a `bundle` error;
   - apply the aliases before validation.
 
   A mod with `defaultMosaic` and no collection uses its default mosaic. A mod with only `sampleCollection` keeps using it until group 6. Verify with unit tests for the scenarios of "Check a mod", "Bundle check", "A default mosaic names its mod" and "Check a mosaic" (missing mosaic file, switched-off mod).
 - [ ] 3.2 Add the mosaic findings (design D4): aliases for fields the tile type's `ref` definition does not declare, and config key paths the mod's config lacks. Verify with unit tests for every "Mosaic findings" scenario.
-- [ ] 3.3 Give the mount check of `src/lib/core/stage/stage_checks.ts` the launch built for the target: merged config, aliased tiles, and grants with the mosaic's lines, where a foreign mosaic's lines count only with a remembered allow. Run tests only for a `mods.check`. Verify with an e2e test in `e2e/mod_check.spec.ts`, using a fixture mod whose default mosaic overrides config and declares `show` for a routed host: the scenario "Check with the default mosaic". Add another for "Foreign mosaic without decisions".
+- [ ] 3.3 Give the mount check of `runStageCheck` (`src/lib/core/stage/stage_checks.ts`) the launch built for the target: merged config, aliased tiles, and the mosaic's grants from `grantLaunchMosaic` passed to `buildModLaunch` as `mosaicGrants`, where a foreign mosaic's lines count only with a remembered allow. Run tests only for a `mods.check`. Verify with an e2e test in `e2e/mod_check.spec.ts`, using a fixture mod whose default mosaic overrides config and declares `show` for a routed host: the scenario "Check with the default mosaic". Add another for "Foreign mosaic without decisions".
 - [ ] 3.4 Add `mosaic` to the check report (`mod_check_report.ts`), and `mosaics.check` to `mosaics_methods.ts`, with the param, `open` and visible-only checks, through the stage's check hook. Verify with unit tests for "Mosaic check requests follow the open rules" and "Check report", and declare `mosaics.check` and the report's `mosaic` in `mod_api.d.ts` (`tsc -b`).
 - [ ] 3.5 Document checks with mosaics in the engine README (Mod check, methods table) and in `docs/mod_plugin_spec.md` (Checking a mod). Verify that the documented report example has `mosaic` and matches a report from 3.4's tests.
 
@@ -36,14 +36,23 @@
   - the `src/test/fixtures/mods/` mods;
   - the default mod fixtures that declare a sample collection.
 
-  Move the `show` permissions of `book_list` and `country_map` into their default mosaics. Verify that `mods.check` of each of them passes (the e2e "Default mods ship their tests" and sample checks), and that the scenarios of the three sample "Mod file" deltas pass in `npm run test:e2e:samples`.
+  Move the `show` permissions of `book_list` and `country_map` into their default mosaics. Verify that `mods.check` of each of them passes (the e2e "Default mods ship their tests" and sample checks), and that the scenarios of the three sample "Mod file" deltas pass in `npm run test:e2e:samples`. Make the sample e2e tests of "Remembered books per row" and "Remembered fields" open and reopen the sample from its default mosaic, and add the "Another collection" and "Study fields per deck" scenarios.
 - [ ] 5.2 Mod viewer (`default_mods/mod_viewer/src/`):
   - drop the "Name" row and show "Default mosaic" with its address;
   - replace "Run with sample tiles" with "Open default mosaic", still the primary button, which sends `mosaics.open` with `defaultMosaic`;
   - update its fixtures (`listed_mod` with `default_mosaic`) and its cases (`run_cases.ts`), including "Open the default mosaic in a case".
 
   Verify that checking `mod_viewer` passes, and add an e2e test in `e2e/default_mods.spec.ts` for "Run with the sample tiles", where the viewed mod opens from its default mosaic with three tiles.
-- [ ] 5.3 Update `docs/modules/mods/viewer/README.md`, `default_mods/README.md` (the tile viewer's default mosaic, fixtures) and the mod module README's sample list to say "default mosaic". Verify that no doc outside `openspec/` still tells authors to write `sample_collection`, except where it is called a former key (`grep -rn sample_collection docs default_mods public`).
+- [ ] 5.3 Update these to say "default mosaic":
+  - `docs/modules/mods/viewer/README.md`;
+  - `default_mods/README.md` (the tile viewer's default mosaic, fixtures);
+  - the mod module README's sample list;
+  - the mosaic glossary prose of `docs/opentesela_spec.md` ("a sample tile collection");
+  - the engine README's `mods.open` example that sends `inspection.sampleCollection`;
+  - the content host lines of `docs/modules/lib/core/sandbox/README.md`.
+
+  Verify that no doc outside `openspec/` still names a mod's sample collection, except where it is called a former key (`grep -rniE 'sample_collection|sampleCollection|sample (tile )?collection' docs default_mods public`).
+- [ ] 5.4 Update `docs/modules/mosaics/README.md`: a mod's default mosaic (`default_mosaic`, a `mosaic.yaml` whose `mod` is `"./"`), checking a mosaic with `mosaics.check`, and storage kept per mosaic. Add the `mod: "./"` case to "Mosaic references" in `docs/modules/lib/mosaic/README.md`. Verify that every link in the new text resolves to an existing file and heading.
 
 ## 6. Former mod file keys are removed
 

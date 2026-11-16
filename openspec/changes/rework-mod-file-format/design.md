@@ -2,16 +2,21 @@
 
 ## Context
 
-See proposal.md (Why). This change assumes `add-mosaics` is archived. It reuses that change's mosaic loader (`src/lib/mosaic/`), the mosaic launch step in `loadModLaunchInputs`, `mergeMosaicConfig`, `applyMosaicAliases`, mosaic `show` grants and `mosaics.*` in `mosaics_methods.ts`.
+See proposal.md (Why). This change builds on `add-mosaics`, archived on 2026-11-16. It reuses that change's:
+
+- mosaic loader (`src/lib/mosaic/`), `mergeMosaicConfig` and `applyMosaicAliases`;
+- launch steps in `mod_launch.ts`: `loadLaunchMosaic`, `expandMosaicRequest` (the mosaic's mod and collection as an ordinary request), `loadLaunchMod` and `loadLaunchTiles`, which `loadModLaunchInputs` chains;
+- mosaic grants: `grantMosaicPermissions`, applied by `grantLaunchMosaic`, and kept apart from the mod's grants until `buildModLaunch` joins them through its `mosaicGrants` parameter, so each refused line is reported with what declared it;
+- `mosaics.*` in `mosaics_methods.ts`.
 
 What it touches today:
 
 - **Mod files:** `src/lib/mod/mod_format.ts` reads `name` (required), `title` (defaults to `name`) and `sample_collection`. `MOD_FILE_KEYS` feeds the surface guard.
 - **Collection files:** `src/lib/tile/collection_format.ts` reads `collection.name`. Loaded collections and indexes carry `name`.
 - **Storage:** `src/lib/core/storage/mod_storage.ts` keys values as `"opentesela.mod-storage:" + JSON.stringify([modSource, key])`. The storage handlers know only the mod's source.
-- **Checks:** `runModBundleCheck` in `src/lib/core/engine/mod_bundle_check.ts` takes `collectionLocation ?? modFile.sampleCollection`. The mount check (`src/lib/core/stage/stage_checks.ts`) mounts with the mod's config and grants.
+- **Checks:** `checkModBundle` in `src/lib/core/engine/mod_bundle_check.ts` takes `collectionLocation ?? modFile.sampleCollection`. `runStageCheck` (`src/lib/core/stage/stage_checks.ts`) builds the mount check's launch with `buildModLaunch` and `grantModPermissions` alone, with no mosaic grants. `onCheckMod` receives a `ModCheckRequest`, `{ source, collection }`.
 - **Readers of the old fields:**
-  - `.name`: four default mods, `mod_inspection.ts` and `mod_launch.ts`;
+  - `.name`: four default mods, `mod_inspection.ts`, `mod_launch.ts` and the e2e probes (`mod_routes.ts`, `layout_probes.ts`, `theme_probes.ts`);
   - `sampleCollection`: the mod viewer, the bundle check and many fixtures.
 
 ## Goals / Non-Goals
@@ -54,7 +59,7 @@ What it touches today:
 
 ### D3. One check pipeline, started from a mod or from a mosaic
 
-`runModBundleCheck` takes a check target instead of `(mod, collectionLocation)`:
+`checkModBundle` takes a check target instead of `(mod, collectionLocation)`, and `ModCheckRequest` carries the same target:
 
 ```
 { mod, collection }   collection given      -> as today, the mod's own config and grants
@@ -65,12 +70,12 @@ What it touches today:
 With a mosaic:
 
 1. Load the mosaic file. A failure is a `bundle` error, and the report's `source` is `null` while the mod is still unknown.
-2. For a default mosaic, compare `mosaic.mod` with the mod's source. A mismatch is a `bundle` error.
+2. Resolve the mosaic's mod with `expandMosaicRequest`, so a default mod name resolves as it does when the mosaic is opened. For a default mosaic, compare it with the mod's source. A mismatch is a `bundle` error.
 3. Load the mod and refuse a switched-off one as a `bundle` error.
 4. Run the existing steps with `mosaic.collection`: entrypoint, libraries, tile type, collection, with the aliases applied before validation.
 5. Add the mosaic findings (D4).
 
-The mount check receives the merged config, the aliased tiles and the grants including the mosaic's lines. A foreign mosaic's lines count as granted only with a remembered allow, as in `mosaics.inspect`. The mount check reuses the launch builder of `add-mosaics` for this, so a check mounts exactly what opening the mosaic would.
+The mount check receives the merged config, the aliased tiles and the grants including the mosaic's lines. `runStageCheck` gets the mosaic's grants from `grantLaunchMosaic` and passes them to `buildModLaunch` as `mosaicGrants`, beside `grantModPermissions` for the mod, so a check mounts exactly what opening the mosaic would. A foreign mosaic's lines count as granted only with a remembered allow, as in `mosaics.inspect`. A refused mosaic line is reported as the mosaic's, as when the mosaic is opened (`add-mosaics` D9).
 
 Tests run only for `mods.check`. They belong to the mod and use its fixtures.
 
@@ -135,12 +140,12 @@ The old two-element keys can never equal a three-element key, so old values are 
 - **[Stored mod state starts over once]** → Today that is `book_list`'s books per row and `flashcards`' study fields, in the browsers of the people working on the project.
 - **[Taking breaking changes as patches becomes a habit]** → The version note records the reason, which holds only while no mod or collection exists outside the repository. Once the project is shared, the minor rule of the engine README applies.
 - **[A bare run link of `book_list` or `country_map` no longer loads the redirecting Open Library covers]** → They load when the mod is opened from its default mosaic, which is what "Open default mosaic" and the explorers lead to. The other covers still load as media linked by tiles. The `sample-country-map` spec records this.
-- **[`add-mosaics` and this change modify the same requirements (mount context, mod API version)]** → This change's text is written on top of `add-mosaics`'s. Archive `add-mosaics` first, then validate this change again before applying.
+- **[`add-mosaics` and this change modify the same requirements (mount context, mod API version)]** → This change's text is written on top of `add-mosaics`'s. `add-mosaics` was archived on 2026-11-16, and this change validates against the updated main specs.
 - **[Wide mechanical edits across fixtures and inline test files]** → Tasks move them module by module, with that module's tests, so each group stays green.
 
 ## Migration Plan
 
-1. Apply after `add-mosaics` is archived.
+1. Apply on top of the archived `add-mosaics` (2026-11-16).
 2. Ship with an app patch bump. The changeset says that mods and collections need `title`, that `sample_collection` becomes `default_mosaic`, and that mods' stored values start over.
 3. **Rollback:** revert the change.
    - Values stored in the new slots become unreachable to the older app, and values in the old keys come back.
