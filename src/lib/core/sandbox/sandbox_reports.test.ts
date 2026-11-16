@@ -188,6 +188,87 @@ describe("describeBlockedRequest", function describeDescribeBlocked(): void {
   });
 });
 
+const MOSAIC_SOURCE = "https://mosaics.example.net/maps/mosaic.yaml";
+const OPEN_LIBRARY_PERMISSION: ModPermission = {
+  category: "show",
+  host: "https://covers.openlibrary.org",
+  reason: "Shows the book covers",
+};
+const MOSAIC = {
+  source: MOSAIC_SOURCE,
+  permissions: [OPEN_LIBRARY_PERMISSION],
+};
+
+function describeMosaicBlock(
+  blockedUrl: string,
+  directive: string,
+  grants: ModGrants,
+): string {
+  const blocked: BlockedRequest = { blockedUrl, directive };
+  const issue = describeBlockedRequest(blocked, MOD, grants, false, MOSAIC);
+  return issue.message;
+}
+
+describe("Blocked show requests point to the mosaic file", function describeMosaicBlocks(): void {
+  it("Undeclared cover host in a mosaic", function describesUndeclaredMosaicImage(): void {
+    const message = describeMosaicBlock(
+      "https://images.example.net/cover.jpg",
+      "img-src",
+      NO_GRANTS,
+    );
+
+    expect(message).toBe(
+      `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml, or in the mosaic file "${MOSAIC_SOURCE}" when the mosaic's data needs it.`,
+    );
+  });
+
+  it("names the mosaic file for every show directive", function describesEveryShowDirective(): void {
+    for (const directive of ["media-src", "font-src", "style-src"]) {
+      const message = describeMosaicBlock(
+        "https://images.example.net/a",
+        directive,
+        NO_GRANTS,
+      );
+
+      expect(message).toContain(MOSAIC_SOURCE);
+    }
+  });
+
+  it("Undeclared connection in a mosaic", function describesUndeclaredMosaicConnection(): void {
+    const message = describeMosaicBlock(
+      "https://api.example.net/data",
+      "connect-src",
+      NO_GRANTS,
+    );
+
+    expect(message).toBe(
+      "Blocked connection request to https://api.example.net. Add it to permissions.connect in mod_conf.yaml.",
+    );
+  });
+
+  it("says that the mosaic declares a refused line", function describesDeniedMosaicLine(): void {
+    const message = describeMosaicBlock(
+      "https://covers.openlibrary.org/b/id/1.jpg",
+      "img-src",
+      { granted: [], denied: [OPEN_LIBRARY_PERMISSION] },
+    );
+
+    expect(message).toBe(
+      "Blocked image request to https://covers.openlibrary.org: the mosaic declares it in permissions.show, but the permission was not granted.",
+    );
+  });
+
+  it("gives the policy text for a host the mosaic's granted line covers", function describesGrantedMosaicLine(): void {
+    const message = describeMosaicBlock(
+      "https://covers.openlibrary.org/b/id/1.jpg",
+      "img-src",
+      { granted: [OPEN_LIBRARY_PERMISSION], denied: [] },
+    );
+
+    expect(message).toBe("Blocked by the sandbox policy (img-src).");
+  });
+});
+
 describe("Redirect hint for tile authors", function describeRedirectHint(): void {
   it("Tile link that redirects", function hintsImageRedirect(): void {
     const message = describeBlock(

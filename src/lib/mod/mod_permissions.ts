@@ -171,6 +171,14 @@ export function permissionHostCovers(host: string, origin: string): boolean {
   );
 }
 
+/**
+ * A host a `show` permission can name: an origin, or a wildcard host such as
+ * `https://*.example.org`. Mosaics check their `show` lines with it.
+ */
+export function isShowHost(host: string): boolean {
+  return isOriginHost(host) || isWildcardHost(host);
+}
+
 function describeInvalidOpenHost(host: string, entryLabel: string): string {
   if (isWildcardHost(host)) {
     const wildcardMessage = `${entryLabel}: host "${host}": wildcard hosts are not allowed in permissions.open`;

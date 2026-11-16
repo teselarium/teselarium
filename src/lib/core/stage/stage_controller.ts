@@ -11,7 +11,10 @@ import type {
   ResolvedDefaultModSettings,
   RunLink,
 } from "../engine/index.ts";
-import type { SiteDecision } from "../permissions/index.ts";
+import type {
+  SiteDecision,
+  SiteDecisionSubject,
+} from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme, Theme } from "../theme/index.ts";
@@ -136,6 +139,8 @@ export interface StageOptions {
 export interface SiteConsentLine extends ModPermission {
   /** Passed back in `SiteConsentAnswer.allowed` when the line is checked. */
   key: string;
+  /** What declared the line: the mod, or the mosaic it was opened from. */
+  subject: SiteDecisionSubject;
 }
 
 /** What the page renders of one message of a sandbox. Frozen. */
@@ -160,6 +165,10 @@ export interface SandboxSnapshot {
   status: SandboxStatus;
   /** Known once the mod is loaded. */
   mod: { title: string; version: string; source: string } | null;
+  /** Known once the mosaic file of a mosaic link is loaded, `null` otherwise. */
+  mosaic: { title: string; source: string } | null;
+  /** The link's mosaic reference, resolved against the app's address, or `null` for a mod link. */
+  mosaicReference: string | null;
   /** The frame's `srcdoc`, only while the mod is running. */
   sandboxDocument: string | null;
   canReloadTiles: boolean;
@@ -171,9 +180,16 @@ export interface SandboxSnapshot {
   messages: readonly MessageSnapshot[];
   /** How many older messages from the mod were dropped, per level. */
   droppedModMessages: Readonly<DroppedMessageCounts>;
-  /** The link's mod reference, resolved against the app's address. */
+  /**
+   * The link's mod reference, resolved against the app's address. For a
+   * mosaic link, `""` until the mosaic file is loaded, then the mosaic's mod.
+   */
   modReference: string;
-  /** The link's collection, resolved against the app's address, or `null` without one. */
+  /**
+   * The link's collection, resolved against the app's address, or `null`
+   * without one. For a mosaic link, the mosaic's collection once its file is
+   * loaded.
+   */
   collection: string | null;
   errorMessage: string | null;
   /** The mod's `api` range and the app's mod API version, only while the sandbox asks the mod API question. */
@@ -336,6 +352,17 @@ function buildModSummary(
   return Object.freeze(summary);
 }
 
+function buildMosaicSummary(
+  runtime: SandboxRuntime | undefined,
+): SandboxSnapshot["mosaic"] {
+  const mosaic = runtime?.loadedMosaic ?? null;
+  if (mosaic === null) {
+    return null;
+  }
+  const summary = { title: mosaic.title, source: mosaic.source };
+  return Object.freeze(summary);
+}
+
 function buildMessageSnapshots(
   runtime: SandboxRuntime | undefined,
 ): readonly MessageSnapshot[] {
@@ -391,6 +418,7 @@ function buildSiteConsent(
       category: line.category,
       host: line.host,
       reason: line.reason,
+      subject: line.subject,
     };
     lines.push(Object.freeze(consentLine));
   }
@@ -398,13 +426,19 @@ function buildSiteConsent(
   return Object.freeze(siteConsent);
 }
 
-/** The link's collection, resolved once the sandbox is launched, or `null` without one. */
+/**
+ * The link's collection, resolved once the sandbox is launched, or `null`
+ * without one. A mosaic's collection once the mosaic file is loaded.
+ */
 function readSnapshotCollection(
   sandbox: StageSandbox,
   runtime: SandboxRuntime | undefined,
 ): string | null {
-  if (runtime === undefined || sandbox.link.collection === null) {
+  if (runtime === undefined) {
     return sandbox.link.collection;
+  }
+  if (runtime.loadedMosaic === null && sandbox.link.collection === null) {
+    return null;
   }
   return runtime.tilesLocation;
 }
@@ -424,6 +458,8 @@ function buildSandboxSnapshot(
     canClose: !sandbox.isHomeMod,
     status,
     mod: buildModSummary(runtime),
+    mosaic: buildMosaicSummary(runtime),
+    mosaicReference: runtime?.mosaicSource ?? sandbox.link.mosaic ?? null,
     sandboxDocument: isRunning ? launch.sandboxDocument : null,
     canReloadTiles: isRunning && launch.tilesSource !== null,
     messages: buildMessageSnapshots(runtime),

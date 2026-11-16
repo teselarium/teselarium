@@ -132,6 +132,7 @@ describe("tile module entry point", function describeEntryPoint(): void {
       "loadTile",
       "loadTileCollection",
       "readTileCollectionIndex",
+      "resolveCollectionReference",
       "validateTile",
       "validateTileCollection",
     ]);

@@ -19,6 +19,7 @@ const BOOKS_URL = `${FIXTURES_BASE_URL}tiles/books/`;
 const KALLOCAIN_URL = `${BOOKS_URL}kallocain.md`;
 const MISSING_TILE_URL = `${BOOKS_URL}missing.md`;
 const MISSING_COLLECTION_URL = `${FIXTURES_BASE_URL}missing.yaml`;
+const EMPTY_COLLECTION_TEXT = 'collection:\n  name: "Empty"\n  tiles: []\n';
 
 function createTestFetch(): Mock<typeof fetch> {
   const testFetch = vi.fn<typeof fetch>(fetchTestFile);
@@ -133,6 +134,20 @@ describe("readTileCollectionIndex", function describeReadTileCollectionIndex(): 
       );
 
       expect(collectionIndex.source).toBe(SAMPLE_COLLECTION_URL);
+    });
+
+    it("Index of a folder", async function readsFolderIndex(): Promise<void> {
+      const testFetch = createTestFetch();
+      const folderFileUrl =
+        "https://example.org/samples/tiles/literature_nobel_laureates/collection.yaml";
+      serveTestFile(folderFileUrl, EMPTY_COLLECTION_TEXT);
+
+      const collectionIndex = await readTileCollectionIndex(
+        "./samples/tiles/literature_nobel_laureates",
+        { baseUrl: "https://example.org/", fetch: testFetch },
+      );
+
+      expect(collectionIndex.source).toBe(folderFileUrl);
     });
   });
 

@@ -5,8 +5,10 @@ import {
   actionDialog,
   buildProbeFiles,
   findModFrame,
+  OTHER_API_RANGE,
   postRequestToParent,
   readProbeCalls,
+  readProbeContext,
   readWindowMessages,
   registerTwoTileHandlers,
   PROBE_MOD_CODE,
@@ -17,6 +19,13 @@ import {
   waitForProbe,
 } from "./mod_routes.ts";
 import {
+  buildLabelsMosaicFiles,
+  buildTilesModFiles,
+  LABELS_COLLECTION_FILE,
+  LABELS_MOSAIC_HASH,
+  LABELS_MOSAIC_PATH,
+  LABELS_MOSAIC_REFERENCE,
+  LABELS_MOSAIC_TITLE,
   MISSING_TEST_MOD_REFERENCE,
   openTilesMod,
   readTilesModSource,
@@ -343,3 +352,110 @@ test.describe(
     });
   },
 );
+
+test.describe("Mods opened from a mosaic", function describeMosaicLaunch(): void {
+  test("Mosaic of the tiles mod", async function givesMosaicContext({
+    page,
+  }): Promise<void> {
+    await serveTilesMod(page, buildLabelsMosaicFiles());
+    await page.goto(`/${LABELS_MOSAIC_HASH}&from=x`);
+    const frame = await findModFrame(page, TILES_TITLE);
+    await waitForProbe(frame);
+
+    const context = await frame.evaluate(readProbeContext);
+
+    expect(context.mosaic).toEqual({
+      source: new URL(LABELS_MOSAIC_PATH, page.url()).href,
+      title: LABELS_MOSAIC_TITLE,
+      description: "The tiles mod on labelled tiles.",
+    });
+    expect(context.config).toEqual({
+      show_images: false,
+      empty_text: "There are no tiles to show.",
+    });
+    expect(context.params).toEqual({ from: "x" });
+    const tiles = context.tiles as { metadata: Record<string, unknown> }[];
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0].metadata).toEqual({ title: "First label" });
+  });
+
+  test("Missing collection of a mosaic", async function namesMissingCollection({
+    page,
+  }): Promise<void> {
+    const files = buildLabelsMosaicFiles();
+    delete files[LABELS_COLLECTION_FILE];
+    await serveTilesMod(page, files);
+
+    await page.goto(`/${LABELS_MOSAIC_HASH}`);
+
+    const collectionSource = new URL(
+      `/test-mods/${LABELS_COLLECTION_FILE}`,
+      page.url(),
+    ).href;
+    await expect(page.getByRole("alert")).toContainText(collectionSource);
+    await expect(page.getByRole("alert")).toContainText("404");
+    await expect(page.locator("iframe")).toHaveCount(0);
+  });
+
+  test("Mosaic of a mod for another API", async function asksApiQuestion({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(page, {
+      ...buildProbeFiles("later", [], OTHER_API_RANGE),
+      "mosaics/later.yaml": [
+        "mosaic:",
+        '  title: "Later mosaic"',
+        '  mod: "../later/"',
+      ].join("\n"),
+    });
+
+    await page.goto("/#/run?mosaic=./test-mods/mosaics/later.yaml");
+
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("dialog")).toContainText(OTHER_API_RANGE);
+    await expect(page.locator("iframe")).toHaveCount(0);
+  });
+});
+
+test.describe("Inspecting and opening mosaics", function describeMosaicMethods(): void {
+  test("Open the labels mosaic", async function opensMosaic({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(page, {
+      ...buildProbeFiles("probe", OPEN_ANY_SITE_LINES),
+      ...buildTilesModFiles(),
+      ...buildLabelsMosaicFiles(),
+    });
+    await page.goto(PROBE_LINK);
+    const probeFrame = await findModFrame(page, "probe");
+    await waitForProbe(probeFrame);
+    const mosaicSource = new URL(LABELS_MOSAIC_PATH, page.url()).href;
+
+    const inspection = await probeFrame.evaluate(requestFromProbe, [
+      "mosaics.inspect",
+      { mosaic: LABELS_MOSAIC_REFERENCE },
+    ]);
+    await probeFrame.evaluate(startProbeRequests, [
+      [
+        "mosaics.open",
+        { mosaic: LABELS_MOSAIC_REFERENCE, params: { from: "probe" } },
+      ],
+    ]);
+
+    expect(inspection.result).toMatchObject({
+      source: mosaicSource,
+      title: LABELS_MOSAIC_TITLE,
+      mod: new URL("/test-mods/tiles/mod_conf.yaml", page.url()).href,
+      aliases: { title: ["label"] },
+    });
+    const tilesFrame = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
+    await expect(tilesFrame.getByRole("listitem")).toHaveText(["First label"]);
+    await expect(page.locator('iframe[title="probe"]')).toBeHidden();
+    const hash = new URL(page.url()).hash;
+    const query = new URLSearchParams(hash.slice(hash.indexOf("?") + 1));
+    expect(hash.startsWith("#/run?mosaic=")).toBe(true);
+    expect(query.get("mosaic")).toBe(mosaicSource);
+    expect(query.get("from")).toBe("probe");
+    expect(query.has("mod")).toBe(false);
+  });
+});

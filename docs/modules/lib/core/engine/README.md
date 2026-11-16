@@ -60,9 +60,11 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `storage.get` | `{ key }`, a non-empty string | The value stored under `key` in the mod's slot, or `null`. |
 | `storage.set` | `{ key, value }`, with `value` plain data (strings, finite numbers, booleans, null, lists and mappings) | `null`. Storing `null` removes the key. |
 | `mods.inspect` | `{ mod }`, a mod reference | The mod's metadata, without running it (see below). |
-| `mods.open` | `{ mod, collection?, tile?, params?, replace? }` | `null`, once the stage opened the mod in a new sandbox. With `replace: true`, the requester is replaced and gets no answer (see [Inspecting and opening mods](#inspecting-and-opening-mods)). `tile` and `replace` added in mod API `0.1.12`. |
+| `mods.open` | `{ mod, collection?, tile?, params?, replace? }`, where `params` cannot hold `mod`, `collection`, `tile` or `mosaic` | `null`, once the stage opened the mod in a new sandbox. With `replace: true`, the requester is replaced and gets no answer (see [Inspecting and opening mods](#inspecting-and-opening-mods)). `tile` and `replace` added in mod API `0.1.12`. |
 | `mods.check` | `{ mod, collection? }` | The check report of the mod, once the check is done (see below). Added in mod API `0.1.1`. |
-| `collections.inspect` | `{ collection }`, a collection location | The collection's index, without loading any tile (see [Inspecting collections](#inspecting-collections)). Added in mod API `0.1.11`. |
+| `collections.inspect` | `{ collection }`, a collection reference: the collection file, or a folder holding `collection.yaml` | The collection's index, without loading any tile (see [Inspecting collections](#inspecting-collections)). Added in mod API `0.1.11`; folders since `0.1.13`. |
+| `mosaics.inspect` | `{ mosaic }`, a mosaic reference | The mosaic file's content, without opening it (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
+| `mosaics.open` | `{ mosaic, params?, replace? }` | `null`, once the stage opened the mosaic in a new sandbox. With `replace: true`, the requester is replaced and gets no answer (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
@@ -96,9 +98,10 @@ The second argument of `mount(engine, context)`. Plain data:
 | Field | Content |
 |---|---|
 | `mod` | `source`, `name`, `title`, `version`, `description`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.12"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
-| `config` | The mod's `config`. |
-| `params` | The link's parameters other than `mod`, `collection` and `tile`, as a mapping of strings. |
+| `mosaic` | `source`, `title`, `description` of the mosaic the mod was opened from (see the [mosaic module](../../mosaic/README.md)), or `null` for a mod opened from a mod link. It never holds the mosaic's `config`, `aliases` or `permissions`: the mod receives their effect in `config`, `tiles` and `permissions`. Added in mod API `0.1.13`. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.13"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `config` | The mod's `config`. For a mod opened from a mosaic, the mod's config merged with the mosaic's: mappings are merged key by key, and any other mosaic value, `null` included, replaces the mod's (see [Config merge](../../mosaic/README.md#config-merge)). `mods.inspect` still gives the mod's own config. |
+| `params` | The link's parameters other than `mod`, `collection`, `tile` and `mosaic`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection, or its one tile, that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
 | `issues` | The issues from loading and validating the collection or the tile. |
 | `permissions` | `granted` and `denied` lists of `{ category, host, reason }`. |
@@ -119,7 +122,8 @@ In `contained`, the base stylesheet keeps the frame's `<body>` at most `--ot-con
 
 A collection is optional. A link may name a `tile` instead, the location of one tile file: the engine loads it before the frame starts and handles it as a collection holding only that tile, whose source is the tile's (`loadModTile`, see [Launch](#launch)), so what follows applies to it too, and a tile of another type gives no tiles and one warning. Without a collection or a tile, `tiles` and `issues` are empty and no collection or tile file is requested. With one:
 
-- When the mod has a `type_path`, the engine builds the tile validator, validates the collection and keeps only the tiles whose `types` include the type name. Tiles that do not match are left out of `tiles` and appear as warnings in `issues`.
+- For a mod opened from a mosaic with `aliases`, the engine first renames each tile's top-level metadata keys (`applyMosaicAliases`, see [Aliases](../../mosaic/README.md#aliases)): a laureate tile with `name` and `birth_country` reaches a type that requires `title` and `country` with those keys instead. The tiles of `tiles.changed` after "Reload tiles" are renamed the same way. A tile's `source` and `body` never change.
+- When the mod has a `type_path`, the engine builds the tile validator, validates the collection, after the aliases for a mosaic, and keeps only the tiles whose `types` include the type name. Tiles that do not match are left out of `tiles` and appear as warnings in `issues`.
 - Without a `type_path`, the mod receives every tile, each with `types` `[]`.
 - The validator is built again on each load, so "Reload tiles" picks up a changed type file too.
 - Each metadata string that starts with `./` or `../`, also inside lists and nested mappings, arrives as the absolute URL it names, resolved against the tile's `source`: `image: "./cover.jpg"` in `https://example.org/books/kallocain.md` arrives as `"https://example.org/books/cover.jpg"`. Only that prefix counts: strings such as `/r/books`, `cover.jpg` or absolute URLs, other values and mapping keys arrive as written. The tiles of `tiles.changed` and of a checked mod are resolved the same way; tiles a test passes to `mount(options)` are used as given. The loaded tile, which the collection is validated against, and the tile's `body` stay as written. A mod that shows such a string as text shows the absolute URL.
@@ -197,7 +201,7 @@ Mods never build app addresses: they send what to run, and only the stage turns 
 
 ### Inspecting collections
 
-`collections.inspect { collection }` reads a tile collection's file alone, without requesting any of its tiles, and answers its index. A mod uses it to list collections, or to show what one holds, without being opened with it.
+`collections.inspect { collection }`, where `collection` is the collection file or a folder holding `collection.yaml`, reads a tile collection's file alone, without requesting any of its tiles, and answers its index. A mod uses it to list collections, or to show what one holds, without being opened with it.
 
 Before any file is requested, the engine checks:
 
@@ -224,6 +228,43 @@ const inspection = await engine.request("collections.inspect", {
 // inspection.tiles[0] === "https://example.org/samples/tiles/literature_nobel_laureates/2010__mario_vargas_llosa.md"
 // inspection.issues is []
 ```
+
+### Inspecting and opening mosaics
+
+A mosaic is a file that opens a mod with a collection, the mosaic's config, aliases and `show` lines (see the [mosaic module](../../mosaic/README.md)). `mosaics.inspect { mosaic }` reads a mosaic file without opening it, and `mosaics.open { mosaic, params?, replace? }` opens it as if the user had followed its run link `#/run?mosaic=…`. A mosaic explorer or viewer uses them to list mosaics, show what one holds, and open it.
+
+Before any file is requested, the engine checks:
+
+1. The params: `mosaic` must be a non-empty string (`-32602`, `mosaics.inspect: "mosaic" must be a non-empty string`, or the same for `mosaics.open`). It is resolved against the app's address, as the references of `mods.*` and `collections.*` are: a folder means the `mosaic.yaml` in it. For `mosaics.open`, `params` must be a mapping of strings without `mod`, `collection`, `tile` or `mosaic` (`mosaics.open: "params.mod" is reserved`), and `replace` a boolean (`mosaics.open: "replace" must be a boolean`), each `-32602`.
+2. The `open` permission: the requesting mod needs a **granted** `open` permission for `"*"` or the origin of the mosaic file. Otherwise `-32002`, with `Opening mosaics from <origin> is not allowed. Add it to permissions.open in mod_conf.yaml.`, or `Opening mosaics from <origin>: the mod declares it in permissions.open, but the permission was not granted.`. The request never shows a dialog.
+
+**The `open` rule of a mosaic:** `open` is checked against the mosaic file's origin only. The mod the mosaic names is not checked against the requester's `open`: checking it would mean loading the mosaic file before answering. Opening a mosaic is the same act as a user following its link, and the mod opened still gets its own mod API question and site consent. So a mod with `open` for `https://example.org` only can open a mosaic at `https://example.org/m.yaml` whose mod is at `https://mods.example.net/clock/`.
+
+`mosaics.inspect` then loads the mosaic file, requesting neither its mod, its collection nor any tile, and answers plain data:
+
+- `source`: the resolved address of the mosaic file;
+- `title` and `description`;
+- `mod`: the resolved address of the mosaic's mod file, and `collection`: the resolved address of its collection file, or `null`;
+- `config` and `aliases`: the mosaic's own, not merged with the mod's;
+- `permissions`: the `granted` and `denied` lists the mosaic's `show` lines would get if it were opened without asking: every line for a mosaic from the app's origin, and for one from another origin, the lines with a remembered allow for that mosaic file granted and every other line denied. Inspecting a mosaic never shows the site consent dialog.
+
+A mosaic file that cannot be fetched or read, is not plain YAML or does not follow the mosaic file format is `-32001`, with the load error's message, which names the mosaic file, such as `Cannot load file "https://example.org/samples/mosaics/missing.yaml": HTTP 404 Not Found`.
+
+`mosaics.open` hands the stage the link `{ mod: "", collection: null, tile: null, mosaic, params }`, where `mosaic` is the resolved address of the mosaic file, through the same `onOpenLink(link, { replace })` as `mods.open`, and answers `null`. So the app's address becomes `#/run?mosaic=<resolved address>&<params>`. Its outcomes map to the same refusals, with their own messages: `mosaics.open: only the visible mod can open mosaics` for a hidden mod, and `mosaics.open: the home mod cannot be replaced` for the Home mod at `#/` with `replace: true`, both `-32002`. The mosaic's load failures belong to the new sandbox, not to the response, so a missing mosaic file is an error of the new sandbox that names the file's address.
+
+```js
+const inspection = await engine.request("mosaics.inspect", {
+  mosaic: "./samples/mosaics/nobel_map",
+});
+// inspection.source === "https://example.org/samples/mosaics/nobel_map/mosaic.yaml"
+// inspection.mod === "https://example.org/samples/mods/country_map/mod_conf.yaml"
+// only the mosaic file was requested
+
+await engine.request("mosaics.open", { mosaic: inspection.source });
+// the mosaic's mod is now the visible mod, and the address is its run link
+```
+
+A mod opened from a mosaic reads it in `context.mosaic` (`source`, `title`, `description`), and `null` otherwise (see [Mount context](#mount-context)).
 
 ### Asking the user: links, files and confirmations
 
@@ -519,7 +560,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.12` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.13` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -532,12 +573,13 @@ A change that bumps the mod API also bumps the app's version, at least as much (
 
 Each bump also updates:
 
-- the surface guard, `mod_api_surface.test.ts`: it records, for each version, the API's surface by name (the method names, the event names, the mount context's keys and the keys of its `mod`, `api`, `permissions` and `theme` mappings, the mod file keys and the permission categories). It fails when the surface built from the code differs from the entry of `MOD_API_VERSION`, or when a recorded version is above it. A bump adds an entry for the new version; older entries are never edited, so the record shows how the API grew. The guard sees names, not params or results, so a change to those needs the bump without the guard's help. The test API is part of the mod API, but the guard does not record it: the guard builds its surface from the engine's code and never runs the frame loader, so the e2e tests of `e2e/mod_tests.spec.ts` pin the test API's names instead;
+- the surface guard, `mod_api_surface.test.ts`: it records, for each version, the API's surface by name (the method names, the event names, the mount context's keys and the keys of its `mod`, `mosaic` (from `0.1.13`, read from a mod opened from a mosaic, since it is `null` otherwise), `api`, `permissions` and `theme` mappings, the mod file keys and the permission categories). It fails when the surface built from the code differs from the entry of `MOD_API_VERSION`, or when a recorded version is above it. A bump adds an entry for the new version; older entries are never edited, so the record shows how the API grew. The guard sees names, not params or results, so a change to those needs the bump without the guard's help. The test API is part of the mod API, but the guard does not record it: the guard builds its surface from the engine's code and never runs the frame loader, so the e2e tests of `e2e/mod_tests.spec.ts` pin the test API's names instead;
 - the shipped mods' `api` ranges, and `TEST_MOD_API_RANGE` in `src/test/sample_mods.ts` and `e2e/mod_routes.ts`, on a breaking bump.
 
 Version notes:
 
 - `0.1.12` added `tile` and `replace` to `mods.open`, the `tile` run link field and the mount context filled from a tile. It also made `tile` a reserved link name, like `mod` and `collection`: a link parameter named `tile` is no longer passed in `params`, and `mods.open` refuses `params` named `mod`, `collection` or `tile` with `-32602`. That could break a mod that read a `tile` parameter or passed one of those names in `params`, which would call for a minor bump. No shipped, test or known mod does, and a minor bump would make every `^0.1.x` mod ask the user before it starts, so it was taken as a patch. The surface guard's `0.1.12` entry repeats `0.1.11`'s, since it records names and no name was added.
+- `0.1.13` added mosaics: the methods `mosaics.inspect` and `mosaics.open`, the mount context key `mosaic` (`source`, `title`, `description`, or `null`), the run link field `mosaic`, and the collection folder, a collection reference without `.yaml` or `.yml` that means the `collection.yaml` in it. A mod not opened from a mosaic gets the same context, config, tiles and grants as before. It also made `mosaic` a reserved link name: a link parameter named `mosaic` is no longer passed in `params`, and `mods.open` refuses `params.mosaic` with `-32602`. As with `tile` in `0.1.12`, no shipped, test or known mod reads or passes a `mosaic` parameter, and no shipped, sample, fixture or known collection is named without `.yaml` or `.yml`, so it was taken as a patch.
 
 An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `openspec/config.yaml` asks.
 
@@ -614,7 +656,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.12"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.13"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.10` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -625,13 +667,17 @@ Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `a
 ### Launch
 
 - `loadModLaunchInputs(request, options)`: loads what a mod's launch is built from. `request` is a `ModLaunchRequest` (`link`, `defaults`), where `link` is a `RunLink` (`mod`, `collection`, `tile`, `params`, where `tile` is optional and absent means `null`): what to run, not an address. In order, it refuses a switched-off mod with `ModSwitchedOffError` and a link with both a collection and a tile with `RunLinkConflictError` (`A link cannot have both a collection and a tile.`, whose `source` is the resolved mod reference) before any request, loads the mod and its entrypoint, and loads the collection when `link.collection` is not `null`, or else the tile when `link.tile` is not `null`. Returns `ModLaunchInputs` (`mod`, `link`, `modTiles`), with `modTiles` `null` without a collection or a tile. Every error propagates, and each names its source. The stage keeps the inputs while it asks the user (see the [stage module](../stage/README.md)), and builds the launch once the grants are known.
-- `loadLaunchMod(request, options)` and `loadLaunchTiles(mod, link, options)`: the two steps of `loadModLaunchInputs`. The first refuses a switched-off mod and a conflicting link and loads the mod, and the second loads the collection or the tile and returns the `ModLaunchInputs`. The stage calls them one after the other, so it knows the mod when the collection or the tile fails.
-- `buildModLaunch(mod, link, modTiles, grants, loadsTileLinkedMedia)`: builds the `ModLaunch` of a loaded mod, its `ModTiles` (or `null`) and its `grants`, the `ModGrants` of `grantModPermissions` (see the [permissions module](../permissions/README.md)), without requesting anything: collects the content hosts and the tile links (when `loadsTileLinkedMedia` is `true`), builds the policy, the frame document, the mount context and the issues. Opening a mod and checking it both call it, so a checked mod gets the frame it would get if it were opened with the same grants.
-  Returns a `ModLaunch` (`mod`, `tilesKind`, `tilesSource`, `context`, `contentHosts`, `tileLinks`, `tileBodies`, `policy`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects, and whose `permissions` are `grants`. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. `tilesKind` is `"collection"` or `"tile"`, and `tilesSource` the resolved location the link's tiles come from, both `null` when the link names neither: the stage's "Reload tiles", its availability and the loaded and reloaded notifications follow them. `tileBodies` is the `TileBodies` of the tiles the mod receives (`buildTileBodies`, below), which the session keeps. `tileLinks` is the `TileLinks` of the tiles the mod receives and their body media (`collectModTileLinks`, below, see [Media linked by tiles](../sandbox/README.md#media-linked-by-tiles)): `sources`, the files the policy allows as images, video and audio, and `issues`, the left-out links and the iframes the bodies left out, kept apart from `issues` so the stage can replace them after "Reload tiles". It is `{ sources: [], issues: [] }` without a collection or a tile, and `null` when `loadsTileLinkedMedia` is `false`: then nothing is collected or reported, and blocked image reports get no redirect hint. The mount context does not list the tile links, so the mod API does not change.
+- With a mosaic: when `link.mosaic` is set, `loadModLaunchInputs` first refuses a link that also has a non-empty `mod`, `collection` or `tile` with `MosaicLinkConflictError` (`A link to a mosaic cannot also have a mod, a collection or a tile.`, whose `source` is the resolved mosaic reference), before any request. It then loads the mosaic file (`loadMosaicFile`, see the [mosaic module](../../mosaic/README.md)), whose failures name the mosaic file and request neither its mod nor its collection, and continues with `{ mod: mosaic.mod, collection: mosaic.collection, tile: null, params: link.params }` as for a mod link. So a switched-off mod named by a mosaic is refused before its files are requested, and a mosaic of a mod for another mod API asks the same question. The returned `ModLaunchInputs` has `mosaic`, the `LoadedMosaic`, or `null` for a mod link, and its `link` is the expanded link. The collection's tiles are renamed by the mosaic's aliases before they are validated.
+- `loadLaunchMosaic(request, options)`, `expandMosaicRequest(request, mosaic)`, `loadLaunchMod(request, options)` and `loadLaunchTiles(mod, link, options, mosaic?)`: the steps of `loadModLaunchInputs`. The first refuses a conflicting mosaic link and loads the mosaic, or gives `null` for a mod link. The second turns a loaded mosaic into the request of its mod and collection, and gives `request` itself for `null`. The third refuses a switched-off mod and a conflicting link and loads the mod, and the last loads the collection or the tile, renamed by the mosaic's aliases, and returns the `ModLaunchInputs`. The stage calls them one after the other, so it knows the mosaic when its mod fails, and the mod when the collection or the tile fails.
+- `buildModLaunch(mod, link, modTiles, grants, loadsTileLinkedMedia, mosaic?)`: builds the `ModLaunch` of a loaded mod, its `ModTiles` (or `null`) and its `grants`, the `ModGrants` of `grantModPermissions` (see the [permissions module](../permissions/README.md)), without requesting anything: collects the content hosts and the tile links (when `loadsTileLinkedMedia` is `true`), builds the policy, the frame document, the mount context and the issues. Opening a mod and checking it both call it, so a checked mod gets the frame it would get if it were opened with the same grants.
+  With a `mosaic`, the mount context's `config` is the merged config, its `mosaic` is the mosaic's `source`, `title` and `description`, and the mosaic file's origin is a content host, first in the list.
+  Returns a `ModLaunch` (`mod`, `mosaic`, the `LoadedMosaic` or `null`, `tilesKind`, `tilesSource`, `context`, `contentHosts`, `tileLinks`, `tileBodies`, `policy`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects, and whose `permissions` are `grants`. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. `tilesKind` is `"collection"` or `"tile"`, and `tilesSource` the resolved location the link's tiles come from, both `null` when the link names neither: the stage's "Reload tiles", its availability and the loaded and reloaded notifications follow them. `tileBodies` is the `TileBodies` of the tiles the mod receives (`buildTileBodies`, below), which the session keeps. `tileLinks` is the `TileLinks` of the tiles the mod receives and their body media (`collectModTileLinks`, below, see [Media linked by tiles](../sandbox/README.md#media-linked-by-tiles)): `sources`, the files the policy allows as images, video and audio, and `issues`, the left-out links and the iframes the bodies left out, kept apart from `issues` so the stage can replace them after "Reload tiles". It is `{ sources: [], issues: [] }` without a collection or a tile, and `null` when `loadsTileLinkedMedia` is `false`: then nothing is collected or reported, and blocked image reports get no redirect hint. The mount context does not list the tile links, so the mod API does not change.
 - `buildModTestDocument(launch)`: the `srcdoc` HTML of a frame of the mod's tests: the launch's `policy` (the frame's Content-Security-Policy) and the mod's theme setting, as in `sandboxDocument`, with the assertions and the test runner after the frame loader (see the [sandbox module](../sandbox/README.md#frames-of-a-checks-tests)). So a case runs the mod with the content policy it gets when it is opened.
-- `loadModTiles(mod, collectionLocation, options?)`: loads a collection for a mod and selects its tiles with `selectModTiles`. Returns `ModTiles` (`tilesSource`, the collection's source, `tiles`, `issues`).
+- `loadModTiles(mod, collectionLocation, options?, aliases?)`: loads a collection for a mod, renames its tiles by `aliases` (none by default) and selects them with `selectModTiles`. Returns `ModTiles` (`tilesSource`, the collection's source, `tiles`, `issues`).
 - `loadModTile(mod, tileLocation, options?)`: loads one tile for a mod (`loadTile`), wraps it in a collection whose `source` is the tile's, with an empty `name` and `description` and no issues, and selects it with `selectModTiles`. Returns `ModTiles` whose `tilesSource` is the tile's source. A tile that cannot be fetched or parsed throws `FileFetchError` or `MarkdownParseError` with the tile as its source.
-- `loadModTilesOfKind(mod, kind, location, options?)`: `loadModTile` for `"tile"`, `loadModTiles` for `"collection"`. The stage's "Reload tiles" calls it with the launch's `tilesKind` and `tilesSource`.
+- `loadModTilesOfKind(mod, kind, location, options?, aliases?)`: `loadModTile` for `"tile"`, `loadModTiles` with the aliases for `"collection"`. The stage's "Reload tiles" calls it with the launch's `tilesKind`, `tilesSource` and `readMosaicAliases(launch.mosaic)`, so a mosaic's reloaded tiles are renamed as at the start, and the mosaic file is not requested again.
+- `readMosaicAliases(mosaic)`: the aliases of a launch's mosaic, or none for `null`.
+- `RUN_LINK_RESERVED_NAMES`: `mod`, `collection`, `tile` and `mosaic`, the link names the stage reads itself. They are never in `context.params`, and `mods.open` and `mosaics.open` refuse them in their `params`.
 - `selectModTiles(collection, tileValidator)`: the `ModTiles` of a loaded collection. With a validator, the collection is validated and only the tiles of its type are kept, the others appearing as warnings in `issues`. With `null`, every tile is kept. The kept tiles are new tiles whose metadata strings starting with `./` or `../` are resolved against the tile's `source` (`resolveTilePaths` in `tile_paths.ts`, not exported by `index.ts`), so opening, "Reload tiles" and checks all get resolved tiles. The collection's tiles stay as written and are validated as written.
 
 ```ts
@@ -654,6 +700,16 @@ const launch = buildModLaunch(inputs.mod, inputs.link, inputs.modTiles, grants, 
 // launch.context.tiles has the three sample books, each with types ["book"]
 // launch.contentHosts is ["https://example.org"]
 // launch.tileLinks is { sources: [], issues: [] }: the granted show hosts cover the covers
+// launch.context.mosaic is null
+
+const mosaicRequest = {
+  link: { mod: "", collection: null, mosaic: "./samples/mosaics/nobel_map.yaml", params: {} },
+  defaults,
+};
+const mosaicInputs = await loadModLaunchInputs(mosaicRequest, { baseUrl: "https://example.org/" });
+// mosaicInputs.mosaic.source === "https://example.org/samples/mosaics/nobel_map.yaml"
+// mosaicInputs.link.mod === "https://example.org/samples/mods/country_map/mod_conf.yaml"
+// mosaicInputs.modTiles.tiles have the mosaic's aliases applied, then the country type's validation
 ```
 
 ### Tile bodies of a launch

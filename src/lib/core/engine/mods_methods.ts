@@ -1,4 +1,3 @@
-import { isYamlMapping } from "../../files/index.ts";
 import type { YamlMapping, YamlValue } from "../../files/index.ts";
 import { resolveModReference } from "../../mod/index.ts";
 import { checkOpenGrant } from "../permissions/index.ts";
@@ -17,7 +16,12 @@ import {
   MOD_SWITCHED_OFF,
   PERMISSION_DENIED,
 } from "./mod_messages.ts";
-import { readRequiredText, throwInvalidParams } from "./mod_methods.ts";
+import {
+  readOpenLinkParams,
+  readOpenReplace,
+  readRequiredText,
+  throwInvalidParams,
+} from "./mod_methods.ts";
 import type {
   ModMethodContext,
   ModMethodTable,
@@ -97,41 +101,6 @@ function readOpenLocation(
   return location;
 }
 
-/** The link names the stage reads itself, which a mod cannot pass in `params`. */
-const RESERVED_PARAM_NAMES: readonly string[] = ["mod", "collection", "tile"];
-
-function readLinkParams(params: YamlMapping): Record<string, string> {
-  const linkParams: Record<string, string> = {};
-  if (params.params === undefined) {
-    return linkParams;
-  }
-  if (!isYamlMapping(params.params)) {
-    throwInvalidParams("mods.open", '"params" must be a mapping');
-  }
-  for (const [name, value] of Object.entries(params.params)) {
-    if (RESERVED_PARAM_NAMES.includes(name)) {
-      throwInvalidParams("mods.open", `"params.${name}" is reserved`);
-    }
-    if (typeof value !== "string") {
-      throwInvalidParams("mods.open", `"params.${name}" must be a string`);
-    }
-    linkParams[name] = value;
-  }
-  return linkParams;
-}
-
-/** Reads the optional `replace` of `mods.open`, `false` when absent. Raises `INVALID_PARAMS`. */
-function readOpenReplace(params: YamlMapping): boolean {
-  const replace: YamlValue | undefined = params.replace;
-  if (replace === undefined) {
-    return false;
-  }
-  if (typeof replace !== "boolean") {
-    throwInvalidParams("mods.open", '"replace" must be a boolean');
-  }
-  return replace;
-}
-
 /** What `mods.open` asks for: the run link, and whether it replaces the requester. */
 export interface OpenRequest {
   link: RunLink;
@@ -148,7 +117,7 @@ export function readOpenParams(params: YamlMapping): OpenRequest {
     mod: readRequiredText(params, "mod", "mods.open"),
     collection: readOpenLocation(params, "collection", "mods.open"),
     tile: readOpenLocation(params, "tile", "mods.open"),
-    params: readLinkParams(params),
+    params: readOpenLinkParams(params, "mods.open"),
   };
   if (link.collection !== null && link.tile !== null) {
     throwInvalidParams(
@@ -156,7 +125,10 @@ export function readOpenParams(params: YamlMapping): OpenRequest {
       'a link cannot have both "collection" and "tile"',
     );
   }
-  const request: OpenRequest = { link, replace: readOpenReplace(params) };
+  const request: OpenRequest = {
+    link,
+    replace: readOpenReplace(params, "mods.open"),
+  };
   return request;
 }
 

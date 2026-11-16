@@ -7,6 +7,7 @@ import {
   APP_ORIGIN,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_MOD_REFERENCE,
+  SAMPLE_MOSAIC_REFERENCE,
   TEST_DEFAULTS,
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile } from "../../../test/test_files.ts";
@@ -39,9 +40,14 @@ interface ModApiSurface {
   events: string[];
   /** The mount context's keys. */
   contextKeys: string[];
-  /** The keys of the mount context's fixed mappings. */
+  /**
+   * The keys of the mount context's fixed mappings. `mosaic`, added in
+   * `0.1.13`, is read from a mod opened from a mosaic, since it is `null`
+   * otherwise.
+   */
   contextMappingKeys: {
     mod: string[];
+    mosaic?: string[];
     api: string[];
     permissions: string[];
     theme: string[];
@@ -664,6 +670,61 @@ const SURFACE_BY_VERSION: Record<string, ModApiSurface> = {
     ],
     permissionCategories: ["code", "connect", "embed", "open", "show"],
   },
+  "0.1.13": {
+    methods: [
+      "collections.inspect",
+      "files.save",
+      "libs.load",
+      "links.open",
+      "mods.check",
+      "mods.inspect",
+      "mods.open",
+      "mosaics.inspect",
+      "mosaics.open",
+      "players.open",
+      "storage.get",
+      "storage.set",
+      "tiles.renderBody",
+      "ui.confirm",
+      "ui.notify",
+    ],
+    events: ["layout.changed", "theme.changed", "tiles.changed"],
+    contextKeys: [
+      "api",
+      "config",
+      "issues",
+      "layout",
+      "mod",
+      "mosaic",
+      "params",
+      "permissions",
+      "theme",
+      "tiles",
+    ],
+    contextMappingKeys: {
+      mod: ["description", "name", "source", "title", "version"],
+      mosaic: ["description", "source", "title"],
+      api: ["version"],
+      permissions: ["denied", "granted"],
+      theme: ["colorScheme", "tokens"],
+    },
+    modFileKeys: [
+      "api",
+      "config",
+      "description",
+      "entrypoint",
+      "libraries",
+      "name",
+      "permissions",
+      "sample_collection",
+      "test_path",
+      "theme",
+      "title",
+      "type_path",
+      "version",
+    ],
+    permissionCategories: ["code", "connect", "embed", "open", "show"],
+  },
 };
 
 const BUMP_RULE = `The mod API surface does not match the entry of MOD_API_VERSION (${MOD_API_VERSION}). Bump MOD_API_VERSION in mod_api_version.ts as "Mod API version" in docs/modules/lib/core/engine/README.md says (while it is 0.x, a breaking change bumps the minor version, an addition or a fix the patch version), and add an entry for the new version to SURFACE_BY_VERSION`;
@@ -682,13 +743,26 @@ function listSortedKeys(mapping: object): string[] {
   return keys;
 }
 
-/** The mount context the sample mod receives in its `sandbox.connect`. */
-async function readSampleMountContext(): Promise<Record<string, object>> {
-  const launch = await launchTestMod({
-    mod: SAMPLE_MOD_REFERENCE,
-    collection: SAMPLE_COLLECTION_REFERENCE,
-    params: {},
-  });
+/** The link of the sample mod with the sample collection. */
+const SAMPLE_LINK: RunLink = {
+  mod: SAMPLE_MOD_REFERENCE,
+  collection: SAMPLE_COLLECTION_REFERENCE,
+  params: {},
+};
+
+/** The link of the fixture mosaic of the sample mod and collection. */
+const SAMPLE_MOSAIC_LINK: RunLink = {
+  mod: "",
+  collection: null,
+  mosaic: SAMPLE_MOSAIC_REFERENCE,
+  params: {},
+};
+
+/** The mount context the mod of `link` receives in its `sandbox.connect`. */
+async function readSampleMountContext(
+  link: RunLink,
+): Promise<Record<string, object>> {
+  const launch = await launchTestMod(link);
   const fakeFrame = createFakeFrame();
   const session = connectModSession(fakeFrame.target, launch, {
     storage: createMemoryStorage(),
@@ -715,7 +789,8 @@ async function readSampleMountContext(): Promise<Record<string, object>> {
 
 /** The surface built from the code. */
 async function buildCurrentSurface(): Promise<ModApiSurface> {
-  const context = await readSampleMountContext();
+  const context = await readSampleMountContext(SAMPLE_LINK);
+  const mosaicContext = await readSampleMountContext(SAMPLE_MOSAIC_LINK);
   const surface: ModApiSurface = {
     methods: listSortedKeys(ENGINE_METHODS),
     events: [
@@ -726,6 +801,7 @@ async function buildCurrentSurface(): Promise<ModApiSurface> {
     contextKeys: listSortedKeys(context),
     contextMappingKeys: {
       mod: listSortedKeys(context.mod),
+      mosaic: listSortedKeys(mosaicContext.mosaic),
       api: listSortedKeys(context.api),
       permissions: listSortedKeys(context.permissions),
       theme: listSortedKeys(context.theme),

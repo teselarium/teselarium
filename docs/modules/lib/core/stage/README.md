@@ -10,7 +10,7 @@ The stage is the only owner of the browser history. It sees the app's sections a
 
 An address hash is one of three routes:
 
-- **Run link**: `#/run?mod=…` with a non-empty `mod` opens a sandbox (below).
+- **Run link**: `#/run?mod=…` with a non-empty `mod`, or `#/run?mosaic=…` with a non-empty `mosaic`, opens a sandbox (below). `#/run?mosaic=` is Home.
 - **Page**: `#/<section>` shows the index page of a page section, and `#/<section>/<page>` its page named `<page>`. `<section>` must be one of `routing.pageSections`, and `<page>` must match `[A-Za-z0-9_-]+`. The name is checked on the raw hash, before anything is built from it, so `..`, `/` and their encoded forms (`#/guides/..%2Fabout%2Findex`) never get through. The Home section's index page has the address `#/`, and `#/home` means the same.
 - **Home**: every other hash, including `""`, `#/` and old links such as `#/mods/view`. Home is `routing.home`: the index page of a page section (the vanilla app), or a mod. A Home mod opens at `#/` in a sandbox like any other mod, without a close button.
 
@@ -23,14 +23,17 @@ A run link's address hash is:
 ```
 #/run?mod=<reference>&collection=<location>&<params>
 #/run?mod=<reference>&tile=<location>&<params>
+#/run?mosaic=<reference>&<params>
 ```
 
 - `mod` is a mod reference (see the [mod module](../../mod/README.md)): a default mod name such as `mod_viewer`, a folder or a mod file.
-- `collection` is the optional location of a collection file.
+- `collection` is the optional reference of a collection: the collection file, or a folder, which means the `collection.yaml` in it (`collection=./samples/tiles/literature_nobel_laureates` reads `./samples/tiles/literature_nobel_laureates/collection.yaml`, see the [tile module](../../tile/README.md#collection-loader)).
 - `tile` is the optional location of one tile file. The mod gets it as the tiles of a collection holding only that tile, validated with the mod's tile type as a collection's tiles are, and no collection file is requested. A tile opens the same way whether collections list it or not.
 - Without a `collection` or a `tile`, the mod gets no tiles. An empty `collection` or `tile` is the same as none.
 - A link has a collection or a tile, not both. A link with both opens a sandbox that shows `A link cannot have both a collection and a tile.`, requests no file and starts no frame (`RunLinkConflictError`, see [Messages and load failures](#messages-and-load-failures)).
-- Every other parameter is passed to the mod as `context.params`, in link order, with the first value of a repeated key. `mod`, `collection` and `tile` are reserved: they are never in `params`.
+- `mosaic` is a mosaic reference (see the [mosaic module](../../mosaic/README.md#mosaic-references)): a mosaic file, or a folder, which means the `mosaic.yaml` in it. The stage loads the mosaic file, then opens its mod with its collection as a link with that `mod` and `collection` would, with the mosaic's config, aliases and `show` permissions (see the [engine module](../engine/README.md#launch)). The address stays the mosaic link: it never shows the mod or the collection the file names.
+- A link to a mosaic has no `mod`, `collection` or `tile`. A link with a non-empty `mosaic` and any of them opens a sandbox that shows `A link to a mosaic cannot also have a mod, a collection or a tile.`, requests no file and starts no frame (`MosaicLinkConflictError`).
+- Every other parameter is passed to the mod as `context.params`, in link order, with the first value of a repeated key. `mod`, `collection`, `tile` and `mosaic` are reserved: they are never in `params`. The engine's `RUN_LINK_RESERVED_NAMES` lists them, and `mods.open` and `mosaics.open` refuse them in their `params`.
 - Values are percent-encoded, and relative ones are resolved against the app's address when the mod is launched. So a link means the same in the address bar, in a `mods.open` request and after a reload, also under a sub-path such as GitHub Pages' `/<repo>/`.
 
 Examples, for an app at `https://example.org/`:
@@ -44,8 +47,13 @@ Examples, for an app at `https://example.org/`:
 | `#/run?mod=./samples/mods/book_list` | the sample mod without tiles |
 | `#/run?mod=./samples/mods/book_list&tile=./samples/mods/book_list/books/kallocain.md` | the sample mod with the one book `kallocain.md` |
 | `#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml` | the mod viewer, showing the sample mod |
+| `#/run?mod=./samples/mods/country_map&collection=./samples/tiles/literature_nobel_laureates` | the country map with the collection file `./samples/tiles/literature_nobel_laureates/collection.yaml` |
+| `#/run?mosaic=./samples/mosaics/nobel_map.yaml&from=x` | the mosaic's mod with its collection, and `params` `{ "from": "x" }` |
+| `#/run?mosaic=./samples/mosaics/nobel_map` | the mosaic file `./samples/mosaics/nobel_map/mosaic.yaml` |
+| `#/run?mosaic=./samples/mosaics/nobel_map.yaml&mod=mod_viewer` | an error: a link to a mosaic cannot also have a mod |
+| `#/run?mosaic=` | Home |
 
-`buildRunLink` writes `mod`, then `collection` and `tile` when present, then the params. Mods never build these addresses. A mod sends `mods.open` with `{ mod, collection, tile, params, replace }`, and the stage turns it into the run link.
+`buildRunLink` writes `mosaic` when present, `mod` unless it is the empty `mod` of a mosaic link, then `collection` and `tile` when present, then the params. A mosaic link is the `RunLink` `{ mod: "", collection: null, tile: null, mosaic, params }`. Mods never build these addresses. A mod sends `mods.open` with `{ mod, collection, tile, params, replace }`, or `mosaics.open` with `{ mosaic, params, replace }`, and the stage turns it into the run link.
 
 ### Sandboxes and their ids
 
@@ -118,12 +126,15 @@ Each sandbox keeps its own messages, which the stage bar shows for the visible s
 
 Every message stays in memory only: a page reload or a new sandbox starts again with none.
 
-When the mod file, its entrypoint, its tile type file, the collection or the tile cannot be loaded, a link names a switched-off default mod, or a link has both a collection and a tile, the sandbox shows the error and no frame, and keeps its history entry and its ×. The same error is an `error` message from the app, whose text is the error's message. Its source is:
+When the mosaic file, the mod file, its entrypoint, its tile type file, the collection or the tile cannot be loaded, a link names a switched-off default mod, a link has both a collection and a tile, or a link to a mosaic also has a mod, a collection or a tile, the sandbox shows the error and no frame, and keeps its history entry and its ×. A mosaic file that cannot be loaded, or does not follow the mosaic file format, requests neither the mod nor the collection. The same error is an `error` message from the app, whose text is the error's message. Its source is:
 
-- the file that failed, for the errors that name one (`FileFetchError`, `MarkdownParseError`, `YamlParseError`, `ModFormatError`, `CollectionFormatError`, `TileTypeError`): the mod file, the entrypoint, the tile type file, the collection or the tile;
+- the file that failed, for the errors that name one (`FileFetchError`, `MarkdownParseError`, `YamlParseError`, `ModFormatError`, `MosaicFormatError`, `CollectionFormatError`, `TileTypeError`): the mosaic file, the mod file, the entrypoint, the tile type file, the collection or the tile;
+- the link's mosaic reference resolved against the app's address, for a link to a mosaic that also has a mod, a collection or a tile (`MosaicLinkConflictError`);
 - otherwise the loaded mod's source, for a cancelled mod API question, or the link's mod reference resolved against the app's address, for a switched-off default mod or a link with both a collection and a tile.
 
-The runtime keeps the mod once its mod file is loaded (`loadLaunchMod`, then `loadLaunchTiles` for the collection or the tile, see the [engine module](../engine/README.md#launch)), so the snapshot's `mod` is set after a later failure, such as a missing collection or a cancelled mod API question. It stays `null` when the mod file itself did not load.
+The stage bar shows a mosaic's title before the mod's name once the mosaic file is loaded, and "Loading mosaic…" or "Mosaic not loaded" before (see the [stage bar](../../../main/README.md#the-stage-bar)), from the snapshot's `mosaicReference` and `mosaic`.
+
+The runtime keeps the mosaic once its mosaic file is loaded (`loadLaunchMosaic`), then the mod once its mod file is loaded (`loadLaunchMod`, with the request `expandMosaicRequest` gives for a mosaic, then `loadLaunchTiles` for the collection or the tile, see the [engine module](../engine/README.md#launch)). So the snapshot's `mosaic` is set after a failure of the mosaic's mod, and its `mod` after a later failure, such as a missing collection or a cancelled mod API question. Each stays `null` when its own file did not load. Once the mosaic is loaded, the snapshot's `modReference` and `collection` are the mosaic's mod and collection.
 
 The app adds three notifications, each an `info` message from the app:
 
@@ -135,7 +146,7 @@ The app adds three notifications, each an `info` message from the app:
 
 The counts say `1 tile` and `1 collection issue` in the singular, so a mod opened with a tile gets `1 tile`, or `0 tiles` when the tile is not of its type. The site consent notification lists the allowed lines, then the refused ones, each as its category's verb and its host, leaves out a part with no line, and ends with `The answer is remembered.` or `The answer is not remembered.`. Escape refuses every line and is not remembered. The site consent notification is built with the answer and passed to the start, because the start resets the arrival list to the launch's issues.
 
-"Reload tiles", for a sandbox opened with a collection or a tile, loads and validates the collection or the tile again, pushes `tiles.changed` to the running mod and replaces the collection issues. The launch's `tilesKind` and `tilesSource` say which file to load. The mod file issues stay. A reload whose collection or tile cannot be loaded makes that error the only collection issue, adds no notification and pushes nothing, so the mod keeps its tiles. A sandbox opened without a collection or a tile has no "Reload tiles" (`canReloadTiles` is `false`).
+"Reload tiles", for a sandbox opened with a collection or a tile, loads and validates the collection or the tile again (for a mosaic, with the tiles renamed by the mosaic's aliases before they are validated, and without requesting the mosaic file again: the config, the aliases and the grants stay those of the start), pushes `tiles.changed` to the running mod and replaces the collection issues. The launch's `tilesKind` and `tilesSource` say which file to load. The mod file issues stay. A reload whose collection or tile cannot be loaded makes that error the only collection issue, adds no notification and pushes nothing, so the mod keeps its tiles. A sandbox opened without a collection or a tile has no "Reload tiles" (`canReloadTiles` is `false`).
 
 The files the tiles link are fixed in the frame's policy when the mod starts. When "Load media linked by tiles" was on as the mod started, a reload also replaces the tile link issues: it collects the links of the reloaded tiles against the launch's content hosts and granted permissions, and lists, in order:
 
@@ -279,7 +290,7 @@ The work behind the public API is split so each file has one reason to change:
 - `warnFullscreenRefused(stage, sandboxId, reason)`: adds the `warning` from the app that fullscreen is not available, with the browser's `reason`, to a sandbox, and publishes the snapshot. Does nothing for an unknown sandbox.
 - `changeStageTileLinkedMedia(stage, isOn)`: switches "Load media linked by tiles" for the mods launched and checked from now on (`stage.loadsTileLinkedMedia`). Running sandboxes keep their launch, and nothing is published.
 - `readStageSnapshot(stage)` and `subscribeStage(stage, listener)`: a frozen `StageSnapshot` that is new after every change, for React's `useSyncExternalStore`. `subscribeStage` returns the function that unsubscribes.
-- Types: `Stage`, `StageOptions`, `StageRouting`, `StageHome`, `SectionLink`, `StageSnapshot` (`sandboxes`, `checks`, `action`, `visible`, `activeSection` and `isTheaterMode`), `CheckSnapshot` (`id`, `key`, `sandboxDocument`, `title`), `VisibleView` (`{ kind: "sandbox", id }`, `{ kind: "page", section, page }` with `page: null` for the index, or `null` before the first entry), `ActionSnapshot` (`id`, `mod` with `title` and `source`, and `action`), `ActionMod`, the engine's `AppAction`, `LinkAction`, `SaveFileAction` and `ConfirmAction` re-exported as types, so the page imports them from the stage, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, set once the mod file is loaded, `sandboxDocument`, `canReloadTiles`, `messages`, every `MessageSnapshot` in the order above, `droppedModMessages`, the count per level of the mod's messages the cap dropped, `modReference`, the link's mod reference resolved against the app's address, `collection`, the link's collection resolved the same way or `null`, `errorMessage`, `apiMismatch` with `range` and `apiVersion` only while asking the mod API question, otherwise `null`, and `siteConsent` with `lines` only while asking the site consent question, otherwise `null`), `SiteConsentLine` (`key`, `category`, `host`, `reason`), `SiteConsentAnswer` (`allowed`, `remember`), `MessageSnapshot` (`id`, `level`, `producer`, `source`, `text`, `isRead`), `MessageLevel`, `MessageProducer`, `DroppedMessageCounts`, `SandboxStatus` (`loading`, `asking`, `failed`, `running` or `stopped`), `StageHistory`, `FrameLayout` (`contained`, `theater` or `fullscreen`).
+- Types: `Stage`, `StageOptions`, `StageRouting`, `StageHome`, `SectionLink`, `StageSnapshot` (`sandboxes`, `checks`, `action`, `visible`, `activeSection` and `isTheaterMode`), `CheckSnapshot` (`id`, `key`, `sandboxDocument`, `title`), `VisibleView` (`{ kind: "sandbox", id }`, `{ kind: "page", section, page }` with `page: null` for the index, or `null` before the first entry), `ActionSnapshot` (`id`, `mod` with `title` and `source`, and `action`), `ActionMod`, the engine's `AppAction`, `LinkAction`, `SaveFileAction` and `ConfirmAction` re-exported as types, so the page imports them from the stage, `SandboxSnapshot` (`id`, `hash`, `isVisible`, `canClose`, `status`, `mod`, set once the mod file is loaded, `mosaic` with `title` and `source`, set once the mosaic file of a mosaic link is loaded, otherwise `null`, `mosaicReference`, the link's mosaic reference resolved against the app's address or `null` for a mod link, `sandboxDocument`, `canReloadTiles`, `messages`, every `MessageSnapshot` in the order above, `droppedModMessages`, the count per level of the mod's messages the cap dropped, `modReference`, the link's mod reference resolved against the app's address (for a mosaic link, `""` until the mosaic file is loaded, then the mosaic's mod), `collection`, the link's collection resolved the same way or `null` (for a mosaic link, the mosaic's collection once its file is loaded), `errorMessage`, `apiMismatch` with `range` and `apiVersion` only while asking the mod API question, otherwise `null`, and `siteConsent` with `lines` only while asking the site consent question, otherwise `null`), `SiteConsentLine` (`key`, `category`, `host`, `reason`, `subject`: `"mod"` or `"mosaic"`, what declared the line; a mosaic line's `key` starts with `mosaic `, so a mod and its mosaic can declare the same host), `SiteConsentAnswer` (`allowed`, `remember`), `MessageSnapshot` (`id`, `level`, `producer`, `source`, `text`, `isRead`), `MessageLevel`, `MessageProducer`, `DroppedMessageCounts`, `SandboxStatus` (`loading`, `asking`, `failed`, `running` or `stopped`), `StageHistory`, `FrameLayout` (`contained`, `theater` or `fullscreen`).
 
 ### Routing options
 

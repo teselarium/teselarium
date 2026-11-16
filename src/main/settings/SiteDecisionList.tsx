@@ -3,22 +3,29 @@ import type { ReactElement } from "react";
 import { ChevronRight } from "lucide-react";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
 import { Checkbox } from "@/vendor/shadcn/ui/checkbox.tsx";
-import { describePermissionLine } from "../../lib/core/permissions/index.ts";
-import type { SiteDecision } from "../../lib/core/permissions/index.ts";
+import {
+  describePermissionLine,
+  isDecisionOf,
+  readDecisionDeclarer,
+} from "../../lib/core/permissions/index.ts";
+import type {
+  DecisionDeclarer,
+  SiteDecision,
+} from "../../lib/core/permissions/index.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import {
   readSiteDecisionsSnapshot,
   rememberSiteDecisions,
-  removeModSiteDecisions,
+  removeDeclaredSiteDecisions,
   removeSiteDecision,
   subscribeSiteDecisions,
 } from "./site_decisions.ts";
 import type { SiteDecisions } from "./site_decisions.ts";
 
-/** The remembered decisions of one mod file. */
+/** The remembered decisions of one mod file or one mosaic file. */
 interface ModDecisionGroup {
-  mod: string;
-  /** The title of the mod's last remembered decision, so a renamed mod shows its newer title. */
+  declarer: DecisionDeclarer;
+  /** The title of the last remembered decision, so a renamed mod or mosaic shows its newer title. */
   title: string;
   /** Sorted by category, then host. */
   decisions: SiteDecision[];
@@ -70,34 +77,43 @@ function compareDecisionLines(
   );
 }
 
-/** By title, then source, so the list does not move when a decision is added. */
+/**
+ * By title, then source, mods and mosaics together, so the list does not
+ * move when a decision is added.
+ */
 function compareGroups(
   first: ModDecisionGroup,
   second: ModDecisionGroup,
 ): number {
-  return compareKeys([first.title, first.mod], [second.title, second.mod]);
+  return compareKeys(
+    [first.title, first.declarer.source, first.declarer.subject],
+    [second.title, second.declarer.source, second.declarer.subject],
+  );
 }
 
 function findGroup(
   groups: ModDecisionGroup[],
-  mod: string,
+  decision: SiteDecision,
 ): ModDecisionGroup | null {
   for (const group of groups) {
-    if (group.mod === mod) {
+    if (isDecisionOf(decision, group.declarer)) {
       return group;
     }
   }
   return null;
 }
 
-/** One group per mod file, in the order of the snapshot, which ends with the latest decisions. */
+/**
+ * One group per mod file and per mosaic file, in the order of the snapshot,
+ * which ends with the latest decisions.
+ */
 function collectGroups(decisions: readonly SiteDecision[]): ModDecisionGroup[] {
   const groups: ModDecisionGroup[] = [];
   for (const decision of decisions) {
-    const group = findGroup(groups, decision.mod);
+    const group = findGroup(groups, decision);
     if (group === null) {
       groups.push({
-        mod: decision.mod,
+        declarer: readDecisionDeclarer(decision),
         title: decision.title,
         decisions: [decision],
       });
@@ -109,7 +125,7 @@ function collectGroups(decisions: readonly SiteDecision[]): ModDecisionGroup[] {
   return groups;
 }
 
-/** The decisions grouped by mod, groups and decisions sorted. */
+/** The decisions grouped by mod or mosaic, groups and decisions sorted. */
 function groupDecisionsByMod(
   decisions: readonly SiteDecision[],
 ): ModDecisionGroup[] {
@@ -218,11 +234,32 @@ function SiteDecisionRow({
   );
 }
 
+/** The key of a group in the list: its subject and its source. */
+function buildGroupKey(group: ModDecisionGroup): string {
+  const key = `${group.declarer.subject} ${group.declarer.source}`;
+  return key;
+}
+
+/** The label of a mosaic's group, which a mod's group does not have. */
+function renderSubjectLabel(group: ModDecisionGroup): ReactElement | null {
+  if (group.declarer.subject !== "mosaic") {
+    return null;
+  }
+  return (
+    <>
+      <span className="rounded-sm border px-1 text-xs font-normal text-muted-foreground">
+        Mosaic
+      </span>{" "}
+    </>
+  );
+}
+
 /**
- * The decisions of one mod: a header with the group checkbox, the button
- * that expands the group, with the title and the counts, the Remove all
- * button and the source, then the decision rows while expanded. Collapsed
- * when the page opens; the group checkbox and Remove all work collapsed.
+ * The decisions of one mod or one mosaic: a header with the group checkbox,
+ * the button that expands the group, with the "Mosaic" label of a mosaic, the
+ * title and the counts, the Remove all button and the source, then the
+ * decision rows while expanded. Collapsed when the page opens; the group
+ * checkbox and Remove all work collapsed.
  */
 function ModGroupItem({
   group,
@@ -236,7 +273,7 @@ function ModGroupItem({
   }
 
   function handleRemoveAllClick(): void {
-    removeModSiteDecisions(siteDecisions, group.mod);
+    removeDeclaredSiteDecisions(siteDecisions, group.declarer);
   }
 
   const groupCheckedState = readGroupCheckedState(group.decisions);
@@ -285,6 +322,7 @@ function ModGroupItem({
                 : "transition-transform"
             }
           />
+          {renderSubjectLabel(group)}
           <span className="[overflow-wrap:anywhere]">{group.title}</span>{" "}
           <span className="text-xs font-normal text-muted-foreground">
             {describeCounts(group.decisions)}
@@ -301,7 +339,7 @@ function ModGroupItem({
         </Button>
       </div>
       <code className="block pl-7 text-xs text-muted-foreground [overflow-wrap:anywhere]">
-        {group.mod}
+        {group.declarer.source}
       </code>
       <ul
         id={decisionsId}
@@ -315,7 +353,7 @@ function ModGroupItem({
   );
 }
 
-/** The remembered site decisions grouped by mod, or a line saying there are none. */
+/** The remembered site decisions grouped by mod and by mosaic, or a line saying there are none. */
 export function SiteDecisionList({
   siteDecisions,
 }: SiteDecisionListProps): ReactElement {
@@ -333,7 +371,7 @@ export function SiteDecisionList({
   for (const group of groupDecisionsByMod(decisions)) {
     items.push(
       <ModGroupItem
-        key={group.mod}
+        key={buildGroupKey(group)}
         group={group}
         siteDecisions={siteDecisions}
       />,

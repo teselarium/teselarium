@@ -50,7 +50,8 @@ export function resolveLocation(
   }
 }
 
-function readDefaultBaseUrl(): string | undefined {
+/** The page's document base URL, or `undefined` outside a browser page. */
+export function readDocumentBaseUrl(): string | undefined {
   if (typeof document === "undefined") {
     return undefined;
   }
@@ -117,7 +118,7 @@ export async function fetchFile(
   location: string,
   options: FileFetchOptions = {},
 ): Promise<FetchedFile> {
-  const baseUrl = options.baseUrl ?? readDefaultBaseUrl();
+  const baseUrl = options.baseUrl ?? readDocumentBaseUrl();
   const url = resolveLocation(location, baseUrl);
   const content = await readFileContent(url, options);
   const fetchedFile: FetchedFile = { source: url.href, content };

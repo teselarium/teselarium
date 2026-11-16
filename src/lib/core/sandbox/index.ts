@@ -28,7 +28,11 @@ export {
   describeBlockedRequest,
   describeNewTileLinks,
 } from "./sandbox_reports.ts";
-export type { BlockedDialogName, BlockedRequest } from "./sandbox_reports.ts";
+export type {
+  BlockedDialogName,
+  BlockedRequest,
+  ReportedMosaic,
+} from "./sandbox_reports.ts";
 export { isGuardedLink } from "./private_hosts.ts";
 export { buildPrivateLinkIssue, collectTileLinks } from "./tile_links.ts";
 export type { TileLinks } from "./tile_links.ts";

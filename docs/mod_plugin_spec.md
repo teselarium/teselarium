@@ -8,7 +8,7 @@ Mods can communicates with the main app via the core engine API, like requesting
 
 A loaded mod doesn't have direct access to localStorage or indexedDB, it must use the core engine API for operations like requesting, writing or redirecting the user. Mods only have access to their own data and the common (shared) data from the main app via the core engine API. Data from each mod is stored in separated slots.
 
-Mods need a Mosaic for defining the configuration. Mods come with a default mosaic.
+A mosaic is a file that opens a mod with a collection, the way the data's author wants it shown: it names the mod and the collection, overrides values of the mod's config, renames the collection's field names to the names of the mod's tile type (`aliases`), and declares the `show` hosts the collection's media need. A mod needs no mosaic: it runs from a mod link with its own config. When it is opened from a mosaic, it reads the mosaic in `context.mosaic`, gets the merged config in `context.config` and the renamed tiles in `context.tiles`, and its sandbox gets the mosaic's granted `show` lines in `context.permissions` (see the [mosaic module](modules/lib/mosaic/README.md)).
 
 As mods are created by the community and they need to follow principles of privacy and security.
 
@@ -203,11 +203,39 @@ const inspection = await engine.request("collections.inspect", {
 showCollection(inspection.name, inspection.description, inspection.tiles);
 ```
 
-The location is resolved against the app's address. A collection that cannot be loaded answers `-32001` with the load error's message, and one whose site the mod's `open` does not cover answers `-32002`, before anything is requested.
+The location is resolved against the app's address, and a folder means the `collection.yaml` in it, so `./samples/tiles/literature_nobel_laureates` names the same collection. A collection that cannot be loaded answers `-32001` with the load error's message, and one whose site the mod's `open` does not cover answers `-32002`, before anything is requested.
+
+## Opening a mosaic
+
+A mod can read a mosaic file without opening it, with `mosaics.inspect`, and open it, with `mosaics.open`, as if the user had followed its link `#/run?mosaic=…` (see [Inspecting and opening mosaics](modules/lib/core/engine/README.md#inspecting-and-opening-mosaics) in the engine's README). Both need an `open` permission for the mosaic file's site, or for `"*"`. Only the mosaic file's site is checked, not the site of the mod it names: that mod still gets its own mod API question and site consent when it opens.
+
+```js
+const inspection = await engine.request("mosaics.inspect", {
+  mosaic: "./samples/mosaics/nobel_map",
+});
+showMosaic(inspection.title, inspection.description, inspection.mod);
+
+await engine.request("mosaics.open", {
+  mosaic: inspection.source,
+  params: { from: context.mod.source },
+});
+```
+
+`mosaics.inspect` answers the mosaic's `source`, `title`, `description`, the resolved `mod` and `collection`, its own `config` and `aliases`, and `permissions`, the `granted` and `denied` lists its `show` lines would get without asking; it requests nothing else and never asks the user. `mosaics.open` takes `params`, without `mod`, `collection`, `tile` or `mosaic`, and `replace`, as `mods.open` does, and only the visible mod can open mosaics. The mosaic's load failures belong to the new sandbox.
+
+The mod opened from a mosaic tells it apart from a mod link with `context.mosaic`:
+
+```js
+export default function mount(engine, context) {
+  const heading = document.createElement("h1");
+  heading.textContent = context.mosaic?.title ?? context.mod.title;
+  document.body.append(heading);
+}
+```
 
 ## Opening a tile
 
-A mod opens another mod with `mods.open`, which needs the same `open` permission. With `tile`, the location of one tile file, the opened mod receives that tile as `context.tiles`, loaded and validated before its frame starts, with its media allowed as for the tiles of a collection (see [Inspecting and opening mods](modules/lib/core/engine/README.md#inspecting-and-opening-mods) in the engine's README). A link has a collection or a tile, not both, and `mod`, `collection` and `tile` cannot be passed in `params`:
+A mod opens another mod with `mods.open`, which needs the same `open` permission. With `tile`, the location of one tile file, the opened mod receives that tile as `context.tiles`, loaded and validated before its frame starts, with its media allowed as for the tiles of a collection (see [Inspecting and opening mods](modules/lib/core/engine/README.md#inspecting-and-opening-mods) in the engine's README). A link has a collection or a tile, not both, and `mod`, `collection`, `tile` and `mosaic` cannot be passed in `params`:
 
 ```js
 await engine.request("mods.open", {

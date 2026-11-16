@@ -1,4 +1,11 @@
-import type { SiteDecision } from "../../lib/core/permissions/index.ts";
+import {
+  isDecisionOf,
+  readDecisionDeclarer,
+} from "../../lib/core/permissions/index.ts";
+import type {
+  DecisionDeclarer,
+  SiteDecision,
+} from "../../lib/core/permissions/index.ts";
 import { PERMISSION_CATEGORIES } from "../../lib/mod/index.ts";
 import { readStoredJson, writeStoredJson } from "./stored_json.ts";
 import type { SettingsStorage } from "./stored_json.ts";
@@ -18,8 +25,14 @@ export interface SiteDecisions {
   snapshot: readonly SiteDecision[];
 }
 
-/** What identifies a decision: one declared category and host of one mod. */
-export type SiteDecisionLine = Pick<SiteDecision, "mod" | "category" | "host">;
+/**
+ * What identifies a decision: one declared category and host of one mod, or
+ * one `show` host of one mosaic.
+ */
+export type SiteDecisionLine = Pick<
+  SiteDecision,
+  "mod" | "mosaic" | "category" | "host"
+>;
 
 /** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
 export const SITE_DECISIONS_KEY = "opentesela.site-decisions";
@@ -36,13 +49,26 @@ function isPermissionCategory(value: unknown): boolean {
   return (PERMISSION_CATEGORIES as readonly unknown[]).includes(value);
 }
 
+/**
+ * Whether the entry names exactly one declarer: a `mod` or a `mosaic` web
+ * address, never both. An older app reads a mosaic entry as invalid.
+ */
+function hasOneDeclarer(fields: Record<string, unknown>): boolean {
+  const hasMod = fields.mod !== undefined;
+  const hasMosaic = fields.mosaic !== undefined;
+  if (hasMod === hasMosaic) {
+    return false;
+  }
+  return isWebAddress(hasMod ? fields.mod : fields.mosaic);
+}
+
 function isSiteDecision(entry: unknown): entry is SiteDecision {
   if (typeof entry !== "object" || entry === null) {
     return false;
   }
   const fields = entry as Record<string, unknown>;
   return (
-    isWebAddress(fields.mod) &&
+    hasOneDeclarer(fields) &&
     typeof fields.title === "string" &&
     isPermissionCategory(fields.category) &&
     typeof fields.host === "string" &&
@@ -54,6 +80,7 @@ function isSiteDecision(entry: unknown): entry is SiteDecision {
 function isSameLine(decision: SiteDecision, line: SiteDecisionLine): boolean {
   return (
     decision.mod === line.mod &&
+    decision.mosaic === line.mosaic &&
     decision.category === line.category &&
     decision.host === line.host
   );
@@ -73,15 +100,19 @@ function leaveOutLine(
   return keptDecisions;
 }
 
-/** A frozen copy of one decision, with only its own fields. */
+/** A frozen copy of one decision, with only its own fields: `mod` or `mosaic`, then the others. */
 function freezeDecision(decision: SiteDecision): SiteDecision {
-  const frozenDecision: SiteDecision = {
-    mod: decision.mod,
+  const fields = {
     title: decision.title,
     category: decision.category,
     host: decision.host,
     allowed: decision.allowed,
   };
+  const declarer = readDecisionDeclarer(decision);
+  const frozenDecision: SiteDecision =
+    declarer.subject === "mosaic"
+      ? { mosaic: declarer.source, ...fields }
+      : { mod: declarer.source, ...fields };
   return Object.freeze(frozenDecision);
 }
 
@@ -141,8 +172,8 @@ export function createSiteDecisions(
 }
 
 /**
- * Keeps `decisions`, each replacing a remembered one for the same mod,
- * category and host, stored when the storage allows.
+ * Keeps `decisions`, each replacing a remembered one for the same mod or
+ * mosaic, category and host, stored when the storage allows.
  */
 export function rememberSiteDecisions(
   store: SiteDecisions,
@@ -162,14 +193,14 @@ export function removeSiteDecision(
   publishDecisions(store, Object.freeze(leaveOutLine(store.snapshot, line)));
 }
 
-/** The decisions of every mod but the one at `mod`. */
-function leaveOutMod(
+/** The decisions of every mod and mosaic but `declarer`. */
+function leaveOutDeclarer(
   decisions: readonly SiteDecision[],
-  mod: string,
+  declarer: DecisionDeclarer,
 ): SiteDecision[] {
   const keptDecisions: SiteDecision[] = [];
   for (const decision of decisions) {
-    if (decision.mod !== mod) {
+    if (!isDecisionOf(decision, declarer)) {
       keptDecisions.push(decision);
     }
   }
@@ -177,14 +208,17 @@ function leaveOutMod(
 }
 
 /**
- * Forgets every decision of the mod file at `mod` with one write, stored
- * when the storage allows. Running mods keep their permissions.
+ * Forgets every decision of one mod file or one mosaic file with one write,
+ * stored when the storage allows. Running mods keep their permissions.
  */
-export function removeModSiteDecisions(
+export function removeDeclaredSiteDecisions(
   store: SiteDecisions,
-  mod: string,
+  declarer: DecisionDeclarer,
 ): void {
-  publishDecisions(store, Object.freeze(leaveOutMod(store.snapshot, mod)));
+  publishDecisions(
+    store,
+    Object.freeze(leaveOutDeclarer(store.snapshot, declarer)),
+  );
 }
 
 export function readSiteDecisionsSnapshot(

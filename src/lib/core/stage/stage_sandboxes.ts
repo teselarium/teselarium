@@ -1,11 +1,9 @@
 import { resolveLocation } from "../../files/index.ts";
 import { resolveModReference } from "../../mod/index.ts";
-import type {
-  LoadedMod,
-  ModIssue,
-  ModLoadOptions,
-  ModPermission,
-} from "../../mod/index.ts";
+import { resolveMosaicReference } from "../../mosaic/index.ts";
+import type { LoadedMosaic } from "../../mosaic/index.ts";
+import { resolveCollectionReference } from "../../tile/index.ts";
+import type { LoadedMod, ModIssue, ModLoadOptions } from "../../mod/index.ts";
 import { describeNewTileLinks } from "../sandbox/index.ts";
 import type { TileIssue } from "../../tile/index.ts";
 import {
@@ -14,13 +12,17 @@ import {
   collectModTileLinks,
   connectModSession,
   describeCancelledApiMismatch,
+  expandMosaicRequest,
+  grantLaunchMosaic,
   loadLaunchMod,
+  loadLaunchMosaic,
   loadLaunchTiles,
   loadModTilesOfKind,
   matchModApiRange,
   pushLayoutChanged,
   pushThemeChanged,
   pushTilesChanged,
+  readMosaicAliases,
   stopModSession,
 } from "../engine/index.ts";
 import type {
@@ -30,6 +32,7 @@ import type {
   ModCheckRequest,
   ModLaunch,
   ModLaunchInputs,
+  ModLaunchRequest,
   ModSession,
   ModTiles,
   OpenLinkOptions,
@@ -41,7 +44,7 @@ import type {
   UserNotification,
 } from "../engine/index.ts";
 import { grantModPermissions, listConsentLines } from "../permissions/index.ts";
-import type { SiteDecision } from "../permissions/index.ts";
+import type { ConsentLine, SiteDecision } from "../permissions/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
 import {
@@ -128,23 +131,33 @@ export interface SandboxRuntime {
   status: SandboxStatus;
   /** The mod once its mod file is loaded, kept when the sandbox fails later. */
   loadedMod: LoadedMod | null;
+  /**
+   * The link's mosaic reference resolved against the app's address, as
+   * written when it cannot be resolved, or `null` for a mod link.
+   */
+  mosaicSource: string | null;
+  /** The mosaic once its mosaic file is loaded, kept when the sandbox fails later. */
+  loadedMosaic: LoadedMosaic | null;
   /** The loaded mod while the runtime asks, before its launch is built. */
   pending: ModLaunchInputs | null;
   /** The question of an `asking` runtime, `null` otherwise. */
   question: SandboxQuestion | null;
-  /** The lines of the site consent question, while it is asked. */
-  consentLines: ModPermission[];
+  /** The lines of the site consent question, the mod's then the mosaic's, while it is asked. */
+  consentLines: ConsentLine[];
   /** Set when the mod starts. */
   launch: ModLaunch | null;
   session: ModSession | null;
   /**
    * The link's mod reference resolved against the app's address, or the
-   * reference as written when it cannot be resolved.
+   * reference as written when it cannot be resolved. For a mosaic link, `""`
+   * until the mosaic file is loaded, then the mosaic's mod.
    */
   modReference: string;
   /**
    * The link's collection or tile resolved against the app's address, as
-   * written when it cannot be resolved, or `null` without either.
+   * written when it cannot be resolved, or `null` without either. For a
+   * mosaic link, `null` until the mosaic file is loaded, then the mosaic's
+   * collection.
    */
   tilesLocation: string | null;
   /** The issues of the mod file itself, such as a missing `api` range. */
@@ -271,14 +284,29 @@ function hasSource(error: unknown): error is Error & { source: string } {
 }
 
 /**
+ * What the app's messages about a sandbox are about when no file is named:
+ * the loaded mod's source, else the resolved mod reference, else the
+ * resolved mosaic reference of a mosaic link whose mosaic is not loaded.
+ */
+function readRuntimeSubject(runtime: SandboxRuntime): string {
+  if (runtime.loadedMod !== null) {
+    return runtime.loadedMod.source;
+  }
+  if (runtime.modReference === "" && runtime.mosaicSource !== null) {
+    return runtime.mosaicSource;
+  }
+  return runtime.modReference;
+}
+
+/**
  * What a failure is about: the file that failed for the errors that name one,
- * and otherwise the loaded mod's source or the resolved mod reference.
+ * and otherwise the subject of the sandbox (`readRuntimeSubject`).
  */
 function readFailureSource(runtime: SandboxRuntime, error: unknown): string {
   if (hasSource(error)) {
     return error.source;
   }
-  return runtime.loadedMod?.source ?? runtime.modReference;
+  return readRuntimeSubject(runtime);
 }
 
 /** Fails the runtime with the error, which is also an error from the app in its messages. */
@@ -328,6 +356,7 @@ function startPendingRuntime(
     inputs.modTiles,
     grants,
     services.loadsTileLinkedMedia,
+    grantLaunchMosaic(inputs.mosaic, services.appOrigin, decisions),
   );
   runtime.pending = null;
   runtime.question = null;
@@ -335,7 +364,10 @@ function startPendingRuntime(
   startRuntime(runtime, services, launch, consentNotification);
 }
 
-/** The second question: asks about the sites of the pending mod, or starts it when there is nothing to ask. */
+/**
+ * The second question: asks once about the sites of the pending mod and of
+ * its mosaic, or starts it when there is nothing to ask.
+ */
 function askSitesOrStart(
   runtime: SandboxRuntime,
   services: SandboxServices,
@@ -345,6 +377,7 @@ function askSitesOrStart(
     inputs.mod,
     services.appOrigin,
     services.readSiteDecisions(),
+    inputs.mosaic,
   );
   if (lines.length === 0) {
     startPendingRuntime(runtime, services, inputs, [], null);
@@ -411,16 +444,24 @@ export function answerSandboxApiMismatch(
   failRuntime(runtime, services, describeCancelledApiMismatch(inputs.mod.api));
 }
 
-/** The key of a consent line in `SiteConsentAnswer.allowed`: its category and host. */
+/**
+ * The key of a consent line in `SiteConsentAnswer.allowed`: its category and
+ * host for a mod's line, led by `mosaic` for a mosaic's line, so a mod and its
+ * mosaic can declare the same host.
+ */
 export function buildConsentLineKey(
-  line: Pick<ModPermission, "category" | "host">,
+  line: Pick<ConsentLine, "category" | "host" | "subject">,
 ): string {
-  const key = `${line.category} ${line.host}`;
-  return key;
+  const lineKey = `${line.category} ${line.host}`;
+  if (line.subject === "mosaic") {
+    const mosaicKey = `mosaic ${lineKey}`;
+    return mosaicKey;
+  }
+  return lineKey;
 }
 
 function isLineAllowed(
-  line: ModPermission,
+  line: ConsentLine,
   answer: SiteConsentAnswer | null,
 ): boolean {
   if (answer === null) {
@@ -429,28 +470,48 @@ function isLineAllowed(
   return answer.allowed.includes(buildConsentLineKey(line));
 }
 
+/** The decision of one consent line, for the mod or for the mosaic that declared it. */
+function buildConsentDecision(
+  inputs: ModLaunchInputs,
+  line: ConsentLine,
+  allowed: boolean,
+): SiteDecision {
+  const fields = { category: line.category, host: line.host, allowed };
+  if (line.subject === "mosaic" && inputs.mosaic !== null) {
+    const mosaicDecision: SiteDecision = {
+      mosaic: inputs.mosaic.source,
+      title: inputs.mosaic.title,
+      ...fields,
+    };
+    return mosaicDecision;
+  }
+  const modDecision: SiteDecision = {
+    mod: inputs.mod.source,
+    title: inputs.mod.title,
+    ...fields,
+  };
+  return modDecision;
+}
+
 /** One decision per consent line: the lines `answer` allows are allowed, the others refused. */
 function buildConsentDecisions(
-  mod: LoadedMod,
-  lines: ModPermission[],
+  inputs: ModLaunchInputs,
+  lines: ConsentLine[],
   answer: SiteConsentAnswer | null,
 ): SiteDecision[] {
   const decisions: SiteDecision[] = [];
   for (const line of lines) {
-    decisions.push({
-      mod: mod.source,
-      title: mod.title,
-      category: line.category,
-      host: line.host,
-      allowed: isLineAllowed(line, answer),
-    });
+    decisions.push(
+      buildConsentDecision(inputs, line, isLineAllowed(line, answer)),
+    );
   }
   return decisions;
 }
 
 /**
  * Answers the site consent question of an `asking` runtime and starts its
- * mod: the lines `answer.allowed` names are granted and the others refused,
+ * mod: the lines `answer.allowed` names, the mod's and the mosaic's alike,
+ * are granted and the others refused,
  * and the decisions are remembered when `answer.remember` is `true`. `null`
  * (Escape) refuses every line without remembering. Does nothing for any
  * other runtime.
@@ -464,11 +525,7 @@ export function answerSandboxSiteConsent(
   if (inputs === null) {
     return;
   }
-  const decisions = buildConsentDecisions(
-    inputs.mod,
-    runtime.consentLines,
-    answer,
-  );
+  const decisions = buildConsentDecisions(inputs, runtime.consentLines, answer);
   const isRemembered = answer !== null && answer.remember;
   if (isRemembered) {
     services.rememberSiteDecisions(decisions);
@@ -481,15 +538,16 @@ export function answerSandboxSiteConsent(
 }
 
 /**
- * Starts loading a sandbox's mod. The runtime is `loading`, then `running` or
- * `failed`, or `asking` when the mod was written for another mod API or
- * needs the user's consent for sites.
+ * The link's mod reference resolved as a launch resolves it, or as written
+ * when it cannot be resolved. The empty mod of a mosaic link stays `""`.
  */
-/** The link's mod reference resolved as a launch resolves it, or as written when it cannot be resolved. */
 function resolveLinkModReference(
   sandbox: StageSandbox,
   services: SandboxServices,
 ): string {
+  if (sandbox.link.mod === "") {
+    return "";
+  }
   try {
     return resolveModReference(sandbox.link.mod, {
       baseUrl: services.fetchOptions.baseUrl,
@@ -502,37 +560,87 @@ function resolveLinkModReference(
 
 /**
  * The link's collection, or else its tile, resolved against the app's
- * address, or as written when it cannot be resolved.
+ * address (a collection folder means its `collection.yaml`), or as written
+ * when it cannot be resolved.
  */
 function resolveLinkTiles(
   sandbox: StageSandbox,
   services: SandboxServices,
 ): string | null {
-  const location = sandbox.link.collection ?? sandbox.link.tile ?? null;
-  if (location === null) {
-    return null;
-  }
+  const baseUrl = services.fetchOptions.baseUrl;
   try {
-    return resolveLocation(location, services.fetchOptions.baseUrl).href;
+    if (sandbox.link.collection !== null) {
+      return resolveCollectionReference(sandbox.link.collection, baseUrl);
+    }
+    const tile = sandbox.link.tile ?? null;
+    return tile === null ? null : resolveLocation(tile, baseUrl).href;
   } catch {
-    return location;
+    return sandbox.link.collection ?? sandbox.link.tile ?? null;
   }
 }
 
-/** Loads the mod, keeps it on the runtime, then loads the link's tiles. */
+/** The link's mosaic reference resolved against the app's address, as written when it cannot be resolved, or `null`. */
+function resolveLinkMosaic(
+  sandbox: StageSandbox,
+  services: SandboxServices,
+): string | null {
+  const mosaic = sandbox.link.mosaic ?? null;
+  if (mosaic === null) {
+    return null;
+  }
+  try {
+    return resolveMosaicReference(mosaic, services.fetchOptions.baseUrl);
+  } catch {
+    return mosaic;
+  }
+}
+
+/** Keeps a loaded mosaic on the runtime: its mod and collection become the sandbox's. */
+function keepRuntimeMosaic(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  mosaic: LoadedMosaic | null,
+): void {
+  if (mosaic === null || runtime.status === "stopped") {
+    return;
+  }
+  runtime.loadedMosaic = mosaic;
+  runtime.modReference = mosaic.mod;
+  runtime.tilesLocation = mosaic.collection;
+  services.onChange();
+}
+
+/**
+ * Loads the link's mosaic, if any, and keeps it on the runtime, then the mod,
+ * which it keeps too, then the tiles of the link or of the mosaic.
+ */
 async function loadRuntimeInputs(
   runtime: SandboxRuntime,
   sandbox: StageSandbox,
   services: SandboxServices,
 ): Promise<ModLaunchInputs> {
-  const mod = await loadLaunchMod(
-    { link: sandbox.link, defaults: services.defaults },
-    services.fetchOptions,
-  );
+  const request: ModLaunchRequest = {
+    link: sandbox.link,
+    defaults: services.defaults,
+  };
+  const mosaic = await loadLaunchMosaic(request, services.fetchOptions);
+  keepRuntimeMosaic(runtime, services, mosaic);
+  const launchRequest = expandMosaicRequest(request, mosaic);
+  const mod = await loadLaunchMod(launchRequest, services.fetchOptions);
   runtime.loadedMod = mod;
-  return loadLaunchTiles(mod, sandbox.link, services.fetchOptions);
+  return loadLaunchTiles(
+    mod,
+    launchRequest.link,
+    services.fetchOptions,
+    mosaic,
+  );
 }
 
+/**
+ * Starts loading a sandbox's mod, or first its mosaic. The runtime is
+ * `loading`, then `running` or `failed`, or `asking` when the mod was written
+ * for another mod API or needs the user's consent for sites.
+ */
 export function launchSandbox(
   sandbox: StageSandbox,
   services: SandboxServices,
@@ -541,6 +649,8 @@ export function launchSandbox(
     id: sandbox.id,
     status: "loading",
     loadedMod: null,
+    mosaicSource: resolveLinkMosaic(sandbox, services),
+    loadedMosaic: null,
     pending: null,
     question: null,
     consentLines: [],
@@ -712,7 +822,7 @@ export function addFullscreenRefusedWarning(
 ): void {
   const issue: ModIssue = {
     level: "warning",
-    source: runtime.loadedMod?.source ?? runtime.modReference,
+    source: readRuntimeSubject(runtime),
     message: `Fullscreen is not available: ${reason}`,
   };
   appendRuntimeMessage(runtime, buildAppIssueContent(issue));
@@ -797,6 +907,7 @@ async function readReloadedIssues(
       tilesKind,
       tilesSource,
       services.fetchOptions,
+      readMosaicAliases(launch.mosaic),
     );
     const tileBodies = buildTileBodies(modTiles.tiles);
     if (runtime.session !== null && runtime.status === "running") {
@@ -834,7 +945,9 @@ async function readReloadedIssues(
 }
 
 /**
- * Loads and validates the sandbox's collection or tile again, pushes
+ * Loads and validates the sandbox's collection or tile again, with the tiles
+ * renamed by the launch's mosaic aliases, without requesting the mosaic file
+ * again, pushes
  * `tiles.changed` to the running mod and replaces the collection issues. With tile links on,
  * it also replaces the tile link issues with those of the reloaded tiles,
  * led by a notice when they link files the frame does not allow yet. A

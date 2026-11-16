@@ -96,6 +96,21 @@ describe("collections.inspect", function describeCollectionsInspect(): void {
       expect(readRequestedUrls(fetchSpy)).toEqual([SAMPLE_COLLECTION_SOURCE]);
     });
 
+    it("Collection folder", async function inspectsFolder(): Promise<void> {
+      const folderSource = `${FIXTURES_BASE_URL}tiles/books/collection.yaml`;
+      testTexts.set(
+        folderSource,
+        'collection:\n  name: "Folder books"\n  tiles:\n    - path: "./kallocain.md"\n',
+      );
+      const { context } = buildSpiedContext([APP_BASE_URL.slice(0, -1)]);
+
+      const collectionIndex = await inspectCollection(context, {
+        collection: "./fixtures/tiles/books",
+      });
+
+      expect(collectionIndex).toMatchObject({ source: folderSource });
+    });
+
     it("Entry issues are returned", async function returnsEntryIssues(): Promise<void> {
       const { context } = buildSpiedContext(["*"]);
       testTexts.set(

@@ -1,0 +1,7 @@
+mosaic:
+  title: "Books on the shelf"
+  description: "The fixture books, without covers."
+  mod: "../../mods/book_list"
+  collection: "../../tiles/books_collection.yaml"
+  config:
+    show_covers: false

@@ -2,6 +2,13 @@ import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
 import { loadMod, resolveModReference } from "../../mod/index.ts";
 import type { LoadedMod, ModIssue, ModLoadOptions } from "../../mod/index.ts";
 import {
+  applyMosaicAliases,
+  loadMosaicFile,
+  mergeMosaicConfig,
+  resolveMosaicReference,
+} from "../../mosaic/index.ts";
+import type { LoadedMosaic, MosaicAliases } from "../../mosaic/index.ts";
+import {
   buildTileValidator,
   loadTile,
   loadTileCollection,
@@ -13,8 +20,13 @@ import type {
   TileIssue,
   TileValidator,
 } from "../../tile/index.ts";
-import { describeDeniedPermission } from "../permissions/index.ts";
-import type { ModGrants } from "../permissions/index.ts";
+import {
+  describeDeniedMosaicPermission,
+  describeDeniedPermission,
+  grantMosaicPermissions,
+  joinGrants,
+} from "../permissions/index.ts";
+import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import {
   buildSandboxDocument,
   buildSandboxPolicy,
@@ -24,7 +36,11 @@ import type { TileLinks } from "../sandbox/index.ts";
 import type { Theme } from "../theme/index.ts";
 import { findSwitchedOffMod } from "./default_mod_settings.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
-import { ModSwitchedOffError, RunLinkConflictError } from "./engine_errors.ts";
+import {
+  ModSwitchedOffError,
+  MosaicLinkConflictError,
+  RunLinkConflictError,
+} from "./engine_errors.ts";
 import {
   describeMissingApiRange,
   matchModApiRange,
@@ -36,21 +52,43 @@ import { resolveTilePaths } from "./tile_paths.ts";
 
 /**
  * What to run: a mod reference, a collection or a tile location, and the
- * link parameters. Not an address. `tile` is optional so that links written
- * without it, such as sections' mod targets, stay valid; absent means `null`.
+ * link parameters, or a mosaic reference and the link parameters. Not an
+ * address. `tile` and `mosaic` are optional so that links written without
+ * them, such as sections' mod targets, stay valid; absent means `null`. A
+ * mosaic link has an empty `mod`, a `null` collection and no tile: the mosaic
+ * file names its mod and its collection.
  */
 export interface RunLink {
   mod: string;
   collection: string | null;
   tile?: string | null;
+  mosaic?: string | null;
   params: Record<string, string>;
 }
+
+/**
+ * The link names the stage reads itself. They are never in a mod's `params`,
+ * and `mods.open` and `mosaics.open` refuse them in theirs.
+ */
+export const RUN_LINK_RESERVED_NAMES: readonly string[] = [
+  "mod",
+  "collection",
+  "tile",
+  "mosaic",
+];
 
 /**
  * How wide a mod frame lays out its content: centered at the content width,
  * across the stage area (theater mode), or across the screen (fullscreen).
  */
 export type FrameLayout = "contained" | "theater" | "fullscreen";
+
+/** The mosaic a mod was opened from, as its mount context gives it. */
+export interface LaunchMosaic {
+  source: string;
+  title: string;
+  description: string;
+}
 
 /** What a mod receives as the second argument of `mount`. Plain data. */
 export interface ModContext {
@@ -61,10 +99,13 @@ export interface ModContext {
     version: string;
     description: string;
   };
+  /** The mosaic the mod was opened from, `null` for a mod opened from a mod link. */
+  mosaic: LaunchMosaic | null;
   /** The mod API the mod runs on. */
   api: {
     version: string;
   };
+  /** The mod's config, merged with the mosaic's when the mod was opened from a mosaic. */
   config: YamlMapping;
   params: Record<string, string>;
   tiles: Tile[];
@@ -88,6 +129,8 @@ export type TilesKind = "collection" | "tile";
 /** Everything needed to start a mod's frame. Plain data. */
 export interface ModLaunch {
   mod: LoadedMod;
+  /** The mosaic the mod was opened from, whose aliases "Reload tiles" applies again, or `null`. */
+  mosaic: LoadedMosaic | null;
   /** Whether the link's tiles come from a collection or a tile, `null` when it names neither. */
   tilesKind: TilesKind | null;
   /** The location the link's tiles come from, resolved, `null` when it names neither. */
@@ -114,14 +157,49 @@ export interface ModLaunch {
   issues: ModIssue[];
 }
 
+/**
+ * The mosaic a launch was opened from, with the grants of its `show` lines
+ * (`grantMosaicPermissions`), kept apart from the mod's grants so each
+ * refused line is reported with what declared it.
+ */
+export interface LaunchMosaicGrants {
+  mosaic: LoadedMosaic;
+  grants: ModGrants;
+}
+
+/**
+ * A launch's mosaic with the grants of its `show` lines by `decisions`
+ * (`grantMosaicPermissions`), or `null` for a mod not opened from a mosaic.
+ */
+export function grantLaunchMosaic(
+  mosaic: LoadedMosaic | null,
+  appOrigin: string,
+  decisions: readonly SiteDecision[],
+): LaunchMosaicGrants | null {
+  if (mosaic === null) {
+    return null;
+  }
+  const mosaicGrants: LaunchMosaicGrants = {
+    mosaic,
+    grants: grantMosaicPermissions(mosaic, appOrigin, decisions),
+  };
+  return mosaicGrants;
+}
+
 export interface ModLaunchRequest {
   link: RunLink;
   defaults: ResolvedDefaultModSettings;
 }
 
-/** What a launch is built from once loaded: the mod, the link and the link's tiles. Plain data. */
+/**
+ * What a launch is built from once loaded: the mod, the link and the link's
+ * tiles, and the mosaic the link opened. For a mosaic, `link` is the link the
+ * mosaic expands into (`expandMosaicRequest`). Plain data.
+ */
 export interface ModLaunchInputs {
   mod: LoadedMod;
+  /** `null` when the link is not a mosaic link. */
+  mosaic: LoadedMosaic | null;
   link: RunLink;
   /** `null` when the link names no collection and no tile. */
   modTiles: ModTiles | null;
@@ -188,31 +266,64 @@ export function selectModTiles(
   return buildModTiles(validatedCollection, typedTiles);
 }
 
-/** Selects the tiles of a loaded collection with the mod's tile type, loading the type when the mod has one. */
-async function selectLoadedModTiles(
-  mod: LoadedMod,
+/**
+ * The collection with each tile's metadata renamed by a mosaic's aliases
+ * (`applyMosaicAliases`). The tiles' `source`, `body` and `types` are kept.
+ */
+function aliasCollectionTiles(
   collection: TileCollection,
-  options: FileFetchOptions,
-): Promise<ModTiles> {
-  if (mod.typeSource === null) {
-    return selectModTiles(collection, null);
+  aliases: MosaicAliases,
+): TileCollection {
+  const aliasedTiles: Tile[] = [];
+  for (const tile of collection.tiles) {
+    aliasedTiles.push({
+      ...tile,
+      metadata: applyMosaicAliases(tile.metadata, aliases),
+    });
   }
-  const tileValidator = await buildTileValidator(mod.typeSource, options);
-  const modTiles = selectModTiles(collection, tileValidator);
-  return modTiles;
+  const aliasedCollection: TileCollection = {
+    ...collection,
+    tiles: aliasedTiles,
+  };
+  return aliasedCollection;
 }
 
 /**
+ * Selects the tiles of a loaded collection with the mod's tile type, loading
+ * the type when the mod has one. The tiles are renamed by `aliases` first, so
+ * the type validates the renamed metadata.
+ */
+async function selectLoadedModTiles(
+  mod: LoadedMod,
+  collection: TileCollection,
+  aliases: MosaicAliases,
+  options: FileFetchOptions,
+): Promise<ModTiles> {
+  const aliasedCollection = aliasCollectionTiles(collection, aliases);
+  if (mod.typeSource === null) {
+    return selectModTiles(aliasedCollection, null);
+  }
+  const tileValidator = await buildTileValidator(mod.typeSource, options);
+  const modTiles = selectModTiles(aliasedCollection, tileValidator);
+  return modTiles;
+}
+
+/** No aliases: the tiles of a mod not opened from a mosaic keep their names. */
+const NO_ALIASES: MosaicAliases = {};
+
+/**
  * Loads a collection for a mod and selects its tiles with the mod's tile
- * type (`selectModTiles`). Load errors propagate.
+ * type (`selectModTiles`), after renaming them by a mosaic's `aliases`. Load
+ * errors propagate.
  */
 export async function loadModTiles(
   mod: LoadedMod,
   collectionLocation: string,
   options: FileFetchOptions = {},
+  aliases: MosaicAliases = NO_ALIASES,
 ): Promise<ModTiles> {
   const collection = await loadTileCollection(collectionLocation, options);
-  return selectLoadedModTiles(mod, collection, options);
+  return selectLoadedModTiles(mod, collection, aliases, options);
 }
 
 /** A collection of one tile, with the tile's source, no name and no issues. */
@@ -238,20 +349,30 @@ export async function loadModTile(
   options: FileFetchOptions = {},
 ): Promise<ModTiles> {
   const tile = await loadTile(tileLocation, options);
-  return selectLoadedModTiles(mod, buildSingleTileCollection(tile), options);
+  return selectLoadedModTiles(
+    mod,
+    buildSingleTileCollection(tile),
+    NO_ALIASES,
+    options,
+  );
 }
 
-/** Loads the tiles of a collection or of a tile for a mod (`loadModTiles`, `loadModTile`). */
+/**
+ * Loads the tiles of a collection or of a tile for a mod (`loadModTiles`,
+ * `loadModTile`). A collection's tiles are renamed by a mosaic's `aliases`;
+ * a mosaic never has a tile.
+ */
 export function loadModTilesOfKind(
   mod: LoadedMod,
   kind: TilesKind,
   location: string,
   options: FileFetchOptions = {},
+  aliases: MosaicAliases = NO_ALIASES,
 ): Promise<ModTiles> {
   if (kind === "tile") {
     return loadModTile(mod, location, options);
   }
-  return loadModTiles(mod, location, options);
+  return loadModTiles(mod, location, options, aliases);
 }
 
 function resolveLaunchSource(
@@ -287,6 +408,7 @@ function readLinkTilesKind(link: RunLink): TilesKind | null {
 async function loadLinkTiles(
   mod: LoadedMod,
   link: RunLink,
+  aliases: MosaicAliases,
   options: FileFetchOptions,
 ): Promise<ModTiles | null> {
   const kind = readLinkTilesKind(link);
@@ -294,14 +416,23 @@ async function loadLinkTiles(
   if (kind === null || location === null) {
     return null;
   }
-  return loadModTilesOfKind(mod, kind, location, options);
+  return loadModTilesOfKind(mod, kind, location, options, aliases);
+}
+
+/** The aliases of a launch's mosaic, or none. */
+export function readMosaicAliases(mosaic: LoadedMosaic | null): MosaicAliases {
+  return mosaic === null ? NO_ALIASES : mosaic.aliases;
 }
 
 function listContentSources(
   mod: LoadedMod,
+  mosaic: LoadedMosaic | null,
   modTiles: ModTiles | null,
 ): string[] {
   const sources = [mod.source, mod.entrypoint];
+  if (mosaic !== null) {
+    sources.unshift(mosaic.source);
+  }
   if (mod.typeSource !== null) {
     sources.push(mod.typeSource);
   }
@@ -314,7 +445,12 @@ function listContentSources(
   return sources;
 }
 
-function buildPermissionIssues(mod: LoadedMod, grants: ModGrants): ModIssue[] {
+/** One warning per refused line: the mod's, then the mosaic's, each with what declared it as source. */
+function buildPermissionIssues(
+  mod: LoadedMod,
+  grants: ModGrants,
+  mosaic: LaunchMosaicGrants | null,
+): ModIssue[] {
   const issues: ModIssue[] = [];
   for (const permission of grants.denied) {
     issues.push({
@@ -323,7 +459,28 @@ function buildPermissionIssues(mod: LoadedMod, grants: ModGrants): ModIssue[] {
       message: describeDeniedPermission(permission),
     });
   }
+  if (mosaic === null) {
+    return issues;
+  }
+  for (const permission of mosaic.grants.denied) {
+    issues.push({
+      level: "warning",
+      source: mosaic.mosaic.source,
+      message: describeDeniedMosaicPermission(permission, mosaic.mosaic.source),
+    });
+  }
   return issues;
+}
+
+/** The grants of the sandbox: the mod's lines, then the mosaic's. */
+function joinLaunchGrants(
+  grants: ModGrants,
+  mosaic: LaunchMosaicGrants | null,
+): ModGrants {
+  if (mosaic === null) {
+    return grants;
+  }
+  return joinGrants(grants, mosaic.grants);
 }
 
 function buildFileIssues(mod: LoadedMod): ModIssue[] {
@@ -338,8 +495,32 @@ function buildFileIssues(mod: LoadedMod): ModIssue[] {
   return issues;
 }
 
+function buildLaunchMosaic(mosaic: LoadedMosaic | null): LaunchMosaic | null {
+  if (mosaic === null) {
+    return null;
+  }
+  const launchMosaic: LaunchMosaic = {
+    source: mosaic.source,
+    title: mosaic.title,
+    description: mosaic.description,
+  };
+  return launchMosaic;
+}
+
+/** The mod's config, merged with the mosaic's config (`mergeMosaicConfig`) for a mosaic. */
+function buildLaunchConfig(
+  mod: LoadedMod,
+  mosaic: LoadedMosaic | null,
+): YamlMapping {
+  if (mosaic === null) {
+    return structuredClone(mod.config);
+  }
+  return mergeMosaicConfig(mod.config, mosaic.config);
+}
+
 function buildModContext(
   mod: LoadedMod,
+  mosaic: LoadedMosaic | null,
   link: RunLink,
   modTiles: ModTiles | null,
   grants: ModGrants,
@@ -352,8 +533,9 @@ function buildModContext(
       version: mod.version,
       description: mod.description,
     },
+    mosaic: buildLaunchMosaic(mosaic),
     api: { version: MOD_API_VERSION },
-    config: structuredClone(mod.config),
+    config: buildLaunchConfig(mod, mosaic),
     params: { ...link.params },
     tiles: modTiles === null ? [] : modTiles.tiles,
     issues: modTiles === null ? [] : modTiles.issues,
@@ -387,16 +569,24 @@ function collectLaunchTileLinks(
  * and its issues, and renders the bodies the tiles need collected
  * (`buildTileBodies`). With `loadsTileLinkedMedia`, the policy also allows
  * the files the tiles and their bodies link (`collectModTileLinks`); the
- * mount context does not list them. Requests nothing.
+ * mount context does not list them. For a mod opened from a mosaic, the
+ * config is merged with the mosaic's, the mosaic file's origin is a content
+ * host, and the mosaic's granted `show` lines join the mod's in the policy
+ * and the mount context. Requests nothing.
  */
 export function buildModLaunch(
   mod: LoadedMod,
   link: RunLink,
   modTiles: ModTiles | null,
-  grants: ModGrants,
+  modGrants: ModGrants,
   loadsTileLinkedMedia: boolean,
+  mosaicGrants: LaunchMosaicGrants | null = null,
 ): ModLaunch {
-  const contentHosts = collectContentHosts(listContentSources(mod, modTiles));
+  const mosaic = mosaicGrants === null ? null : mosaicGrants.mosaic;
+  const grants = joinLaunchGrants(modGrants, mosaicGrants);
+  const contentHosts = collectContentHosts(
+    listContentSources(mod, mosaic, modTiles),
+  );
   const tiles = modTiles === null ? [] : modTiles.tiles;
   const tileBodies = buildTileBodies(tiles);
   const tileLinks = collectLaunchTileLinks(
@@ -413,9 +603,10 @@ export function buildModLaunch(
   );
   const launch: ModLaunch = {
     mod,
+    mosaic,
     tilesKind: modTiles === null ? null : readLinkTilesKind(link),
     tilesSource: modTiles === null ? null : modTiles.tilesSource,
-    context: buildModContext(mod, link, modTiles, grants),
+    context: buildModContext(mod, mosaic, link, modTiles, grants),
     contentHosts,
     tileLinks,
     tileBodies,
@@ -423,7 +614,7 @@ export function buildModLaunch(
     sandboxDocument: buildSandboxDocument(policy, mod.theme),
     apiCompatible: matchModApiRange(mod.api),
     fileIssues: buildFileIssues(mod),
-    issues: buildPermissionIssues(mod, grants),
+    issues: buildPermissionIssues(mod, modGrants, mosaicGrants),
   };
   return launch;
 }
@@ -441,6 +632,7 @@ export function buildModTestDocument(launch: ModLaunch): string {
 /**
  * Loads the mod of a launch: refuses a switched-off default mod and a link
  * with both a collection and a tile before any request, then loads the mod.
+ * For a mosaic link, `request` is the expanded request (`expandMosaicRequest`).
  * Every error propagates.
  */
 export async function loadLaunchMod(
@@ -451,31 +643,109 @@ export async function loadLaunchMod(
   return loadMod(source, options);
 }
 
+/** The link's mosaic reference resolved against the app's address, or as written when it cannot be resolved. */
+function resolveLinkMosaic(mosaic: string, options: FileFetchOptions): string {
+  try {
+    return resolveMosaicReference(mosaic, options.baseUrl);
+  } catch {
+    return mosaic;
+  }
+}
+
+function hasLinkLocation(location: string | null | undefined): boolean {
+  return location !== undefined && location !== null && location !== "";
+}
+
+/**
+ * Loads the mosaic of a mosaic link, or gives `null` for a mod link. A link
+ * with a mosaic and a mod, a collection or a tile fails with
+ * `MosaicLinkConflictError` before any request. The mosaic's `mod` is
+ * resolved with the default mods folder of `request`. Every error propagates.
+ */
+export async function loadLaunchMosaic(
+  request: ModLaunchRequest,
+  options: FileFetchOptions,
+): Promise<LoadedMosaic | null> {
+  const mosaic = request.link.mosaic ?? null;
+  if (mosaic === null) {
+    return null;
+  }
+  const link = request.link;
+  if (
+    link.mod !== "" ||
+    hasLinkLocation(link.collection) ||
+    hasLinkLocation(link.tile)
+  ) {
+    throw new MosaicLinkConflictError(resolveLinkMosaic(mosaic, options));
+  }
+  const loadedMosaic = await loadMosaicFile(mosaic, {
+    ...options,
+    defaultModsFolder: request.defaults.folder,
+  });
+  return loadedMosaic;
+}
+
+/**
+ * The request a loaded mosaic expands into: a link to its mod with its
+ * collection and the mosaic link's params, so the rest of the launch runs as
+ * for a mod link. `request` itself is returned when `mosaic` is `null`.
+ */
+export function expandMosaicRequest(
+  request: ModLaunchRequest,
+  mosaic: LoadedMosaic | null,
+): ModLaunchRequest {
+  if (mosaic === null) {
+    return request;
+  }
+  const expandedRequest: ModLaunchRequest = {
+    link: {
+      mod: mosaic.mod,
+      collection: mosaic.collection,
+      tile: null,
+      params: { ...request.link.params },
+    },
+    defaults: request.defaults,
+  };
+  return expandedRequest;
+}
+
 /**
  * Loads the rest of what a loaded mod's launch is built from: the link's
- * collection or tile, when it names one. Every error propagates.
+ * collection or tile, when it names one, with the tiles renamed by the
+ * `mosaic`'s aliases. Every error propagates.
  */
 export async function loadLaunchTiles(
   mod: LoadedMod,
   link: RunLink,
   options: FileFetchOptions,
+  mosaic: LoadedMosaic | null = null,
 ): Promise<ModLaunchInputs> {
-  const modTiles = await loadLinkTiles(mod, link, options);
-  const inputs: ModLaunchInputs = { mod, link, modTiles };
+  const modTiles = await loadLinkTiles(
+    mod,
+    link,
+    readMosaicAliases(mosaic),
+    options,
+  );
+  const inputs: ModLaunchInputs = { mod, mosaic, link, modTiles };
   return inputs;
 }
 
 /**
- * Loads what a mod's launch is built from: the mod (`loadLaunchMod`) and,
- * when the link names one, its collection or tile (`loadLaunchTiles`). A
- * link with both fails with `RunLinkConflictError` before any request. Every
- * error propagates. The launch itself is built later with `buildModLaunch`, once
- * the grants are known.
+ * Loads what a mod's launch is built from: the mosaic of a mosaic link
+ * (`loadLaunchMosaic`), the mod (`loadLaunchMod`) and, when the link or the
+ * mosaic names one, its collection or tile (`loadLaunchTiles`). A link with
+ * both a collection and a tile fails with `RunLinkConflictError`, and a
+ * mosaic link with a mod, a collection or a tile with
+ * `MosaicLinkConflictError`, before any request. Every error propagates. The
+ * launch itself is built later with `buildModLaunch`, once the grants are
+ * known.
  */
 export async function loadModLaunchInputs(
   request: ModLaunchRequest,
   options: FileFetchOptions,
 ): Promise<ModLaunchInputs> {
-  const mod = await loadLaunchMod(request, options);
-  return loadLaunchTiles(mod, request.link, options);
+  const mosaic = await loadLaunchMosaic(request, options);
+  const launchRequest = expandMosaicRequest(request, mosaic);
+  const mod = await loadLaunchMod(launchRequest, options);
+  return loadLaunchTiles(mod, launchRequest.link, options, mosaic);
 }

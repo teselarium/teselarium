@@ -6,30 +6,34 @@
 - **Tile Type**: Schema in yaml format that allow to valid a Tile as belonging to a certain type based on its metadata. It follows structural typing principles.
 - **Tile Collection**: List of tiles paths or urls in yaml format.
 - **Mosaic Design (Mod)**: Javascript plugin that allows to visualize and interact with a collection of tiles of a given tile type. 
-- **Mosaic**: Bundle configuration in yaml that ties together a tile collection, a mosaic design and its configuration.
+- **Mosaic**: Shareable yaml file that opens a mosaic design with a tile collection: it overrides the mod's configuration, maps the collection's field names to the mod's tile type and declares the media hosts the tiles need.
 
 ## Architecture Overview
 
 ### Mosaic
 
-A mosaic is a bundle made of three parts: a tile collection, a mod and a mosaic configuration. The tile collection contains the tiles to be displayed, each one a markdown file with metadata in its frontmatter. The mod includes the javascript plugin, the tile type required by the plugin, a default mosaic configuration and a sample tile collection with example tiles. The mosaic configuration defines the values used by this specific mosaic, overriding the mod defaults when needed.
+A mosaic is a file that names two other things: a mod and, optionally, a tile collection. The tile collection contains the tiles to be displayed, each one a markdown file with metadata in its frontmatter. The mod includes the javascript plugin, the tile type required by the plugin, its default configuration and a sample tile collection with example tiles. The mosaic file holds only what this pairing needs: the configuration values that override the mod's defaults, the aliases that rename the collection's fields to the tile type's, and the `show` permissions for the hosts of the tiles' media. Mod, collection and mosaic can each live on a different site.
 
 ```mermaid
 flowchart TD
-    subgraph Mosaic["Mosaic (bundle)"]
-      subgraph TileCollection["Tile collection"]
-        Tiles@{ shape: docs, label: "Tile\n(markdown +\n frontmatter)" }
-      end
-      subgraph Mod["Mosaic Design (Mod)"]
-        plugin["Plugin (js)"]
-        schema["Tile Type (schema)"]
-        default_mosaic_conf["Default Mosaic Configuration"]
-        subgraph SampleTileCollection["Sample Tile collection"]
-          SampleTiles@{ shape: docs, label: "Sample Tile" }
-        end
-      end
-      mosaic_conf["Mosaic Configuration"]
+    subgraph MosaicFile["Mosaic (mosaic.yaml)"]
+      mosaic_conf["Configuration overrides"]
+      aliases["Aliases"]
+      mosaic_permissions["Show permissions"]
     end
+    subgraph TileCollection["Tile collection"]
+      Tiles@{ shape: docs, label: "Tile\n(markdown +\n frontmatter)" }
+    end
+    subgraph Mod["Mosaic Design (Mod)"]
+      plugin["Plugin (js)"]
+      schema["Tile Type (schema)"]
+      mod_conf["Default Configuration"]
+      subgraph SampleTileCollection["Sample Tile collection"]
+        SampleTiles@{ shape: docs, label: "Sample Tile" }
+      end
+    end
+    MosaicFile -- "mod" --> Mod
+    MosaicFile -- "collection" --> TileCollection
 ```
 
 ### Sandbox
@@ -52,7 +56,7 @@ flowchart LR
   subgraph External["External Sites or Filesystem"]
     external_tiles@{ shape: docs, label: "Tiles" }
     external_mod["Mosaic Design (Mod)"]
-    external_mosaic["Mosaic (bundle)"]
+    external_mosaic["Mosaic (mosaic.yaml)"]
   end
 
   mod <-- "API" --> engine
@@ -64,7 +68,7 @@ flowchart LR
 
 OpenTesela is implemented as a Single Page Application design to be self hosted via static files like github pages. The project can be clones and put tiles, mods and mosaics inside the dedicated folder in order that the app load them by default.
 OpenTesela could be also loaded in a html file and initialized from there without the need of cloning the full project, the default tiles, mods and mosaics can be defined during initialization.
-A third way of using OpenTesela is by setting a mosaic path as parameter in the url via hash routing. In this way user can share a mosaic by only sharing a link.
+A third way of using OpenTesela is by setting a mosaic path as parameter in the url via hash routing (`#/run?mosaic=<path or url>`). In this way user can share a mosaic by only sharing a link.
 
 ## Tiles and Tile Collections
 
@@ -201,24 +205,30 @@ mod:
 
 ## Mosaic
 
-A mosaic is the final product presented to the users where they can interact with tiles using the mod UI. A mosaic is built dynamically by OpenTesela based on a mosaic yaml file. This yaml is a bundle configuration that ties together a tile collection, a mod and its configuration. For example it can change default values or add aliases for the metadata for increasing compatibility.
+A mosaic is the final product presented to the users where they can interact with tiles using the mod UI. OpenTesela opens it from a mosaic yaml file, `mosaic.yaml` in a folder by convention, that ties together a mod and a tile collection. It can change the mod's default configuration values, add aliases that rename the tiles' metadata fields to the names of the mod's tile type, for increasing compatibility, and declare the hosts the tiles' images come from. For example, for the "country_markers_map" mod above:
 
 ```yaml
 mosaic:
-  name: "science_fiction_books_by_country"
   title: "Science Fiction Books Around the World"
   description: "Classic science fiction novels placed on a map by country of origin."
 
-  # Tile collection to display (path or url).
-  tile_collection:
-    path: "./science_fiction_books.yaml"
+  # Mod used to render the collection: a folder, a mod file, or a default mod name.
+  mod: "../mods/country_markers_map"
 
-  # Mod used to render the collection (path or url), with a compatible version range.
-  mod:
-    name: "country_markers_map"
-    path: "./mods/country_markers_map"
-    version: "^1.0.0"
+  # Tile collection to display: a folder holding collection.yaml, or the file itself.
+  collection: "./science_fiction_books.yaml"
 
+  # Deep-merged into the mod's config: mappings are merged, other values replace.
+  config:
+    map:
+      center: [-34.6085, -58.3722]
+      zoom: 3
+    markers:
+      color: "#aa3333"
+    popup:
+      show_body: true
+
+  # For each field of the mod's tile type, the names this collection uses for it.
   aliases:
     title:
       - "name"
@@ -230,12 +240,11 @@ mosaic:
       - "pub_date"
       - "published"
 
-  config:
-    map:
-      center: [-34.6085, -58.3722]
-      zoom: 3
-    markers:
-      color: "#aa3333"
-    popup:
-      show_body: true
+  # Only show permissions: the hosts the tiles' media come from.
+  permissions:
+    show:
+      - host: "https://covers.openlibrary.org"
+        reason: "Shows the book covers"
 ```
+
+Paths in the file are resolved against the file's own location. The mosaic opens with the link `#/run?mosaic=<path or url>`. The format, the merge and alias rules and the module are described in the [mosaic module](modules/lib/mosaic/README.md).

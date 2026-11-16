@@ -16,6 +16,8 @@ function buildSandbox(changes: Partial<SandboxSnapshot>): SandboxSnapshot {
     canClose: true,
     status: "running",
     mod: { title: "Book List", version: "1.0.0", source: MOD_SOURCE },
+    mosaic: null,
+    mosaicReference: null,
     sandboxDocument: null,
     canReloadTiles: true,
     messages: [],

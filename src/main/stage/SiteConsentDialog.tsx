@@ -4,6 +4,7 @@ import { Button } from "@/vendor/shadcn/ui/button.tsx";
 import { Label } from "@/vendor/shadcn/ui/label.tsx";
 import { Checkbox } from "@/vendor/shadcn/ui/checkbox.tsx";
 import { describePermissionLine } from "../../lib/core/permissions/index.ts";
+import type { SiteDecisionSubject } from "../../lib/core/permissions/index.ts";
 import type {
   SandboxSnapshot,
   SiteConsentAnswer,
@@ -26,6 +27,28 @@ interface ConsentLineRowProps {
   isChecked: boolean;
   onCheck: (key: string, isChecked: boolean) => void;
 }
+
+/** The lines one subject declared, under its title and address. */
+interface ConsentGroup {
+  subject: SiteDecisionSubject;
+  title: string;
+  source: string;
+  lines: SiteConsentLine[];
+}
+
+interface ConsentGroupSectionProps {
+  group: ConsentGroup;
+  /** The first group's title is the dialog's title. */
+  titleId: string | null;
+  checkedKeys: string[];
+  onCheck: (key: string, isChecked: boolean) => void;
+}
+
+/** How the dialog names each subject. */
+const SUBJECT_NOUNS: Record<SiteDecisionSubject, string> = {
+  mod: "mod",
+  mosaic: "mosaic",
+};
 
 /** Categories whose sites can receive what the mod shows or keeps. */
 const DATA_CATEGORIES: ReadonlySet<string> = new Set(["connect", "code"]);
@@ -65,7 +88,68 @@ function sendsData(lines: readonly SiteConsentLine[]): boolean {
   return false;
 }
 
-/** One line: its checkbox labeled with the app's words, then the mod's reason as plain text. */
+function listSubjectLines(
+  lines: readonly SiteConsentLine[],
+  subject: SiteDecisionSubject,
+): SiteConsentLine[] {
+  const subjectLines: SiteConsentLine[] = [];
+  for (const line of lines) {
+    if (line.subject === subject) {
+      subjectLines.push(line);
+    }
+  }
+  return subjectLines;
+}
+
+/** The mosaic's title and address, or its reference while it has no title. */
+function readMosaicHeading(sandbox: SandboxSnapshot): {
+  title: string;
+  source: string;
+} {
+  const source = sandbox.mosaic?.source ?? sandbox.mosaicReference ?? "";
+  const heading = { title: sandbox.mosaic?.title ?? "Mosaic", source };
+  return heading;
+}
+
+/** One group per subject that has lines: the mod's, then the mosaic's. */
+function groupConsentLines(
+  sandbox: SandboxSnapshot,
+  modTitle: string,
+  modSource: string,
+  lines: readonly SiteConsentLine[],
+): ConsentGroup[] {
+  const groups: ConsentGroup[] = [];
+  const modLines = listSubjectLines(lines, "mod");
+  if (modLines.length > 0) {
+    groups.push({
+      subject: "mod",
+      title: modTitle,
+      source: modSource,
+      lines: modLines,
+    });
+  }
+  const mosaicLines = listSubjectLines(lines, "mosaic");
+  if (mosaicLines.length > 0) {
+    groups.push({
+      subject: "mosaic",
+      ...readMosaicHeading(sandbox),
+      lines: mosaicLines,
+    });
+  }
+  return groups;
+}
+
+/** `this mod`, `this mosaic` or `this mod and this mosaic`, for the Remember label. */
+function describeRememberedSubjects(groups: ConsentGroup[]): string {
+  const parts: string[] = [];
+  for (const group of groups) {
+    parts.push(`this ${SUBJECT_NOUNS[group.subject]}`);
+  }
+  const subjects = parts.join(" and ");
+  return subjects;
+}
+
+/** One line: its checkbox labeled with the app's words, then the mod's or the mosaic's reason as plain text. */
 function ConsentLineRow({
   line,
   isChecked,
@@ -93,22 +177,71 @@ function ConsentLineRow({
         </Label>
       </div>
       <p className="m-0 pl-6 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-        In the mod's words: {line.reason}
+        In the {SUBJECT_NOUNS[line.subject]}'s words: {line.reason}
       </p>
     </li>
   );
 }
 
 /**
+ * The lines of one subject: its title, as the dialog's title for the first
+ * group, its address, then its lines. The address is under the title, so a
+ * mod or mosaic that borrows another title still shows where it comes from.
+ */
+function ConsentGroupSection({
+  group,
+  titleId,
+  checkedKeys,
+  onCheck,
+}: ConsentGroupSectionProps): ReactElement {
+  const lineItems: ReactElement[] = [];
+  for (const line of group.lines) {
+    lineItems.push(
+      <ConsentLineRow
+        key={line.key}
+        line={line}
+        isChecked={checkedKeys.includes(line.key)}
+        onCheck={onCheck}
+      />,
+    );
+  }
+  const titleClasses = "font-semibold tracking-tight [overflow-wrap:anywhere]";
+  const title =
+    titleId === null ? (
+      <h3 className={`mt-4 text-base ${titleClasses}`}>{group.title}</h3>
+    ) : (
+      <h2 id={titleId} className={`text-lg ${titleClasses}`}>
+        {group.title}
+      </h2>
+    );
+  return (
+    <section aria-label={group.title}>
+      {title}
+      <code className="block text-sm text-muted-foreground [overflow-wrap:anywhere]">
+        {group.source}
+      </code>
+      <p className="mt-4 mb-2">
+        This {SUBJECT_NOUNS[group.subject]} comes from another site and asks to:
+      </p>
+      <ul className="m-0 flex list-none flex-col gap-3 rounded-md bg-muted p-3">
+        {lineItems}
+      </ul>
+    </section>
+  );
+}
+
+/**
  * The app's question before it starts a mod from another site that declares
- * permissions, a `StageDialog` like the action dialog: modal, out of every
- * frame's reach, with Show without them focused. It names the mod by its
- * title and source, lists one line per site and category, with a checkbox checked,
- * the app's verb and the mod's reason, and states the cost. Allow grants the
- * checked lines; Show without them refuses every line; both remember the
- * answer when Remember is checked. Escape refuses every line and remembers
- * nothing. The page renders it only while the visible sandbox is asking, and
- * keys it by sandbox, so each question starts with every line checked.
+ * permissions, or a mod opened from a mosaic from another site that declares
+ * `show` lines, a `StageDialog` like the action dialog: modal, out of every
+ * frame's reach, with Show without them focused. It shows one group per
+ * subject, the mod's then the mosaic's, each named by its title and source,
+ * with one line per site and category, a checkbox checked, the app's verb and
+ * the declared reason, and states the cost. Allow grants the checked lines;
+ * Show without them refuses every line; both remember the answer when
+ * Remember is checked. Escape refuses every line and remembers nothing. The
+ * page renders it only while the visible sandbox is asking, and keys it by
+ * sandbox, so each question starts with every line checked.
  */
 export function SiteConsentDialog({
   sandbox,
@@ -150,13 +283,20 @@ export function SiteConsentDialog({
       />
     );
   }
-  const lineItems: ReactElement[] = [];
-  for (const line of lines) {
-    lineItems.push(
-      <ConsentLineRow
-        key={line.key}
-        line={line}
-        isChecked={checkedKeys.includes(line.key)}
+  const groups = groupConsentLines(
+    sandbox,
+    sandbox.mod.title,
+    sandbox.mod.source,
+    lines,
+  );
+  const sections: ReactElement[] = [];
+  for (const [index, group] of groups.entries()) {
+    sections.push(
+      <ConsentGroupSection
+        key={group.subject}
+        group={group}
+        titleId={index === 0 ? titleId : null}
+        checkedKeys={checkedKeys}
         onCheck={handleLineCheck}
       />,
     );
@@ -168,20 +308,7 @@ export function SiteConsentDialog({
       cancelRef={cancelRef}
       onCancel={handleEscape}
     >
-      <h2
-        id={titleId}
-        className="text-lg font-semibold tracking-tight [overflow-wrap:anywhere]"
-      >
-        {sandbox.mod.title}
-      </h2>
-      {/* Under the title, so a mod that borrows another title still shows where it comes from. */}
-      <code className="block text-sm text-muted-foreground [overflow-wrap:anywhere]">
-        {sandbox.mod.source}
-      </code>
-      <p className="mt-4 mb-2">This mod comes from another site and asks to:</p>
-      <ul className="m-0 flex list-none flex-col gap-3 rounded-md bg-muted p-3">
-        {lineItems}
-      </ul>
+      {sections}
       <p className="mt-4 mb-0">
         Each site you allow can see that you used this mod.
         {sendsData(lines)
@@ -194,7 +321,9 @@ export function SiteConsentDialog({
           checked={remembers}
           onCheckedChange={handleRememberChange}
         />
-        <Label htmlFor={rememberId}>Remember my answer for this mod</Label>
+        <Label htmlFor={rememberId}>
+          Remember my answer for {describeRememberedSubjects(groups)}
+        </Label>
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button

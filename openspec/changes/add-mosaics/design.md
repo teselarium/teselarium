@@ -62,6 +62,8 @@ The launch reads the mosaic. A mosaic viewer does not turn it into `mods.open { 
 - adds the mosaic file's origin to the content hosts;
 - passes the mosaic's `show` lines to the grant step (D9).
 
+The launch runs in steps: `loadLaunchMosaic` (the conflict check of D2, then the mosaic file), `expandMosaicRequest` (the mosaic's mod and collection as an ordinary request), `loadLaunchMod` and `loadLaunchTiles`. `loadModLaunchInputs` chains them, and the stage calls them one by one, so it knows the mosaic when its mod fails, and the mod when its collection fails.
+
 "Reload tiles" repeats the collection load, the aliases and the validation from the stored inputs. It does not read the mosaic file again, because the content policy is fixed at the start.
 
 `src/lib/mosaic/` exports `resolveMosaicReference`, `loadMosaicFile`, `mergeMosaicConfig`, `applyMosaicAliases`, `MosaicFormatError` and the `LoadedMosaic` type. All of them are pure apart from the fetch. It reuses `src/lib/files` for fetching and YAML, `resolveModReference` for `mod`, the new collection reference resolver (D4) for `collection`, and the `show` host checks of `src/lib/mod/mod_permissions.ts`, which become exported.
@@ -74,7 +76,7 @@ The launch reads the mosaic. A mosaic viewer does not turn it into `mods.open { 
 | collection | `collection.yaml` | no |
 | mosaic | `mosaic.yaml` | no |
 
-A path ending in `.yaml` or `.yml` is the file. Any other path is a folder: `/` is added and the query and fragment are dropped. That is what `resolveModReference` already does for mods.
+A path ending in `.yaml` or `.yml` is the file. Any other path is a folder: `/` is added and the query and fragment are dropped. That is what `resolveModReference` already did for mods. The rule moves into one function, `resolveFileReference` in `src/lib/files`, which the mod, collection and mosaic resolvers call with their own file name.
 
 `src/lib/tile` gets `resolveCollectionReference`, which `loadTileCollection` and `readCollectionIndex` call first. So run links, `mods.open`, `mods.check`, `collections.inspect` and mosaics all accept folders without changes of their own. References inside a mosaic resolve against the mosaic file. References in requests and links resolve against the app's address, as today.
 
@@ -116,7 +118,7 @@ Checking it would mean loading the mosaic before answering. Opening a mosaic is 
 
 ### D9. A mosaic's `show` lines join the sandbox's grants
 
-`grantModPermissions` gets the mosaic, if any, and returns one `ModGrants` for the sandbox. Its `granted` and `denied` lists hold the mod's lines, then the mosaic's.
+`grantMosaicPermissions` applies the site-owner rule to the mosaic's `show` lines, beside `grantModPermissions`, which is unchanged. The launch gets the mosaic with its grants (`grantLaunchMosaic`) and joins them: the sandbox's `granted` and `denied` lists hold the mod's lines, then the mosaic's. They stay apart until the launch because a joined list cannot tell which refused line is the mosaic's when the mod and the mosaic declare the same host, and each refused line is reported with what declared it.
 
 - A mosaic file from the app's origin: every mosaic line is granted.
 - A mosaic file from another origin: remembered mosaic decisions apply, and lines without one are asked.
@@ -124,9 +126,11 @@ Checking it would mean loading the mosaic before answering. Opening a mosaic is 
 - **Stored decisions:** a mosaic decision is `{ mosaic, title, category, host, allowed }`, with `mosaic` in place of `mod`. The validator accepts entries with exactly one of the two keys. Existing entries are therefore valid as they are, and an older app drops a mosaic entry as invalid rather than misreading it.
 - **Settings:** `SiteDecisionList` groups by subject and address, and labels mosaic groups.
 - **Mount context:** `context.permissions` lists the mosaic's lines in the same `{ category, host, reason }` shape. A mod therefore sees one effective permission set, the same one the content policy enforces.
-- **Blocked requests:** `describeBlockedRequest` learns whether the sandbox has a mosaic, and for `show`-category blocks names the mosaic file as the second place to declare the host.
+- **Blocked requests:** `describeBlockedRequest` learns whether the sandbox has a mosaic, and for `show`-category blocks names the mosaic file as the second place to declare the host. A refused host that the mosaic declares is reported as the mosaic's: "the mosaic declares it in permissions.show, but the permission was not granted".
 
 *Alternative:* a separate dialog for the mosaic. That is two questions for one link, and the user cannot see both parties side by side.
+
+*Alternative:* `grantModPermissions` taking the mosaic and returning the joined grants, the first plan. The launch could then not attribute a refused line to the mosaic when the mod declares the same host, so a report could name the wrong file.
 
 ### D10. The mosaic file's origin is a content host
 
@@ -149,7 +153,7 @@ The mosaic file is a file the engine read to start the mod. Under the existing r
 Further changes:
 
 - `default_mods/mod_api.d.ts` declares `MosaicInspection`, `mosaics.inspect`, `mosaics.open` and `context.mosaic`, and the type test (`mod_api_types.test.ts`) checks them.
-- The run link's reserved names become `mod`, `collection`, `tile` and `mosaic`, in one constant that the stage, `mods.open` and `mosaics.open` all read.
+- The run link's reserved names become `mod`, `collection`, `tile` and `mosaic`, in one constant, `RUN_LINK_RESERVED_NAMES`, that the stage, `mods.open` and `mosaics.open` all read. It is declared beside `RunLink` in the engine (`mod_launch.ts`), because the stage depends on the engine, not the reverse.
 
 ## Risks / Trade-offs
 

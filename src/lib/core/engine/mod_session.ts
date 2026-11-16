@@ -19,6 +19,7 @@ import type {
   SandboxTestReport,
 } from "../sandbox/index.ts";
 import type { SiteDecision } from "../permissions/index.ts";
+import type { LoadedMosaic } from "../../mosaic/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
@@ -28,6 +29,7 @@ import { describeEngineError, ModMethodError } from "./engine_errors.ts";
 import { FILES_METHODS } from "./files_methods.ts";
 import { LIBS_METHODS } from "./libs_methods.ts";
 import { LINKS_METHODS } from "./links_methods.ts";
+import { MOSAICS_METHODS } from "./mosaics_methods.ts";
 import type {
   FrameLayout,
   LaunchContext,
@@ -127,6 +129,8 @@ export interface ModSession {
   onTestReport: ((report: SandboxTestReport) => void) | null;
   /** Whether blocked image and media reports get the redirect hint: tile links were on as the mod started. */
   hintsTileLinks: boolean;
+  /** The mosaic the mod was opened from, which blocked `show` reports name as a second place to declare a host, or `null`. */
+  mosaic: LoadedMosaic | null;
   stopped: boolean;
 }
 
@@ -152,6 +156,7 @@ export const ENGINE_METHODS: ModMethodTable = {
   ...STORAGE_METHODS,
   ...MODS_METHODS,
   ...COLLECTIONS_METHODS,
+  ...MOSAICS_METHODS,
   ...LINKS_METHODS,
   ...FILES_METHODS,
   ...UI_METHODS,
@@ -254,6 +259,7 @@ function reportBlockedRequest(session: ModSession, params: unknown): void {
       context.mod,
       context.grants,
       session.hintsTileLinks,
+      session.mosaic,
     ),
   );
 }
@@ -412,6 +418,7 @@ export function connectModSession(
     onErrorResponse: options.onErrorResponse ?? null,
     onTestReport: options.onTestReport ?? null,
     hintsTileLinks: launch.tileLinks !== null,
+    mosaic: launch.mosaic,
     stopped: false,
   };
   port.onmessage = handleModPortMessage.bind(undefined, session);

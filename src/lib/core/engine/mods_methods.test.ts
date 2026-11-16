@@ -449,6 +449,18 @@ describe("mods.open", function describeModsOpen(): void {
     expect(openLinkSpy).not.toHaveBeenCalled();
   });
 
+  it("Mosaic is a reserved parameter", async function rejectsMosaicParam(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["*"]);
+
+    const error = await catchMethodError(
+      open(context, { mod: "tile_viewer", params: { mosaic: "./m.yaml" } }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe('mods.open: "params.mosaic" is reserved');
+    expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+
   it("Replace that is not a boolean", async function rejectsReplaceText(): Promise<void> {
     const { context, openLinkSpy } = buildSpiedContext(["*"]);
 

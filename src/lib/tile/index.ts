@@ -2,6 +2,7 @@ export { readTileCollectionIndex } from "./collection_index.ts";
 export type { TileCollectionIndex } from "./collection_index.ts";
 export { loadTileCollection } from "./collection_loader.ts";
 export type { TileCollection } from "./collection_loader.ts";
+export { resolveCollectionReference } from "./collection_reference.ts";
 export { validateTileCollection } from "./collection_validator.ts";
 export {
   CollectionFormatError,

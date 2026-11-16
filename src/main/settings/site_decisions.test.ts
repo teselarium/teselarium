@@ -15,7 +15,7 @@ import {
   createSiteDecisions,
   readSiteDecisionsSnapshot,
   rememberSiteDecisions,
-  removeModSiteDecisions,
+  removeDeclaredSiteDecisions,
   removeSiteDecision,
   SITE_DECISIONS_KEY,
   subscribeSiteDecisions,
@@ -24,6 +24,14 @@ import {
 const COVERS_ALLOW = buildProbeDecision(SAMPLE_COVERS_PERMISSION, true);
 const COVERS_REFUSAL = buildProbeDecision(SAMPLE_COVERS_PERMISSION, false);
 const CONNECT_REFUSAL = buildProbeDecision(PROBE_CONNECT_PERMISSION, false);
+const MOSAIC_SOURCE = "https://mosaics.example.net/nobel/mosaic.yaml";
+const MOSAIC_COVERS_ALLOW: SiteDecision = {
+  mosaic: MOSAIC_SOURCE,
+  title: "Nobel books",
+  category: "show",
+  host: "https://covers.openlibrary.org",
+  allowed: true,
+};
 const ATLAS_ALLOW: SiteDecision = {
   ...COVERS_ALLOW,
   mod: "https://mods.example.net/atlas/mod_conf.yaml",
@@ -77,6 +85,79 @@ describe("createSiteDecisions", function describeCreateSiteDecisions(): void {
     const store = createSiteDecisions({ storage });
 
     expect(readSiteDecisionsSnapshot(store)).toEqual([CONNECT_REFUSAL]);
+  });
+
+  it("reads a stored mod decision as before", function readsStoredModDecision(): void {
+    const storage = buildStoredStorage([
+      {
+        mod: "https://mods.example.net/probe/mod_conf.yaml",
+        title: "Probe",
+        category: "show",
+        host: "https://upload.wikimedia.org",
+        allowed: true,
+      },
+    ]);
+
+    const store = createSiteDecisions({ storage });
+
+    expect(readSiteDecisionsSnapshot(store)).toEqual([
+      {
+        mod: "https://mods.example.net/probe/mod_conf.yaml",
+        title: "Probe",
+        category: "show",
+        host: "https://upload.wikimedia.org",
+        allowed: true,
+      },
+    ]);
+  });
+
+  it("reads a stored mosaic decision", function readsMosaicDecision(): void {
+    const storage = buildStoredStorage([MOSAIC_COVERS_ALLOW, COVERS_ALLOW]);
+
+    const store = createSiteDecisions({ storage });
+
+    expect(readSiteDecisionsSnapshot(store)).toEqual([
+      MOSAIC_COVERS_ALLOW,
+      COVERS_ALLOW,
+    ]);
+  });
+
+  it("drops an entry with both a mod and a mosaic, or neither", function dropsAmbiguousEntries(): void {
+    const { mod: _mod, ...noDeclarer } = COVERS_ALLOW;
+    const storage = buildStoredStorage([
+      { ...COVERS_ALLOW, mosaic: MOSAIC_SOURCE },
+      noDeclarer,
+      { ...MOSAIC_COVERS_ALLOW, mosaic: "./nobel/mosaic.yaml" },
+      CONNECT_REFUSAL,
+    ]);
+
+    const store = createSiteDecisions({ storage });
+
+    expect(readSiteDecisionsSnapshot(store)).toEqual([CONNECT_REFUSAL]);
+  });
+
+  it("keeps a mosaic decision apart from a mod decision for the same address and host", function keepsSubjectsApart(): void {
+    const modDecision: SiteDecision = {
+      ...MOSAIC_COVERS_ALLOW,
+      mosaic: undefined,
+      mod: MOSAIC_SOURCE,
+      allowed: false,
+    };
+    const store = createSiteDecisions({ storage: createMemoryStorage() });
+
+    rememberSiteDecisions(store, [MOSAIC_COVERS_ALLOW]);
+    rememberSiteDecisions(store, [modDecision]);
+
+    expect(readSiteDecisionsSnapshot(store)).toEqual([
+      MOSAIC_COVERS_ALLOW,
+      {
+        mod: MOSAIC_SOURCE,
+        title: "Nobel books",
+        category: "show",
+        host: "https://covers.openlibrary.org",
+        allowed: false,
+      },
+    ]);
   });
 
   it("keeps the last of duplicated decisions", function keepsLastDuplicate(): void {
@@ -203,7 +284,7 @@ describe("removeSiteDecision", function describeRemoveSiteDecision(): void {
   });
 });
 
-describe("removeModSiteDecisions", function describeRemoveModSiteDecisions(): void {
+describe("removeDeclaredSiteDecisions", function describeRemoveDeclaredSiteDecisions(): void {
   it("removes every decision of the mod and keeps the others", function removesModDecisions(): void {
     const storage = buildStoredStorage([
       COVERS_ALLOW,
@@ -212,7 +293,10 @@ describe("removeModSiteDecisions", function describeRemoveModSiteDecisions(): vo
     ]);
     const store = createSiteDecisions({ storage });
 
-    removeModSiteDecisions(store, COVERS_ALLOW.mod);
+    removeDeclaredSiteDecisions(store, {
+      subject: "mod",
+      source: COVERS_ALLOW.mod,
+    });
 
     expect(readSiteDecisionsSnapshot(store)).toEqual([ATLAS_ALLOW]);
     expect(readStoredDecisions(storage)).toEqual([ATLAS_ALLOW]);
@@ -225,7 +309,10 @@ describe("removeModSiteDecisions", function describeRemoveModSiteDecisions(): vo
     const listener = vi.fn<() => void>();
     subscribeSiteDecisions(store, listener);
 
-    removeModSiteDecisions(store, COVERS_ALLOW.mod);
+    removeDeclaredSiteDecisions(store, {
+      subject: "mod",
+      source: COVERS_ALLOW.mod,
+    });
 
     expect(setItemSpy).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledOnce();
@@ -236,9 +323,36 @@ describe("removeModSiteDecisions", function describeRemoveModSiteDecisions(): vo
     storage.setItem = createFullStorage().setItem;
     const store = createSiteDecisions({ storage });
 
-    removeModSiteDecisions(store, COVERS_ALLOW.mod);
+    removeDeclaredSiteDecisions(store, {
+      subject: "mod",
+      source: COVERS_ALLOW.mod,
+    });
 
     expect(readSiteDecisionsSnapshot(store)).toEqual([ATLAS_ALLOW]);
+  });
+});
+
+describe("removing mosaic decisions", function describeRemoveMosaicDecisions(): void {
+  it("removes one mosaic decision and keeps the mod's", function removesMosaicDecision(): void {
+    const storage = buildStoredStorage([MOSAIC_COVERS_ALLOW, COVERS_ALLOW]);
+    const store = createSiteDecisions({ storage });
+
+    removeSiteDecision(store, MOSAIC_COVERS_ALLOW);
+
+    expect(readSiteDecisionsSnapshot(store)).toEqual([COVERS_ALLOW]);
+  });
+
+  it("removes every decision of a mosaic and keeps the mods'", function removesAllMosaicDecisions(): void {
+    const storage = buildStoredStorage([MOSAIC_COVERS_ALLOW, COVERS_ALLOW]);
+    const store = createSiteDecisions({ storage });
+
+    removeDeclaredSiteDecisions(store, {
+      subject: "mosaic",
+      source: MOSAIC_SOURCE,
+    });
+
+    expect(readSiteDecisionsSnapshot(store)).toEqual([COVERS_ALLOW]);
+    expect(readStoredDecisions(storage)).toEqual([COVERS_ALLOW]);
   });
 });
 

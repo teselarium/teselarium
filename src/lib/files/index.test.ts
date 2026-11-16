@@ -14,6 +14,8 @@ describe("files module", function describeFilesModule(): void {
       "listYamlStrings",
       "parseMarkdown",
       "parseYaml",
+      "readDocumentBaseUrl",
+      "resolveFileReference",
       "resolveLocation",
     ]);
   });

@@ -11,6 +11,8 @@ import type { MemorySiteDecisions } from "../../../test/memory_site_decisions.ts
 import { createMemoryStorage } from "../../../test/memory_storage.ts";
 import { APP_BASE_URL, FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
+  ALIASED_MOSAIC_REFERENCE,
+  ALIASED_MOSAIC_SOURCE,
   APP_ORIGIN,
   buildProbeDecision,
   buildSampleCoversDecision,
@@ -19,6 +21,8 @@ import {
   FOUR_BOOKS_SOURCE,
   MISSING_MOD_REFERENCE,
   MISSING_MOD_SOURCE,
+  NAMED_BOOK_SOURCE,
+  NAMED_BOOKS_SOURCE,
   NO_API_BOOK_MOD_SOURCE,
   NO_COUNTRY_TILE_SOURCE,
   OTHER_API_RANGE,
@@ -30,6 +34,7 @@ import {
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
+  serveAliasedMosaic,
   serveCoverBook,
   serveFourBooks,
   serveNoApiBookMod,
@@ -42,6 +47,7 @@ import {
 import {
   buildTypeText,
   fetchTestFile,
+  readRequestedUrl,
   testTexts,
 } from "../../../test/test_files.ts";
 import {
@@ -259,6 +265,25 @@ function buildTileSandbox(mod: string, tile: string): StageSandbox {
     link: { mod, collection: null, tile, params: {} },
   };
   return sandbox;
+}
+
+function buildMosaicSandbox(mosaic: string): StageSandbox {
+  const sandbox: StageSandbox = {
+    ...buildSandbox("", null),
+    link: { mod: "", collection: null, tile: null, mosaic, params: {} },
+  };
+  return sandbox;
+}
+
+/** Counts the requests of a spied fetch whose URL is `url`. */
+function countRequests(testFetch: Mock<typeof fetch>, url: string): number {
+  let count = 0;
+  for (const call of testFetch.mock.calls) {
+    if (readRequestedUrl(call[0]) === url) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 /** Launches a sandbox, waits for its launch and attaches a fake frame. */
@@ -590,7 +615,9 @@ describe("Site consent question", function describeSiteConsentQuestion(): void {
 
     expect(runtime.status).toBe("asking");
     expect(runtime.question).toBe("sites");
-    expect(runtime.consentLines).toEqual([PROBE_CONNECT_PERMISSION]);
+    expect(runtime.consentLines).toEqual([
+      { ...PROBE_CONNECT_PERMISSION, subject: "mod" },
+    ]);
     expect(runtime.launch).toBeNull();
     expect(runtime.pending?.mod.source).toBe(PROBE_MOD_SOURCE);
     expect(spied.onChange).toHaveBeenCalledOnce();
@@ -609,7 +636,9 @@ describe("Site consent question", function describeSiteConsentQuestion(): void {
 
     expect(runtime.status).toBe("asking");
     expect(runtime.question).toBe("sites");
-    expect(runtime.consentLines).toEqual([SAMPLE_COVERS_PERMISSION]);
+    expect(runtime.consentLines).toEqual([
+      { ...SAMPLE_COVERS_PERMISSION, subject: "mod" },
+    ]);
   });
 
   it("Cancelled for another API", async function cancelsBeforeSites(): Promise<void> {
@@ -1028,6 +1057,78 @@ describe("stopSandbox", function describeStopSandbox(): void {
 
     expect(runtime.status).toBe("stopped");
     expect(readIssues(runtime)).toEqual([]);
+  });
+});
+
+describe("Mosaic sandboxes", function describeMosaicSandboxes(): void {
+  it("keeps the mosaic, then its mod and its collection", async function keepsMosaic(): Promise<void> {
+    serveAliasedMosaic();
+    const spied = buildServices();
+
+    const runtime = launchSandbox(
+      buildMosaicSandbox(ALIASED_MOSAIC_REFERENCE),
+      spied.services,
+    );
+
+    expect(runtime.mosaicSource).toBe(ALIASED_MOSAIC_SOURCE);
+    expect(runtime.modReference).toBe("");
+    expect(runtime.tilesLocation).toBeNull();
+    await runtime.settled;
+    expect(runtime.status).toBe("running");
+    expect(runtime.loadedMosaic?.source).toBe(ALIASED_MOSAIC_SOURCE);
+    expect(runtime.modReference).toBe(SAMPLE_MOD_SOURCE);
+    expect(runtime.tilesLocation).toBe(NAMED_BOOKS_SOURCE);
+    expect(runtime.launch?.context.mosaic?.source).toBe(ALIASED_MOSAIC_SOURCE);
+  });
+
+  it("names the mosaic file of a missing mosaic", async function failsMissingMosaic(): Promise<void> {
+    const spied = buildServices();
+    const missingSource = `${FIXTURES_BASE_URL}mosaics/missing/mosaic.yaml`;
+
+    const runtime = launchSandbox(
+      buildMosaicSandbox("./fixtures/mosaics/missing"),
+      spied.services,
+    );
+    await runtime.settled;
+
+    expect(runtime.status).toBe("failed");
+    expect(runtime.loadedMosaic).toBeNull();
+    expect(runtime.loadedMod).toBeNull();
+    expect(runtime.errorMessage).toContain(missingSource);
+    expect(readSandboxMessages(runtime)[0]).toMatchObject({
+      level: "error",
+      source: missingSource,
+    });
+  });
+
+  it("Reloaded tiles keep their aliases", async function reloadsAliasedTiles(): Promise<void> {
+    serveAliasedMosaic();
+    const spied = buildServices();
+    const testFetch = vi.fn<typeof fetch>(fetchTestFile);
+    spied.services.fetchOptions = { baseUrl: APP_BASE_URL, fetch: testFetch };
+    const { runtime, received } = await startSandbox(
+      buildMosaicSandbox(ALIASED_MOSAIC_REFERENCE),
+      spied,
+    );
+    testTexts.set(
+      NAMED_BOOK_SOURCE,
+      (testTexts.get(NAMED_BOOK_SOURCE) ?? "").replace("Kallocain", "Changed"),
+    );
+
+    await reloadSandboxTiles(runtime, spied.services);
+    await waitForMessages();
+
+    expect(received).toHaveLength(1);
+    const params = (
+      received[0] as {
+        params: { tiles: { metadata: Record<string, unknown> }[] };
+      }
+    ).params;
+    expect(params.tiles).toHaveLength(1);
+    expect(params.tiles[0].metadata.title).toBe("Changed");
+    expect(params.tiles[0].metadata.country).toBe("Sweden");
+    expect(params.tiles[0].metadata).not.toHaveProperty("name");
+    expect(countRequests(testFetch, ALIASED_MOSAIC_SOURCE)).toBe(1);
   });
 });
 

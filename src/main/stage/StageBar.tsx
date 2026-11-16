@@ -83,34 +83,71 @@ function hasModFrame(sandbox: SandboxSnapshot): boolean {
   return sandbox.status === "running" && sandbox.sandboxDocument !== null;
 }
 
+function isSandboxLoading(sandbox: SandboxSnapshot): boolean {
+  return sandbox.status === "loading" || sandbox.status === "asking";
+}
+
 /**
  * The mod's name and version once its mod file is loaded, even when the
- * sandbox failed later. Before that, "Loading mod…", or "Mod not loaded"
- * when it failed or stopped first.
+ * sandbox failed later, in muted text after a mosaic's title. Before that,
+ * "Loading mod…", or "Mod not loaded" when it failed or stopped first.
  */
-function renderModName(sandbox: SandboxSnapshot): ReactElement {
+function renderModName(
+  sandbox: SandboxSnapshot,
+  isAfterMosaic: boolean,
+): ReactElement {
   if (sandbox.mod !== null) {
+    const title = isAfterMosaic ? (
+      <span className="truncate text-muted-foreground">
+        {sandbox.mod.title}
+      </span>
+    ) : (
+      <strong className="truncate font-semibold">{sandbox.mod.title}</strong>
+    );
     return (
       <>
-        <strong className="truncate font-semibold">{sandbox.mod.title}</strong>
+        {title}
         <Badge variant="outline" className="tabular-nums">
           {sandbox.mod.version}
         </Badge>
       </>
     );
   }
-  const isLoading = sandbox.status === "loading" || sandbox.status === "asking";
   return (
     <span className="truncate text-muted-foreground">
-      {isLoading ? "Loading mod…" : "Mod not loaded"}
+      {isSandboxLoading(sandbox) ? "Loading mod…" : "Mod not loaded"}
     </span>
   );
 }
 
 /**
+ * For a mosaic link, the mosaic's title before the mod's name once the
+ * mosaic file is loaded. Before that, "Loading mosaic…", or "Mosaic not
+ * loaded" when it failed or stopped first. For a mod link, the mod's name.
+ */
+function renderSandboxName(sandbox: SandboxSnapshot): ReactElement {
+  if (sandbox.mosaicReference === null) {
+    return renderModName(sandbox, false);
+  }
+  if (sandbox.mosaic === null) {
+    return (
+      <span className="truncate text-muted-foreground">
+        {isSandboxLoading(sandbox) ? "Loading mosaic…" : "Mosaic not loaded"}
+      </span>
+    );
+  }
+  return (
+    <>
+      <strong className="truncate font-semibold">{sandbox.mosaic.title}</strong>
+      {renderModName(sandbox, true)}
+    </>
+  );
+}
+
+/**
  * The visible sandbox's bar, in one row above its frame. On the left: the
- * mod's name and version, the information button, the Share button and
- * "Reload tiles". On the right: the errors, warnings and notifications
+ * mosaic's title for a mosaic, the mod's name and version, the information
+ * button, the Share button and "Reload tiles". On the right: the errors, warnings and notifications
  * buttons, a separator, the theater mode toggle, the fullscreen button while
  * the mod runs in its frame, then, when the sandbox has a close button, a
  * separator and the close button (×). Each button opens its
@@ -248,7 +285,7 @@ export function StageBar({
       aria-label="Stage bar"
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        {renderModName(sandbox)}
+        {renderSandboxName(sandbox)}
         <Popover
           open={isPanelOpen("mod-info")}
           onOpenChange={handlePanelOpenChange.bind(undefined, "mod-info")}

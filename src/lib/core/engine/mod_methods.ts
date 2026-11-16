@@ -1,4 +1,5 @@
-import type { YamlMapping } from "../../files/index.ts";
+import { isYamlMapping } from "../../files/index.ts";
+import type { YamlMapping, YamlValue } from "../../files/index.ts";
 import type { LoadedMod, ModLoadOptions } from "../../mod/index.ts";
 import type { IssueLevel } from "../../tile/index.ts";
 import type { ModGrants, SiteDecision } from "../permissions/index.ts";
@@ -7,6 +8,7 @@ import type { AppAction } from "./app_actions.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
+import { RUN_LINK_RESERVED_NAMES } from "./mod_launch.ts";
 import type { RunLink } from "./mod_launch.ts";
 import type { TileBodies } from "./mod_tile_bodies.ts";
 import { INVALID_PARAMS, PERMISSION_DENIED } from "./mod_messages.ts";
@@ -100,6 +102,46 @@ export function readRequiredText(
     throwInvalidParams(method, `"${fieldName}" must be a non-empty string`);
   }
   return value;
+}
+
+/**
+ * Reads the optional `params` of a request that opens a link (`mods.open`,
+ * `mosaics.open`): a mapping of strings without the reserved link names.
+ * Raises `INVALID_PARAMS` naming `method`.
+ */
+export function readOpenLinkParams(
+  params: YamlMapping,
+  method: string,
+): Record<string, string> {
+  const linkParams: Record<string, string> = {};
+  if (params.params === undefined) {
+    return linkParams;
+  }
+  if (!isYamlMapping(params.params)) {
+    throwInvalidParams(method, '"params" must be a mapping');
+  }
+  for (const [name, value] of Object.entries(params.params)) {
+    if (RUN_LINK_RESERVED_NAMES.includes(name)) {
+      throwInvalidParams(method, `"params.${name}" is reserved`);
+    }
+    if (typeof value !== "string") {
+      throwInvalidParams(method, `"params.${name}" must be a string`);
+    }
+    linkParams[name] = value;
+  }
+  return linkParams;
+}
+
+/** Reads the optional `replace` of a request that opens a link, `false` when absent. Raises `INVALID_PARAMS` naming `method`. */
+export function readOpenReplace(params: YamlMapping, method: string): boolean {
+  const replace: YamlValue | undefined = params.replace;
+  if (replace === undefined) {
+    return false;
+  }
+  if (typeof replace !== "boolean") {
+    throwInvalidParams(method, '"replace" must be a boolean');
+  }
+  return replace;
 }
 
 /**

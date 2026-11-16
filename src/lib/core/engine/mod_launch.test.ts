@@ -6,6 +6,8 @@ import {
   FIXTURES_REFERENCE,
 } from "../../../test/sample_files.ts";
 import {
+  ALIASED_MOSAIC_REFERENCE,
+  ALIASED_MOSAIC_SOURCE,
   APP_ORIGIN,
   buildSampleCoversDecision,
   COVER_BOOK_COLLECTION_SOURCE,
@@ -13,6 +15,8 @@ import {
   COVER_BOOK_TILE_SOURCE,
   FOUR_BOOKS_SOURCE,
   MISSING_MOD_REFERENCE,
+  NAMED_BOOK_SOURCE,
+  NAMED_BOOKS_SOURCE,
   NO_COUNTRY_TILE_SOURCE,
   OTHER_API_MOD_SOURCE,
   OTHER_APP_ORIGIN,
@@ -21,6 +25,11 @@ import {
   SAMPLE_COVERS_PERMISSION,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
+  SAMPLE_MOSAIC_REFERENCE,
+  SAMPLE_MOSAIC_SOURCE,
+  serveAliasedMosaic,
+  serveNamedBooks,
+  serveTestMosaic,
   SAMPLE_TILE_SOURCES,
   SAMPLE_TYPE_SOURCE,
   serveCoverBook,
@@ -44,6 +53,7 @@ import {
   YamlParseError,
 } from "../../files/index.ts";
 import { ModFormatError } from "../../mod/index.ts";
+import { MosaicFormatError } from "../../mosaic/index.ts";
 import {
   buildTileValidator,
   CollectionFormatError,
@@ -53,7 +63,11 @@ import {
 import type { Tile } from "../../tile/index.ts";
 import { grantModPermissions } from "../permissions/index.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
-import { ModSwitchedOffError, RunLinkConflictError } from "./engine_errors.ts";
+import {
+  ModSwitchedOffError,
+  MosaicLinkConflictError,
+  RunLinkConflictError,
+} from "./engine_errors.ts";
 import { MOD_API_VERSION } from "./mod_api_version.ts";
 import {
   buildSandboxDocument,
@@ -496,6 +510,354 @@ describe("Links with a tile", function describeTileLinks(): void {
   });
 });
 
+/** A link to a mosaic, as the stage reads `#/run?mosaic=…`. */
+function buildMosaicLink(mosaic: string): RunLink {
+  const link: RunLink = {
+    mod: "",
+    collection: null,
+    tile: null,
+    mosaic,
+    params: { from: "x" },
+  };
+  return link;
+}
+
+describe("Mosaic links", function describeMosaicLinks(): void {
+  it("loads the mosaic, then its mod and its collection", async function loadsMosaicInputs(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const inputs = await loadInputs(
+      buildMosaicLink(SAMPLE_MOSAIC_REFERENCE),
+      testFetch,
+    );
+
+    expect(inputs.mosaic?.source).toBe(SAMPLE_MOSAIC_SOURCE);
+    expect(inputs.mod.source).toBe(SAMPLE_MOD_SOURCE);
+    expect(inputs.link).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      collection: SAMPLE_COLLECTION_SOURCE,
+      tile: null,
+      params: { from: "x" },
+    });
+    expect(readModTiles(inputs).tilesSource).toBe(SAMPLE_COLLECTION_SOURCE);
+    expect(listRequestedUrls(testFetch)[0]).toBe(SAMPLE_MOSAIC_SOURCE);
+  });
+
+  it("gives no mosaic for a mod link", async function loadsWithoutMosaic(): Promise<void> {
+    const inputs = await loadInputs(SAMPLE_LINK);
+
+    expect(inputs.mosaic).toBeNull();
+  });
+
+  it("Mosaic and mod", async function refusesMosaicWithMod(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const launching = loadInputs(
+      { ...buildMosaicLink(SAMPLE_MOSAIC_REFERENCE), mod: "mod_viewer" },
+      testFetch,
+    );
+
+    await expect(launching).rejects.toThrow(MosaicLinkConflictError);
+    await expect(launching).rejects.toThrow(
+      "A link to a mosaic cannot also have a mod, a collection or a tile.",
+    );
+    await expect(launching).rejects.toHaveProperty(
+      "source",
+      SAMPLE_MOSAIC_SOURCE,
+    );
+    expect(testFetch).not.toHaveBeenCalled();
+  });
+
+  it("Mosaic and collection", async function refusesMosaicWithCollection(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const withCollection = loadInputs(
+      {
+        ...buildMosaicLink(SAMPLE_MOSAIC_REFERENCE),
+        collection: SAMPLE_COLLECTION_REFERENCE,
+      },
+      testFetch,
+    );
+    const withTile = loadInputs(
+      { ...buildMosaicLink(SAMPLE_MOSAIC_REFERENCE), tile: "./a.md" },
+      testFetch,
+    );
+
+    await expect(withCollection).rejects.toThrow(MosaicLinkConflictError);
+    await expect(withTile).rejects.toThrow(MosaicLinkConflictError);
+    expect(testFetch).not.toHaveBeenCalled();
+  });
+
+  it("Missing mosaic file", async function failsMissingMosaic(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const launching = loadInputs(
+      buildMosaicLink(`${FIXTURES_REFERENCE}mosaics/missing`),
+      testFetch,
+    );
+
+    await expect(launching).rejects.toThrow(FileFetchError);
+    await expect(launching).rejects.toHaveProperty(
+      "source",
+      `${FIXTURES_BASE_URL}mosaics/missing/mosaic.yaml`,
+    );
+    await expect(launching).rejects.toThrow("404");
+    expect(listRequestedUrls(testFetch)).toEqual([
+      `${FIXTURES_BASE_URL}mosaics/missing/mosaic.yaml`,
+    ]);
+  });
+
+  it("Mosaic without a title", async function failsUntitledMosaic(): Promise<void> {
+    const testFetch = createTestFetch();
+    serveTestMosaic(ALIASED_MOSAIC_SOURCE, ['mod: "../../mods/book_list"']);
+
+    const launching = loadInputs(
+      buildMosaicLink(ALIASED_MOSAIC_REFERENCE),
+      testFetch,
+    );
+
+    await expect(launching).rejects.toThrow(MosaicFormatError);
+    await expect(launching).rejects.toThrow(
+      '"title" must be a non-empty string',
+    );
+    await expect(launching).rejects.toHaveProperty(
+      "source",
+      ALIASED_MOSAIC_SOURCE,
+    );
+    expect(listRequestedUrls(testFetch)).toEqual([ALIASED_MOSAIC_SOURCE]);
+  });
+
+  it("Mosaic of a switched-off mod", async function refusesSwitchedOffMod(): Promise<void> {
+    const testFetch = createTestFetch();
+    serveTestMosaic(ALIASED_MOSAIC_SOURCE, [
+      'title: "Viewer"',
+      'mod: "book_list"',
+    ]);
+    const defaults = resolveDefaultModSettings(
+      { folder: `${FIXTURES_REFERENCE}mods/`, switchedOff: ["book_list"] },
+      APP_BASE_URL,
+    );
+
+    const launching = loadModLaunchInputs(
+      { link: buildMosaicLink(ALIASED_MOSAIC_REFERENCE), defaults },
+      { baseUrl: APP_BASE_URL, fetch: testFetch },
+    );
+
+    await expect(launching).rejects.toThrow(ModSwitchedOffError);
+    expect(listRequestedUrls(testFetch)).toEqual([ALIASED_MOSAIC_SOURCE]);
+  });
+
+  it("Mod not opened from a mosaic", async function givesNullMosaic(): Promise<void> {
+    const launch = await launchMod(SAMPLE_LINK);
+
+    expect(launch.context.mosaic).toBeNull();
+    expect(launch.mosaic).toBeNull();
+  });
+
+  it("Mod opened from a mosaic", async function givesLaunchMosaic(): Promise<void> {
+    const launch = await launchMod(buildMosaicLink(SAMPLE_MOSAIC_REFERENCE));
+
+    expect(launch.context.mosaic).toEqual({
+      source: SAMPLE_MOSAIC_SOURCE,
+      title: "Books on the shelf",
+      description: "The fixture books, without covers.",
+    });
+    expect(launch.context.mod.source).toBe(SAMPLE_MOD_SOURCE);
+    expect(launch.context.params).toEqual({ from: "x" });
+    expect(launch.context.tiles).toHaveLength(3);
+  });
+
+  it("merges the mosaic's config into the mod's", async function mergesConfig(): Promise<void> {
+    const launch = await launchMod(buildMosaicLink(SAMPLE_MOSAIC_REFERENCE));
+
+    expect(launch.context.config).toEqual({ show_covers: false });
+    expect(launch.mod.config).toEqual({ show_covers: true });
+  });
+
+  it("validates the tiles after the aliases", async function validatesAliasedTiles(): Promise<void> {
+    serveAliasedMosaic();
+
+    const launch = await launchMod(buildMosaicLink(ALIASED_MOSAIC_REFERENCE));
+
+    expect(launch.context.tiles).toHaveLength(1);
+    expect(launch.context.tiles[0].types).toEqual(["book"]);
+    expect(launch.context.tiles[0].source).toBe(NAMED_BOOK_SOURCE);
+    expect(launch.context.tiles[0].metadata.title).toBe("Kallocain");
+    expect(launch.context.tiles[0].metadata.country).toBe("Sweden");
+    expect(launch.context.tiles[0].metadata).not.toHaveProperty("name");
+    expect(launch.context.issues).toEqual([]);
+  });
+
+  it("leaves the same tiles out without the mosaic", async function leavesOutUnaliasedTiles(): Promise<void> {
+    serveNamedBooks();
+
+    const launch = await launchMod({
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: NAMED_BOOKS_SOURCE,
+      params: {},
+    });
+
+    expect(launch.context.tiles).toEqual([]);
+    expect(launch.context.issues).toHaveLength(1);
+  });
+
+  it("Mosaic from another host", async function addsMosaicContentHost(): Promise<void> {
+    const foreignMosaicSource = "https://mosaics.example.net/maps/mosaic.yaml";
+    serveTestMosaic(foreignMosaicSource, [
+      'title: "Books"',
+      `mod: "${SAMPLE_MOD_SOURCE}"`,
+    ]);
+
+    const launch = await launchMod(
+      buildMosaicLink("https://mosaics.example.net/maps/"),
+    );
+
+    expect(launch.contentHosts).toContain("https://mosaics.example.net");
+    expect(readDirective(launch.policy, "img-src")).toContain(
+      "https://mosaics.example.net",
+    );
+  });
+});
+
+const PERMISSIONS_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mosaics/covers/mosaic.yaml`;
+const FOREIGN_PERMISSIONS_MOSAIC_SOURCE =
+  "https://mosaics.example.net/covers/mosaic.yaml";
+const ARCHIVE_LINE = {
+  category: "show",
+  host: "https://*.archive.org",
+  reason: "Shows the covers",
+} as const;
+const OPEN_LIBRARY_LINE = {
+  category: "show",
+  host: "https://covers.openlibrary.org",
+  reason: "Shows the book covers",
+} as const;
+
+/** Serves a mosaic of the untyped mod at `source` that declares `line`. */
+function serveUntypedMosaic(
+  source: string,
+  line: { host: string; reason: string },
+): void {
+  serveUntypedMod();
+  serveTestMosaic(source, [
+    'title: "Covers"',
+    `mod: "${UNTYPED_MOD_SOURCE}"`,
+    "permissions:",
+    "  show:",
+    `    - host: "${line.host}"`,
+    `      reason: "${line.reason}"`,
+  ]);
+}
+
+describe("Permissions of a mosaic", function describeMosaicPermissions(): void {
+  it("Covers declared by a mosaic from the app's origin", async function grantsAppOriginMosaic(): Promise<void> {
+    serveUntypedMosaic(PERMISSIONS_MOSAIC_SOURCE, ARCHIVE_LINE);
+
+    const launch = await launchMod(buildMosaicLink(PERMISSIONS_MOSAIC_SOURCE));
+
+    expect(launch.context.permissions).toEqual({
+      granted: [ARCHIVE_LINE],
+      denied: [],
+    });
+    expect(readDirective(launch.policy, "img-src")).toContain(
+      "https://*.archive.org",
+    );
+    expect(launch.issues).toEqual([]);
+  });
+
+  it("lists the mod's lines, then the mosaic's", async function joinsModAndMosaicLines(): Promise<void> {
+    serveTestMosaic(PERMISSIONS_MOSAIC_SOURCE, [
+      'title: "Covers"',
+      `mod: "${SAMPLE_MOD_SOURCE}"`,
+      "permissions:",
+      "  show:",
+      `    - host: "${ARCHIVE_LINE.host}"`,
+      `      reason: "${ARCHIVE_LINE.reason}"`,
+    ]);
+
+    const launch = await launchMod(buildMosaicLink(PERMISSIONS_MOSAIC_SOURCE));
+
+    expect(launch.context.permissions.granted).toEqual([
+      SAMPLE_COVERS_PERMISSION,
+      ARCHIVE_LINE,
+    ]);
+  });
+
+  it("Refused line of a foreign mosaic", async function deniesForeignMosaicLine(): Promise<void> {
+    serveUntypedMosaic(FOREIGN_PERMISSIONS_MOSAIC_SOURCE, OPEN_LIBRARY_LINE);
+
+    const launch = await launchMod(
+      buildMosaicLink(FOREIGN_PERMISSIONS_MOSAIC_SOURCE),
+    );
+
+    expect(launch.context.permissions).toEqual({
+      granted: [],
+      denied: [OPEN_LIBRARY_LINE],
+    });
+    expect(readDirective(launch.policy, "img-src")).not.toContain(
+      OPEN_LIBRARY_LINE.host,
+    );
+  });
+
+  it("Refused cover host", async function reportsRefusedMosaicLine(): Promise<void> {
+    serveUntypedMosaic(FOREIGN_PERMISSIONS_MOSAIC_SOURCE, OPEN_LIBRARY_LINE);
+
+    const launch = await launchMod(
+      buildMosaicLink(FOREIGN_PERMISSIONS_MOSAIC_SOURCE),
+    );
+
+    expect(launch.issues).toHaveLength(1);
+    expect(launch.issues[0].level).toBe("warning");
+    expect(launch.issues[0].source).toBe(FOREIGN_PERMISSIONS_MOSAIC_SOURCE);
+    expect(launch.issues[0].message).toContain(OPEN_LIBRARY_LINE.host);
+    expect(launch.issues[0].message).toContain(OPEN_LIBRARY_LINE.reason);
+    expect(launch.issues[0].message).toContain(
+      FOREIGN_PERMISSIONS_MOSAIC_SOURCE,
+    );
+    expect(launch.issues[0].message).toContain(
+      "Mosaics from other sites get only the permissions you allow.",
+    );
+  });
+
+  it("grants a foreign mosaic's line the user allowed for that mosaic", async function grantsAllowedMosaicLine(): Promise<void> {
+    serveUntypedMosaic(FOREIGN_PERMISSIONS_MOSAIC_SOURCE, OPEN_LIBRARY_LINE);
+
+    const launch = await launchTestMod(
+      buildMosaicLink(FOREIGN_PERMISSIONS_MOSAIC_SOURCE),
+      {
+        decisions: [
+          {
+            mosaic: FOREIGN_PERMISSIONS_MOSAIC_SOURCE,
+            title: "Covers",
+            category: "show",
+            host: OPEN_LIBRARY_LINE.host,
+            allowed: true,
+          },
+        ],
+      },
+    );
+
+    expect(launch.context.permissions.granted).toEqual([OPEN_LIBRARY_LINE]);
+    expect(launch.issues).toEqual([]);
+  });
+
+  it("Same mod without the mosaic", async function keepsGrantsToMosaicSandbox(): Promise<void> {
+    serveUntypedMosaic(PERMISSIONS_MOSAIC_SOURCE, ARCHIVE_LINE);
+    await launchMod(buildMosaicLink(PERMISSIONS_MOSAIC_SOURCE));
+
+    const modLaunch = await launchMod({
+      mod: UNTYPED_MOD_SOURCE,
+      collection: null,
+      params: {},
+    });
+
+    expect(modLaunch.context.permissions).toEqual({ granted: [], denied: [] });
+    expect(readDirective(modLaunch.policy, "img-src")).not.toContain(
+      "archive.org",
+    );
+  });
+});
+
 describe("loadModTile", function describeLoadModTile(): void {
   it("gives the same tile as the launch when called again", async function reloadsTile(): Promise<void> {
     serveUntypedMod();
@@ -836,6 +1198,7 @@ describe("Media linked by tiles", function describeTileLinkedMedia(): void {
       "config",
       "issues",
       "mod",
+      "mosaic",
       "params",
       "permissions",
       "tiles",

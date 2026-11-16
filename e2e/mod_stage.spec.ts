@@ -28,9 +28,15 @@ import {
   waitForProbe,
 } from "./mod_routes.ts";
 import {
+  buildLabelsCollection,
+  buildLabelsMosaicFiles,
   buildNoteCollection,
   buildNoteTile,
+  buildTilesModFiles,
   buildTypedProbeFiles,
+  LABELS_COLLECTION_FILE,
+  LABELS_MOSAIC_HASH,
+  LABELS_MOSAIC_PATH,
   MISSING_TEST_MOD_FILE_PATH,
   MISSING_TEST_MOD_REFERENCE,
   openProbe,
@@ -206,6 +212,61 @@ test.describe("A link has a collection or a tile", function describeConflict(): 
     for (const url of requestedUrls) {
       expect(url).not.toContain("item_collection.yaml");
       expect(url).not.toContain("second.md");
+    }
+  });
+});
+
+test.describe("Open a mosaic from a run link", function describeMosaicLinks(): void {
+  test("Mosaic of the tiles mod", async function opensMosaic({
+    page,
+  }): Promise<void> {
+    await serveTilesMod(page, buildLabelsMosaicFiles());
+
+    await page.goto(`/${LABELS_MOSAIC_HASH}&from=x`);
+
+    const frame = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
+    await expect(frame.getByRole("listitem")).toHaveText(["First label"]);
+    const address = new URL(page.url());
+    expect(address.hash).toBe(`${LABELS_MOSAIC_HASH}&from=x`);
+  });
+});
+
+test.describe("A mosaic link has no mod, collection or tile", function describeMosaicConflict(): void {
+  test("Mosaic and mod", async function refusesMosaicWithMod({
+    page,
+  }): Promise<void> {
+    const requestedUrls = collectRequestedUrls(page);
+    await serveTilesMod(page, buildLabelsMosaicFiles());
+
+    await page.goto(`/${LABELS_MOSAIC_HASH}&mod=mod_viewer`);
+
+    await expect(page.getByRole("alert")).toContainText(
+      "A link to a mosaic cannot also have a mod, a collection or a tile.",
+    );
+    await expect(page.locator("iframe")).toHaveCount(0);
+    for (const url of requestedUrls) {
+      expect(url).not.toContain("labels.yaml");
+      expect(url).not.toContain("mod_viewer");
+    }
+  });
+
+  test("Mosaic and collection", async function refusesMosaicWithCollection({
+    page,
+  }): Promise<void> {
+    const requestedUrls = collectRequestedUrls(page);
+    await serveTilesMod(page, buildLabelsMosaicFiles());
+
+    await page.goto(
+      `/${LABELS_MOSAIC_HASH}&collection=./test-mods/tiles/item_collection.yaml`,
+    );
+
+    await expect(page.getByRole("alert")).toContainText(
+      "A link to a mosaic cannot also have a mod, a collection or a tile.",
+    );
+    await expect(page.locator("iframe")).toHaveCount(0);
+    for (const url of requestedUrls) {
+      expect(url).not.toContain("labels.yaml");
+      expect(url).not.toContain("item_collection.yaml");
     }
   });
 });
@@ -514,6 +575,40 @@ test.describe("Show load failures", function describeLoadFailures(): void {
     await expect(page.getByRole("alert")).toContainText("404");
     await expect(page.locator("iframe")).toHaveCount(0);
   });
+
+  test("Missing mosaic file", async function showsMissingMosaic({
+    page,
+  }): Promise<void> {
+    const requestedUrls = collectRequestedUrls(page);
+    await serveTilesMod(page);
+    await page.goto(`/${LABELS_MOSAIC_HASH}`);
+    const mosaicSource = new URL(LABELS_MOSAIC_PATH, page.url()).href;
+
+    await expect(page.getByRole("alert")).toContainText(mosaicSource);
+    await expect(page.getByRole("alert")).toContainText("404");
+    await expect(page.locator("iframe")).toHaveCount(0);
+    const errors = await readMessages(page, "Errors");
+    expect(errors[0].source).toBe(mosaicSource);
+    for (const url of requestedUrls) {
+      expect(url).not.toContain("mod_conf.yaml");
+    }
+  });
+
+  test("Mosaic without a title", async function showsUntitledMosaic({
+    page,
+  }): Promise<void> {
+    const files = buildLabelsMosaicFiles();
+    files["mosaics/labels.yaml"] = 'mosaic:\n  mod: "../tiles/"\n';
+    await serveTilesMod(page, files);
+    await page.goto(`/${LABELS_MOSAIC_HASH}`);
+    const mosaicSource = new URL(LABELS_MOSAIC_PATH, page.url()).href;
+
+    await expect(page.getByRole("alert")).toContainText(mosaicSource);
+    await expect(page.getByRole("alert")).toContainText(
+      '"title" must be a non-empty string',
+    );
+    await expect(page.locator("iframe")).toHaveCount(0);
+  });
 });
 
 interface ChangedTilesGlobal {
@@ -541,6 +636,17 @@ function recordChangedTiles(): void {
   probeGlobal.probe.engine.on("tiles.changed", recordTitles);
 }
 
+/** How many of the URLs a route saw are the labels mosaic's file. */
+function countMosaicRequests(seenUrls: string[]): number {
+  let count = 0;
+  for (const url of seenUrls) {
+    if (url.endsWith(LABELS_MOSAIC_PATH)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 /** Runs in a probe frame: the tile titles `recordChangedTiles` recorded. */
 function readChangedTitles(): string[][] {
   return (globalThis as unknown as ChangedTilesGlobal).changedTitles ?? [];
@@ -563,6 +669,26 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
       .poll(frame.evaluate.bind(frame, readChangedTitles))
       .toEqual([["First note", "Second note"]]);
     expect(await isFrameMarked(frame)).toBe(true);
+  });
+
+  test("Reloaded mosaic tiles keep their aliases", async function reloadsMosaicTiles({
+    page,
+  }): Promise<void> {
+    const files = { ...buildTilesModFiles(), ...buildLabelsMosaicFiles() };
+    const seenUrls = await serveAppOriginMod(page, files);
+    await page.goto(`/${LABELS_MOSAIC_HASH}`);
+    const frame = await findModFrame(page, TILES_TITLE);
+    await waitForProbe(frame);
+    await frame.evaluate(recordChangedTiles);
+    files[LABELS_COLLECTION_FILE] = buildLabelsCollection(["./second.md"]);
+    const mosaicRequests = countMosaicRequests(seenUrls);
+
+    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+
+    await expect
+      .poll(frame.evaluate.bind(frame, readChangedTitles))
+      .toEqual([["First label", "Second label"]]);
+    expect(countMosaicRequests(seenUrls)).toBe(mosaicRequests);
   });
 
   test("Reload a tile", async function reloadsTile({ page }): Promise<void> {

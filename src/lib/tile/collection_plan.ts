@@ -15,6 +15,7 @@ import type {
   MalformedTileEntry,
   TileEntry,
 } from "./collection_format.ts";
+import { resolveCollectionReference } from "./collection_reference.ts";
 import type { IssueLevel, TileIssue } from "./tile_issues.ts";
 
 export const LOCAL_FILE_PROTOCOL = "file:";
@@ -196,15 +197,19 @@ function planCollectionSlots(
 }
 
 /**
- * Fetches and parses a collection file, then plans its entries, requesting
- * no tile. Raises `FileFetchError`, `YamlParseError` or
+ * Fetches and parses a collection file, named by a collection reference (the
+ * file or its folder), then plans its entries, requesting no tile. Raises `FileFetchError`, `YamlParseError` or
  * `CollectionFormatError` when the collection file itself fails.
  */
 export async function planTileCollection(
   location: string,
   options: FileFetchOptions,
 ): Promise<CollectionPlan> {
-  const collectionFile = await fetchFile(location, options);
+  const collectionSource = resolveCollectionReference(
+    location,
+    options.baseUrl,
+  );
+  const collectionFile = await fetchFile(collectionSource, options);
   const collectionFormat = readCollectionFormat(parseYaml(collectionFile));
   const collectionUrl = new URL(collectionFile.source);
   const collectionPlan: CollectionPlan = {

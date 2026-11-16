@@ -17,6 +17,7 @@ export type {
 export {
   ModMethodError,
   ModSwitchedOffError,
+  MosaicLinkConflictError,
   RunLinkConflictError,
 } from "./engine_errors.ts";
 export {
@@ -40,17 +41,24 @@ export type { ModInspection } from "./mod_inspection.ts";
 export {
   buildModLaunch,
   buildModTestDocument,
+  expandMosaicRequest,
+  grantLaunchMosaic,
   loadLaunchMod,
+  loadLaunchMosaic,
   loadLaunchTiles,
   loadModLaunchInputs,
   loadModTile,
   loadModTiles,
   loadModTilesOfKind,
+  readMosaicAliases,
+  RUN_LINK_RESERVED_NAMES,
   selectModTiles,
 } from "./mod_launch.ts";
 export type {
   FrameLayout,
   LaunchContext,
+  LaunchMosaic,
+  LaunchMosaicGrants,
   ModContext,
   ModLaunch,
   ModLaunchInputs,
@@ -59,6 +67,7 @@ export type {
   RunLink,
   TilesKind,
 } from "./mod_launch.ts";
+export type { MosaicInspection } from "./mosaics_methods.ts";
 export type { ResponseError } from "./mod_messages.ts";
 export type {
   ModCheckRequest,

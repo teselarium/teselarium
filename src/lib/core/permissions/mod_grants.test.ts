@@ -4,12 +4,15 @@ import type { ModPermission } from "../../mod/index.ts";
 import * as permissionsModule from "./index.ts";
 import {
   checkOpenGrant,
+  describeDeniedMosaicPermission,
+  grantMosaicPermissions,
+  joinGrants,
   describeDeniedPermission,
   describePermissionLine,
   grantModPermissions,
   listConsentLines,
 } from "./index.ts";
-import type { ModGrants, SiteDecision } from "./index.ts";
+import type { ConsentLine, ModGrants, SiteDecision } from "./index.ts";
 
 const APP_ORIGIN = "https://example.org";
 const SAMPLE_MOD = {
@@ -154,11 +157,20 @@ describe("grantModPermissions", function describeGrantModPermissions(): void {
   });
 });
 
+/** The consent lines of a mod's permissions: each permission with the subject `mod`. */
+function asModLines(permissions: ModPermission[]): ConsentLine[] {
+  const lines: ConsentLine[] = [];
+  for (const permission of permissions) {
+    lines.push({ ...permission, subject: "mod" });
+  }
+  return lines;
+}
+
 describe("listConsentLines", function describeListConsentLines(): void {
   it("lists every undecided permission of a foreign mod, as declared", function listsUndecided(): void {
     const lines = listConsentLines(FOREIGN_MOD, APP_ORIGIN, []);
 
-    expect(lines).toEqual(FOREIGN_MOD.permissions);
+    expect(lines).toEqual(asModLines(FOREIGN_MOD.permissions));
   });
 
   it("leaves out the permissions with a decision for that mod", function leavesOutDecided(): void {
@@ -170,7 +182,7 @@ describe("listConsentLines", function describeListConsentLines(): void {
 
     const lines = listConsentLines(FOREIGN_MOD, APP_ORIGIN, [decision]);
 
-    expect(lines).toEqual([FOREIGN_MOD.permissions[1]]);
+    expect(lines).toEqual(asModLines([FOREIGN_MOD.permissions[1]]));
   });
 
   it("still lists a permission decided for another mod", function listsOtherModDecision(): void {
@@ -178,7 +190,7 @@ describe("listConsentLines", function describeListConsentLines(): void {
 
     const lines = listConsentLines(FOREIGN_MOD, APP_ORIGIN, [decision]);
 
-    expect(lines).toEqual(FOREIGN_MOD.permissions);
+    expect(lines).toEqual(asModLines(FOREIGN_MOD.permissions));
   });
 
   it("gives one line per category and host, with the first reason", function mergesDuplicates(): void {
@@ -193,13 +205,190 @@ describe("listConsentLines", function describeListConsentLines(): void {
 
     const lines = listConsentLines(mod, APP_ORIGIN, []);
 
-    expect(lines).toEqual([mod.permissions[0], mod.permissions[1]]);
+    expect(lines).toEqual(asModLines([mod.permissions[0], mod.permissions[1]]));
   });
 
   it("lists nothing for a mod from the app's origin", function listsNothingOnAppOrigin(): void {
     const lines = listConsentLines(SAMPLE_MOD, APP_ORIGIN, []);
 
     expect(lines).toEqual([]);
+  });
+});
+
+const APP_MOSAIC = {
+  source: `${APP_ORIGIN}/mosaics/books/mosaic.yaml`,
+  permissions: [
+    {
+      category: "show",
+      host: "https://*.archive.org",
+      reason: "Shows the covers",
+    },
+  ] satisfies ModPermission[],
+};
+const FOREIGN_MOSAIC = {
+  source: "https://mosaics.example.net/maps/mosaic.yaml",
+  permissions: [
+    {
+      category: "show",
+      host: "https://covers.openlibrary.org",
+      reason: "Shows the book covers",
+    },
+  ] satisfies ModPermission[],
+};
+
+function buildMosaicDecision(
+  mosaic: string,
+  host: string,
+  allowed: boolean,
+): SiteDecision {
+  const decision: SiteDecision = {
+    mosaic,
+    title: "Nobel books",
+    category: "show",
+    host,
+    allowed,
+  };
+  return decision;
+}
+
+describe("grantMosaicPermissions", function describeGrantMosaicPermissions(): void {
+  it("Covers declared by a mosaic from the app's origin", function grantsAppOriginMosaic(): void {
+    const grants = grantMosaicPermissions(APP_MOSAIC, APP_ORIGIN, []);
+
+    expect(grants).toEqual(buildGrants(APP_MOSAIC.permissions, []));
+  });
+
+  it("denies the lines of a foreign mosaic without a decision", function deniesForeignMosaic(): void {
+    const grants = grantMosaicPermissions(FOREIGN_MOSAIC, APP_ORIGIN, []);
+
+    expect(grants).toEqual(buildGrants([], FOREIGN_MOSAIC.permissions));
+  });
+
+  it("grants a foreign mosaic's line allowed for that mosaic", function grantsAllowedMosaicLine(): void {
+    const decision = buildMosaicDecision(
+      FOREIGN_MOSAIC.source,
+      "https://covers.openlibrary.org",
+      true,
+    );
+
+    const grants = grantMosaicPermissions(FOREIGN_MOSAIC, APP_ORIGIN, [
+      decision,
+    ]);
+
+    expect(grants).toEqual(buildGrants(FOREIGN_MOSAIC.permissions, []));
+  });
+
+  it("Another mosaic with the same host", function ignoresOtherMosaicDecision(): void {
+    const decision = buildMosaicDecision(
+      "https://mosaics.example.net/other/mosaic.yaml",
+      "https://covers.openlibrary.org",
+      true,
+    );
+
+    const grants = grantMosaicPermissions(FOREIGN_MOSAIC, APP_ORIGIN, [
+      decision,
+    ]);
+
+    expect(grants.granted).toEqual([]);
+  });
+
+  it("ignores a mod's decision with the mosaic's address", function ignoresModDecision(): void {
+    const decision = buildCoversDecision(
+      FOREIGN_MOSAIC.source,
+      "https://covers.openlibrary.org",
+      true,
+    );
+
+    const grants = grantMosaicPermissions(FOREIGN_MOSAIC, APP_ORIGIN, [
+      decision,
+    ]);
+
+    expect(grants.granted).toEqual([]);
+  });
+
+  it("gives no lines without a mosaic", function grantsNothingWithoutMosaic(): void {
+    expect(grantMosaicPermissions(null, APP_ORIGIN, [])).toEqual(
+      buildGrants([], []),
+    );
+  });
+});
+
+describe("grantModPermissions with mosaic decisions", function describeModWithMosaicDecisions(): void {
+  it("Same mod without the mosaic", function ignoresMosaicDecisionForMod(): void {
+    const decision = buildMosaicDecision(FOREIGN_MOD.source, COVERS_HOST, true);
+
+    const grants = grantModPermissions(FOREIGN_MOD, APP_ORIGIN, [decision]);
+
+    expect(grants.granted).toEqual([]);
+  });
+});
+
+describe("joinGrants", function describeJoinGrants(): void {
+  it("lists the mod's lines, then the mosaic's", function joinsInOrder(): void {
+    const modGrants = buildGrants([SAMPLE_MOD.permissions[0]], []);
+    const mosaicGrants = buildGrants([], FOREIGN_MOSAIC.permissions);
+
+    expect(joinGrants(modGrants, mosaicGrants)).toEqual(
+      buildGrants([SAMPLE_MOD.permissions[0]], FOREIGN_MOSAIC.permissions),
+    );
+  });
+});
+
+describe("listConsentLines with a mosaic", function describeMosaicConsentLines(): void {
+  it("Foreign mosaic with a cover host", function listsMosaicLines(): void {
+    const lines = listConsentLines(SAMPLE_MOD, APP_ORIGIN, [], FOREIGN_MOSAIC);
+
+    expect(lines).toEqual([
+      { ...FOREIGN_MOSAIC.permissions[0], subject: "mosaic" },
+    ]);
+  });
+
+  it("Mosaic from the app's origin", function listsNothingForAppMosaic(): void {
+    const lines = listConsentLines(SAMPLE_MOD, APP_ORIGIN, [], APP_MOSAIC);
+
+    expect(lines).toEqual([]);
+  });
+
+  it("Foreign mosaic and foreign mod", function listsBothSubjects(): void {
+    const lines = listConsentLines(FOREIGN_MOD, APP_ORIGIN, [], FOREIGN_MOSAIC);
+
+    expect(lines).toEqual([
+      ...asModLines(FOREIGN_MOD.permissions),
+      { ...FOREIGN_MOSAIC.permissions[0], subject: "mosaic" },
+    ]);
+  });
+
+  it("leaves out a mosaic line decided for that mosaic", function leavesOutDecidedMosaicLine(): void {
+    const decision = buildMosaicDecision(
+      FOREIGN_MOSAIC.source,
+      "https://covers.openlibrary.org",
+      false,
+    );
+
+    const lines = listConsentLines(
+      SAMPLE_MOD,
+      APP_ORIGIN,
+      [decision],
+      FOREIGN_MOSAIC,
+    );
+
+    expect(lines).toEqual([]);
+  });
+});
+
+describe("describeDeniedMosaicPermission", function describeDescribeDeniedMosaic(): void {
+  it("Refused cover host", function describesRefusedMosaicLine(): void {
+    const description = describeDeniedMosaicPermission(
+      FOREIGN_MOSAIC.permissions[0],
+      FOREIGN_MOSAIC.source,
+    );
+
+    expect(description).toContain("https://covers.openlibrary.org");
+    expect(description).toContain("Shows the book covers");
+    expect(description).toContain(FOREIGN_MOSAIC.source);
+    expect(description).toContain(
+      "Mosaics from other sites get only the permissions you allow.",
+    );
   });
 });
 
@@ -338,10 +527,15 @@ describe("permissions module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(permissionsModule).sort()).toEqual([
       "checkOpenGrant",
+      "describeDeniedMosaicPermission",
       "describeDeniedPermission",
       "describePermissionLine",
       "grantModPermissions",
+      "grantMosaicPermissions",
+      "isDecisionOf",
+      "joinGrants",
       "listConsentLines",
+      "readDecisionDeclarer",
     ]);
   });
 });

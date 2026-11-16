@@ -27,6 +27,8 @@ Implemented in `src/lib/files/`. Other modules import only from the public entry
 
 - `fetchFile(location, options?)`: file fetcher. Returns a `FetchedFile` (`source`, `content`).
 - `resolveLocation(location, baseUrl)`: resolves a path or URL to an absolute `URL`. Raises `FileFetchError` when it cannot.
+- `resolveFileReference(reference, folderFileName, baseUrl)`: resolves a reference to a file that a folder holds by convention to the file's absolute URL, as a string. A path ending in `.yaml` or `.yml` is the file itself. Any other path is a folder: a `/` is added when the path does not end with one, the query and fragment are dropped, and `folderFileName` is resolved in it. Mod, collection and mosaic references use it with `mod_conf.yaml`, `collection.yaml` and `mosaic.yaml`. Raises `FileFetchError` when the reference cannot be resolved.
+- `readDocumentBaseUrl()`: the page's document base URL, or `undefined` outside a browser page. The default base of `fetchFile`.
 - `indexLocalFiles(pickedFiles)`: turns the files the user picked (`PickedFile`: `path` inside the picked folder and `content` as a `Blob`) into `LocalFiles`, keyed by their virtual `file:///` URL.
 - `FileFetchOptions`: `baseUrl` for relative locations, `fetch` to replace `globalThis.fetch`, `localFiles` for `file:` locations.
 - Errors: `FileFetchError` (file cannot be fetched or read). It exposes the failing `source`. Its message is `Cannot load file "<source>": <reason>`, where the reason is:

@@ -200,6 +200,68 @@ export const TILES_MOD_REFERENCE = `.${TILES_FOLDER_PATH}/`;
 /** `./test-mods/tiles/item_collection.yaml`: the tiles mod's sample collection as a run link names it. */
 export const TILES_COLLECTION_REFERENCE = `.${TILES_COLLECTION_PATH}`;
 
+/** `./test-mods/mosaics/labels.yaml`: the labels mosaic as a run link names it. */
+export const LABELS_MOSAIC_REFERENCE = `.${APP_ORIGIN_MOD_PATH}mosaics/labels.yaml`;
+
+/** `/test-mods/mosaics/labels.yaml`: the labels mosaic's file. */
+export const LABELS_MOSAIC_PATH = `${APP_ORIGIN_MOD_PATH}mosaics/labels.yaml`;
+
+/** `#/run?mosaic=./test-mods/mosaics/labels.yaml`: the run link of the labels mosaic. */
+export const LABELS_MOSAIC_HASH = `#/run?mosaic=${LABELS_MOSAIC_REFERENCE}`;
+
+/** `Labelled items`: the labels mosaic's title. */
+export const LABELS_MOSAIC_TITLE = "Labelled items";
+
+/** `/test-mods/mosaics/labels/collection.yaml`: the labels mosaic's collection, which a test can change before a reload. */
+export const LABELS_COLLECTION_FILE = "mosaics/labels/collection.yaml";
+
+/** A tile that writes its title under `label`, which the item type does not know. */
+export function buildLabelledTile(label: string): string {
+  const tile = ["---", `label: "${label}"`, "---", "", "A labelled tile.", ""];
+  return tile.join("\n");
+}
+
+/** The labels mosaic's collection: the labelled tiles `first.md`, then `extraPaths`, relative to it. */
+export function buildLabelsCollection(extraPaths: string[] = []): string {
+  const lines = [
+    "collection:",
+    '  name: "Labelled tiles"',
+    "  tiles:",
+    '    - path: "./first.md"',
+  ];
+  for (const path of extraPaths) {
+    lines.push(`    - path: "${path}"`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * The labels mosaic, served with `serveTilesMod`: the tiles mod with a
+ * collection folder whose tiles write their title under `label`, renamed to
+ * `title` by the mosaic's aliases, and a config that hides the images. Its
+ * collection holds `first.md` ("First label"); `second.md` ("Second label")
+ * is next to it for a test to add.
+ */
+export function buildLabelsMosaicFiles(): ModFiles {
+  const files: ModFiles = {
+    "mosaics/labels.yaml": [
+      "mosaic:",
+      `  title: "${LABELS_MOSAIC_TITLE}"`,
+      '  description: "The tiles mod on labelled tiles."',
+      '  mod: "../tiles/"',
+      '  collection: "./labels"',
+      "  config:",
+      "    show_images: false",
+      "  aliases:",
+      '    title: ["label"]',
+    ].join("\n"),
+    [LABELS_COLLECTION_FILE]: buildLabelsCollection(),
+    "mosaics/labels/first.md": buildLabelledTile("First label"),
+    "mosaics/labels/second.md": buildLabelledTile("Second label"),
+  };
+  return files;
+}
+
 /** `#/run?mod=./test-mods/tiles/`: the run link of the tiles mod without tiles. */
 export const TILES_RUN_HASH = `#/run?mod=${TILES_MOD_REFERENCE}`;
 

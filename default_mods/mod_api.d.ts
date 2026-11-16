@@ -71,6 +71,13 @@ export interface ModLayoutChangedParams {
   layout: ModLayout;
 }
 
+/** The mosaic a mod was opened from, as its mount context gives it. */
+export interface ModContextMosaic {
+  source: string;
+  title: string;
+  description: string;
+}
+
 /** The second argument of `mount`. */
 export interface ModContext {
   mod: {
@@ -80,9 +87,12 @@ export interface ModContext {
     version: string;
     description: string;
   };
+  /** The mosaic the mod was opened from, or `null` for a mod opened from a mod link. */
+  mosaic: ModContextMosaic | null;
   api: {
     version: string;
   };
+  /** The mod's config, merged with the mosaic's for a mod opened from a mosaic. */
   config: ModYamlMapping;
   params: Record<string, string>;
   tiles: ModTile[];
@@ -144,6 +154,26 @@ export interface CollectionInspection {
   issues: ModTileIssue[];
 }
 
+/**
+ * What `mosaics.inspect` answers: a mosaic file's content, read without
+ * requesting its mod, its collection or any tile.
+ */
+export interface MosaicInspection {
+  source: string;
+  title: string;
+  description: string;
+  /** The resolved address of the mosaic's mod file. */
+  mod: string;
+  /** The resolved address of the mosaic's collection file, or `null`. */
+  collection: string | null;
+  /** The mosaic's own config, which the mod's config is merged with when it opens. */
+  config: ModYamlMapping;
+  /** For each field of the mod's tile type, the names a collection uses for it. */
+  aliases: Record<string, string[]>;
+  /** What the mosaic's `show` lines would get if it were opened without asking. */
+  permissions: ModGrants;
+}
+
 /** A problem found by a mod check. */
 export interface ModCheckFinding {
   step: "bundle" | "mount" | "test";
@@ -176,9 +206,19 @@ export interface ModOpenParams {
   collection?: string;
   /** The location of one tile file, which the opened mod receives as its tiles. */
   tile?: string;
-  /** Parameters other than `mod`, `collection` and `tile`, which are reserved. */
+  /** Parameters other than `mod`, `collection`, `tile` and `mosaic`, which are reserved. */
   params?: Record<string, string>;
   /** Opens the mod in place of the requesting sandbox, which is closed and gets no answer. */
+  replace?: boolean;
+}
+
+/** The params of `mosaics.open`. The mosaic file names the mod and the collection. */
+export interface MosaicOpenParams {
+  /** A mosaic reference: the mosaic file, or a folder holding `mosaic.yaml`. */
+  mosaic: string;
+  /** Parameters other than `mod`, `collection`, `tile` and `mosaic`, which are reserved. */
+  params?: Record<string, string>;
+  /** Opens the mosaic in place of the requesting sandbox, which is closed and gets no answer. */
   replace?: boolean;
 }
 
@@ -197,6 +237,8 @@ export interface ModApiMethods {
     params: { collection: string };
     result: CollectionInspection;
   };
+  "mosaics.inspect": { params: { mosaic: string }; result: MosaicInspection };
+  "mosaics.open": { params: MosaicOpenParams; result: null };
 }
 
 /** The engine events this file types: the params each one pushes. */

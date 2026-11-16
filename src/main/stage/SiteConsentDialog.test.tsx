@@ -15,16 +15,19 @@ import { SiteConsentDialog } from "./SiteConsentDialog.tsx";
 
 const COVERS_LINE: SiteConsentLine = {
   key: "show https://upload.wikimedia.org",
+  subject: "mod",
   ...SAMPLE_COVERS_PERMISSION,
 };
 const OPEN_LINE: SiteConsentLine = {
   key: "open *",
+  subject: "mod",
   category: "open",
   host: "*",
   reason: "Opens the mods you pick",
 };
 const CONNECT_LINE: SiteConsentLine = {
   key: "connect https://api.example.net",
+  subject: "mod",
   ...PROBE_CONNECT_PERMISSION,
 };
 
@@ -49,6 +52,8 @@ function buildAskingSandbox(lines: SiteConsentLine[]): SandboxSnapshot {
     canClose: true,
     status: "asking",
     mod: { title: "Probe", version: "1.0.0", source: PROBE_MOD_SOURCE },
+    mosaic: null,
+    mosaicReference: null,
     sandboxDocument: null,
     canReloadTiles: false,
     messages: [],

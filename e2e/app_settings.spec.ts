@@ -35,6 +35,7 @@ import {
   waitForProbe,
 } from "./mod_routes.ts";
 import { openProbe } from "./test_mods.ts";
+import { PREVIEW_URL as PREVIEW_ORIGIN } from "./app_servers.ts";
 import {
   openBodyProbe,
   playerDialog,
@@ -355,6 +356,113 @@ test.describe("Changing every decision of a mod", function describeChangingAll()
     expect(await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`)).toBe(
       false,
     );
+  });
+});
+
+const MOSAIC_HOST = "https://mosaics.example.net";
+const MOSAIC_SOURCE = `${MOSAIC_HOST}/nobel/mosaic.yaml`;
+const MOSAIC_HASH = `#/run?mosaic=${encodeURIComponent(MOSAIC_SOURCE)}`;
+const MOSAIC_TITLE = "Nobel books";
+const OPEN_LIBRARY_HOST = "https://covers.openlibrary.org";
+const OPEN_LIBRARY_LINE = `show content from ${OPEN_LIBRARY_HOST}`;
+
+/**
+ * Serves the foreign mosaic "Nobel books" of the app-origin probe, which
+ * declares `show` for the Open Library covers, follows its link, allows its
+ * line with Remember, and waits for the probe.
+ */
+async function openRememberedMosaic(page: Page): Promise<void> {
+  await routeImages(page, `${OPEN_LIBRARY_HOST}/**`);
+  await serveAppOriginMod(
+    page,
+    buildProbeFiles("probe", ['  title: "App probe"']),
+  );
+  await serveForeignMod(
+    page,
+    {
+      "nobel/mosaic.yaml": [
+        "mosaic:",
+        `  title: "${MOSAIC_TITLE}"`,
+        `  mod: "${new URL("/test-mods/probe/", PREVIEW_ORIGIN).href}"`,
+        "  permissions:",
+        "    show:",
+        `      - host: "${OPEN_LIBRARY_HOST}"`,
+        '        reason: "Shows the book covers"',
+      ].join("\n"),
+    },
+    MOSAIC_HOST,
+  );
+  await followLink(page, MOSAIC_HASH);
+  const dialog = siteConsentDialog(page);
+  await clickCheckedTo(
+    dialog.getByRole("checkbox", {
+      name: "Remember my answer for this mosaic",
+    }),
+    true,
+  );
+  await dialog.getByRole("button", { name: "Allow" }).click();
+  await expect(dialog).toHaveCount(0);
+  await waitForProbe(await findModFrame(page, "App probe"));
+}
+
+/** The expand buttons of the groups in the Mod permissions group, in list order. */
+function groupToggles(page: Page): Locator {
+  return modPermissionsGroup(page).locator("button[aria-expanded]");
+}
+
+test.describe("Remembered mosaic decisions in Settings", function describeMosaicDecisions(): void {
+  test("One remembered mosaic allow", async function listsMosaicGroup({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+    await openRememberedMosaic(page);
+
+    await openSection(page, "Settings");
+
+    await expect(groupToggles(page)).toHaveCount(1);
+    await expect(groupToggles(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(groupToggles(page)).toHaveText(
+      `Mosaic ${MOSAIC_TITLE} 1 allowed`,
+    );
+    await expect(modPermissionsGroup(page)).toContainText(MOSAIC_SOURCE);
+  });
+
+  test("A mod and a mosaic", async function sortsModsAndMosaics({
+    page,
+  }): Promise<void> {
+    await openRememberedProbe(page);
+    await openRememberedMosaic(page);
+
+    await openSection(page, "Settings");
+
+    await expect(groupToggles(page)).toHaveCount(2);
+    await expect(groupToggles(page).nth(0)).toContainText(MOSAIC_TITLE);
+    await expect(groupToggles(page).nth(0)).toContainText("Mosaic");
+    await expect(groupToggles(page).nth(1)).toContainText("Probe");
+    await expect(groupToggles(page).nth(1)).not.toContainText("Mosaic");
+  });
+
+  test("Removing a mosaic's decision", async function removesMosaicDecision({
+    page,
+  }): Promise<void> {
+    await openRememberedProbe(page);
+    await openRememberedMosaic(page);
+    await expandModGroup(page, `Mosaic ${MOSAIC_TITLE}`);
+
+    await modPermissionsGroup(page)
+      .getByRole("button", {
+        name: `Remove ${MOSAIC_TITLE}: ${OPEN_LIBRARY_LINE}`,
+      })
+      .click();
+
+    await expect(groupToggles(page)).toHaveCount(1);
+    await expect(groupToggles(page)).toContainText("Probe 1 allowed");
+    await followLink(page, MOSAIC_HASH);
+    await expect(
+      siteConsentDialog(page).getByRole("checkbox", {
+        name: OPEN_LIBRARY_LINE,
+      }),
+    ).toBeVisible();
   });
 });
 

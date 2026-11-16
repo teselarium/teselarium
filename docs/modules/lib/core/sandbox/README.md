@@ -6,12 +6,23 @@ Each mod runs isolated from the app in its own sandboxed frame. This module buil
 
 ### Content hosts
 
-The content hosts of a mod are the `http:` and `https:` origins of the files the engine read to start it: the mod file, its entrypoint, its tile type file, the collection file (when the mod was opened with one) and each tile. They are always allowed for `show`, so a mod can show images from where its tiles live. `file:` and `data:` sources are dropped, and the list is sorted and without duplicates.
+The content hosts of a mod are the `http:` and `https:` origins of the files the engine read to start it: the mosaic file (when the mod was opened from a mosaic), the mod file, its entrypoint, its tile type file, the collection file (when the mod was opened with one) and each tile. They are always allowed for `show`, so a mod can show images from where its tiles live. `file:` and `data:` sources are dropped, and the list is sorted and without duplicates.
 
 - The sample collection is not a content host unless the mod was opened with it.
 - Content hosts are fixed when the mod starts. Tiles reloaded later from a new host are blocked, and the block is reported.
 
-Example: the sample book list mod opened with the sample collection from the app at `https://example.org/` has one content host, `https://example.org`.
+Example: the sample book list mod opened with the sample collection from the app at `https://example.org/` has one content host, `https://example.org`. Opened from a mosaic at `https://mosaics.example.net/maps/mosaic.yaml`, it also has `https://mosaics.example.net`, so a mosaic's author can show media from their own site, as a collection's author can.
+
+### Permissions of a mosaic
+
+A mosaic can declare `show` lines, the hosts its collection's images, media, fonts and stylesheets come from, never `connect`, `embed`, `code` or `open` (see the [mosaic module](../../mosaic/README.md#permissions)). A mosaic chooses data, not what the mod's code may reach.
+
+- **Granted as a mod's `show` permissions are** (see the [permissions module](../permissions/README.md#the-site-owner-rule)): every line of a mosaic file served from the app's origin, and for a mosaic from another origin, the lines the user allowed for that mosaic file in the site consent dialog, which asks about the mod's lines and the mosaic's together.
+- **One permission set**: the sandbox's grants list the mod's lines, then the mosaic's, in `context.permissions.granted` and `denied`, in the same `{ category, host, reason }` shape. The content policy allows the granted ones, so a mod sees the set the policy enforces.
+- **Refused lines are reported** as warnings whose source is the mosaic file: `Permission of the mosaic "https://mosaics.example.net/maps/mosaic.yaml" not granted: show content from https://covers.openlibrary.org ("Shows the book covers"). Mosaics from other sites get only the permissions you allow.`
+- **Only for that sandbox**: a run link to the same mod without the mosaic, and a mod the mosaic's mod opens with `mods.open`, get none of the mosaic's lines. A remembered mosaic decision applies only to the mosaic file at that address, whatever mod it names.
+
+So the laureates' map, a mosaic from the app's origin, can show covers from `https://covers.openlibrary.org` and `https://*.archive.org` with a country map that declares no `show` permission of its own.
 
 ### Assets next to the mod
 
@@ -141,6 +152,7 @@ The blocked URL is reduced to its origin, since browsers sometimes report only t
 - Not declared: `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.`
 - Not declared, for `img-src` and `media-src` when "Load media linked by tiles" was on as the mod started, the same message followed by a sentence for tile authors: `Blocked image request to https://cdn.example.org. Add it to permissions.show in mod_conf.yaml. If a tile links this file, link its final address: links that redirect to another site are blocked.` The hint does not say which tile link redirected, since browsers report either the original address or the target, sometimes only its origin.
 - Declared but not granted: `Blocked image request to https://upload.wikimedia.org: the mod declares it in permissions.show, but the permission was not granted.`
+- In a sandbox opened from a mosaic, a `show` block (images, media, fonts and stylesheets) whose host neither the mod nor the mosaic declares also names the mosaic file as a place to declare it: `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml, or in the mosaic file "https://mosaics.example.net/maps/mosaic.yaml" when the mosaic's data needs it.` A host the mosaic declares and the user refused gives `… : the mosaic declares it in permissions.show, but the permission was not granted.` Blocks of other categories name only `mod_conf.yaml`, since a mosaic declares only `show`.
 - Any other directive, or a blocked URL that is not a web URL (such as `inline` or `eval`): `Blocked by the sandbox policy (object-src).`
 
 A blocked origin counts as declared when a host of the category covers it, as the mod module's `permissionHostCovers` decides: an exact host equal to it, or a wildcard host one of whose subdomains it is. With `show` for `https://*.us.archive.org`:
@@ -287,10 +299,10 @@ Implemented in `src/lib/core/sandbox/`. Other modules import only from the publi
 - `isGuardedLink(url, tileSource)`: whether the private network guard leaves out a link of the tile at `tileSource`. The tile bodies module uses it for iframes.
 - `buildPrivateLinkIssue(tileSource, value)`: the guard's warning for a left-out link.
 - `buildSandboxPolicy(contentHosts, granted, tileLinkSources)`: the policy text for the content hosts, the granted permissions and the tile link sources, which go into `img-src` and `media-src` only. Pass `[]` when tile links are off.
-- `describeBlockedRequest(blocked, mod, grants, hintsTileLinks)`: the `ModIssue` for a `BlockedRequest` (`blockedUrl`, `directive`) of the mod with that `source`. With `hintsTileLinks`, an undeclared image or media host gets the redirect hint.
+- `describeBlockedRequest(blocked, mod, grants, hintsTileLinks, mosaic?)`: the `ModIssue` for a `BlockedRequest` (`blockedUrl`, `directive`) of the mod with that `source`. With `hintsTileLinks`, an undeclared image or media host gets the redirect hint. With the sandbox's `mosaic` (`ReportedMosaic`, its `source` and `permissions`), `show` blocks also name the mosaic file. The session passes the launch's mosaic.
 - `describeNewTileLinks(count, collectionSource)`: the warning, whose source is the collection, that the reloaded tiles link `count` files the running mod does not allow yet.
 - `describeBlockedDialog(name, mod)`: the warning `ModIssue` for a blocked dialog function (`BlockedDialogName`) of the mod with that `source`.
-- Types: `BlockedRequest`, `BlockedDialogName` (`"alert"`, `"confirm"`, `"prompt"` or `"print"`), `TileLinks`.
+- Types: `BlockedRequest`, `BlockedDialogName` (`"alert"`, `"confirm"`, `"prompt"` or `"print"`), `ReportedMosaic`, `TileLinks`.
 
 Example:
 

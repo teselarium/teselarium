@@ -558,6 +558,7 @@ describe("mod module entry point", function describeEntryPoint(): void {
       "ModFormatError",
       "PERMISSION_CATEGORIES",
       "SHIPPED_LIBRARY_NAMES",
+      "isShowHost",
       "loadMod",
       "loadModCode",
       "loadModFile",

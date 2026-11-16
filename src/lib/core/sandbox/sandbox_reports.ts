@@ -5,7 +5,11 @@ import type {
   PermissionCategory,
 } from "../../mod/index.ts";
 import { permissionHostCovers } from "../../mod/index.ts";
+import type { LoadedMosaic } from "../../mosaic/index.ts";
 import type { ModGrants } from "../permissions/index.ts";
+
+/** What a blocked request report reads of the mosaic a sandbox was opened from. */
+export type ReportedMosaic = Pick<LoadedMosaic, "source" | "permissions">;
 
 /** A request the frame's policy blocked, as the frame loader reports it. */
 export interface BlockedRequest {
@@ -92,10 +96,38 @@ function declaresHost(
   return false;
 }
 
+/**
+ * Where to declare an undeclared host: `mod_conf.yaml`, and for a `show`
+ * block in a mosaic's sandbox, also the mosaic file.
+ */
+function describeDeclarationPlace(
+  category: PermissionCategory,
+  mosaic: ReportedMosaic | null,
+): string {
+  if (category !== "show" || mosaic === null) {
+    return "mod_conf.yaml";
+  }
+  const places = `mod_conf.yaml, or in the mosaic file "${mosaic.source}" when the mosaic's data needs it`;
+  return places;
+}
+
+/** Who declared a refused host: the mosaic when it declares the host, otherwise the mod. */
+function readDeniedDeclarer(
+  mosaic: ReportedMosaic | null,
+  category: PermissionCategory,
+  origin: string,
+): string {
+  if (mosaic !== null && declaresHost(mosaic.permissions, category, origin)) {
+    return "mosaic";
+  }
+  return "mod";
+}
+
 function describeBlock(
   blocked: BlockedRequest,
   grants: ModGrants,
   hintsTileLinks: boolean,
+  mosaic: ReportedMosaic | null,
 ): string {
   const rule = readDirectiveRule(blocked.directive);
   const origin = readBlockedOrigin(blocked.blockedUrl);
@@ -108,10 +140,11 @@ function describeBlock(
     return policyMessage;
   }
   if (declaresHost(grants.denied, rule.category, origin)) {
-    const deniedMessage = `Blocked ${rule.noun} request to ${origin}: the mod declares it in permissions.${rule.category}, but the permission was not granted.`;
+    const declarer = readDeniedDeclarer(mosaic, rule.category, origin);
+    const deniedMessage = `Blocked ${rule.noun} request to ${origin}: the ${declarer} declares it in permissions.${rule.category}, but the permission was not granted.`;
     return deniedMessage;
   }
-  const undeclaredMessage = `Blocked ${rule.noun} request to ${origin}. Add it to permissions.${rule.category} in mod_conf.yaml.`;
+  const undeclaredMessage = `Blocked ${rule.noun} request to ${origin}. Add it to permissions.${rule.category} in ${describeDeclarationPlace(rule.category, mosaic)}.`;
   if (hintsTileLinks && TILE_LINK_DIRECTIVES.has(blocked.directive)) {
     const hintedMessage = `${undeclaredMessage} ${TILE_LINK_REDIRECT_HINT}`;
     return hintedMessage;
@@ -122,20 +155,23 @@ function describeBlock(
 /**
  * Turns a blocked request into a warning for the mod's issue list, with the
  * fix when there is one: the entry to add to `mod_conf.yaml`, or the note
- * that the declared permission was not granted. With `hintsTileLinks`, an
- * undeclared image or media host also gets a sentence for tile authors about
- * links that redirect.
+ * that the declared permission was not granted. In the sandbox of a
+ * `mosaic`, an undeclared `show` host also names the mosaic file as a place
+ * to declare it, and a refused line the mosaic declares says so. With
+ * `hintsTileLinks`, an undeclared image or media host also gets a sentence
+ * for tile authors about links that redirect.
  */
 export function describeBlockedRequest(
   blocked: BlockedRequest,
   mod: Pick<ModFile, "source">,
   grants: ModGrants,
   hintsTileLinks: boolean,
+  mosaic: ReportedMosaic | null = null,
 ): ModIssue {
   const issue: ModIssue = {
     level: "warning",
     source: mod.source,
-    message: describeBlock(blocked, grants, hintsTileLinks),
+    message: describeBlock(blocked, grants, hintsTileLinks, mosaic),
   };
   return issue;
 }

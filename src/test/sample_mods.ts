@@ -3,7 +3,10 @@ import {
   FIXTURES_BASE_URL,
   FIXTURES_REFERENCE,
 } from "./sample_files.ts";
-import type { SiteDecision } from "../lib/core/permissions/index.ts";
+import type {
+  ModSiteDecision,
+  SiteDecision,
+} from "../lib/core/permissions/index.ts";
 import { buildTypeText, testTexts } from "./test_files.ts";
 
 /** The app's origin in tests. Mods under `APP_BASE_URL` are on it and get their permissions. */
@@ -27,6 +30,19 @@ export const SAMPLE_MOD_REFERENCE = `${FIXTURES_REFERENCE}mods/book_list`;
 
 /** `./fixtures/tiles/books_collection.yaml`: the sample collection as a run link names it. It resolves to `SAMPLE_COLLECTION_SOURCE`. */
 export const SAMPLE_COLLECTION_REFERENCE = `${FIXTURES_REFERENCE}tiles/books_collection.yaml`;
+
+export const SAMPLE_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mosaics/books/mosaic.yaml`;
+
+/** `./fixtures/mosaics/books`: the fixture mosaic of the sample mod and collection, as a run link names it. It resolves to `SAMPLE_MOSAIC_SOURCE`. */
+export const SAMPLE_MOSAIC_REFERENCE = `${FIXTURES_REFERENCE}mosaics/books`;
+
+export const ALIASED_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mosaics/test/mosaic.yaml`;
+
+/** `./fixtures/mosaics/test`: the mosaic `serveAliasedMosaic` serves, as a run link names it. */
+export const ALIASED_MOSAIC_REFERENCE = `${FIXTURES_REFERENCE}mosaics/test`;
+
+export const NAMED_BOOKS_SOURCE = `${FIXTURES_BASE_URL}tiles/named_books/collection.yaml`;
+export const NAMED_BOOK_SOURCE = `${FIXTURES_BASE_URL}tiles/named_books/named_book.md`;
 
 /** `./fixtures/mods/missing`: a mod folder that does not exist. It resolves to `MISSING_MOD_SOURCE`. */
 export const MISSING_MOD_REFERENCE = `${FIXTURES_REFERENCE}mods/missing`;
@@ -67,8 +83,8 @@ export const SAMPLE_COVERS_PERMISSION = {
  * The user's answer about the covers of the sample mod, which counts for it
  * as a foreign mod on `OTHER_APP_ORIGIN`.
  */
-export function buildSampleCoversDecision(allowed: boolean): SiteDecision {
-  const decision: SiteDecision = {
+export function buildSampleCoversDecision(allowed: boolean): ModSiteDecision {
+  const decision: ModSiteDecision = {
     mod: SAMPLE_MOD_SOURCE,
     title: "Book List",
     category: SAMPLE_COVERS_PERMISSION.category,
@@ -211,8 +227,8 @@ export function serveProbeMod(
 export function buildProbeDecision(
   permission: { category: SiteDecision["category"]; host: string },
   allowed: boolean,
-): SiteDecision {
-  const decision: SiteDecision = {
+): ModSiteDecision {
+  const decision: ModSiteDecision = {
     mod: PROBE_MOD_SOURCE,
     title: "Probe",
     category: permission.category,
@@ -411,5 +427,55 @@ export function serveLibraryMod(): void {
     '      files: ["dist/leaflet.js", "dist/leaflet.css"]',
     "    helper:",
     '      files: ["./vendor/helper.js"]',
+  ]);
+}
+
+/** Serves a mosaic file at `source` from the lines of its `mosaic` mapping. */
+export function serveTestMosaic(source: string, mosaicLines: string[]): void {
+  const lines = ["mosaic:"];
+  for (const mosaicLine of mosaicLines) {
+    lines.push(`  ${mosaicLine}`);
+  }
+  testTexts.set(source, `${lines.join("\n")}\n`);
+}
+
+/** Serves a collection of one book whose title is under `name` and whose country is under `origin`. */
+export function serveNamedBooks(): void {
+  testTexts.set(
+    NAMED_BOOKS_SOURCE,
+    [
+      "collection:",
+      '  name: "Named books"',
+      "  tiles:",
+      '    - path: "./named_book.md"',
+    ].join("\n"),
+  );
+  testTexts.set(
+    NAMED_BOOK_SOURCE,
+    buildTypeText([
+      'name: "Kallocain"',
+      'date: "1940-01-01"',
+      "authors:",
+      '  - "Karin Boye"',
+      'origin: "Sweden"',
+      "genres:",
+      '  - "Dystopia"',
+    ]),
+  );
+}
+
+/**
+ * Serves the mosaic `ALIASED_MOSAIC_SOURCE` of the sample mod with the named
+ * books, whose `name` and `origin` its aliases rename to `title` and `country`.
+ */
+export function serveAliasedMosaic(): void {
+  serveNamedBooks();
+  serveTestMosaic(ALIASED_MOSAIC_SOURCE, [
+    'title: "Named books on the shelf"',
+    'mod: "../../mods/book_list"',
+    'collection: "../../tiles/named_books"',
+    "aliases:",
+    '  title: ["name"]',
+    '  country: ["origin"]',
   ]);
 }

@@ -14,8 +14,9 @@ This library implements the following components based on [tesela_spec.md](../..
   - The error message names the tile's source, the type name, the type file's source and every mismatching metadata field, not only the first one (e.g. `metadata must have property 'country'; metadata/genres must be array`).
   - The tile is not changed: its `types` is not updated, and no defaults are added, no fields removed and no values converted.
   - A validator can check any number of tiles, and the result for a tile does not depend on the tiles checked before it.
-- A collection loader that takes as input a path or URL and chains the file fetcher and the yaml parser, for generating the tile path list, and then calls the tile loader for each path. Relative paths for tile are resolved against the collection file's location. Tile related errors are captured, so it traverses the whole tile list. Tiles that fail to load are excluded from tiles and reported as issues. Output properties:
+- A collection loader that takes as input a collection reference (a path or URL) and chains the file fetcher and the yaml parser, for generating the tile path list, and then calls the tile loader for each path. Relative paths for tile are resolved against the collection file's location. Tile related errors are captured, so it traverses the whole tile list. Tiles that fail to load are excluded from tiles and reported as issues. Output properties:
   - Source: the resolved absolute URL of the collection file.
+  - A reference whose resolved path ends in `.yaml` or `.yml` is the collection file. Any other reference names a folder and means the `collection.yaml` in it: a `/` is added when the path does not end with one, and the folder's query and fragment are dropped. So `./samples/tiles/literature_nobel_laureates` with base `https://example.org/` is `https://example.org/samples/tiles/literature_nobel_laureates/collection.yaml`, and `https://tiles.example.net/books/?v=2` is `https://tiles.example.net/books/collection.yaml`. Mod references follow the same rule with `mod_conf.yaml` (see the [mod module](../mod/README.md)).
   - Name and description of the collection (description is empty when the file has none).
   - Tiles is a list of tile objects, in the order of the entries.
   - Issues, containing warnings and errors, in the order of the entries.
@@ -24,7 +25,7 @@ This library implements the following components based on [tesela_spec.md](../..
   - When several entries resolve to the same tile, it is loaded once at the first entry's position, and each repeat adds a warning issue.
   - Tiles load in parallel, at most 6 at a time. The limit does not change the result or its order.
   - Local files stay local: only a collection loaded from a picked `file:` location can list `file:` tiles. In a remote collection, such entries become error issues and are never read.
-- A collection index reader that takes as input a path or URL and reads the collection file alone: it chains the file fetcher and the yaml parser, and plans the entries as the collection loader does, but requests no tile. The index and a loaded collection never disagree about which tiles a collection lists or which entry issues it has. Output properties:
+- A collection index reader that takes as input a collection reference, resolved as for the collection loader, and reads the collection file alone: it chains the file fetcher and the yaml parser, and plans the entries as the collection loader does, but requests no tile. The index and a loaded collection never disagree about which tiles a collection lists or which entry issues it has. Output properties:
   - Source, name and description, as for a loaded collection.
   - Tiles is the list of resolved addresses of the tiles that loading the collection would request, in the order of the entries, with a repeated tile listed once.
   - Issues holds the entry issues found before any tile request: malformed entries, relative `url`s, local files in a remote collection and repeated tiles. A tile that would fail to load is still listed, with no issue, since it is never requested.
@@ -101,7 +102,8 @@ Hosting note: tiles loaded from another origin are fetched by the browser with C
 
 Also exported from `src/lib/tile/index.ts`:
 
-- `loadTileCollection(location, options?)`: fetches and parses a collection file, then loads every tile it lists, at most 6 at a time. Takes the same `FileFetchOptions` as `loadTile`. Returns a `TileCollection` (`source`, `name`, `description`, `tiles`, `issues`).
+- `resolveCollectionReference(reference, baseUrl)`: resolves a collection reference, the file or its folder, to the absolute URL of the collection file, against `baseUrl` or the page's document base URL when it is `undefined`. Raises `FileFetchError` when it cannot be resolved. The loader and the index reader call it first.
+- `loadTileCollection(location, options?)`: resolves the collection reference, fetches and parses the collection file, then loads every tile it lists, at most 6 at a time. Takes the same `FileFetchOptions` as `loadTile`. Returns a `TileCollection` (`source`, `name`, `description`, `tiles`, `issues`).
 - Errors: `CollectionFormatError` (not the collection structure). It exposes the failing `source`. A collection file that cannot be fetched raises `FileFetchError`, and one that is not valid plain YAML raises `YamlParseError` (both from the files module).
 - Types: `TileCollection`, `TileIssue` (`level`, `source`, `message`), `IssueLevel` (`"warning"` or `"error"`).
 
@@ -123,7 +125,7 @@ const collection = await loadTileCollection("./book_collection.yaml", {
 
 Also exported from `src/lib/tile/index.ts`:
 
-- `readTileCollectionIndex(location, options?)`: fetches and parses a collection file and plans its entries, without requesting any tile. Takes the same `FileFetchOptions` as `loadTile`. Returns a `TileCollectionIndex` (`source`, `name`, `description`, `tiles`, `issues`), where `tiles` is a list of addresses (strings), not of tile objects. The result is plain data.
+- `readTileCollectionIndex(location, options?)`: resolves the collection reference as `loadTileCollection` does, fetches and parses the collection file and plans its entries, without requesting any tile. Takes the same `FileFetchOptions` as `loadTile`. Returns a `TileCollectionIndex` (`source`, `name`, `description`, `tiles`, `issues`), where `tiles` is a list of addresses (strings), not of tile objects. The result is plain data.
 - It reads only the collection file: it never requests a tile, and so never reports a tile that cannot be fetched or parsed.
 - Errors: the same as `loadTileCollection` for the collection file itself, `FileFetchError`, `YamlParseError` or `CollectionFormatError`, each with the collection's `source`.
 - Types: `TileCollectionIndex`.
@@ -141,6 +143,12 @@ const collectionIndex = await readTileCollectionIndex(
 // collectionIndex.tiles[1] === "https://example.org/samples/mods/book_list/books/kallocain.md"
 // collectionIndex.issues is []
 // no tile file was requested
+
+const folderIndex = await readTileCollectionIndex(
+  "./samples/tiles/literature_nobel_laureates",
+  { baseUrl: "https://example.org/" },
+);
+// folderIndex.source === "https://example.org/samples/tiles/literature_nobel_laureates/collection.yaml"
 ```
 
 ### Tile validator

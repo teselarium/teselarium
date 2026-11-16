@@ -27,11 +27,19 @@ import {
 } from "./mod_routes.ts";
 import type { MessageLevelName, ProbeAnswer } from "./mod_routes.ts";
 import {
+  buildLabelsMosaicFiles,
   buildNoteCollection,
   buildTypedProbeFiles,
+  LABELS_MOSAIC_HASH,
+  LABELS_MOSAIC_PATH,
+  LABELS_MOSAIC_TITLE,
   openProbe,
   openTypedProbe,
   PROBE_LINK,
+  serveTilesMod,
+  TILES_COLLECTION_RUN_HASH,
+  TILES_TITLE,
+  TILES_VERSION,
 } from "./test_mods.ts";
 import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
 
@@ -316,6 +324,117 @@ test.describe("One-row stage bar", function describeLayout(): void {
     expect(
       barBox.x + barBox.width - (closeBox.x + closeBox.width),
     ).toBeLessThan(20);
+  });
+});
+
+/** Opens the labels mosaic of the tiles mod, with `files` in place of its own, and waits for the mod's frame. */
+async function openLabelsMosaic(
+  page: Page,
+  files = buildLabelsMosaicFiles(),
+): Promise<void> {
+  await serveTilesMod(page, files);
+  await page.goto(`/${LABELS_MOSAIC_HASH}`);
+}
+
+test.describe("Mosaic title in the stage bar", function describeMosaicTitle(): void {
+  test("Labelled items on the tiles mod", async function ordersMosaicItems({
+    page,
+  }): Promise<void> {
+    await openLabelsMosaic(page);
+    const bar = stageBar(page);
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
+
+    const mosaicTitle = bar.getByText(LABELS_MOSAIC_TITLE, { exact: true });
+    const modTitle = bar.getByText(TILES_TITLE, { exact: true });
+    const items = [
+      mosaicTitle,
+      modTitle,
+      bar.getByText(TILES_VERSION, { exact: true }),
+      bar.getByRole("button", { name: "Mod information" }),
+    ];
+    const boxes: Box[] = [];
+    for (const item of items) {
+      boxes.push(await readBox(item));
+    }
+    for (const [index, box] of boxes.entries()) {
+      if (index > 0) {
+        expect(box.x).toBeGreaterThan(boxes[index - 1].x);
+      }
+    }
+    await expect(modTitle).toHaveClass(/text-muted-foreground/);
+    await expect(mosaicTitle).not.toHaveClass(/text-muted-foreground/);
+    const barBox = await readBox(bar);
+    expect(barBox.height).toBeLessThan(boxes[3].height * 2);
+  });
+
+  test("Mod opened without a mosaic", async function showsNoMosaicTitle({
+    page,
+  }): Promise<void> {
+    await serveTilesMod(page, buildLabelsMosaicFiles());
+
+    await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
+
+    await expect(stageBar(page)).not.toContainText(LABELS_MOSAIC_TITLE);
+    await expect(
+      stageBar(page).getByText(TILES_TITLE, { exact: true }),
+    ).not.toHaveClass(/text-muted-foreground/);
+  });
+});
+
+test.describe("Mosaic name while loading or after a failure", function describeMosaicLoading(): void {
+  test("Missing mosaic file", async function showsMosaicNotLoaded({
+    page,
+  }): Promise<void> {
+    await openLabelsMosaic(page, {});
+
+    await expect(stageBar(page)).toContainText("Mosaic not loaded");
+    await expect(stageBar(page)).not.toContainText(TILES_VERSION);
+  });
+
+  test("Missing mod of a mosaic", async function showsModNotLoaded({
+    page,
+  }): Promise<void> {
+    const files = buildLabelsMosaicFiles();
+    files["mosaics/labels.yaml"] = [
+      "mosaic:",
+      `  title: "${LABELS_MOSAIC_TITLE}"`,
+      '  mod: "../missing/"',
+    ].join("\n");
+
+    await openLabelsMosaic(page, files);
+
+    await expect(stageBar(page)).toContainText(LABELS_MOSAIC_TITLE);
+    await expect(stageBar(page)).toContainText("Mod not loaded");
+  });
+});
+
+test.describe("Information popover of a mosaic", function describeMosaicInfo(): void {
+  test("Mosaic with a collection", async function listsMosaicFirst({
+    page,
+  }): Promise<void> {
+    await openLabelsMosaic(page);
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
+    const mosaicSource = new URL(LABELS_MOSAIC_PATH, page.url()).href;
+    const modSource = new URL("/test-mods/tiles/mod_conf.yaml", page.url())
+      .href;
+    const collectionSource = new URL(
+      "/test-mods/mosaics/labels/collection.yaml",
+      page.url(),
+    ).href;
+
+    await stageBar(page)
+      .getByRole("button", { name: "Mod information" })
+      .click();
+
+    const popover = page.locator("[data-slot=popover-content]");
+    const details = await popover.locator("dd").allTextContents();
+    expect(details).toEqual([
+      mosaicSource,
+      modSource,
+      collectionSource,
+      LABELS_MOSAIC_HASH,
+    ]);
   });
 });
 

@@ -25,6 +25,24 @@ export class RunLinkConflictError extends Error {
   }
 }
 
+/**
+ * A run link names a mosaic and also a mod, a collection or a tile. `source`
+ * is the link's mosaic reference, resolved. It is thrown before any file is
+ * requested.
+ */
+export class MosaicLinkConflictError extends Error {
+  readonly source: string;
+
+  constructor(source: string, options?: ErrorOptions) {
+    super(
+      "A link to a mosaic cannot also have a mod, a collection or a tile.",
+      options,
+    );
+    this.name = "MosaicLinkConflictError";
+    this.source = source;
+  }
+}
+
 /** A request handler failed. The session sends `code` and `message` as the error response. */
 export class ModMethodError extends Error {
   readonly code: number;

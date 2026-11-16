@@ -14,6 +14,7 @@ import {
   readProbeContext,
   recordHost,
   REMEMBER_LABEL,
+  routeImages,
   requestFromProbe,
   routeCovers,
   serveAppOriginMod,
@@ -26,6 +27,7 @@ import {
   waitForProbe,
 } from "./mod_routes.ts";
 import type { ModFiles } from "./mod_routes.ts";
+import { PREVIEW_URL } from "./app_servers.ts";
 import {
   serveTilesMod,
   TILES_COLLECTION_RUN_HASH,
@@ -315,5 +317,276 @@ test.describe("The dialog waits for its mod to be visible", function describeVis
 
     await expect(stageBar(page)).toContainText(PROBE_TITLE);
     await expectAsking(page);
+  });
+});
+
+const MOSAIC_HOST = "https://mosaics.example.net";
+const MOSAIC_SOURCE = `${MOSAIC_HOST}/maps/mosaic.yaml`;
+const OTHER_MOSAIC_SOURCE = `${MOSAIC_HOST}/maps/other.yaml`;
+const MOSAIC_TITLE = "Nobel books";
+const MOSAIC_REMEMBER_LABEL = "Remember my answer for this mosaic";
+const BOTH_REMEMBER_LABEL = "Remember my answer for this mod and this mosaic";
+const OPEN_LIBRARY_HOST = "https://covers.openlibrary.org";
+const OPEN_LIBRARY_COVER_URL = `${OPEN_LIBRARY_HOST}/b/id/1.jpg`;
+const OPEN_LIBRARY_LINE = `show content from ${OPEN_LIBRARY_HOST}`;
+const APP_PROBE_TITLE = "App probe";
+const APP_PROBE_FOLDER = `${PREVIEW_URL}/test-mods/probe/`;
+
+/** The run link of a mosaic file. */
+function buildMosaicHash(source: string): string {
+  const hash = `#/run?mosaic=${encodeURIComponent(source)}`;
+  return hash;
+}
+
+/** A mosaic file titled `title` of the mod at `mod`, declaring `show` for the Open Library covers. */
+function buildCoversMosaic(mod: string, title: string = MOSAIC_TITLE): string {
+  const mosaic = [
+    "mosaic:",
+    `  title: "${title}"`,
+    `  mod: "${mod}"`,
+    "  permissions:",
+    "    show:",
+    `      - host: "${OPEN_LIBRARY_HOST}"`,
+    '        reason: "Shows the book covers"',
+  ].join("\n");
+  return mosaic;
+}
+
+/**
+ * Serves the app-origin probe, titled `App probe` and declaring nothing, the
+ * foreign mosaics `maps/mosaic.yaml` and `maps/other.yaml` of it, and the
+ * covers of both image hosts.
+ */
+async function serveCoversMosaics(page: Page): Promise<void> {
+  await routeCovers(page);
+  await routeImages(page, `${OPEN_LIBRARY_HOST}/**`);
+  await serveAppOriginMod(
+    page,
+    buildProbeFiles("probe", [`  title: "${APP_PROBE_TITLE}"`]),
+  );
+  await serveForeignMod(
+    page,
+    {
+      "maps/mosaic.yaml": buildCoversMosaic(APP_PROBE_FOLDER),
+      "maps/other.yaml": buildCoversMosaic(APP_PROBE_FOLDER, "Other books"),
+    },
+    MOSAIC_HOST,
+  );
+}
+
+/** Serves the foreign probe declaring the covers of `COVER_HOST`, and a foreign mosaic of it at `maps/mosaic.yaml`. */
+async function serveForeignModMosaic(page: Page): Promise<void> {
+  await routeCovers(page);
+  await routeImages(page, `${OPEN_LIBRARY_HOST}/**`);
+  await serveForeignMod(
+    page,
+    buildForeignProbeFiles("probe", PROBE_TITLE, SHOW_LINES),
+  );
+  await serveForeignMod(
+    page,
+    { "maps/mosaic.yaml": buildCoversMosaic(PROBE_FOLDER) },
+    MOSAIC_HOST,
+  );
+}
+
+function consentGroup(page: Page, title: string): Locator {
+  return siteConsentDialog(page).getByRole("region", { name: title });
+}
+
+test.describe("Ask before a foreign mosaic's permissions apply", function describeMosaicAsk(): void {
+  test("Foreign mosaic with a cover host", async function asksForeignMosaic({
+    page,
+  }): Promise<void> {
+    await serveCoversMosaics(page);
+
+    await page.goto(`/${buildMosaicHash(MOSAIC_SOURCE)}`);
+
+    const dialog = siteConsentDialog(page);
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole("heading", { name: MOSAIC_TITLE }),
+    ).toBeVisible();
+    await expect(dialog).toContainText(MOSAIC_SOURCE);
+    await expect(dialog.getByRole("checkbox")).toHaveCount(2);
+    await expect(lineCheckbox(page, OPEN_LIBRARY_LINE)).toBeChecked();
+    await expect(lineCheckbox(page, MOSAIC_REMEMBER_LABEL)).toBeVisible();
+    await expect(visibleSandbox(page).locator("iframe")).toHaveCount(0);
+  });
+
+  test("Mosaic from the app's origin", async function grantsAppOriginMosaic({
+    page,
+  }): Promise<void> {
+    await routeImages(page, `${OPEN_LIBRARY_HOST}/**`);
+    await serveAppOriginMod(page, {
+      ...buildProbeFiles("probe", [`  title: "${APP_PROBE_TITLE}"`]),
+      "mosaics/covers.yaml": buildCoversMosaic("../probe/"),
+    });
+
+    await page.goto("/#/run?mosaic=./test-mods/mosaics/covers.yaml");
+    const frame = await waitForProbeFrame(page, APP_PROBE_TITLE);
+
+    await expectNoDialog(page);
+    expect(await frame.evaluate(showImage, OPEN_LIBRARY_COVER_URL)).toBe(true);
+  });
+
+  test("Foreign mosaic and foreign mod", async function asksBoth({
+    page,
+  }): Promise<void> {
+    await serveForeignModMosaic(page);
+
+    await page.goto(`/${buildMosaicHash(MOSAIC_SOURCE)}`);
+
+    await expect(siteConsentDialog(page)).toBeVisible();
+    await expect(lineCheckbox(page, SHOW_LINE)).toBeChecked();
+    await expect(lineCheckbox(page, OPEN_LIBRARY_LINE)).toBeChecked();
+    await expect(lineCheckbox(page, BOTH_REMEMBER_LABEL)).toBeVisible();
+    await expect(siteConsentDialog(page)).toHaveCount(1);
+  });
+});
+
+test.describe("The dialog shows the mosaic's lines apart", function describeMosaicGroups(): void {
+  test("Lines of the mod and of the mosaic", async function groupsLines({
+    page,
+  }): Promise<void> {
+    await serveForeignModMosaic(page);
+
+    await page.goto(`/${buildMosaicHash(MOSAIC_SOURCE)}`);
+
+    const modGroup = consentGroup(page, PROBE_TITLE);
+    const mosaicGroup = consentGroup(page, MOSAIC_TITLE);
+    await expect(modGroup).toContainText(`${PROBE_FOLDER}mod_conf.yaml`);
+    await expect(modGroup.getByRole("checkbox")).toHaveAccessibleName(
+      SHOW_LINE,
+    );
+    await expect(mosaicGroup).toContainText(MOSAIC_SOURCE);
+    await expect(mosaicGroup.getByRole("checkbox")).toHaveAccessibleName(
+      OPEN_LIBRARY_LINE,
+    );
+    await expect(mosaicGroup).toContainText("Shows the book covers");
+  });
+
+  test("Allow with the mosaic's line unchecked", async function refusesMosaicLine({
+    page,
+  }): Promise<void> {
+    await serveForeignModMosaic(page);
+    await page.goto(`/${buildMosaicHash(MOSAIC_SOURCE)}`);
+
+    await answerSiteConsent(page, "Allow", { unchecked: [OPEN_LIBRARY_LINE] });
+    const frame = await waitForProbeFrame(page);
+
+    expect(await frame.evaluate(showImage, COVER_URL)).toBe(true);
+    expect(await frame.evaluate(showImage, OPEN_LIBRARY_COVER_URL)).toBe(false);
+    const context = await frame.evaluate(readProbeContext);
+    expect(context.permissions).toEqual({
+      granted: [
+        { category: "show", host: COVER_HOST, reason: "Shows the book covers" },
+      ],
+      denied: [
+        {
+          category: "show",
+          host: OPEN_LIBRARY_HOST,
+          reason: "Shows the book covers",
+        },
+      ],
+    });
+  });
+});
+
+test.describe("Remember keeps the answer for that mosaic", function describeMosaicRemember(): void {
+  test("Remembered mosaic allow", async function remembersMosaicAllow({
+    page,
+  }): Promise<void> {
+    await serveCoversMosaics(page);
+    await page.goto(`/${buildMosaicHash(MOSAIC_SOURCE)}`);
+    await clickCheckedTo(lineCheckbox(page, MOSAIC_REMEMBER_LABEL), true);
+    await siteConsentDialog(page)
+      .getByRole("button", { name: "Allow" })
+      .click();
+    await waitForProbeFrame(page, APP_PROBE_TITLE);
+
+    await stageBar(page).getByRole("button", { name: "Close" }).click();
+    await followLink(page, buildMosaicHash(MOSAIC_SOURCE));
+    const frame = await waitForProbeFrame(page, APP_PROBE_TITLE);
+
+    await expectNoDialog(page);
+    expect(await frame.evaluate(showImage, OPEN_LIBRARY_COVER_URL)).toBe(true);
+  });
+
+  test("Another mosaic with the same host", async function asksOtherMosaic({
+    page,
+  }): Promise<void> {
+    await serveCoversMosaics(page);
+    await page.goto(`/${buildMosaicHash(MOSAIC_SOURCE)}`);
+    await clickCheckedTo(lineCheckbox(page, MOSAIC_REMEMBER_LABEL), true);
+    await siteConsentDialog(page)
+      .getByRole("button", { name: "Allow" })
+      .click();
+    await waitForProbeFrame(page, APP_PROBE_TITLE);
+
+    await followLink(page, buildMosaicHash(OTHER_MOSAIC_SOURCE));
+
+    await expect(
+      siteConsentDialog(page).getByRole("heading", { name: "Other books" }),
+    ).toBeVisible();
+  });
+
+  test("Same mod without the mosaic", async function keepsDecisionToMosaic({
+    page,
+  }): Promise<void> {
+    await serveCoversMosaics(page);
+    await page.goto(`/${buildMosaicHash(MOSAIC_SOURCE)}`);
+    await clickCheckedTo(lineCheckbox(page, MOSAIC_REMEMBER_LABEL), true);
+    await siteConsentDialog(page)
+      .getByRole("button", { name: "Allow" })
+      .click();
+    await waitForProbeFrame(page, APP_PROBE_TITLE);
+    await stageBar(page).getByRole("button", { name: "Close" }).click();
+
+    await followLink(page, "#/run?mod=./test-mods/probe/");
+    const frame = await waitForProbeFrame(page, APP_PROBE_TITLE);
+
+    await expectNoDialog(page);
+    expect(await frame.evaluate(showImage, OPEN_LIBRARY_COVER_URL)).toBe(false);
+    const context = await frame.evaluate(readProbeContext);
+    expect(context.permissions).toEqual({ granted: [], denied: [] });
+  });
+});
+
+test.describe("Inspecting a mosaic never asks", function describeMosaicInspect(): void {
+  test("Inspect a foreign mosaic without decisions", async function inspectsWithoutAsking({
+    page,
+  }): Promise<void> {
+    await serveCoversMosaics(page);
+    await serveAppOriginMod(
+      page,
+      buildProbeFiles("probe", [
+        `  title: "${APP_PROBE_TITLE}"`,
+        "  permissions:",
+        "    open:",
+        '      - host: "*"',
+        '        reason: "Opens mosaics"',
+      ]),
+    );
+    await page.goto("/#/run?mod=./test-mods/probe/");
+    const frame = await waitForProbeFrame(page, APP_PROBE_TITLE);
+
+    const answer = await frame.evaluate(requestFromProbe, [
+      "mosaics.inspect",
+      { mosaic: MOSAIC_SOURCE },
+    ]);
+
+    await expectNoDialog(page);
+    expect(answer.result).toMatchObject({
+      permissions: {
+        granted: [],
+        denied: [
+          {
+            category: "show",
+            host: OPEN_LIBRARY_HOST,
+            reason: "Shows the book covers",
+          },
+        ],
+      },
+    });
   });
 });

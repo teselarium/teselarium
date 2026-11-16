@@ -138,6 +138,54 @@ describe("readAppRoute", function describeReadAppRoute(): void {
     });
   });
 
+  it("Mosaic link with a parameter", function readsMosaicLink(): void {
+    const route = readAppRoute("#/run?mosaic=x&from=y");
+
+    expect(route).toEqual({
+      page: "run",
+      link: {
+        mod: "",
+        collection: null,
+        tile: null,
+        mosaic: "x",
+        params: { from: "y" },
+      },
+    });
+  });
+
+  it("Run link with an empty mosaic", function readsEmptyMosaic(): void {
+    expect(readAppRoute("#/run?mosaic=")).toEqual({ page: "home" });
+  });
+
+  it("Mosaic is not a parameter of the mod", function reservesMosaic(): void {
+    const route = readAppRoute("#/run?mod=mod_viewer&mosaic=&from=y");
+
+    expect(route).toEqual({
+      page: "run",
+      link: {
+        mod: "mod_viewer",
+        collection: null,
+        tile: null,
+        params: { from: "y" },
+      },
+    });
+  });
+
+  it("reads a mosaic link with a mod as written", function readsMosaicWithMod(): void {
+    const route = readAppRoute("#/run?mosaic=./m.yaml&mod=mod_viewer");
+
+    expect(route).toEqual({
+      page: "run",
+      link: {
+        mod: "mod_viewer",
+        collection: null,
+        tile: null,
+        mosaic: "./m.yaml",
+        params: {},
+      },
+    });
+  });
+
   it("No hash", function readsNoHash(): void {
     expect(readAppRoute("")).toEqual({ page: "home" });
     expect(readAppRoute("#/")).toEqual({ page: "home" });
@@ -195,6 +243,19 @@ describe("buildRunLink", function describeBuildRunLink(): void {
     expect(runLink).toBe(SAMPLE_VIEWER_RUN_HASH);
   });
 
+  it("writes the mosaic first and no empty mod", function buildsMosaicLink(): void {
+    const runLink = buildRunLink({
+      mod: "",
+      collection: null,
+      mosaic: "./samples/mosaics/nobel_map.yaml",
+      params: { from: "x" },
+    });
+
+    expect(runLink).toBe(
+      "#/run?mosaic=.%2Fsamples%2Fmosaics%2Fnobel_map.yaml&from=x",
+    );
+  });
+
   it("gives the link back when read", function roundTrips(): void {
     const links: RunLink[] = [
       { mod: "mod_viewer", collection: null, tile: null, params: {} },
@@ -209,6 +270,13 @@ describe("buildRunLink", function describeBuildRunLink(): void {
         collection: null,
         tile: "https://example.org/a b&c.md",
         params: { from: "https://example.org/c.yaml" },
+      },
+      {
+        mod: "",
+        collection: null,
+        tile: null,
+        mosaic: "https://example.org/a b&c/mosaic.yaml",
+        params: { from: "y" },
       },
     ];
 

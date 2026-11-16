@@ -26,6 +26,7 @@ const KALLOCAIN_URL = `${BOOKS_URL}kallocain.md`;
 const LOCAL_COLLECTION_URL = "file:///library/books_collection.yaml";
 const CODE_RAN_MARKER = "openTeselaCollectionCodeRan";
 const SAMPLE_BOOK_FILES = ["farenheit_451.md", "kallocain.md", "fictions.md"];
+const EMPTY_COLLECTION_TEXT = 'collection:\n  name: "Empty"\n  tiles: []\n';
 
 interface PendingFetch {
   url: string;
@@ -237,6 +238,35 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       expect(String(error)).toContain(SAMPLE_COLLECTION_PATH);
       expect(String(error)).toContain("a base URL is required");
       expect(testFetch).not.toHaveBeenCalled();
+    });
+
+    it("Collection folder", async function loadsCollectionFolder(): Promise<void> {
+      const testFetch = createTestFetch();
+      const folderFileUrl =
+        "https://example.org/samples/tiles/literature_nobel_laureates/collection.yaml";
+      serveTestFile(folderFileUrl, EMPTY_COLLECTION_TEXT);
+
+      const collection = await loadTileCollection(
+        "./samples/tiles/literature_nobel_laureates",
+        { baseUrl: "https://example.org/", fetch: testFetch },
+      );
+
+      expect(collection.source).toBe(folderFileUrl);
+      expect(testFetch).toHaveBeenCalledExactlyOnceWith(folderFileUrl);
+    });
+
+    it("Folder with a trailing slash and a query", async function loadsFolderWithQuery(): Promise<void> {
+      const testFetch = createTestFetch();
+      const folderFileUrl = "https://tiles.example.net/books/collection.yaml";
+      serveTestFile(folderFileUrl, EMPTY_COLLECTION_TEXT);
+
+      const collection = await loadTileCollection(
+        "https://tiles.example.net/books/?v=2",
+        { fetch: testFetch },
+      );
+
+      expect(collection.source).toBe(folderFileUrl);
+      expect(testFetch).toHaveBeenCalledExactlyOnceWith(folderFileUrl);
     });
   });
 
