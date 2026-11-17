@@ -13,9 +13,13 @@ The Settings section SHALL show, at `#/settings`, an Appearance group holding th
 - **WHEN** the vanilla app is opened at `#/settings`
 - **THEN** the page shows the Theme control, and switches labeled Tiles, Mods, Mosaics and Guides, all on
 - **AND** Home, Settings and About are listed as always shown, without a switch
-- **AND** Mosaics says `Coming soon`, and Tiles does not
+- **AND** no section says `Coming soon`
 - **AND** the Privacy group shows a switch labeled `Load media linked by tiles`, on
 - **AND** the Mod permissions group, after the Privacy group, says that no decision is remembered
+
+#### Scenario: Coming-soon section of an instantiation
+- **WHEN** an instantiation's registry has an optional section `Example Section` marked as coming soon, and `#/settings` is opened
+- **THEN** the Sidebar group shows a switch labeled `Example Section` that says `Coming soon`
 
 ### Requirement: Switch a section off
 Switching an optional section off SHALL remove its item from the sidebar at once, and switching it on SHALL bring the item back at its place, without reloading the page or any frame. Coming-soon sections SHALL be switched the same way.
@@ -59,12 +63,12 @@ The section switches SHALL be kept in the app's storage, under a key that no mod
 - **THEN** the sidebar has no Mosaics item and its switch is off
 
 #### Scenario: Removed section is dropped
-- **WHEN** the stored switches hold `atlas` off and the registry has no `atlas` section
-- **THEN** the app starts normally, and the next stored value has no `atlas`
+- **WHEN** the stored switches hold `removed_section` off and the registry has no `removed_section` section
+- **THEN** the app starts normally, and the next stored value has no `removed_section`
 
 #### Scenario: New section starts on
-- **WHEN** an instantiation adds an optional section `atlas` and the stored switches have no `atlas`
-- **THEN** the sidebar shows the Atlas item
+- **WHEN** an instantiation adds an optional section `new_section`, labeled New Section, and the stored switches have no `new_section`
+- **THEN** the sidebar shows the New Section item
 
 #### Scenario: Storage cannot be written
 - **WHEN** writing to the app's storage fails and the user switches Guides off

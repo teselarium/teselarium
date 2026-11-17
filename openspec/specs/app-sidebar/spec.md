@@ -22,7 +22,7 @@ The sidebar SHALL be built from a section registry. Each section SHALL have an i
 - **THEN** the app reports an error that names `My Guides` and the allowed pattern
 
 ### Requirement: Vanilla sections
-The vanilla registry SHALL hold, in the `main` group and in this order: Home (a page, always shown), Tiles (the mod link `collection_explorer`, optional), Mods (the mod link `mod_explorer`, optional), Mosaics (optional, coming soon) and Guides (a page, optional); and in the `footer` group: Settings (a page, always shown) and About (a page, always shown). The `footer` group SHALL be shown at the bottom of the sidebar.
+The vanilla registry SHALL hold, in the `main` group and in this order: Home (a page, always shown), Tiles (the mod link `collection_explorer`, optional), Mods (the mod link `mod_explorer`, optional), Mosaics (the mod link `mosaic_explorer`, optional) and Guides (a page, optional); and in the `footer` group: Settings (a page, always shown) and About (a page, always shown). The `footer` group SHALL be shown at the bottom of the sidebar.
 
 #### Scenario: Vanilla sidebar
 - **WHEN** the vanilla app is opened for the first time on a 1280×800 viewport
@@ -31,6 +31,10 @@ The vanilla registry SHALL hold, in the `main` group and in this order: Home (a 
 #### Scenario: Tiles opens the collection explorer
 - **WHEN** the user clicks the Tiles item in the vanilla sidebar
 - **THEN** the collection explorer is the visible mod, the address is `#/run?mod=collection_explorer` and the Tiles item is the current one
+
+#### Scenario: Mosaics opens the mosaic explorer
+- **WHEN** the user clicks the Mosaics item in the vanilla sidebar
+- **THEN** the mosaic explorer is the visible mod, the address is `#/run?mod=mosaic_explorer` and the Mosaics item is the current one
 
 ### Requirement: Section icons
 Each sidebar item SHALL show its section's icon before its label. An icon SHALL be a lucide icon or an image. An image SHALL be drawn in the item's text color, following the color scheme, unless the section sets it not to be tinted, in which case it SHALL be drawn with its own colors. Icons SHALL be decorative: the item's accessible name SHALL be the label.
@@ -57,6 +61,10 @@ A section whose target is a default mod that the instantiation switched off SHAL
 #### Scenario: Collection explorer switched off
 - **WHEN** `collection_explorer` is switched off in the default mod settings
 - **THEN** the sidebar has no Tiles item and the Settings page has no Tiles switch
+
+#### Scenario: Mosaic explorer switched off
+- **WHEN** `mosaic_explorer` is switched off in the default mod settings
+- **THEN** the sidebar has no Mosaics item and the Settings page has no Mosaics switch
 
 ### Requirement: Section navigation
 Activating a section's item SHALL add a history entry and show, in the state it was left in: the last sandbox or page seen in that section, when the user comes from another section and it is still open; otherwise the section's start. Activating the item of the section already shown SHALL show its start. A mod section's start SHALL be its root sandbox while it is open, or a new one. A page section's start SHALL be its index page. No frame SHALL be reloaded.
@@ -213,9 +221,13 @@ Pressing `Ctrl+B`, or `Cmd+B` on macOS, while the app's page has focus SHALL tog
 - **WHEN** the sidebar is expanded, the app's page has focus and the user presses `Ctrl+B`
 - **THEN** the sidebar is collapsed
 
-### Requirement: Coming-soon items are disabled
-A coming-soon section SHALL be shown in the sidebar as a disabled item that says it is coming soon, and SHALL NOT navigate when activated.
+### Requirement: Coming-soon sections are disabled
+A coming-soon section SHALL be shown in the sidebar as a disabled item that says it is coming soon, and SHALL NOT navigate when activated. The vanilla registry SHALL have no coming-soon section.
 
-#### Scenario: Mosaics is coming soon
-- **WHEN** the user clicks the Mosaics item in the vanilla sidebar
+#### Scenario: An instantiation's coming-soon section
+- **WHEN** an instantiation's registry has an optional section `Example Section` marked as coming soon, and the user clicks its item
 - **THEN** the item has `aria-disabled="true"`, its tooltip or label says `Coming soon`, and the visible page or sandbox does not change
+
+#### Scenario: No coming-soon item in the vanilla app
+- **WHEN** the vanilla sidebar is shown
+- **THEN** no item says `Coming soon`

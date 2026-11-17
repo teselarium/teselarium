@@ -78,7 +78,7 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 - **THEN** `requests` lists the `storage.get` for that key with its result, and then the `storage.set` with that key and the written value
 
 ### Requirement: Scripted answers
-`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean value, or `mods.open` with `null`. The request SHALL resolve with the queued value without any dialog. A `mods.open` answered this way SHALL NOT open anything. Requests without a queued answer SHALL be answered as in the mount check. In cases, no request that needs the user SHALL be a finding, answered or not.
+`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean value, or `mods.open` or `mosaics.open` with `null`. The request SHALL resolve with the queued value without any dialog. A `mods.open` or `mosaics.open` answered this way SHALL NOT open anything. Requests without a queued answer SHALL be answered as in the mount check, and `mods.check` and `mosaics.check`, which cannot be answered, SHALL be answered with error code `-32002`. In cases, no request that needs the user SHALL be a finding, answered or not.
 
 #### Scenario: Confirm answered yes
 - **WHEN** a case calls `answer("ui.confirm", true)` and the mod then sends `ui.confirm`
@@ -95,6 +95,14 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 #### Scenario: Player answered
 - **WHEN** a case calls `answer("players.open", true)` and the mod then sends `players.open` with a player address of its tiles
 - **THEN** the request resolves with `true`, no dialog is shown and nothing is requested from the player's site
+
+#### Scenario: Mosaic open answered
+- **WHEN** a case calls `answer("mosaics.open", null)` and the mod then sends `mosaics.open` for a fixture mosaic
+- **THEN** the request resolves with `null`, nothing is opened, and the case's `requests` holds the `mosaics.open` with its `mosaic`
+
+#### Scenario: Mosaic check in a case
+- **WHEN** the mod sends `mosaics.check` in a case
+- **THEN** the request is answered with error code `-32002`, nothing is checked, and the report has no finding about `mosaics.check`
 
 ### Requirement: What a case records
 While a case runs, the check SHALL record as `test` findings what the mount check records as `mount` findings, with the same level and source and a message that also names the case: blocked requests and blocked browser dialogs as warnings, and each request answered with `-32600`, `-32601` or `-32602` as an error. A mount that throws or rejects SHALL NOT be a finding, since it rejects the case's `mount` call.
