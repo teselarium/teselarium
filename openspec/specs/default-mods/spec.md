@@ -7,14 +7,14 @@ Ships the vanilla app's Explore, Viewer and Maker components as default mods: or
 ## Requirements
 
 ### Requirement: Default mods folder
-Default mods SHALL live in the default mods folder, `./default_mods/` next to the app, one folder per mod named after the mod, each with a `mod_conf.yaml`. They SHALL be served from the app's origin, so they get their declared permissions. A default mod name SHALL resolve to the folder of that name in the default mods folder, whatever `name` the mod file declares, so an instantiation replaces a default mod by putting another mod in its folder.
+Default mods SHALL live in the default mods folder, `./default_mods/` next to the app, one folder per mod named after the mod, each with a `mod_conf.yaml`. They SHALL be served from the app's origin, so they get their declared permissions. A default mod name SHALL resolve to the folder of that name in the default mods folder, whatever `title` the mod file declares, so an instantiation replaces a default mod by putting another mod in its folder.
 
 #### Scenario: Explorer from the default folder
 - **WHEN** the app at `https://example.org/` opens the Mods section
 - **THEN** the mod's source is `https://example.org/default_mods/mod_explorer/mod_conf.yaml` and its `open` permission is granted
 
 #### Scenario: Replaced viewer
-- **WHEN** the default mods folder's `mod_viewer/mod_conf.yaml` declares `name: "fancy_viewer"` and the explorer opens `mod_viewer`
+- **WHEN** the default mods folder's `mod_viewer/mod_conf.yaml` declares `title: "Fancy Viewer"` and the explorer opens `mod_viewer`
 - **THEN** that mod is opened
 
 ### Requirement: Default mod settings
@@ -68,12 +68,16 @@ The mod explorer's vanilla config SHALL list the sample book list mod, then the 
 - **THEN** its frame lists `Country Map` after `Flashcards`, with the country map mod's description
 
 ### Requirement: Mod viewer
-The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the mod named by its `target` parameter, using `mods.inspect`: title, version, description, name, source, API range and whether it matches the app's mod API version, tile type, sample collection, config, and each declared permission with its reason and whether it would be granted. It SHALL NOT need a collection.
+The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the mod named by its `target` parameter, using `mods.inspect`: title, version, description, source, API range and whether it matches the app's mod API version, tile type, default mosaic, config, and each declared permission with its reason and whether it would be granted. It SHALL NOT need a collection.
 
 #### Scenario: View the sample mod
 - **WHEN** the app is opened at `#/run?mod=mod_viewer&target=./samples/mods/book_list`
-- **THEN** the viewer's frame shows `Book List`, `1.1.0`, its description, the config value `show_covers`, and the `show` permission for `https://upload.wikimedia.org` with the reason `Shows the book covers`, marked as granted
-- **AND** it shows the API range `^0.1.5`, marked as matching
+- **THEN** the viewer's frame shows `Book List`, `1.1.0`, its description, the config value `show_covers`, and the default mosaic's address ending in `samples/mods/book_list/mosaic.yaml`
+- **AND** it shows the API range `^0.1.14`, marked as matching, and no "Name" row
+
+#### Scenario: View a mod with a permission
+- **WHEN** the viewer shows a fixture mod that declares `show` for `https://upload.wikimedia.org` with the reason `Shows the book covers`
+- **THEN** the viewer's frame shows that permission with its reason, marked as granted
 
 #### Scenario: View a mod for another API
 - **WHEN** the viewer shows a mod with `api: "^0.2.0"`
@@ -103,11 +107,11 @@ Without `target`, or with an empty `target`, the mod viewer SHALL say that no mo
 - **THEN** the viewer's frame shows an error whose message says that `theme` must be `"default"` or `"none"`
 
 ### Requirement: Mod viewer runs the mod
-The mod viewer SHALL offer to run the viewed mod with its sample collection (only when the mod declares one), with a collection whose address the user types, or without tiles. Each choice SHALL send `mods.open` with the mod's source as `mod` and, when there is one, the chosen collection as `collection`. A typed address SHALL be sent as typed, without surrounding spaces, whether it is a full address or a relative path, which is resolved against the app's address.
+The mod viewer SHALL offer to open the viewed mod's default mosaic (only when the mod declares one), to run the mod with a collection whose address the user types, or to run it without tiles. Opening the default mosaic SHALL send `mosaics.open` with the mod's `defaultMosaic` as `mosaic`. The other choices SHALL send `mods.open` with the mod's source as `mod` and, when there is one, the typed collection as `collection`. A typed address SHALL be sent as typed, without surrounding spaces, whether it is a full address or a relative path, which is resolved against the app's address.
 
 #### Scenario: Run with the sample tiles
-- **WHEN** the viewer shows a mod whose sample collection has three tiles of its type, and the user chooses to run it with its sample tiles
-- **THEN** the viewed mod is the visible mod and receives the three tiles of its sample collection
+- **WHEN** the viewer shows a mod whose default mosaic names a collection with three tiles of its type, and the user chooses "Open default mosaic"
+- **THEN** the viewed mod is the visible mod, opened from its default mosaic, and receives the three tiles
 - **AND** the mod viewer is hidden and still running
 
 #### Scenario: Run with a typed collection
@@ -128,8 +132,8 @@ The mod viewer SHALL offer to run the viewed mod with its sample collection (onl
 - **THEN** the opened link has no `collection` and the mod runs with no tiles
 
 #### Scenario: Mod without a sample collection
-- **WHEN** the viewer shows a mod that declares no `sample_collection`
-- **THEN** the viewer offers no choice to run it with sample tiles
+- **WHEN** the viewer shows a mod that declares no `default_mosaic`
+- **THEN** the viewer offers no choice to open a default mosaic
 
 ### Requirement: Default mods show how to get the app's look
 The default mods SHALL get their look only from the theme: semantic HTML, the color scheme, and the `data-ot-variant` attribute. Their own styles SHALL set layout only (display, grid, flex, gaps, widths, alignment, overflow) and SHALL NOT set colors, borders, backgrounds, fonts, radii or shadows. No class or `style` attribute in them SHALL exist to change the look.
@@ -180,9 +184,9 @@ While the mod viewer shows a mod, it SHALL have a "Check mod" button that sends 
 - **THEN** the viewer's frame has no "Check mod" button
 
 #### Scenario: Check with a relative collection address
-- **WHEN** the app's address is `https://example.org/`, the viewer shows a mod that declares a sample collection, and the user types `./test-mods/missing.yaml`, which answers HTTP 404, and presses "Check mod"
+- **WHEN** the app's address is `https://example.org/`, the viewer shows a mod that declares a default mosaic, and the user types `./test-mods/missing.yaml`, which answers HTTP 404, and presses "Check mod"
 - **THEN** the report shows an error finding whose source is `https://example.org/test-mods/missing.yaml` and whose message names `404`
-- **AND** the mod's sample collection is not requested
+- **AND** the mod's default mosaic is not requested
 
 ### Requirement: Mod viewer shows the check report
 The mod viewer SHALL show the report's status as a badge, with `data-ot-variant` `success` for `"pass"`, `warning` for `"warn"` and `destructive` for `"fail"`, each test case with its status and message, and each finding with its step, level, source and message. When the request fails, it SHALL show the error message as an alert. The mod viewer SHALL stay the visible mod.
@@ -247,14 +251,18 @@ The mod explorer's cases SHALL cover listing the mods of its config as cards, li
 - **THEN** the case's `requests` holds a `mods.open` with `mod` `mod_viewer` and `params.target` the fixture mod's source
 
 ### Requirement: Viewer cases
-The mod viewer's cases SHALL cover showing the metadata of the mod named by its `target` parameter, the API range marked as matching, not matching or missing, a missing, empty or failing `target`, and each run choice: the case answers `mods.open` with `null`, and `requests` shows the `mods.open` that the choice sends.
+The mod viewer's cases SHALL cover showing the metadata of the mod named by its `target` parameter, the API range marked as matching, not matching or missing, a missing, empty or failing `target`, and each run choice: the case answers `mods.open` and `mosaics.open` with `null`, and `requests` shows the request that the choice sends.
 
 #### Scenario: Run without tiles in a case
 - **WHEN** a case of the mod viewer mounts it with a fixture mod as `params.target`, answers `mods.open` with `null`, and chooses to run the mod without tiles
 - **THEN** the case's `requests` holds a `mods.open` with the fixture mod's source as `mod` and no `collection`
 
+#### Scenario: Open the default mosaic in a case
+- **WHEN** a case mounts the viewer with a fixture mod that declares a default mosaic, answers `mosaics.open` with `null`, and chooses "Open default mosaic"
+- **THEN** the case's `requests` holds a `mosaics.open` with the fixture mod's `defaultMosaic` as `mosaic`
+
 ### Requirement: Collection explorer
-The collection explorer `collection_explorer` SHALL declare `open` for `"*"`, and SHALL list each collection location in its config's `collections` with the name, description and number of tiles it gets from `collections.inspect`. A location that cannot be inspected SHALL be listed with the location and the error message. Selecting a collection SHALL send `mods.open` for the mod in its config's `viewer`, with the collection's source as the `target` parameter.
+The collection explorer `collection_explorer` SHALL declare `open` for `"*"`, and SHALL list each collection location in its config's `collections` with the title, description and number of tiles it gets from `collections.inspect`. A location that cannot be inspected SHALL be listed with the location and the error message. Selecting a collection SHALL send `mods.open` for the mod in its config's `viewer`, with the collection's source as the `target` parameter.
 
 #### Scenario: Vanilla explorer lists the Nobel laureates
 - **WHEN** the collection explorer runs with its vanilla config
@@ -262,7 +270,7 @@ The collection explorer `collection_explorer` SHALL declare `open` for `"*"`, an
 
 #### Scenario: Select a collection
 - **WHEN** the collection explorer lists a collection and the user selects it
-- **THEN** the collection viewer is the visible mod and shows the selected collection's name
+- **THEN** the collection viewer is the visible mod and shows the selected collection's title
 - **AND** the app's address is a run link with `mod=collection_viewer` and the selected collection's source as `target`
 
 #### Scenario: Collection that cannot be inspected
@@ -285,7 +293,7 @@ The collection explorer's vanilla config SHALL list the sample collection of Nob
 - **THEN** its frame lists `Nobel Prize in Literature laureates books` after `Nobel Prize in Literature laureates`, and no other collection
 
 ### Requirement: Collection viewer
-The collection viewer `collection_viewer` SHALL declare `open` for `"*"`, and SHALL show the collection named by its `target` parameter, using `collections.inspect`: name, description, source, each entry issue with its level, source and message, and the list of its tiles. It SHALL NOT need a collection to be opened with, and SHALL request no tile.
+The collection viewer `collection_viewer` SHALL declare `open` for `"*"`, and SHALL show the collection named by its `target` parameter, using `collections.inspect`: title, description, source, each entry issue with its level, source and message, and the list of its tiles. It SHALL NOT need a collection to be opened with, and SHALL request no tile.
 
 #### Scenario: View a sample collection
 - **WHEN** the app is opened at the run link of `collection_viewer` whose `target` is the Nobel laureates collection's source
@@ -479,19 +487,19 @@ A click on a link of the metadata or of the body whose address's path ends with 
 - **THEN** the new tile viewer's link has no `from`
 
 ### Requirement: Tile viewer shows its place in a collection
-With a `from` parameter, the tile viewer SHALL inspect that collection with `collections.inspect`. When its tile's source is in the collection's tiles, it SHALL show the collection's name, as a button that opens the mod in its config's `collection_viewer` with `from` as `target` in a new sandbox, and the tile's position as `<i> of <n>`. Otherwise it SHALL show neither.
+With a `from` parameter, the tile viewer SHALL inspect that collection with `collections.inspect`. When its tile's source is in the collection's tiles, it SHALL show the collection's title, as a button that opens the mod in its config's `collection_viewer` with `from` as `target` in a new sandbox, and the tile's position as `<i> of <n>`. Otherwise it SHALL show neither.
 
 #### Scenario: Tile in its collection
 - **WHEN** the viewer is opened with the third tile of a collection of sixteen as `tile` and that collection as `from`
-- **THEN** its frame shows the collection's name and `3 of 16`
+- **THEN** its frame shows the collection's title and `3 of 16`
 
 #### Scenario: Open the collection
-- **WHEN** the viewer shows its place in a collection and the user activates the collection's name
+- **WHEN** the viewer shows its place in a collection and the user activates the collection's title
 - **THEN** a collection viewer showing that collection is visible
 
 #### Scenario: Tile no longer in the collection
 - **WHEN** the viewer is opened with a `from` collection that does not list its tile
-- **THEN** its frame shows the tile, and neither the collection's name nor a position
+- **THEN** its frame shows the tile, and neither the collection's title nor a position
 
 ### Requirement: Tile viewer steps through its collection
 When the tile viewer shows its place in a collection, it SHALL have Previous and Next buttons. Each SHALL send `mods.open` for the mod in its config's `tile_viewer` with the neighbouring tile of the collection as `tile`, the same `from` and `replace` `true`. Previous SHALL be disabled on the first tile and Next on the last; the list SHALL NOT wrap around.

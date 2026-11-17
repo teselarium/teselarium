@@ -7,11 +7,11 @@ Describes what the shipped sample flashcards mod (`public/samples/mods/flashcard
 ## Requirements
 
 ### Requirement: Mod file
-The mod file SHALL name the mod `flashcards` with the title "Flashcards", and SHALL declare its tile type `./flashcard_type.md`, its sample collection `./flashcard_collection.yaml` and its test file `./test.js`. It SHALL declare no permissions.
+The mod file SHALL give the mod the title "Flashcards", and SHALL declare `api: "^0.1.14"`, the first mod API version with `default_mosaic`, its tile type `./flashcard_type.md`, its test file `./test.js` and `default_mosaic: "./mosaic.yaml"`, whose mosaic names the mod's own folder and the sample deck `./flashcard_collection.yaml` as its collection. Neither the mod file nor its default mosaic SHALL declare permissions. The sample deck's collection file SHALL use `title`.
 
 #### Scenario: Inspect the sample
 - **WHEN** `mods.inspect` is sent for `./samples/mods/flashcards`
-- **THEN** the answer has the title "Flashcards", a tile type and a sample collection, and its permissions have no granted and no denied entry
+- **THEN** the answer has the title "Flashcards", a tile type and a default mosaic, and its permissions have no granted and no denied entry
 
 ### Requirement: Explore and Study modes
 The mod SHALL show its title as a heading, then two buttons, "Explore" and "Study". The button of the current mode SHALL have `aria-pressed="true"` and the other `aria-pressed="false"`. The mod SHALL start in Explore. Pressing a button SHALL switch to its mode without reloading the mod's frame.
@@ -159,15 +159,19 @@ When the setup dialog opens with no remembered fields, Question SHALL be `questi
 - **THEN** Question shows `question` and Answer shows "Body"
 
 ### Requirement: Remembered fields
-Pressing "Start" SHALL store the chosen Question and Answer in the mod's storage under the key `study_fields`. When the setup dialog opens with no session, it SHALL show the stored fields, each one only when its select still offers it, and the default otherwise.
+Pressing "Start" SHALL store the chosen Question and Answer in the mod's storage under the key `study_fields`. When the setup dialog opens with no session, it SHALL show the stored fields, each one only when its select still offers it, and the default otherwise. The stored fields SHALL be those of the deck the mod was opened with: they come back when the mod is opened again from the same mosaic or with the same collection, and not with another one.
 
 #### Scenario: Fields kept across starts
-- **WHEN** the user starts a session with Question `title` and Answer "Body", and the mod is opened again and the user presses "Study"
+- **WHEN** the user starts a session with Question `title` and Answer "Body" while the mod is opened from its default mosaic, and the mod is opened again from its default mosaic and the user presses "Study"
 - **THEN** Question shows `title` and Answer shows "Body"
 
 #### Scenario: Stored key no longer offered
 - **WHEN** the storage holds Question `term` and no tile has the key `term`
 - **THEN** the setup dialog shows the default Question
+
+#### Scenario: Study fields per deck
+- **WHEN** the user chooses study fields while the mod is opened from its default mosaic, and then opens the mod with another collection
+- **THEN** the setup does not start from the fields chosen for the sample deck
 
 ### Requirement: Which tiles are cards
 A tile SHALL be a card when both its question and its answer have a value. A metadata key has a value when the value is a non-blank string, a number, a boolean, or a non-empty list of those. "Body" has a value when the body is not blank. "First heading" has a value when the rendered body has a heading with text and its section is not empty.

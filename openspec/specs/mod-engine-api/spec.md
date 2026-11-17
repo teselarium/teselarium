@@ -44,11 +44,11 @@ The engine API object given to `mount` SHALL have `request(method, params)` and 
 - **THEN** both handlers are called once with the event's params, in the order they were registered
 
 ### Requirement: Mount context
-The mount context SHALL have `mod` (`source`, `name`, `title`, `version`, `description`), `mosaic` (`source`, `title`, `description` of the mosaic the mod was opened from, or `null`), `config` (the mod's config, merged with the mosaic's config when the mod was opened from a mosaic), `params` (the parameters of the link that opened the mod, other than `mod`, `collection`, `tile` and `mosaic`, as a mapping of strings), `tiles`, `issues` (the issues from loading and validating the collection or the tile) and `permissions` with `granted` and `denied` lists of `{ category, host, reason }`.
+The mount context SHALL have `mod` (`source`, `title`, `version`, `description`), `mosaic` (`source`, `title`, `description` of the mosaic the mod was opened from, or `null`), `config` (the mod's config, merged with the mosaic's config when the mod was opened from a mosaic), `params` (the parameters of the link that opened the mod, other than `mod`, `collection`, `tile` and `mosaic`, as a mapping of strings), `tiles`, `issues` (the issues from loading and validating the collection or the tile) and `permissions` with `granted` and `denied` lists of `{ category, host, reason }`.
 
 #### Scenario: Sample mount context
-- **WHEN** the sample book list mod is opened with the sample collection from the app's origin
-- **THEN** the context's `mod.name` is `"book_list"`, its `config` is the mod's config and it has three tiles
+- **WHEN** the fixture book list mod, which declares `show` for `https://upload.wikimedia.org`, is opened with its collection from the app's origin
+- **THEN** the context's `mod` is `{ source, title: "Book List", version, description }` with no `name`, its `config` is the mod's config and it has three tiles
 - **AND** `permissions.granted` holds the `show` permission for `https://upload.wikimedia.org` and `permissions.denied` is empty
 
 #### Scenario: Foreign mod sees its denied permissions
@@ -138,24 +138,44 @@ The engine's own error codes SHALL be `-32000` (storage failed), `-32001` (a mod
 - **WHEN** a mod sets a key to a `Date`
 - **THEN** the response has an error with code `-32602` whose message says that the value must be plain data
 
-### Requirement: Storage slots are separate per mod source
-Each mod SHALL have its own storage slot, identified by the mod's source. Two mods with different sources SHALL NOT read each other's values, even when they have the same name. A slot SHALL keep its values when the app is reloaded.
+### Requirement: Storage slots are separate per mod and context
+Each mod SHALL have one storage slot per context, identified by the mod's source and the context: the mosaic file's address when the mod was opened from a mosaic, otherwise the collection's source, otherwise the tile's source, otherwise no context. Two slots that differ in mod or context SHALL NOT read each other's values. A slot SHALL keep its values when the app is reloaded. Values stored before slots had a context SHALL NOT be read.
 
 #### Scenario: Same name, different sources
-- **WHEN** a mod named `book_list` at one source stores key `selected`, and a mod named `book_list` at another source gets key `selected`
+- **WHEN** a mod titled `Book List` at one source stores key `selected`, and a mod titled `Book List` at another source gets key `selected` with the same collection
 - **THEN** the second mod receives `null`
 
 #### Scenario: Value kept after a reload
-- **WHEN** a mod stores key `selected` and the app page is reloaded and the same mod is opened again
+- **WHEN** a mod stores key `selected` and the app page is reloaded and the same mod is opened again with the same collection
 - **THEN** getting key `selected` returns the stored value
 
+#### Scenario: Two collections
+- **WHEN** `flashcards` stores key `study_fields` while opened with one collection, and is then opened with another collection
+- **THEN** getting key `study_fields` returns `null`
+
+#### Scenario: Two mosaics with the same mod and collection
+- **WHEN** a mod stores key `selected` while opened from one mosaic, and is then opened from another mosaic file that names the same mod and collection
+- **THEN** getting key `selected` returns `null`
+
+#### Scenario: A mosaic and a run link
+- **WHEN** a mod stores key `selected` while opened from a mosaic, and is then opened from a run link with the mosaic's mod and collection
+- **THEN** getting key `selected` returns `null`
+
+#### Scenario: No tiles
+- **WHEN** a mod opened without a collection or a tile stores key `selected`, and is opened again the same way
+- **THEN** getting key `selected` returns the stored value
+
+#### Scenario: Value stored before contexts
+- **WHEN** the app's storage holds a value under a mod's former per-mod key, and the mod is opened and gets that key
+- **THEN** the result is `null`
+
 ### Requirement: Inspect a mod
-`mods.inspect` with `{ mod }`, where `mod` is a mod reference, SHALL load the mod file without fetching its entrypoint and return `source`, `name`, `title`, `version`, `description`, `typeSource`, `sampleCollection`, `config`, `libraries`, the mod's declared libraries as the loaded mod carries them, and `permissions`, with the `granted` and `denied` lists that mod would get if it were opened. Inspecting SHALL NOT fetch any library file. When the mod file cannot be loaded, the engine SHALL answer with error code `-32001` and the load error's message.
+`mods.inspect` with `{ mod }`, where `mod` is a mod reference, SHALL load the mod file without fetching its entrypoint and return `source`, `title`, `version`, `description`, `typeSource`, `defaultMosaic`, `config`, `libraries`, the mod's declared libraries as the loaded mod carries them, and `permissions`, with the `granted` and `denied` lists that mod would get if it were opened. Inspecting SHALL NOT fetch any library file or the default mosaic. When the mod file cannot be loaded, the engine SHALL answer with error code `-32001` and the load error's message.
 
 #### Scenario: Inspect the sample mod
 - **WHEN** a mod with `open` granted for the app's origin sends `mods.inspect` with `{ "mod": "./fixtures/mods/book_list" }`
-- **THEN** the result has source `https://example.org/fixtures/mods/book_list/mod_conf.yaml`, title `"Book List"`, `sampleCollection` `https://example.org/fixtures/tiles/books_collection.yaml`, and the `show` permission in `permissions.granted`
-- **AND** `main.js` is not requested
+- **THEN** the result has source `https://example.org/fixtures/mods/book_list/mod_conf.yaml`, title `"Book List"`, `defaultMosaic` `https://example.org/fixtures/mods/book_list/mosaic.yaml`, no `name`, and the `show` permission in `permissions.granted`
+- **AND** neither `main.js` nor `mosaic.yaml` is requested
 
 #### Scenario: Inspect a mod with a library
 - **WHEN** a mod with `open` granted for the app's origin inspects a mod that declares `leaflet` with `npm: "leaflet@1.9.4"` and `files: ["dist/leaflet.js"]`
@@ -384,11 +404,11 @@ The `issues` of the mount context and of `tiles.changed` SHALL hold only the iss
 - **THEN** the `tiles.changed` event's `issues` has no item with level `"info"`
 
 ### Requirement: Inspect a collection
-`collections.inspect` with `{ collection }`, where `collection` is a collection location, SHALL read the collection file without requesting any tile and return its index: `source`, `name`, `description`, `tiles` (the resolved address of each tile entry, in entry order, a repeated tile once) and `issues` (the entry issues, each with level `"warning"` or `"error"`). The result SHALL be plain data.
+`collections.inspect` with `{ collection }`, where `collection` is a collection reference, SHALL read the collection file without requesting any tile and return its index: `source`, `title`, `description`, `tiles` (the resolved address of each tile entry, in entry order, a repeated tile once) and `issues` (the entry issues, each with level `"warning"` or `"error"`). The result SHALL be plain data.
 
 #### Scenario: Inspect the sample collection
 - **WHEN** a mod with `open` granted for the app's origin sends `collections.inspect` with `{ "collection": "./fixtures/tiles/books_collection.yaml" }`
-- **THEN** the result has source `https://example.org/fixtures/tiles/books_collection.yaml`, name `"Science fiction books"`, three tile addresses and no issues
+- **THEN** the result has source `https://example.org/fixtures/tiles/books_collection.yaml`, title `"Science fiction books"`, three tile addresses and no issues
 - **AND** no tile file is requested
 
 #### Scenario: Entry issues are returned

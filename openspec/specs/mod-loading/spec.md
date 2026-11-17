@@ -7,11 +7,11 @@ Reads a mod configuration file (`mod_conf.yaml`), named by a default mod name, a
 ## Requirements
 
 ### Requirement: Load a mod from a location
-The system SHALL load a mod configuration file from a relative path or an absolute URL, with the same location rules as a tile. It SHALL return a loaded mod with `source` (resolved URL of the mod file), `name`, `title`, `version`, `description`, `entrypoint` (resolved URL), `code` (entrypoint text), `typeSource` (resolved URL or `null`), `sampleCollection` (resolved URL or `null`), `config` and `permissions`.
+The system SHALL load a mod configuration file from a relative path or an absolute URL, with the same location rules as a tile. It SHALL return a loaded mod with `source` (resolved URL of the mod file), `title`, `version`, `description`, `entrypoint` (resolved URL), `code` (entrypoint text), `typeSource` (resolved URL or `null`), `defaultMosaic` (resolved URL or `null`), `config` and `permissions`.
 
 #### Scenario: Load the sample book list mod
 - **WHEN** the mod at `https://example.org/fixtures/mods/book_list/mod_conf.yaml` is loaded and the server returns the files under `fixtures/`
-- **THEN** the loaded mod has source `https://example.org/fixtures/mods/book_list/mod_conf.yaml`, name `"book_list"`, title `"Book List"` and version `"1.0.0"`
+- **THEN** the loaded mod has source `https://example.org/fixtures/mods/book_list/mod_conf.yaml`, title `"Book List"` and version `"1.0.0"`, and no `name`
 - **AND** its `code` is the text of `fixtures/mods/book_list/main.js`
 
 #### Scenario: Relative mod path with a base URL
@@ -52,7 +52,7 @@ All the references to one mod file SHALL give the same `source`, so the mod keep
 - **THEN** the three loaded mods have the same source
 
 ### Requirement: Resolve mod paths against the mod file
-The system SHALL resolve `entrypoint`, `type_path` and `sample_collection` against the location of the mod file, not against the base URL.
+The system SHALL resolve `entrypoint`, `type_path` and `default_mosaic` against the location of the mod file, not against the base URL.
 
 #### Scenario: Entrypoint next to the mod file
 - **WHEN** the mod at `https://example.org/fixtures/mods/book_list/mod_conf.yaml` declares `entrypoint: "./main.js"`
@@ -68,19 +68,28 @@ The system SHALL resolve `entrypoint`, `type_path` and `sample_collection` again
 
 #### Scenario: Sample collection outside the mod folder
 - **WHEN** the mod at `https://example.org/fixtures/mods/book_list/mod_conf.yaml` declares `sample_collection: "../../tiles/books_collection.yaml"`
-- **THEN** the loaded mod's `sampleCollection` is `https://example.org/fixtures/tiles/books_collection.yaml`
+- **THEN** the key is ignored: the loaded mod has no `sampleCollection` and its `defaultMosaic` is `null`
 - **AND** the collection file is not requested
 
+#### Scenario: Default mosaic next to the mod file
+- **WHEN** the mod at `https://example.org/fixtures/mods/book_list/mod_conf.yaml` declares `default_mosaic: "./mosaic.yaml"`
+- **THEN** the loaded mod's `defaultMosaic` is `https://example.org/fixtures/mods/book_list/mosaic.yaml`
+- **AND** the mosaic file is not requested
+
 ### Requirement: Mod file format
-A mod file SHALL have a `mod` mapping with non-empty string `name`, `version` and `entrypoint`. `title` and `description` SHALL be optional strings, defaulting to `name` and `""`. `type_path` and `sample_collection` SHALL be optional non-empty strings. `config` SHALL be an optional mapping, defaulting to an empty mapping. Other keys SHALL be ignored.
+A mod file SHALL have a `mod` mapping with non-empty string `title`, `version` and `entrypoint`. `description` SHALL be an optional string, defaulting to `""`. `type_path` and `default_mosaic` SHALL be optional non-empty strings. `config` SHALL be an optional mapping, defaulting to an empty mapping. Other keys SHALL be ignored, `name` and `sample_collection` included.
 
 #### Scenario: Minimal mod file
-- **WHEN** a mod file has only `name: "minimal"`, `version: "0.1.0"` and `entrypoint: "./main.js"` under `mod`
-- **THEN** the loaded mod has title `"minimal"`, description `""`, `typeSource` `null`, `sampleCollection` `null`, config `{}` and no permissions
+- **WHEN** a mod file has only `title: "Minimal"`, `version: "0.1.0"` and `entrypoint: "./main.js"` under `mod`
+- **THEN** the loaded mod has title `"Minimal"`, description `""`, `typeSource` `null`, `defaultMosaic` `null`, config `{}` and no permissions
 
 #### Scenario: Unknown keys are ignored
 - **WHEN** a mod file has an extra key `author: "Alice"` under `mod`
 - **THEN** the mod loads and the loaded mod has no `author` property
+
+#### Scenario: Former keys are ignored
+- **WHEN** a mod file has `name: "book_list"` and `sample_collection: "./books.yaml"` besides its `title`
+- **THEN** the mod loads, the loaded mod has no `name`, its `defaultMosaic` is `null`, and `./books.yaml` is not requested
 
 #### Scenario: Config is kept as plain data
 - **WHEN** the sample book list mod is loaded
@@ -97,6 +106,10 @@ The system SHALL fail with a mod format error when the mod file does not follow 
 - **WHEN** a mod file has no `entrypoint`
 - **THEN** loading fails with a mod format error whose message says that `entrypoint` must be a non-empty string
 
+#### Scenario: Missing title
+- **WHEN** a mod file has `name: "clock"` and no `title`
+- **THEN** loading fails with a mod format error whose message says that `title` must be a non-empty string
+
 #### Scenario: Version written as a number
 - **WHEN** a mod file has `version: 1`
 - **THEN** loading fails with a mod format error whose message says that `version` must be a non-empty string
@@ -107,7 +120,11 @@ The system SHALL fail with a mod format error when the mod file does not follow 
 
 #### Scenario: Empty sample collection
 - **WHEN** a mod file has `sample_collection: ""`
-- **THEN** loading fails with a mod format error whose message says that `sample_collection` must be a non-empty string
+- **THEN** the mod loads, since `sample_collection` is no longer read
+
+#### Scenario: Empty default mosaic
+- **WHEN** a mod file has `default_mosaic: ""`
+- **THEN** loading fails with a mod format error whose message says that `default_mosaic` must be a non-empty string
 
 ### Requirement: Tile type by path only
 The system SHALL reject a mod file that has a `schema` key under `mod` with a mod format error whose message says that inline schemas are not supported yet and that `type_path` must be used.
