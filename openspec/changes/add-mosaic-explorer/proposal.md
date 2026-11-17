@@ -51,6 +51,7 @@ Out of scope:
   - the rule that fixtures are not listed by the vanilla explorers.
 - `app-sidebar`: the vanilla registry gives Mosaics the target `mosaic_explorer`, and the coming-soon behavior is shown with an instantiation's section instead of Mosaics.
 - `app-settings`: the vanilla Settings page no longer shows Mosaics as coming soon.
+- `mod-tests`: a case can answer `mosaics.open` with `null`, as `rework-mod-file-format` already implemented, and a case's `mosaics.check` is answered with `-32002`. This records existing behavior; the mod API does not change.
 
 ## Impact
 
@@ -69,4 +70,4 @@ Out of scope:
   - `docs/modules/mosaics/explorer/README.md` and `docs/modules/mosaics/viewer/README.md`;
   - `docs/modules/main/README.md`, `docs/modules/main/settings/README.md` and `docs/modules/README.md`;
   - `default_mods/README.md`.
-- **Depends on `add-mosaics` and `rework-mod-file-format`,** which must be archived first.
+- **Depends on `add-mosaics` and `rework-mod-file-format`,** archived on 2026-11-16 and 2026-11-17. Their specs are the base of this change's deltas.

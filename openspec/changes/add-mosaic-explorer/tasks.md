@@ -51,7 +51,8 @@
 - [ ] 4.3 Add its `fixtures/` (design D7) and its `test/` cases for the viewer half of "Mosaic explorer and viewer cases":
   - the metadata, the mod and collection, and a failing collection;
   - a missing, empty or untitled `target`;
-  - both links, "Open mosaic", and "Check mosaic" with an answered `"warn"` report;
+  - both links and "Open mosaic", answered with `null`;
+  - "Check mosaic", whose `mosaics.check` the case cannot answer: `requests` holds it with error `-32002`, the error is shown as an alert, and the button is enabled again. The report itself is covered by the real check of 4.4;
   - its look.
 
   Verify that checking `mosaic_viewer` reports `"pass"` with every case passed, also in an app built without `samples/` ("Mosaic cases without the samples").

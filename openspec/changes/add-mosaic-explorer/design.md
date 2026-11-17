@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md (Why). This change assumes `add-mosaics` and `rework-mod-file-format` are archived, so these exist:
+See proposal.md (Why). This change builds on `add-mosaics` and `rework-mod-file-format`, archived on 2026-11-16 and 2026-11-17, so these exist:
 
 - **Methods:** `mosaics.inspect`, `mosaics.open` and `mosaics.check`, all needing `open` for the mosaic file's origin.
 - **Files:** `title` in mod and collection files, and default mosaics.
@@ -103,7 +103,7 @@ Their mosaics point to these neighbors with relative paths, so the cases pass wi
 
 ## Risks / Trade-offs
 
-- **[Two copies of the report view drift apart]** → Both READMEs point to each other. The look tests of both viewers check the same badges and headings.
+- **[Two copies of the report view drift apart]** → Both READMEs point to each other. The e2e checks of both viewers assert the same status headings and finding badges. Cases cannot cover the report, since a case cannot answer `mods.check` or `mosaics.check`.
 - **[The coming-soon path loses its only real use and could rot]** → Its tests move to the `Atlas` test registry, so it stays covered.
 - **[The samples depend on remote covers and portraits]** → `e2e/sample_mosaics.spec.ts` routes the image hosts with `routeCovers` from `e2e/mod_routes.ts`, as the book list's sample tests do, and runs only in `npm run test:e2e:samples`.
 - **[An "Open" next to "View" on every card is busier than the other explorers]** → "Open" is the primary button and "View" an outline one, so the eye lands on one action per card.

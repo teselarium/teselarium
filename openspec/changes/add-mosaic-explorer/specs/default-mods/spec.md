@@ -150,12 +150,13 @@ Without `target`, or with an empty `target`, the mosaic viewer SHALL say that no
 - **THEN** the viewer's frame shows an error whose message says that `title` must be a non-empty string
 
 ### Requirement: Mosaic explorer and viewer cases
-The cases of the mosaic explorer SHALL cover listing fixture mosaics, a location that cannot be inspected, and both buttons, answering `mosaics.open` and `mods.open` with `null`. The cases of the mosaic viewer SHALL cover the metadata, its mod and collection, a failing mod or collection, a missing, empty or failing `target`, the links to the mod and collection viewers, "Open mosaic", and "Check mosaic" with a report the case answers.
+The cases of the mosaic explorer SHALL cover listing fixture mosaics, a location that cannot be inspected, and both buttons, answering `mosaics.open` and `mods.open` with `null`. The cases of the mosaic viewer SHALL cover the metadata, its mod and collection, a failing mod or collection, a missing, empty or failing `target`, the links to the mod and collection viewers, "Open mosaic", and "Check mosaic", whose `mosaics.check` a case cannot answer and the check refuses with `-32002`.
 
 #### Scenario: Open in an explorer case
 - **WHEN** a case mounts the explorer with a fixture mosaic, answers `mosaics.open` with `null`, and presses "Open"
 - **THEN** the case's `requests` holds a `mosaics.open` whose `mosaic` is the fixture mosaic's source
 
 #### Scenario: Check in a viewer case
-- **WHEN** a case mounts the viewer with a fixture mosaic as `params.target`, answers `mosaics.check` with a report with status `"warn"`, and presses "Check mosaic"
-- **THEN** the frame shows "Check passed with warnings" and the report's findings
+- **WHEN** a case mounts the viewer with a fixture mosaic as `params.target` and presses "Check mosaic"
+- **THEN** the case's `requests` holds a `mosaics.check` whose `mosaic` is the fixture mosaic's source, with an error with code `-32002`
+- **AND** the frame shows the error as an alert, and "Check mosaic" is enabled again
