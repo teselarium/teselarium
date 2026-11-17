@@ -360,6 +360,40 @@ export async function serveExplorerOfTilesMod(page: Page): Promise<void> {
   await page.route(EXPLORER_MOD_FILE_GLOB, answerExplorerOfTilesMod);
 }
 
+/** `**\/default_mods/mosaic_explorer/mod_conf.yaml`: the route glob of the mosaic explorer's file. */
+const MOSAIC_EXPLORER_MOD_FILE_GLOB =
+  "**/default_mods/mosaic_explorer/mod_conf.yaml";
+
+/** The `mosaics` list of the mosaic explorer's file: the line `mosaics:` and its items. */
+const MOSAIC_EXPLORER_MOSAICS_LIST = /^ {4}mosaics:\n(?: {6}- .*\n?)+/m;
+
+async function answerMosaicExplorerOfLabels(route: Route): Promise<void> {
+  const response = await route.fetch();
+  const modFile = await response.text();
+  if (!MOSAIC_EXPLORER_MOSAICS_LIST.test(modFile)) {
+    throw new Error(
+      `The mosaic explorer's file has no config.mosaics list:\n${modFile}`,
+    );
+  }
+  await route.fulfill({
+    response,
+    body: modFile.replace(
+      MOSAIC_EXPLORER_MOSAICS_LIST,
+      `    mosaics:\n      - "${LABELS_MOSAIC_REFERENCE}"\n`,
+    ),
+  });
+}
+
+/**
+ * Serves the tiles mod and the labels mosaic, and the mosaic explorer's own
+ * file with a `config.mosaics` that lists only the labels mosaic, so the
+ * explorer lists `Labelled items`.
+ */
+export async function serveMosaicExplorerOfLabels(page: Page): Promise<void> {
+  await serveTilesMod(page, buildLabelsMosaicFiles());
+  await page.route(MOSAIC_EXPLORER_MOD_FILE_GLOB, answerMosaicExplorerOfLabels);
+}
+
 /**
  * `./test-mods/missing`: a mod folder that does not exist. Its mod file
  * answers `404 Not Found` once `serveAppOriginMod` or `serveTilesMod` serves

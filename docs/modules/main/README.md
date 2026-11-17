@@ -55,10 +55,10 @@ The sidebar works like a tab bar (see the [stage](../lib/core/stage/README.md#se
 
 - Activating a section shows what was last seen in it, in the state it was left in, when the user comes from another section.
 - Activating the section the user is already in shows its start: the index page, or the section's own mod.
-- A mod section keeps one root sandbox: repeated visits to Mods show the same mod explorer, and repeated visits to Tiles the same collection explorer.
+- A mod section keeps one root sandbox: repeated visits to Mods show the same mod explorer, repeated visits to Tiles the same collection explorer, and repeated visits to Mosaics the same mosaic explorer.
 - The section of what is shown is the current item (`aria-current="page"`). A mod that a section's mod opened stays in that section, also after a reload.
 
-Each item is a link with the section's start address (`#/`, `#/run?mod=collection_explorer`, `#/run?mod=mod_explorer`, `#/guides`), so middle-click and "open in new tab" work too.
+Each item is a link with the section's start address (`#/`, `#/run?mod=collection_explorer`, `#/run?mod=mod_explorer`, `#/run?mod=mosaic_explorer`, `#/guides`), so middle-click and "open in new tab" work too.
 
 ## The section registry
 
@@ -83,12 +83,12 @@ The vanilla registry:
 | `home` | Home | `{ page: true }` | `main` | no | no |
 | `tiles` | Tiles | `{ mod: { mod: "collection_explorer", collection: null, params: {} } }` | `main` | yes | no |
 | `mods` | Mods | `{ mod: { mod: "mod_explorer", collection: null, params: {} } }` | `main` | yes | no |
-| `mosaics` | Mosaics | `{ page: true }` | `main` | yes | yes |
+| `mosaics` | Mosaics | `{ mod: { mod: "mosaic_explorer", collection: null, params: {} } }` | `main` | yes | no |
 | `guides` | Guides | `{ page: true }` | `main` | yes | no |
 | `settings` | Settings | `{ page: true }` | `footer` | no | no |
 | `about` | About | `{ page: true }` | `footer` | no | no |
 
-Tiles opens the [collection explorer](../tiles/explorer/README.md) and Mods the [mod explorer](../mods/explorer/README.md). Mosaics is the only coming-soon section.
+Tiles opens the [collection explorer](../tiles/explorer/README.md), Mods the [mod explorer](../mods/explorer/README.md) and Mosaics the [mosaic explorer](../mosaics/explorer/README.md). The vanilla registry has no coming-soon section.
 
 ### Fields
 
@@ -96,11 +96,11 @@ Tiles opens the [collection explorer](../tiles/explorer/README.md) and Mods the 
 |---|---|
 | `id` | The section's id. It names its page folder (`pages/<id>/`), its address (`#/<id>`), its stored switch and its stored membership in the history. |
 | `label` | The item's name: its text, its accessible name and its tooltip in the rail. |
-| `icon` | `{ lucide: Icon }`, a [lucide](https://lucide.dev/icons) icon component, or `{ image: "./icons/atlas.svg" }`, an image relative to the app. An image is drawn in the item's text color, following the color scheme (a CSS mask, so use a monochrome image); `{ image, tint: false }` draws it with its own colors. Icons are decorative: the label names the item. |
+| `icon` | `{ lucide: Icon }`, a [lucide](https://lucide.dev/icons) icon component, or `{ image: "./icons/example.svg" }`, an image relative to the app. An image is drawn in the item's text color, following the color scheme (a CSS mask, so use a monochrome image); `{ image, tint: false }` draws it with its own colors. Icons are decorative: the label names the item. |
 | `target` | `{ page: true }`: the section shows the markdown pages in `pages/<id>/` (the `settings` section shows the Settings page instead). `{ mod: { mod, collection, tile, params } }`: the section runs a mod link, the same value a mod passes to `mods.open`, for example `{ mod: "collection_explorer", collection: null, params: {} }` for Tiles. `tile` is optional: a target written without it has no tile, and equals a typed run link without `tile`. |
 | `group` | `main` (top of the sidebar) or `footer` (bottom). Items keep the registry's order within their group. |
 | `optional` | Whether the user can hide the item on the Settings page. Hiding only removes the item: links still work (see [Settings](settings/README.md)). |
-| `comingSoon` | Shown as a disabled item that says "Coming soon" and does not navigate, as Mosaics is in the vanilla app. Its target is not used, and its address shows Home, until it becomes available. |
+| `comingSoon` | Shown as a disabled item that says "Coming soon" and does not navigate, for an instantiation's section that is not ready yet. For example, an instantiation could add a section with the id `example_section` and the label Example Section, marked as coming soon. Its target is not used, and its address shows Home, until it becomes available. No vanilla section is coming soon. |
 
 ### Rules
 
@@ -123,14 +123,14 @@ The Home mod runs in a sandbox like any other mod, at the address `#/`, and has 
 
 ### Sections of switched-off mods
 
-A section whose target is a default mod that the instantiation switched off (`switchedOff` in `src/main/default_mods.ts`) is not part of the app: it is in neither the sidebar nor the Settings page, and its link opens the switched-off error like any link to that mod. Switching off `mod_explorer` removes Mods, and switching off `collection_explorer` removes Tiles. Switching off `collection_viewer` keeps Tiles: the collection explorer then shows an error that names `collection_viewer` when a collection is selected.
+A section whose target is a default mod that the instantiation switched off (`switchedOff` in `src/main/default_mods.ts`) is not part of the app: it is in neither the sidebar nor the Settings page, and its link opens the switched-off error like any link to that mod. Switching off `mod_explorer` removes Mods, switching off `collection_explorer` removes Tiles, and switching off `mosaic_explorer` removes Mosaics. Switching off `collection_viewer` keeps Tiles: the collection explorer then shows an error that names `collection_viewer` when a collection is selected. Likewise, switching off `mosaic_viewer` keeps Mosaics, and the mosaic explorer's "View" shows an error that names `mosaic_viewer`.
 
 ### Changing the sections when cloning
 
 - **Add a section**: add an entry in the order it should appear. For a page section, add `public/pages/<id>/index.md` (see [pages](homepage/README.md)). For a mod section, set its target to the mod's link: a default mod name, or a folder or mod file relative to the app.
 - **Remove a section**: delete its entry, and its `public/pages/<id>/` folder if it had one. Stored switches of a removed section are dropped on the next start. `home`, `settings` and `about` cannot be removed.
 - **Change a section**: edit its fields. Changing an `id` changes its addresses and its folder, and resets its stored switch.
-- **Make a coming-soon section available**: set `comingSoon` to `false` and give it its real target, as Tiles was given `collection_explorer`.
+- **Make a coming-soon section available**: set `comingSoon` to `false` and give it its real target, as Mosaics was given `mosaic_explorer`.
 
 ## Stage dialogs
 

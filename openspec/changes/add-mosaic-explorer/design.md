@@ -84,7 +84,7 @@ A mosaic is one small YAML file with no assets. So the samples are `nobel_books_
 
 `vanilla_sections.ts` gives `mosaics` the target `{ mod: { mod: "mosaic_explorer", collection: null, params: {} } }` and `comingSoon: false`. The `comingSoon` field, its validation, the disabled sidebar item and the Settings label all stay, for instantiations.
 
-Their unit and e2e tests used the vanilla Mosaics item as their example. They move to a test registry with an `Atlas` section marked coming soon, which the Sidebar and Settings tests already know how to pass in. The docs' examples change the same way.
+Their unit and e2e tests used the vanilla Mosaics item as their example. They move to a test registry with an `Example Section` section (id `example_section`) marked coming soon, which the Sidebar and Settings tests already know how to pass in. The docs' examples change the same way.
 
 Sandboxes opened from the explorer stay in Mosaics through the opener rule. No stage change is needed.
 
@@ -104,6 +104,6 @@ Their mosaics point to these neighbors with relative paths, so the cases pass wi
 ## Risks / Trade-offs
 
 - **[Two copies of the report view drift apart]** → Both READMEs point to each other. The e2e checks of both viewers assert the same status headings and finding badges. Cases cannot cover the report, since a case cannot answer `mods.check` or `mosaics.check`.
-- **[The coming-soon path loses its only real use and could rot]** → Its tests move to the `Atlas` test registry, so it stays covered.
+- **[The coming-soon path loses its only real use and could rot]** → Its tests move to the `Example Section` test registry, so it stays covered.
 - **[The samples depend on remote covers and portraits]** → `e2e/sample_mosaics.spec.ts` routes the image hosts with `routeCovers` from `e2e/mod_routes.ts`, as the book list's sample tests do, and runs only in `npm run test:e2e:samples`.
 - **[An "Open" next to "View" on every card is busier than the other explorers]** → "Open" is the primary button and "View" an outline one, so the eye lands on one action per card.

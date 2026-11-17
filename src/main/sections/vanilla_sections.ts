@@ -49,10 +49,10 @@ export const VANILLA_SECTIONS: readonly SectionDefinition[] = [
     id: "mosaics",
     label: "Mosaics",
     icon: { lucide: Shapes },
-    target: { page: true },
+    target: { mod: { mod: "mosaic_explorer", collection: null, params: {} } },
     group: "main",
     optional: true,
-    comingSoon: true,
+    comingSoon: false,
   },
   {
     id: "guides",

@@ -1,0 +1,5 @@
+# A fixture mosaic for the explorer's tests, listed after the listed mosaic. It has no collection.
+mosaic:
+  title: "Other mosaic"
+  description: "A second fixture mosaic, listed after the first."
+  mod: "./fixture_mod"

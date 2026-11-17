@@ -608,7 +608,7 @@ test.describe("Section switches are remembered", function describeRemembered(): 
 
     await page.reload();
 
-    await expect(sectionItem(page, /Mosaics/)).toHaveCount(0);
+    await expect(sectionItem(page, "Mosaics")).toHaveCount(0);
     await expect(sectionSwitch(page, "Mosaics")).not.toBeChecked();
   });
 

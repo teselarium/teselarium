@@ -73,4 +73,6 @@ mosaic:
 
 ## Components
 
-The mosaic explorer, the mosaic viewer and the mosaic maker, the default mods that list, show and make mosaics, come later: see [explorer](explorer/README.md), [viewer](viewer/README.md) and [maker](maker/README.md).
+The [mosaic explorer](explorer/README.md), opened by the Mosaics section, lists mosaics and opens them, and the [mosaic viewer](viewer/README.md) shows a mosaic with its mod, collection, config, aliases and permissions, and checks it. Both ship as default mods. The mosaic maker, which will make mosaics, comes later (see [maker](maker/README.md)).
+
+The app ships two sample mosaics in `samples/mosaics/`, which the vanilla mosaic explorer lists: `nobel_books_list.yaml`, the book list with the laureates' books eight per row, and `nobel_laureates_map.yaml`, the laureates on the country map through the aliases of the example above.

@@ -66,7 +66,7 @@ describe("section switches", function describeSectionSwitches(): void {
     const storage = createMemoryStorage();
     storage.setItem(
       SECTION_SWITCHES_KEY,
-      JSON.stringify({ atlas: false, guides: false }),
+      JSON.stringify({ removed_section: false, guides: false }),
     );
 
     const switches = buildSwitches(storage);
@@ -81,11 +81,11 @@ describe("section switches", function describeSectionSwitches(): void {
     const storage = createMemoryStorage();
     storage.setItem(SECTION_SWITCHES_KEY, JSON.stringify({ guides: false }));
 
-    const switches = buildSwitches(storage, [...OPTIONAL_IDS, "atlas"]);
+    const switches = buildSwitches(storage, [...OPTIONAL_IDS, "new_section"]);
 
-    expect(isSectionShown(readSectionSwitchesSnapshot(switches), "atlas")).toBe(
-      true,
-    );
+    expect(
+      isSectionShown(readSectionSwitchesSnapshot(switches), "new_section"),
+    ).toBe(true);
   });
 
   it("ignores an invalid stored value", function ignoresInvalid(): void {

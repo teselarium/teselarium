@@ -7,6 +7,7 @@ import { startTestApp } from "../../test/test_app.ts";
 import type { AppFixture } from "../../test/test_app.ts";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import { VANILLA_SECTIONS } from "../sections/vanilla_sections.ts";
+import { COMING_SOON_SECTIONS } from "../../test/registries/coming_soon_sections.ts";
 import { HamburgerButton } from "./HamburgerButton.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import {
@@ -75,7 +76,7 @@ describe("Sidebar", function describeSidebar(): void {
       "Home",
       "Tiles",
       "Mods",
-      "MosaicsComing soon",
+      "Mosaics",
       "Guides",
     ]);
     expect(readItemNames(lists[1])).toEqual(["Settings", "About"]);
@@ -114,19 +115,28 @@ describe("Sidebar", function describeSidebar(): void {
     expect(icon.style.maskImage).toContain("./icons/guides.svg");
   });
 
-  it("Mosaics is coming soon", async function disablesMosaics(): Promise<void> {
-    const fixture = await startTestApp("");
+  it("An instantiation's coming-soon section", async function disablesComingSoon(): Promise<void> {
+    const fixture = await startTestApp("", { sections: COMING_SOON_SECTIONS });
     renderSidebar(fixture);
-    const mosaics = findItem(/Mosaics/);
+    const example = findItem(/Example Section/);
     const visibleBefore = readStageSnapshot(fixture.stage).visible;
 
-    fireEvent.click(mosaics);
+    fireEvent.click(example);
 
-    expect(mosaics).toHaveAttribute("aria-disabled", "true");
-    expect(mosaics).not.toHaveAttribute("href");
-    expect(mosaics).toHaveTextContent("Coming soon");
+    expect(example).toHaveAttribute("aria-disabled", "true");
+    expect(example).not.toHaveAttribute("href");
+    expect(example).toHaveTextContent("Coming soon");
     expect(fixture.history.entries).toHaveLength(1);
     expect(readStageSnapshot(fixture.stage).visible).toEqual(visibleBefore);
+  });
+
+  it("No coming-soon item in the vanilla app", async function hasNoComingSoon(): Promise<void> {
+    renderSidebar(await startTestApp(""));
+
+    for (const item of within(sectionsNav()).getAllByRole("link")) {
+      expect(item).not.toHaveTextContent("Coming soon");
+      expect(item).not.toHaveAttribute("aria-disabled");
+    }
   });
 
   it("gives each item its section's start address", async function linksStarts(): Promise<void> {
@@ -138,6 +148,10 @@ describe("Sidebar", function describeSidebar(): void {
       "#/run?mod=collection_explorer",
     );
     expect(findItem("Mods")).toHaveAttribute("href", "#/run?mod=mod_explorer");
+    expect(findItem("Mosaics")).toHaveAttribute(
+      "href",
+      "#/run?mod=mosaic_explorer",
+    );
     expect(findItem("Guides")).toHaveAttribute("href", "#/guides");
   });
 

@@ -1,3 +1,7 @@
+// The mosaic viewer has a copy of this rendering without the tests list
+// (mosaic_viewer/src/check_report.ts), since a default mod cannot import
+// another mod's files. Keep both copies alike.
+
 import type {
   ModCheckFinding,
   ModCheckReport,

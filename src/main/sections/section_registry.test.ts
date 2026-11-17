@@ -9,10 +9,16 @@ import {
 } from "./section_registry.ts";
 import type { SectionDefinition } from "./section_registry.ts";
 import { VANILLA_SECTIONS } from "./vanilla_sections.ts";
+import { COMING_SOON_SECTIONS } from "../../test/registries/coming_soon_sections.ts";
 
 const EXPLORER_LINK = { mod: "mod_explorer", collection: null, params: {} };
 const COLLECTION_EXPLORER_LINK = {
   mod: "collection_explorer",
+  collection: null,
+  params: {},
+};
+const MOSAIC_EXPLORER_LINK = {
+  mod: "mosaic_explorer",
   collection: null,
   params: {},
 };
@@ -181,6 +187,33 @@ describe("availableSections", function describeAvailableSections(): void {
     ]);
   });
 
+  it("Mosaic explorer switched off", function dropsMosaics(): void {
+    const sections = availableSections(
+      VANILLA_SECTIONS,
+      resolveDefaults(["mosaic_explorer"]),
+      APP_BASE_URL,
+    );
+
+    expect(listIds(sections)).toEqual([
+      "home",
+      "tiles",
+      "mods",
+      "guides",
+      "settings",
+      "about",
+    ]);
+  });
+
+  it("keeps Mosaics when only the mosaic viewer is switched off", function keepsMosaics(): void {
+    const sections = availableSections(
+      VANILLA_SECTIONS,
+      resolveDefaults(["mosaic_viewer"]),
+      APP_BASE_URL,
+    );
+
+    expect(listIds(sections)).toContain("mosaics");
+  });
+
   it("keeps Tiles when only the collection viewer is switched off", function keepsTiles(): void {
     const sections = availableSections(
       VANILLA_SECTIONS,
@@ -223,8 +256,29 @@ describe("buildStageRouting", function describeBuildStageRouting(): void {
       sectionLinks: [
         { section: "tiles", link: COLLECTION_EXPLORER_LINK },
         { section: "mods", link: EXPLORER_LINK },
+        { section: "mosaics", link: MOSAIC_EXPLORER_LINK },
       ],
     });
+  });
+
+  it("leaves a coming-soon section out", function leavesOutComingSoon(): void {
+    const routing = buildStageRouting(COMING_SOON_SECTIONS);
+
+    expect(routing.pageSections).not.toContain("example_section");
+    expect(routing.sectionLinks).toEqual(
+      buildStageRouting(VANILLA_SECTIONS).sectionLinks,
+    );
+  });
+
+  it("No coming-soon section in the vanilla registry", function hasNoComingSoon(): void {
+    const comingSoonIds: string[] = [];
+    for (const section of VANILLA_SECTIONS) {
+      if (section.comingSoon) {
+        comingSoonIds.push(section.id);
+      }
+    }
+
+    expect(comingSoonIds).toEqual([]);
   });
 
   it("Home as a mod", function buildsHomeMod(): void {

@@ -50,7 +50,7 @@ Out of scope:
   - the list of default mods that ship their tests;
   - the rule that fixtures are not listed by the vanilla explorers.
 - `app-sidebar`: the vanilla registry gives Mosaics the target `mosaic_explorer`, and the coming-soon behavior is shown with an instantiation's section instead of Mosaics.
-- `app-settings`: the vanilla Settings page no longer shows Mosaics as coming soon.
+- `app-settings`: the vanilla Settings page no longer shows Mosaics as coming soon, and the switch scenarios name their example sections `removed_section` and `new_section` instead of `atlas`.
 - `mod-tests`: a case can answer `mosaics.open` with `null`, as `rework-mod-file-format` already implemented, and a case's `mosaics.check` is answered with `-32002`. This records existing behavior; the mod API does not change.
 
 ## Impact

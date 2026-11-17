@@ -1,0 +1,16 @@
+mod:
+  title: "Mosaics"
+  version: "0.1.0"
+  api: "^0.1.0"
+  description: "Lists mosaics, opens them, and opens them in the mosaic viewer."
+  entrypoint: "./main.js"
+  test_path: "./test.js"
+  config:
+    viewer: "mosaic_viewer"
+    mosaics:
+      - "./samples/mosaics/nobel_books_list.yaml"
+      - "./samples/mosaics/nobel_laureates_map.yaml"
+  permissions:
+    open:
+      - host: "*"
+        reason: "Lists the mosaics of its config and opens the one you pick"

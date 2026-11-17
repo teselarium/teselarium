@@ -44,7 +44,7 @@ A section whose target is a default mod that the instantiation switched off SHAL
 A coming-soon section SHALL be shown in the sidebar as a disabled item that says it is coming soon, and SHALL NOT navigate when activated. The vanilla registry SHALL have no coming-soon section.
 
 #### Scenario: An instantiation's coming-soon section
-- **WHEN** an instantiation's registry has an optional section `Atlas` marked as coming soon, and the user clicks its item
+- **WHEN** an instantiation's registry has an optional section `Example Section` marked as coming soon, and the user clicks its item
 - **THEN** the item has `aria-disabled="true"`, its tooltip or label says `Coming soon`, and the visible page or sandbox does not change
 
 #### Scenario: No coming-soon item in the vanilla app

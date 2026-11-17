@@ -1,0 +1,4 @@
+# A fixture mosaic for the viewer's tests, whose mosaic file has a format error: it has no title.
+mosaic:
+  description: "A fixture mosaic without a title."
+  mod: "./fixture_mod"

@@ -8,6 +8,7 @@ import type {
 } from "@playwright/test";
 import type { ModFiles } from "./mod_routes.ts";
 import {
+  APP_ORIGIN_MOD_PATH,
   buildMissingEntrypointFiles,
   buildSlowMountFiles,
   buildTestedProbeFiles,
@@ -28,9 +29,15 @@ import {
   visibleSandbox,
 } from "./mod_routes.ts";
 import {
+  buildLabelsMosaicFiles,
+  LABELS_COLLECTION_FILE,
+  LABELS_MOSAIC_PATH,
+  LABELS_MOSAIC_REFERENCE,
+  LABELS_MOSAIC_TITLE,
   readTilesModSource,
   readTilesMosaicSource,
   serveExplorerOfTilesMod,
+  serveMosaicExplorerOfLabels,
   serveTilesMod,
   TILES_CASE_NAMES,
   TILES_COLLECTION_GLOB,
@@ -610,6 +617,42 @@ const COLLECTION_VIEWER_CASES = [
   "keeps the filter field to a readable width",
 ];
 
+/** The cases of the mosaic explorer's test file (default_mods/mosaic_explorer/test/test.ts), in order. */
+const MOSAIC_EXPLORER_CASES = [
+  "lists the mosaics of its config as cards",
+  "lists a mosaic that cannot be inspected as an alert",
+  "opens the selected mosaic",
+  "opens the viewer for the selected mosaic",
+  "shows a refused open",
+  "says the list is busy while it loads",
+  "keeps its own styles to layout",
+  "draws each mosaic on the card background",
+  "draws a failure with the destructive border",
+  "makes Open the primary action",
+];
+
+/** The cases of the mosaic viewer's test file (default_mods/mosaic_viewer/test/test.ts), in order. */
+const MOSAIC_VIEWER_CASES = [
+  "shows the mosaic of its target",
+  "shows permission statuses as badges",
+  "shows the mosaic's mod",
+  "shows the mosaic's collection",
+  "says when the mosaic has no collection",
+  "shows a collection that cannot be inspected as an alert",
+  "says no mosaic was given without a target",
+  "says no mosaic was given for an empty target",
+  "shows why a missing target cannot be inspected",
+  "shows the format error of its target",
+  "opens the mod viewer from the mod's title",
+  "opens the collection viewer from the collection's title",
+  "opens the mosaic",
+  "shows a refused check and enables it again",
+  "makes opening the mosaic the primary action",
+  "draws the mosaic on the card background",
+  "draws a failure with the destructive border",
+  "keeps its own styles to layout",
+];
+
 /** The cases of the tile viewer's test file (default_mods/tile_viewer/test/test.ts), in order. */
 const TILE_VIEWER_CASES = [
   "heads a tile with its title",
@@ -752,6 +795,22 @@ test.describe(
       await expectEveryCasePassed(report, TILE_VIEWER_CASES);
     });
 
+    test("Mosaic explorer passes its check", async function checksMosaicExplorer({
+      page,
+    }): Promise<void> {
+      const report = await checkDefaultMod(page, "mosaic_explorer");
+
+      await expectEveryCasePassed(report, MOSAIC_EXPLORER_CASES);
+    });
+
+    test("Mosaic viewer passes its check", async function checksMosaicViewer({
+      page,
+    }): Promise<void> {
+      const report = await checkDefaultMod(page, "mosaic_viewer");
+
+      await expectEveryCasePassed(report, MOSAIC_VIEWER_CASES);
+    });
+
     test("Cases without the samples", async function checksWithoutSamples({
       page,
     }): Promise<void> {
@@ -779,6 +838,13 @@ test.describe(
       );
       const tileViewerReport = await checkDefaultMod(page, "tile_viewer");
       await expectEveryCasePassed(tileViewerReport, TILE_VIEWER_CASES);
+      const mosaicExplorerReport = await checkDefaultMod(
+        page,
+        "mosaic_explorer",
+      );
+      await expectEveryCasePassed(mosaicExplorerReport, MOSAIC_EXPLORER_CASES);
+      const mosaicViewerReport = await checkDefaultMod(page, "mosaic_viewer");
+      await expectEveryCasePassed(mosaicViewerReport, MOSAIC_VIEWER_CASES);
     });
   },
 );
@@ -1328,6 +1394,454 @@ test.describe(
       expect(new URL(page.url()).hash).toBe(
         `#/run?mod=collection_viewer&target=${encodeURIComponent(readTileFixtureUrl(page, "tiles_collection.yaml"))}`,
       );
+    });
+  },
+);
+
+const MOSAIC_EXPLORER_RUN_LINK = "/#/run?mod=mosaic_explorer";
+
+/** The sample mosaics of the vanilla mosaic explorer's config, in order. */
+const BOOKS_MOSAIC_REFERENCE = "./samples/mosaics/nobel_books_list.yaml";
+const BOOKS_MOSAIC_TITLE = "Books by Nobel laureates";
+const MAP_MOSAIC_TITLE = "Nobel laureates on the map";
+
+function mosaicExplorerFrame(page: Page): FrameLocator {
+  return visibleSandbox(page).frameLocator('iframe[title="Mosaics"]');
+}
+
+function mosaicExplorerCards(page: Page): Locator {
+  return mosaicExplorerFrame(page).locator("li > article");
+}
+
+function mosaicViewerFrame(page: Page): FrameLocator {
+  return visibleSandbox(page).frameLocator('iframe[title="Mosaic Viewer"]');
+}
+
+/** Waits until the mosaic explorer listed its mosaics. */
+async function waitForMosaicList(page: Page): Promise<void> {
+  const list = mosaicExplorerFrame(page).getByRole("region", {
+    name: "Mosaics",
+  });
+  await expect(list.getByRole("listitem").first()).toBeVisible();
+  await expect(list).not.toHaveAttribute("aria-busy");
+}
+
+function recordBundleRequest(bundleUrls: string[], request: Request): void {
+  const path = new URL(request.url()).pathname;
+  const isOwnFile = path.startsWith("/default_mods/mosaic_explorer/");
+  const isBundleFile =
+    path.endsWith("mod_conf.yaml") ||
+    path.endsWith("collection.yaml") ||
+    path.endsWith(".md");
+  if (isBundleFile && !isOwnFile) {
+    bundleUrls.push(request.url());
+  }
+}
+
+/** The mod files, collection files and tile files the page requests from now on, but the mosaic explorer's own. */
+function recordBundleRequests(page: Page): string[] {
+  const bundleUrls: string[] = [];
+  page.on("request", recordBundleRequest.bind(undefined, bundleUrls));
+  return bundleUrls;
+}
+
+test.describe(
+  "Mosaic explorer",
+  { tag: "@frames" },
+  function describeMosaicExplorer(): void {
+    test(
+      "Vanilla explorer lists the sample mosaics",
+      { tag: "@sample" },
+      async function listsSampleMosaics({ page }): Promise<void> {
+        const bundleUrls = recordBundleRequests(page);
+        await page.goto(MOSAIC_EXPLORER_RUN_LINK);
+        const cards = mosaicExplorerCards(page);
+
+        await expect(cards.getByRole("heading")).toHaveText([
+          BOOKS_MOSAIC_TITLE,
+          MAP_MOSAIC_TITLE,
+        ]);
+        await expect(cards.nth(0)).toContainText(
+          "The book list with the books of the Nobel Prize in Literature laureates, eight per row.",
+        );
+        await expect(cards.nth(1)).toContainText(
+          "The Nobel Prize in Literature laureates on the country map, by their country of birth.",
+        );
+        await waitForMosaicList(page);
+        expect(bundleUrls).toEqual([]);
+      },
+    );
+
+    test(
+      "Only the sample mosaics",
+      { tag: "@sample" },
+      async function listsOnlySampleMosaics({ page }): Promise<void> {
+        await page.goto(MOSAIC_EXPLORER_RUN_LINK);
+        await waitForMosaicList(page);
+
+        const titles = await mosaicExplorerCards(page)
+          .getByRole("heading")
+          .allTextContents();
+        expect(titles).toEqual([BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE]);
+        for (const defaultMosaicTitle of [
+          "Science fiction books",
+          "Nobel laureates' books on the map",
+          "Markdown flashcards",
+        ]) {
+          expect(titles).not.toContain(defaultMosaicTitle);
+        }
+      },
+    );
+
+    test("Explorer requests no mod, collection or tile", async function requestsNoBundleFile({
+      page,
+    }): Promise<void> {
+      const bundleUrls = recordBundleRequests(page);
+
+      await page.goto(MOSAIC_EXPLORER_RUN_LINK);
+      await waitForMosaicList(page);
+
+      expect(bundleUrls).toEqual([]);
+    });
+
+    test("Mosaic that cannot be inspected", async function drawsMosaicFailure({
+      page,
+    }): Promise<void> {
+      await page.route(`**${BOOKS_MOSAIC_REFERENCE.slice(1)}`, answerNotFound);
+      await page.goto(MOSAIC_EXPLORER_RUN_LINK);
+      const alert = mosaicExplorerFrame(page).getByRole("alert").first();
+
+      await expect(alert).toContainText(BOOKS_MOSAIC_REFERENCE);
+      await expect(alert).toContainText("404");
+    });
+
+    test("Open a mosaic", async function opensMosaic({ page }): Promise<void> {
+      await serveMosaicExplorerOfLabels(page);
+      await page.goto("/");
+      await openSection(page, "Mosaics");
+
+      await mosaicExplorerFrame(page)
+        .getByRole("button", { name: `Open ${LABELS_MOSAIC_TITLE}` })
+        .click();
+
+      const tilesMod = visibleSandbox(page).frameLocator(
+        `iframe[title="${TILES_TITLE}"]`,
+      );
+      await expect(tilesMod.getByRole("listitem")).toHaveText(["First label"]);
+      expect(readRunLinkParam(page, "mosaic")).toBe(
+        new URL(LABELS_MOSAIC_PATH, page.url()).href,
+      );
+      expect(readRunLinkParam(page, "mod")).toBeNull();
+      await expect(currentItem(page)).toHaveText("Mosaics");
+      await expect(page.locator('iframe[title="Mosaics"]')).toBeHidden();
+    });
+
+    test("View a mosaic", async function viewsMosaic({ page }): Promise<void> {
+      await serveMosaicExplorerOfLabels(page);
+      await page.goto("/");
+      await openSection(page, "Mosaics");
+
+      await mosaicExplorerFrame(page)
+        .getByRole("button", { name: `View ${LABELS_MOSAIC_TITLE}` })
+        .click();
+
+      await expect(stageBar(page)).toContainText("Mosaic Viewer");
+      await expect(
+        mosaicViewerFrame(page).getByRole("heading", {
+          level: 1,
+          name: LABELS_MOSAIC_TITLE,
+        }),
+      ).toBeVisible();
+      const source = new URL(LABELS_MOSAIC_PATH, page.url()).href;
+      expect(new URL(page.url()).hash).toBe(
+        `#/run?mod=mosaic_viewer&target=${encodeURIComponent(source)}`,
+      );
+      await expect(currentItem(page)).toHaveText("Mosaics");
+    });
+
+    test("Mosaic viewer switched off", async function showsSwitchedOffMosaicViewer({
+      page,
+    }): Promise<void> {
+      await serveMosaicExplorerOfLabels(page);
+      await page.goto(`${EXPLORER_OFF_PREVIEW_URL}${MOSAIC_EXPLORER_RUN_LINK}`);
+      const explorer = mosaicExplorerFrame(page);
+
+      await explorer
+        .getByRole("button", { name: `View ${LABELS_MOSAIC_TITLE}` })
+        .click();
+
+      await expect(explorer.getByRole("status")).toContainText("mosaic_viewer");
+      await expect(stageBar(page)).toContainText("Mosaics");
+      await expect(page.locator('iframe[title="Mosaic Viewer"]')).toHaveCount(
+        0,
+      );
+    });
+  },
+);
+
+const MAP_MOSAIC_REFERENCE = "./samples/mosaics/nobel_laureates_map.yaml";
+
+function buildMosaicViewerLink(target: string): string {
+  const link = `/#/run?mod=mosaic_viewer&target=${encodeURIComponent(target)}`;
+  return link;
+}
+
+/** A section of the mosaic viewer, by its heading. */
+function mosaicViewerSection(page: Page, name: string): Locator {
+  return mosaicViewerFrame(page).getByRole("region", { name });
+}
+
+/** Opens the mosaic viewer on `target` and waits until its mod and collection are shown. */
+async function openMosaicViewer(page: Page, target: string): Promise<void> {
+  await page.goto(buildMosaicViewerLink(target));
+  await expect(mosaicViewerSection(page, "Mod")).not.toHaveAttribute(
+    "aria-busy",
+  );
+  await expect(mosaicViewerSection(page, "Collection")).not.toHaveAttribute(
+    "aria-busy",
+  );
+}
+
+/** `/test-mods/mosaics/unknown_alias.yaml`: the labels mosaic with an alias for a field the item type does not declare. */
+const UNKNOWN_ALIAS_MOSAIC_FILE = "mosaics/unknown_alias.yaml";
+
+function buildUnknownAliasMosaicFiles(): ModFiles {
+  const files: ModFiles = {
+    [UNKNOWN_ALIAS_MOSAIC_FILE]: [
+      "mosaic:",
+      '  title: "Unknown alias"',
+      '  mod: "../tiles/"',
+      '  collection: "./labels"',
+      "  aliases:",
+      '    title: ["label"]',
+      '    colour: ["tint"]',
+    ].join("\n"),
+  };
+  return files;
+}
+
+test.describe(
+  "Mosaic viewer",
+  { tag: "@frames" },
+  function describeMosaicViewer(): void {
+    test(
+      "View the laureates' map",
+      { tag: "@sample" },
+      async function viewsLaureatesMap({ page }): Promise<void> {
+        const tileUrls = recordTileRequests(page);
+
+        await openMosaicViewer(page, MAP_MOSAIC_REFERENCE);
+
+        const viewer = mosaicViewerFrame(page);
+        const card = viewer.getByRole("article");
+        await expect(card.getByRole("heading", { level: 1 })).toHaveText(
+          MAP_MOSAIC_TITLE,
+        );
+        await expect(card).toContainText(
+          "The Nobel Prize in Literature laureates on the country map, by their country of birth.",
+        );
+        await expect(card).toContainText(
+          new URL(MAP_MOSAIC_REFERENCE, page.url()).href,
+        );
+        await expect(
+          mosaicViewerSection(page, "Aliases").getByRole("listitem"),
+        ).toHaveText(["title ← name", "country ← birth_country"]);
+        const permission = mosaicViewerSection(page, "Permissions")
+          .getByRole("row")
+          .filter({ hasText: "https://upload.wikimedia.org" });
+        await expect(permission).toContainText(
+          "Shows the laureates' portraits",
+        );
+        await expect(permission).toContainText("granted");
+        await expect(permission).not.toContainText("not granted");
+        expect(tileUrls).toEqual([]);
+      },
+    );
+
+    test(
+      "Mod and collection of the laureates' map",
+      { tag: "@sample" },
+      async function showsLaureatesBundle({ page }): Promise<void> {
+        await openMosaicViewer(page, MAP_MOSAIC_REFERENCE);
+
+        const modSection = mosaicViewerSection(page, "Mod");
+        await expect(
+          modSection.getByRole("button", { name: "Country Map" }),
+        ).toBeVisible();
+        await expect(modSection).toContainText("1.0.0");
+        await expect(modSection).toContainText("^0.1.14");
+        await expect(modSection).toContainText("matches");
+        await expect(modSection).not.toContainText("does not match");
+        const collectionSection = mosaicViewerSection(page, "Collection");
+        await expect(
+          collectionSection.getByRole("button", { name: LAUREATES_TITLE }),
+        ).toBeVisible();
+        await expect(collectionSection).toContainText("17 tiles");
+      },
+    );
+
+    test(
+      "View the books mosaic",
+      { tag: "@sample" },
+      async function viewsBooksMosaic({ page }): Promise<void> {
+        await openMosaicViewer(page, BOOKS_MOSAIC_REFERENCE);
+
+        await expect(mosaicViewerSection(page, "Config")).toContainText(
+          "columns: 8",
+        );
+        await expect(mosaicViewerSection(page, "Aliases")).toContainText(
+          "(none)",
+        );
+      },
+    );
+
+    test("Missing collection", async function showsMissingCollection({
+      page,
+    }): Promise<void> {
+      await openMosaicViewer(
+        page,
+        "./default_mods/mosaic_viewer/fixtures/missing_collection.yaml",
+      );
+
+      const viewer = mosaicViewerFrame(page);
+      await expect(
+        viewer.getByRole("heading", { level: 1, name: "Missing collection" }),
+      ).toBeVisible();
+      await expect(mosaicViewerSection(page, "Mod")).toContainText(
+        "Fixture Mod",
+      );
+      const alert = mosaicViewerSection(page, "Collection").getByRole("alert");
+      await expect(alert).toContainText(
+        "/default_mods/mosaic_viewer/fixtures/no_such_collection.yaml",
+      );
+      await expect(alert).toContainText("404");
+    });
+
+    test("No target", async function saysNoMosaicGiven({
+      page,
+    }): Promise<void> {
+      await page.goto("/#/run?mod=mosaic_viewer");
+
+      const viewer = mosaicViewerFrame(page);
+      await expect(viewer.getByRole("status")).toHaveText(
+        "No mosaic was given.",
+      );
+      await expect(viewer.getByRole("button")).toHaveCount(0);
+    });
+
+    test("Mosaic with a format error", async function showsFormatError({
+      page,
+    }): Promise<void> {
+      await page.goto(
+        buildMosaicViewerLink(
+          "./default_mods/mosaic_viewer/fixtures/untitled_mosaic.yaml",
+        ),
+      );
+
+      await expect(mosaicViewerFrame(page).getByRole("alert")).toContainText(
+        '"title" must be a non-empty string',
+      );
+    });
+
+    test("Open the mosaic", async function opensLabelsMosaic({
+      page,
+    }): Promise<void> {
+      await serveTilesMod(page, buildLabelsMosaicFiles());
+      await openMosaicViewer(page, LABELS_MOSAIC_REFERENCE);
+
+      await mosaicViewerFrame(page)
+        .getByRole("button", { name: "Open mosaic" })
+        .click();
+
+      // The labelled tiles reach the tiles mod renamed by the mosaic's aliases.
+      const tilesMod = visibleSandbox(page).frameLocator(
+        `iframe[title="${TILES_TITLE}"]`,
+      );
+      await expect(tilesMod.getByRole("listitem")).toHaveText(["First label"]);
+      expect(readRunLinkParam(page, "mosaic")).toBe(
+        new URL(LABELS_MOSAIC_PATH, page.url()).href,
+      );
+      await expect(page.locator('iframe[title="Mosaic Viewer"]')).toBeHidden();
+      await expect(
+        page.locator('iframe[title="Mosaic Viewer"]'),
+      ).toBeAttached();
+    });
+
+    test("Open the mod viewer", async function opensModViewerFromTitle({
+      page,
+    }): Promise<void> {
+      await serveTilesMod(page, buildLabelsMosaicFiles());
+      await openMosaicViewer(page, LABELS_MOSAIC_REFERENCE);
+
+      await mosaicViewerSection(page, "Mod")
+        .getByRole("button", { name: TILES_TITLE })
+        .click();
+
+      await expect(stageBar(page)).toContainText("Mod Viewer");
+      await expect(
+        visibleSandbox(page)
+          .frameLocator('iframe[title="Mod Viewer"]')
+          .getByRole("heading", { level: 1, name: TILES_TITLE }),
+      ).toBeVisible();
+      expect(new URL(page.url()).hash).toBe(
+        `#/run?mod=mod_viewer&target=${encodeURIComponent(readTilesModSource(page))}`,
+      );
+    });
+
+    test("Open the collection viewer", async function opensCollectionViewerFromTitle({
+      page,
+    }): Promise<void> {
+      await serveTilesMod(page, buildLabelsMosaicFiles());
+      await openMosaicViewer(page, LABELS_MOSAIC_REFERENCE);
+
+      await mosaicViewerSection(page, "Collection")
+        .getByRole("button", { name: "Labelled tiles" })
+        .click();
+
+      await expect(stageBar(page)).toContainText("Collection Viewer");
+      await expect(
+        collectionViewerFrame(page).getByRole("heading", {
+          name: "Labelled tiles",
+        }),
+      ).toBeVisible();
+      const collectionSource = new URL(
+        `${APP_ORIGIN_MOD_PATH}${LABELS_COLLECTION_FILE}`,
+        page.url(),
+      ).href;
+      expect(new URL(page.url()).hash).toBe(
+        `#/run?mod=collection_viewer&target=${encodeURIComponent(collectionSource)}`,
+      );
+    });
+
+    test("Check with a mosaic finding", async function showsMosaicFinding({
+      page,
+    }): Promise<void> {
+      await serveTilesMod(page, {
+        ...buildLabelsMosaicFiles(),
+        ...buildUnknownAliasMosaicFiles(),
+      });
+      await openMosaicViewer(
+        page,
+        `.${APP_ORIGIN_MOD_PATH}${UNKNOWN_ALIAS_MOSAIC_FILE}`,
+      );
+      const viewer = mosaicViewerFrame(page);
+      const checkButton = viewer.getByRole("button", { name: "Check mosaic" });
+
+      await checkButton.click();
+
+      const report = checkReport(viewer);
+      await expect(report.getByRole("heading")).toHaveText(
+        "Check passed with warnings warn",
+        { timeout: DEFAULT_MOD_CHECK_TIMEOUT },
+      );
+      const finding = report
+        .getByRole("list", { name: "Findings" })
+        .getByRole("listitem");
+      await expect(finding).toHaveCount(1);
+      await expect(finding).toContainText("warning bundle:");
+      await expect(finding).toContainText('"colour"');
+      await expect(report.getByRole("list", { name: "Tests" })).toHaveCount(0);
+      await expect(checkButton).toBeEnabled();
     });
   },
 );

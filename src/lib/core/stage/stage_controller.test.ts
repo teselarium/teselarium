@@ -542,7 +542,7 @@ describe("openStageSection", function describeOpenStageSection(): void {
     const history = new FakeHistory("");
     const stage = await startPageStage(history);
 
-    expect(openStageSection(stage, "atlas")).toBe(false);
+    expect(openStageSection(stage, "unknown_section")).toBe(false);
     expect(history.entries).toHaveLength(1);
   });
 

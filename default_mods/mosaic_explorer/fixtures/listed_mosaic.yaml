@@ -1,0 +1,6 @@
+# A fixture mosaic for the explorer's tests (test/explorer_cases.ts), which only inspect it and answer its opening: its mod and its collection are never requested.
+mosaic:
+  title: "Listed mosaic"
+  description: "A fixture mosaic that the explorer's tests list."
+  mod: "./fixture_mod"
+  collection: "./fixture_collection.yaml"

@@ -1,0 +1,4 @@
+# A fixture mosaic for the viewer's tests, without a collection and without config, aliases or permissions.
+mosaic:
+  title: "No collection"
+  mod: "./fixture_mod"

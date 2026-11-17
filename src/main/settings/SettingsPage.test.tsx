@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { RenderResult } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "../../App.tsx";
+import { COMING_SOON_SECTIONS } from "../../test/registries/coming_soon_sections.ts";
 import { startTestApp } from "../../test/test_app.ts";
 import type { AppFixture } from "../../test/test_app.ts";
 import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
@@ -171,9 +172,7 @@ describe("SettingsPage", function describeSettingsPage(): void {
       expect(findRow(name)).toHaveTextContent("Always shown");
       expect(within(findRow(name)).queryByRole("switch")).toBeNull();
     }
-    expect(findRow("Tiles")).not.toHaveTextContent("Coming soon");
-    expect(findRow("Mosaics")).toHaveTextContent("Coming soon");
-    expect(findRow("Mods")).not.toHaveTextContent("Coming soon");
+    expect(sectionRows()).not.toHaveTextContent("Coming soon");
     expect(
       screen.getByRole("switch", { name: TILE_MEDIA_LABEL }),
     ).toBeChecked();
@@ -541,12 +540,26 @@ describe("SettingsPage", function describeSettingsPage(): void {
     expect(readSidebarNames()).not.toContain("Guides");
   });
 
-  it("Hide a coming-soon section", async function hidesMosaics(): Promise<void> {
-    renderApp(await startTestApp("#/settings"));
+  it("Coming-soon section of an instantiation", async function showsComingSoon(): Promise<void> {
+    renderApp(
+      await startTestApp("#/settings", { sections: COMING_SOON_SECTIONS }),
+    );
 
-    fireEvent.click(screen.getByRole("switch", { name: "Mosaics" }));
+    expect(
+      screen.getByRole("switch", { name: "Example Section" }),
+    ).toBeChecked();
+    expect(findRow("Example Section")).toHaveTextContent("Coming soon");
+    expect(findRow("Mosaics")).not.toHaveTextContent("Coming soon");
+  });
 
-    expect(readSidebarNames()).not.toContain("Mosaics");
+  it("Hide a coming-soon section", async function hidesComingSoon(): Promise<void> {
+    renderApp(
+      await startTestApp("#/settings", { sections: COMING_SOON_SECTIONS }),
+    );
+
+    fireEvent.click(screen.getByRole("switch", { name: "Example Section" }));
+
+    expect(readSidebarNames()).not.toContain("Example Section");
   });
 
   it("Hide Tiles", async function hidesTiles(): Promise<void> {

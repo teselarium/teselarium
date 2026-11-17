@@ -1,0 +1,14 @@
+# A fixture mosaic for the viewer's tests (test/viewer_cases.ts), which only inspect it and answer its opening.
+mosaic:
+  title: "Shown mosaic"
+  description: "A fixture mosaic that the viewer's tests show."
+  mod: "./fixture_mod"
+  collection: "./fixture_collection.yaml"
+  config:
+    columns: 8
+  aliases:
+    title: ["name", "label"]
+  permissions:
+    show:
+      - host: "https://images.example.org"
+        reason: "Shows the fixture images"

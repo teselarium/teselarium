@@ -94,6 +94,19 @@ test.describe("Vanilla sections", function describeVanilla(): void {
     await expect(currentItem(page)).toHaveText("Tiles");
   });
 
+  test("Mosaics opens the mosaic explorer", async function opensMosaics({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+
+    await openSection(page, "Mosaics");
+
+    await expect(stageBar(page)).toContainText("Mosaics");
+    await expect(page.locator('iframe[title="Mosaics"]')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe("#/run?mod=mosaic_explorer");
+    await expect(currentItem(page)).toHaveText("Mosaics");
+  });
+
   test("Tinted image follows the color scheme", async function tintsImage({
     page,
   }): Promise<void> {

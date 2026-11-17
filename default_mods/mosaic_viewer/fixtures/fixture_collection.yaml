@@ -1,0 +1,7 @@
+# A fixture collection for the mosaic viewer's tests, which only inspect it: its tiles are never requested.
+collection:
+  title: "Fixture collection"
+  description: "The collection of the mosaic viewer's fixture mosaics."
+  tiles:
+    - path: "./tiles/first.md"
+    - path: "./tiles/second.md"

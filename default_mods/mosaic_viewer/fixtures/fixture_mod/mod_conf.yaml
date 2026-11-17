@@ -1,0 +1,9 @@
+# A fixture mod for the mosaic viewer's tests, which only inspect it: it has no code.
+mod:
+  title: "Fixture Mod"
+  version: "2.0.0"
+  api: "^0.1.0"
+  description: "The mod of the mosaic viewer's fixture mosaics."
+  entrypoint: "./main.js"
+  config:
+    columns: 6
