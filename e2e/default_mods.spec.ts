@@ -1668,7 +1668,7 @@ test.describe(
         await expect(
           modSection.getByRole("button", { name: "Country Map" }),
         ).toBeVisible();
-        await expect(modSection).toContainText("1.0.0");
+        await expect(modSection).toContainText("1.0.1");
         await expect(modSection).toContainText("^0.1.14");
         await expect(modSection).toContainText("matches");
         await expect(modSection).not.toContainText("does not match");

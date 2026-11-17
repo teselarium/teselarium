@@ -18,12 +18,12 @@ A same tile could be compatible with multiple mods if they have the required fie
 
 A Mod can use a generic tile type in order to be compatible with any tile, for example defining only optional parameter like title or name. Furthermore, a mod may not need any tile to work, for example a mod for an alternative visualization of the home or the settings page
 
-Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. By default, a mod is a folder that bundles its mod_conf.yaml, its code, its tile type file, its default mosaic and its tests, so it can be copied or shared as one folder. `title`, the mod's name as people read it, is required. `type_path`, `default_mosaic` and `test_path` are resolved against the mod_conf.yaml location, and they may also point outside the mod folder or to another site, for example to share one tile type between several mods. For example, the sample country map mod the app ships, `public/samples/mods/country_map/`, shows the tiles of any collection organized by country on a world map. Its `default_mosaic`, `mosaic.yaml` next to it, opens it with the Nobel laureates' books, outside its folder, and declares the `show` permissions that let the cards show the books' covers, since those hosts belong to the data rather than to the mod. Its `libraries` are covered in [Declared libraries](#declared-libraries):
+Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. By default, a mod is a folder that bundles its mod_conf.yaml, its code, its tile type file, its default mosaic and its tests, so it can be copied or shared as one folder. `title`, the mod's name as people read it, is required. `type_path`, `default_mosaic` and `test_path` are resolved against the mod_conf.yaml location, and they may also point outside the mod folder or to another site, for example to share one tile type between several mods. For example, the sample country map mod the app ships, `public/samples/mods/country_map/`, shows the tiles of any collection organized by country on a world map. Its `default_mosaic`, `mosaic.yaml` next to it, opens it with its own sample collection, eleven UNESCO World Heritage Sites in its `sites/` folder, and declares the `show` permission that lets the cards show the sites' images from `https://upload.wikimedia.org`, since that host belongs to the data rather than to the mod. To show a mod with data from elsewhere, write a standalone mosaic rather than a default mosaic that points outside the mod folder: `samples/mosaics/nobel_laureates_map.yaml`, for example, opens the country map with the Nobel laureates (see [Mosaics](modules/mosaics/README.md)). Its `libraries` are covered in [Declared libraries](#declared-libraries):
 
 ```yaml
 mod:
   title: "Country Map"
-  version: "1.0.0"
+  version: "1.0.1"
   api: "^0.1.14"
   description: "Shows any collection on a world map, with a marker per country, a list of its tiles and a card for each one."
   entrypoint: "./main.js"
@@ -49,19 +49,13 @@ Its default mosaic, `mosaic.yaml`, names the mod's own folder with `mod: "./"`. 
 
 ```yaml
 mosaic:
-  title: "Nobel laureates' books on the map"
+  title: "UNESCO World Heritage Sites Example"
   mod: "./"
-  collection: "../../tiles/literature_nobel_laureates_books/collection.yaml"
+  collection: "./sites/collection.yaml"
   permissions:
     show:
       - host: "https://upload.wikimedia.org"
-        reason: "Shows the book covers"
-      - host: "https://covers.openlibrary.org"
-        reason: "Shows the book covers"
-      - host: "https://*.archive.org"
-        reason: "Shows the book covers"
-      - host: "https://archive.org"
-        reason: "Shows the book covers"
+        reason: "Shows the sites' images"
 ```
 
 `api` is the range of mod API versions the mod was written for, in npm's semver range syntax. The mod API version is separate from the app's own version and covers what a mod relies on: the engine methods and events, the mount context, the mod file format and the test API (see [Mod tests](#mod-tests)). When the range does not match the app's mod API version, the app asks the user before starting the mod; a mod without `api` runs with a warning. A mod reads the version it runs on in its mount context, as `context.api.version`.

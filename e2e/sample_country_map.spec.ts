@@ -10,16 +10,15 @@ import {
   markFrame,
   openMessages,
   routeCovers,
-  routeImages,
   stageBar,
 } from "./mod_routes.ts";
 import {
-  COUNTRY_MAP_BOOKS_FOLDER_PATH,
   COUNTRY_MAP_COLLECTION_GLOB,
   COUNTRY_MAP_COLLECTION_PATH,
   COUNTRY_MAP_COLLECTION_RUN_HASH,
   COUNTRY_MAP_MOD_REFERENCE,
   COUNTRY_MAP_MOSAIC_RUN_HASH,
+  COUNTRY_MAP_SITES_FOLDER_PATH,
   NPM_HOST,
   routeNpmFiles,
 } from "./sample_mod.ts";
@@ -29,22 +28,18 @@ import { readTokenAs, waitForFrameColorScheme } from "./theme_probes.ts";
 const MOD_TITLE = "Country Map";
 const MAP_COUNTRY_COUNT = 177;
 
-/** The markers of the sample books, in the order of their countries' names, which is their Tab order. */
+/** The markers of the sample sites, in the order of their countries' names, which is their Tab order. */
 const SAMPLE_MARKER_NAMES = [
-  "Austria, 2 tiles",
-  "Belarus, 3 tiles",
-  "Canada, 6 tiles",
-  "China, 3 tiles",
-  "France, 6 tiles",
-  "Germany, 1 tile",
-  "Hungary, 3 tiles",
-  "Norway, 3 tiles",
-  "Peru, 3 tiles",
-  "Poland, 3 tiles",
-  "South Korea, 3 tiles",
-  "Sweden, 3 tiles",
-  "United Kingdom, 6 tiles",
-  "United States, 6 tiles",
+  "China, 2 tiles",
+  "Ecuador, 1 tile",
+  "Egypt, 1 tile",
+  "France, 1 tile",
+  "Greece, 1 tile",
+  "India, 1 tile",
+  "Jordan, 1 tile",
+  "Peru, 1 tile",
+  "Tanzania, 1 tile",
+  "United States, 1 tile",
 ];
 
 /** The five files the sample declares, on the vanilla npm host, sorted. */
@@ -55,9 +50,6 @@ const SAMPLE_LIBRARY_URLS = [
   `${NPM_HOST}topojson-client@3.1.0/dist/topojson-client.min.js`,
   `${NPM_HOST}world-atlas@2.0.2/countries-110m.json`,
 ];
-
-/** The covers of the sample books that are not on upload.wikimedia.org, which `routeCovers` answers. */
-const OPEN_LIBRARY_COVERS_GLOB = "https://covers.openlibrary.org/**";
 
 const LEAFLET_SCRIPT_PATH = "leaflet@1.9.4/dist/leaflet.js";
 
@@ -74,18 +66,50 @@ const LEAFLET_PROBE_HOOKS = [
   "});",
 ].join("\n");
 
-const YEARS_TITLE = "The Years";
-const YEARS_LINK = "https://en.wikipedia.org/wiki/The_Years_(Ernaux_book)";
-const YEARS_TILE_GLOB = `**${COUNTRY_MAP_BOOKS_FOLDER_PATH}/annie_ernaux__the_years__2008.md`;
-const YEARS_COLLECTION_LINE =
-  '    - path: "./annie_ernaux__the_years__2008.md"';
-const GERMAN_BOOK_COLLECTION_LINE =
-  '    - path: "./peter_handke__the_goalies_anxiety_at_the_penalty_kick__1970.md"';
+/** The sample site whose card the card tests open, in Peru. */
+const CARD_TITLE = "Machu Picchu";
+const CARD_COUNTRY = "Peru";
+const CARD_LINK = "https://en.wikipedia.org/wiki/Machu_Picchu";
+const CARD_TILE_GLOB = `**${COUNTRY_MAP_SITES_FOLDER_PATH}/machu_picchu.md`;
+const CARD_COLLECTION_LINE = '    - path: "./machu_picchu.md"';
 
-/** A French book that is not in the sample, served next to the sample books. */
-const EXTRA_FRENCH_BOOK_FILE = "extra_french_book.md";
-const EXTRA_FRENCH_BOOK_TITLE = "An Extra French Book";
-const EXTRA_FRENCH_BOOK_TEXT = `---\ntitle: "${EXTRA_FRENCH_BOOK_TITLE}"\ncountry: "France"\n---\n\nA book added to the collection.\n`;
+/** China's sample sites, in the collection's order. */
+const CHINESE_TITLES = ["Great Wall of China", "Forbidden City"];
+const GREAT_WALL_COLLECTION_LINE = '    - path: "./great_wall_of_china.md"';
+
+/** The upload.wikimedia.org host the sample sites' images load from, which `routeCovers` answers. */
+const SITE_IMAGE_HOST = "https://upload.wikimedia.org";
+
+/** A made-up tile that is not in the sample, served next to the sample sites. */
+interface AddedTile {
+  file: string;
+  title: string;
+  country: string;
+}
+
+const EXTRA_CHINESE_SITE: AddedTile = {
+  file: "extra_chinese_site.md",
+  title: "An Extra Chinese Site",
+  country: "China",
+};
+
+const MADE_UP_NORWAY: AddedTile = {
+  file: "made_up_norway.md",
+  title: "A Made-up Tile in Norway",
+  country: "Norway",
+};
+
+const MADE_UP_AUSTRIA: AddedTile = {
+  file: "made_up_austria.md",
+  title: "A Made-up Tile in Austria",
+  country: "Austria",
+};
+
+const MADE_UP_HUNGARY: AddedTile = {
+  file: "made_up_hungary.md",
+  title: "A Made-up Tile in Hungary",
+  country: "Hungary",
+};
 
 /** How much narrower than the viewport the mod's frame is, with the app's sidebar collapsed. */
 const NARROW_FRAME_INSET = 80;
@@ -166,7 +190,7 @@ interface Place {
 /** Bordeaux, in France, away from France's marker. */
 const BORDEAUX: Place = { lat: 44.84, lng: -0.58 };
 
-/** Madrid, in Spain, which has no sample books. */
+/** Madrid, in Spain, which has no sample sites. */
 const MADRID: Place = { lat: 40.42, lng: -3.7 };
 
 function escapeRegExp(text: string): string {
@@ -181,7 +205,7 @@ function buildProbeRouteOptions(missingPaths: string[]): NpmRouteOptions {
   return options;
 }
 
-/** Answers the npm host from `e2e/npm_files/`, with the probe hooks, and every cover with a 1×1 PNG. */
+/** Answers the npm host from `e2e/npm_files/`, with the probe hooks, and every site image with a 1×1 PNG. */
 async function routeSampleHosts(
   page: Page,
   missingPaths: string[] = [],
@@ -191,7 +215,6 @@ async function routeSampleHosts(
     buildProbeRouteOptions(missingPaths),
   );
   await routeCovers(page);
-  await routeImages(page, OPEN_LIBRARY_COVERS_GLOB);
   return npmRequests;
 }
 
@@ -213,7 +236,7 @@ function tileCard(frame: Frame): Locator {
   return frame.getByRole("dialog");
 }
 
-/** Opens the sample at `hash`, its default mosaic with the sample books unless given, and waits for France's marker. */
+/** Opens the sample at `hash`, its default mosaic with the sample sites unless given, and waits for France's marker. */
 async function openSample(
   page: Page,
   hash: string = COUNTRY_MAP_MOSAIC_RUN_HASH,
@@ -241,10 +264,11 @@ async function selectWithKeyboard(
   await expect(sidebar(frame).getByRole("heading")).toHaveText(country);
 }
 
-async function openYearsCard(frame: Frame): Promise<Locator> {
-  await selectWithKeyboard(frame, "France");
-  await tileButton(frame, YEARS_TITLE).click();
-  const card = frame.getByRole("dialog", { name: YEARS_TITLE });
+/** Opens the card of "Machu Picchu" from Peru's sidebar. */
+async function openSiteCard(frame: Frame): Promise<Locator> {
+  await selectWithKeyboard(frame, CARD_COUNTRY);
+  await tileButton(frame, CARD_TITLE).click();
+  const card = frame.getByRole("dialog", { name: CARD_TITLE });
   await expect(card).toBeVisible();
   return card;
 }
@@ -482,37 +506,9 @@ function readBox(element: Element): ElementBox {
   return box;
 }
 
-/** Where Open Library redirects The Years' cover: to archive.org, then to one of its mirrors. */
-const ARCHIVE_COVER_URL =
-  "https://archive.org/download/m_covers_0000/968944-L.jpg";
-const ARCHIVE_MIRROR_COVER_URL =
-  "https://ia800100.us.archive.org/view_archive.php?archive=m_covers_0000.zip&file=968944-L.jpg";
-
-/** Answers a route with a redirect to `location`, as Open Library answers a cover. */
-async function answerRedirect(location: string, route: Route): Promise<void> {
-  await route.fulfill({ status: 302, headers: { Location: location } });
-}
-
 /** Runs in the page before the app: "Load media linked by tiles" off. */
 function turnOffTileLinkedMedia(): void {
   localStorage.setItem("opentesela.tile-linked-media", "false");
-}
-
-/** Runs in the frame: whether each image loads. */
-async function loadImages(urls: string[]): Promise<boolean[]> {
-  const loads: Promise<boolean>[] = [];
-  for (const url of urls) {
-    const image = new Image();
-    loads.push(
-      new Promise<boolean>(function waitForImage(resolve): void {
-        image.addEventListener("load", resolve.bind(undefined, true));
-        image.addEventListener("error", resolve.bind(undefined, false));
-      }),
-    );
-    image.src = url;
-  }
-  const loaded = await Promise.all(loads);
-  return loaded;
 }
 
 /** Runs on an image: its natural width, 0 until it loaded. */
@@ -605,31 +601,36 @@ async function answerChangedCollection(
   await route.fulfill({ response, body: change(text) });
 }
 
-function addExtraFrenchBook(text: string): string {
-  const changedText = `${text.trimEnd()}\n    - path: "./${EXTRA_FRENCH_BOOK_FILE}"\n`;
+/** The text of a made-up tile file. */
+function buildAddedTileText(tile: AddedTile): string {
+  const text = `---\ntitle: "${tile.title}"\ncountry: "${tile.country}"\n---\n\nA tile added to the collection.\n`;
+  return text;
+}
+
+function addTiles(tiles: AddedTile[], text: string): string {
+  let changedText = text.trimEnd();
+  for (const tile of tiles) {
+    changedText += `\n    - path: "./${tile.file}"`;
+  }
+  changedText += "\n";
   return changedText;
 }
 
-function removeGermanBook(text: string): string {
-  const changedText = text.replace(`${GERMAN_BOOK_COLLECTION_LINE}\n`, "");
+function removeCollectionLine(line: string, text: string): string {
+  const changedText = text.replace(`${line}\n`, "");
   return changedText;
 }
 
-function removeYears(text: string): string {
-  const changedText = text.replace(`${YEARS_COLLECTION_LINE}\n`, "");
-  return changedText;
-}
-
-async function answerExtraFrenchBook(route: Route): Promise<void> {
+async function answerAddedTile(tile: AddedTile, route: Route): Promise<void> {
   await route.fulfill({
     status: 200,
     contentType: "text/markdown",
-    body: EXTRA_FRENCH_BOOK_TEXT,
+    body: buildAddedTileText(tile),
   });
 }
 
-/** Answers The Years with `pages: 256` once `changed.isOn` is set. */
-async function answerChangedYears(
+/** Answers "Machu Picchu" with `inscribed: 1983` once `changed.isOn` is set. */
+async function answerChangedSite(
   changed: RouteSwitch,
   route: Route,
 ): Promise<void> {
@@ -641,7 +642,10 @@ async function answerChangedYears(
   const text = await response.text();
   await route.fulfill({
     response,
-    body: text.replace("pages: null", "pages: 256"),
+    body: text.replace(
+      `country: "${CARD_COUNTRY}"\n`,
+      `country: "${CARD_COUNTRY}"\ninscribed: 1983\n`,
+    ),
   });
 }
 
@@ -656,6 +660,39 @@ async function routeChangedCollection(
     answerChangedCollection.bind(undefined, changed, change),
   );
   return changed;
+}
+
+/**
+ * Serves `tiles` next to the sample sites, and adds them to the sample
+ * collection once the returned switch is on.
+ */
+async function routeAddedTiles(
+  page: Page,
+  tiles: AddedTile[],
+): Promise<RouteSwitch> {
+  const changed = await routeChangedCollection(
+    page,
+    addTiles.bind(undefined, tiles),
+  );
+  for (const tile of tiles) {
+    await page.route(
+      `**${COUNTRY_MAP_SITES_FOLDER_PATH}/${tile.file}`,
+      answerAddedTile.bind(undefined, tile),
+    );
+  }
+  return changed;
+}
+
+/** Opens the default mosaic with `tiles` added to the sample sites. */
+async function routeAndOpenSampleWith(
+  page: Page,
+  tiles: AddedTile[],
+): Promise<Frame> {
+  await routeSampleHosts(page);
+  const changed = await routeAddedTiles(page, tiles);
+  changed.isOn = true;
+  const frame = await openSample(page);
+  return frame;
 }
 
 /** The sample's collection file, as the tests' changes start from it. */
@@ -823,11 +860,12 @@ test.describe("Markers", { tag: "@sample" }, function describeMarkers(): void {
   test("Tip on the country's land", async function placesTipsOnLand({
     page,
   }): Promise<void> {
-    const frame = await routeAndOpenSample(page);
+    const frame = await routeAndOpenSampleWith(page, [MADE_UP_NORWAY]);
+    await expect(markerButton(frame, "Norway")).toBeVisible();
 
     const tips = await frame.evaluate(readMarkerTips, PROJECTION_SETTINGS);
 
-    expect(tips).toHaveLength(SAMPLE_MARKER_NAMES.length);
+    expect(tips).toHaveLength(SAMPLE_MARKER_NAMES.length + 1);
     for (const tip of tips) {
       expect(tip.isOnOwnLand, tip.name).toBe(true);
     }
@@ -866,13 +904,14 @@ test.describe("Markers", { tag: "@sample" }, function describeMarkers(): void {
     page,
   }): Promise<void> {
     const frame = await routeAndOpenSample(page);
-    const france = markerButton(frame, "France");
+    const china = markerButton(frame, "China");
+    await expect(china).toHaveAccessibleName("China, 2 tiles");
 
-    await france.focus();
-    await france.press("Enter");
+    await china.focus();
+    await china.press("Enter");
 
-    await expect(sidebar(frame).getByRole("heading")).toHaveText("France");
-    await expect(france).toHaveAttribute("aria-expanded", "true");
+    await expect(sidebar(frame).getByRole("heading")).toHaveText("China");
+    await expect(china).toHaveAttribute("aria-expanded", "true");
     await expect(sidebar(frame).getByRole("heading")).toBeFocused();
   });
 
@@ -905,7 +944,10 @@ test.describe("Markers", { tag: "@sample" }, function describeMarkers(): void {
   test("Overlapping markers", async function raisesFocusedMarker({
     page,
   }): Promise<void> {
-    const frame = await routeAndOpenSample(page);
+    const frame = await routeAndOpenSampleWith(page, [
+      MADE_UP_AUSTRIA,
+      MADE_UP_HUNGARY,
+    ]);
     const austria = markerButton(frame, "Austria");
     const hungary = markerButton(frame, "Hungary");
     const austriaTip = await readTip(frame, "Austria");
@@ -962,14 +1004,32 @@ test.describe("Sidebar", { tag: "@sample" }, function describeSidebar(): void {
     await markerButton(frame, "France").click();
 
     await expect(sidebar(frame).getByRole("heading")).toHaveText("France");
-    await expect(sidebar(frame)).toContainText("6 tiles");
-    await expect(sidebar(frame).getByRole("listitem")).toHaveCount(6);
-    await expect(tileButton(frame, YEARS_TITLE)).toBeVisible();
+    await expect(sidebar(frame)).toContainText("1 tile");
+    await expect(sidebar(frame).getByRole("listitem")).toHaveText([
+      "Mont-Saint-Michel",
+    ]);
+  });
+
+  test("China's tiles", async function listsChinaTiles({
+    page,
+  }): Promise<void> {
+    const frame = await routeAndOpenSample(page);
+
+    await markerButton(frame, "China").click();
+
+    await expect(sidebar(frame).getByRole("heading")).toHaveText("China");
+    await expect(sidebar(frame)).toContainText("2 tiles");
+    await expect(sidebar(frame).getByRole("listitem")).toHaveText(
+      CHINESE_TITLES,
+    );
   });
 
   test("Sidebar colors", async function colorsSidebar({ page }): Promise<void> {
     const frame = await routeAndOpenSample(page);
-    await selectWithKeyboard(frame, "France");
+    await selectWithKeyboard(frame, "China");
+    await expect(sidebar(frame).getByRole("listitem").first()).toHaveText(
+      CHINESE_TITLES[0],
+    );
 
     const card = await frame.evaluate(readTokenAs, [
       "--ot-card",
@@ -990,14 +1050,14 @@ test.describe("Sidebar", { tag: "@sample" }, function describeSidebar(): void {
     page,
   }): Promise<void> {
     const frame = await routeAndOpenSample(page);
-    const france = markerButton(frame, "France");
-    await france.click();
+    const china = markerButton(frame, "China");
+    await china.click();
 
     await sidebar(frame).getByRole("button", { name: "Close" }).click();
 
     await expect(sidebar(frame)).toBeHidden();
-    await expect(france).toHaveAttribute("aria-expanded", "false");
-    await expect(france).toBeFocused();
+    await expect(china).toHaveAttribute("aria-expanded", "false");
+    await expect(china).toBeFocused();
   });
 
   test("Phone width", async function stacksSidebarBelowMap({
@@ -1030,69 +1090,61 @@ test.describe(
   "Tile card",
   { tag: "@sample" },
   function describeTileCard(): void {
-    // Playwright routes only the first request of a redirect, so the test
-    // checks each host of Open Library's redirect on its own, with "Load
-    // media linked by tiles" off: only the default mosaic's permissions
-    // allow them.
-    test("Open Library cover", async function showsRedirectedCover({
+    // "Load media linked by tiles" is off, so only the default mosaic's
+    // permission allows the image.
+    test("Linked image", async function showsLinkedImage({
       page,
     }): Promise<void> {
       await page.addInitScript(turnOffTileLinkedMedia);
       await routeSampleHosts(page);
-      await routeImages(page, "https://archive.org/**");
-      await routeImages(page, "https://ia800100.us.archive.org/**");
       const frame = await openSample(page);
 
-      const card = await openYearsCard(frame);
-      const cover = card.locator("figure > img");
+      const card = await openSiteCard(frame);
+      const image = card.locator("figure > img");
 
+      await expect(image).toHaveAttribute(
+        "src",
+        new RegExp(`^${escapeRegExp(SITE_IMAGE_HOST)}/`),
+      );
       await expect
-        .poll(cover.evaluate.bind(cover, readNaturalWidth))
+        .poll(image.evaluate.bind(image, readNaturalWidth))
         .toBeGreaterThan(0);
-      expect(
-        await frame.evaluate(loadImages, [
-          ARCHIVE_COVER_URL,
-          ARCHIVE_MIRROR_COVER_URL,
-        ]),
-      ).toEqual([true, true]);
+      const imageBox = await image.evaluate(readBox);
+      const headingBox = await card
+        .getByRole("heading", { level: 2 })
+        .evaluate(readBox);
+      expect(imageBox.bottom).toBeLessThanOrEqual(headingBox.top);
       await expectNoIssues(page);
     });
 
-    test("Without the default mosaic", async function blocksRedirectedCover({
+    test("Without the default mosaic", async function blocksLinkedImage({
       page,
-      browserName,
     }): Promise<void> {
-      // Playwright's WebKit cannot fulfill a route with a redirect status.
-      test.skip(
-        browserName === "webkit",
-        "Playwright cannot fulfill a route with a 302 in WebKit",
-      );
-      await routeSampleHosts(page);
-      await page.route(
-        OPEN_LIBRARY_COVERS_GLOB,
-        answerRedirect.bind(undefined, ARCHIVE_COVER_URL),
-      );
-      const archiveUrls = await routeImages(page, "https://archive.org/**");
+      await page.addInitScript(turnOffTileLinkedMedia);
+      await routeNpmFiles(page, buildProbeRouteOptions([]));
+      const imageUrls = await routeCovers(page);
       const frame = await openSample(page, COUNTRY_MAP_COLLECTION_RUN_HASH);
 
-      await openYearsCard(frame);
+      await openSiteCard(frame);
 
       const warnings = await openMessages(page, "Warnings");
       await expect(warnings).toContainText(
-        /Blocked image request to https:\/\/(covers\.openlibrary|archive)\.org/,
+        `Blocked image request to ${SITE_IMAGE_HOST}`,
       );
-      expect(archiveUrls).toEqual([]);
+      expect(imageUrls).toEqual([]);
     });
 
-    test("Open a book", async function opensBookCard({ page }): Promise<void> {
+    test("Open a tile", async function opensTileCard({ page }): Promise<void> {
       const frame = await routeAndOpenSample(page);
 
-      const card = await openYearsCard(frame);
+      const card = await openSiteCard(frame);
 
       await expect(card.getByRole("heading", { level: 2 })).toHaveText(
-        YEARS_TITLE,
+        CARD_TITLE,
       );
-      await expect(card).toContainText("The Years (French: Les Années)");
+      await expect(card).toContainText(
+        "Machu Picchu is a 15th-century Inca citadel",
+      );
     });
 
     test("A link in the body", async function opensBodyLink({
@@ -1100,29 +1152,31 @@ test.describe(
     }): Promise<void> {
       const frame = await routeAndOpenSample(page);
       await markFrame(frame);
-      const card = await openYearsCard(frame);
+      const card = await openSiteCard(frame);
 
-      await card.getByRole("link", { name: YEARS_LINK }).click();
+      await card.getByRole("link", { name: CARD_LINK }).click();
 
-      await expect(actionDialog(page)).toContainText(YEARS_LINK);
+      await expect(actionDialog(page)).toContainText(CARD_LINK);
       await actionDialog(page).getByRole("button", { name: "Cancel" }).click();
       expect(await isFrameMarked(frame)).toBe(true);
     });
 
     test("Escape", async function closesWithEscape({ page }): Promise<void> {
       const frame = await routeAndOpenSample(page);
-      await openYearsCard(frame);
+      await openSiteCard(frame);
 
       await page.keyboard.press("Escape");
 
       await expect(tileCard(frame)).toBeHidden();
-      await expect(sidebar(frame).getByRole("heading")).toHaveText("France");
-      await expect(tileButton(frame, YEARS_TITLE)).toBeFocused();
+      await expect(sidebar(frame).getByRole("heading")).toHaveText(
+        CARD_COUNTRY,
+      );
+      await expect(tileButton(frame, CARD_TITLE)).toBeFocused();
     });
 
     test("Backdrop", async function closesOnBackdrop({ page }): Promise<void> {
       const frame = await routeAndOpenSample(page);
-      const card = await openYearsCard(frame);
+      const card = await openSiteCard(frame);
       const box = await card.boundingBox();
       if (box === null) {
         throw new Error("Expected the card to have a box");
@@ -1138,27 +1192,23 @@ test.describe(
 );
 
 test.describe(
-  "Map follows the tiles",
+  "Map follows tile changes",
   { tag: "@sample" },
   function describeFollowsTiles(): void {
-    test("Book added", async function showsAddedBook({ page }): Promise<void> {
+    test("Tile added", async function showsAddedTile({ page }): Promise<void> {
       await routeSampleHosts(page);
-      const changed = await routeChangedCollection(page, addExtraFrenchBook);
-      await page.route(
-        `**${COUNTRY_MAP_BOOKS_FOLDER_PATH}/${EXTRA_FRENCH_BOOK_FILE}`,
-        answerExtraFrenchBook,
-      );
+      const changed = await routeAddedTiles(page, [EXTRA_CHINESE_SITE]);
       const frame = await openSample(page);
       await markFrame(frame);
-      await selectWithKeyboard(frame, "France");
+      await selectWithKeyboard(frame, "China");
 
       changed.isOn = true;
       await reloadTiles(page);
 
-      await expect(markerButton(frame, "France")).toHaveText("7");
-      await expect(sidebar(frame)).toContainText("7 tiles");
-      await expect(tileButton(frame, EXTRA_FRENCH_BOOK_TITLE)).toBeVisible();
-      await expect(markerButton(frame, "France")).toHaveAttribute(
+      await expect(markerButton(frame, "China")).toHaveText("3");
+      await expect(sidebar(frame)).toContainText("3 tiles");
+      await expect(tileButton(frame, EXTRA_CHINESE_SITE.title)).toBeVisible();
+      await expect(markerButton(frame, "China")).toHaveAttribute(
         "aria-expanded",
         "true",
       );
@@ -1168,17 +1218,20 @@ test.describe(
     test("Country emptied", async function deselectsEmptiedCountry({
       page,
     }): Promise<void> {
-      expect(readSampleCollectionText()).toContain(GERMAN_BOOK_COLLECTION_LINE);
+      expect(readSampleCollectionText()).toContain(CARD_COLLECTION_LINE);
       await routeSampleHosts(page);
-      const changed = await routeChangedCollection(page, removeGermanBook);
+      const changed = await routeChangedCollection(
+        page,
+        removeCollectionLine.bind(undefined, CARD_COLLECTION_LINE),
+      );
       const frame = await openSample(page);
-      await selectWithKeyboard(frame, "Germany");
+      await selectWithKeyboard(frame, CARD_COUNTRY);
 
       changed.isOn = true;
       await reloadTiles(page);
 
       await expect(sidebar(frame)).toBeHidden();
-      await expect(markerButton(frame, "Germany")).toHaveCount(0);
+      await expect(markerButton(frame, CARD_COUNTRY)).toHaveCount(0);
       await expect(markerButton(frame, "France")).toBeVisible();
     });
 
@@ -1188,36 +1241,41 @@ test.describe(
       await routeSampleHosts(page);
       const changed: RouteSwitch = { isOn: false };
       await page.route(
-        YEARS_TILE_GLOB,
-        answerChangedYears.bind(undefined, changed),
+        CARD_TILE_GLOB,
+        answerChangedSite.bind(undefined, changed),
       );
       const frame = await openSample(page);
-      const card = await openYearsCard(frame);
-      await expect(card).not.toContainText("pages");
+      const card = await openSiteCard(frame);
+      await expect(card).not.toContainText("inscribed");
 
       changed.isOn = true;
       await reloadTiles(page);
 
-      await expect(card).toContainText("pages");
-      await expect(card).toContainText("256");
+      await expect(card).toContainText("inscribed");
+      await expect(card).toContainText("1983");
       await expect(card).toBeVisible();
     });
 
     test("Open card closed", async function closesCardOfRemovedTile({
       page,
     }): Promise<void> {
-      expect(readSampleCollectionText()).toContain(YEARS_COLLECTION_LINE);
+      expect(readSampleCollectionText()).toContain(GREAT_WALL_COLLECTION_LINE);
       await routeSampleHosts(page);
-      const changed = await routeChangedCollection(page, removeYears);
+      const changed = await routeChangedCollection(
+        page,
+        removeCollectionLine.bind(undefined, GREAT_WALL_COLLECTION_LINE),
+      );
       const frame = await openSample(page);
-      await openYearsCard(frame);
+      await selectWithKeyboard(frame, "China");
+      await tileButton(frame, CHINESE_TITLES[0]).click();
+      await expect(tileCard(frame)).toBeVisible();
 
       changed.isOn = true;
       await reloadTiles(page);
 
       await expect(tileCard(frame)).toBeHidden();
-      await expect(sidebar(frame)).toContainText("5 tiles");
-      await expect(tileButton(frame, YEARS_TITLE)).toHaveCount(0);
+      await expect(sidebar(frame)).toContainText("1 tile");
+      await expect(tileButton(frame, CHINESE_TITLES[0])).toHaveCount(0);
     });
   },
 );

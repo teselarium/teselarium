@@ -104,7 +104,7 @@ const COUNTRY_MAP_LIBRARIES: LoadedLibrary[] = [
   },
 ];
 
-/** The `show` permissions of the default mosaics of the book list and the country map: the hosts the sample books' covers load from, Open Library's redirects included. */
+/** The `show` permissions of the book list's default mosaic: the hosts the sample books' covers load from, Open Library's redirects included. */
 const COVER_PERMISSIONS: ModPermission[] = [
   {
     category: "show",
@@ -125,6 +125,15 @@ const COVER_PERMISSIONS: ModPermission[] = [
     category: "show",
     host: "https://archive.org",
     reason: "Shows the book covers",
+  },
+];
+
+/** The `show` permission of the country map's default mosaic: the host the sample sites' images load from. */
+const SITE_IMAGE_PERMISSIONS: ModPermission[] = [
+  {
+    category: "show",
+    host: "https://upload.wikimedia.org",
+    reason: "Shows the sites' images",
   },
 ];
 
@@ -314,21 +323,21 @@ describe("shipped sample mod country_map", function describeCountryMap(): void {
     expect(sampleMod.libraries).toEqual(COUNTRY_MAP_LIBRARIES);
   });
 
-  it("declares show for the covers' hosts in its default mosaic only", async function declaresCoverHosts(): Promise<void> {
+  it("declares show for the sites' image host in its default mosaic only", async function declaresSiteImageHost(): Promise<void> {
     const permissions = await readSamplePermissions(SHIPPED_COUNTRY_MAP);
 
-    expect(permissions).toEqual({ mod: [], mosaic: COVER_PERMISSIONS });
+    expect(permissions).toEqual({ mod: [], mosaic: SITE_IMAGE_PERMISSIONS });
   });
 });
 
 describe("country tile type", function describeCountryTileType(): void {
-  it("is named country_tile, with the 51 sample books", async function namesCountryTileType(): Promise<void> {
+  it("is named country_tile, with the 11 sample sites", async function namesCountryTileType(): Promise<void> {
     const sampleMod = await loadShippedMod(SHIPPED_COUNTRY_MAP);
 
     const { typeName, collection } = await validateSampleCollection(sampleMod);
 
     expect(typeName).toBe("country_tile");
-    expect(collection.tiles.length).toBe(51);
+    expect(collection.tiles.length).toBe(11);
     expect(collection.issues).toEqual([]);
   });
 

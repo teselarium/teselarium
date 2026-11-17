@@ -1,15 +1,9 @@
 mosaic:
-  title: "Nobel laureates' books on the map"
-  description: "Books by Nobel Prize in Literature laureates, by the country of their author, with their covers."
+  title: "UNESCO World Heritage Sites Example"
+  description: "Eleven UNESCO World Heritage Sites, by their country, with their images and the start of their Wikipedia articles."
   mod: "./"
-  collection: "../../tiles/literature_nobel_laureates_books/collection.yaml"
+  collection: "./sites/collection.yaml"
   permissions:
     show:
       - host: "https://upload.wikimedia.org"
-        reason: "Shows the book covers"
-      - host: "https://covers.openlibrary.org"
-        reason: "Shows the book covers"
-      - host: "https://*.archive.org"
-        reason: "Shows the book covers"
-      - host: "https://archive.org"
-        reason: "Shows the book covers"
+        reason: "Shows the sites' images"

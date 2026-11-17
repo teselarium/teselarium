@@ -4,9 +4,12 @@
  * storage slot, and mounts the mod itself through its context.
  *
  * The cases read the page: the country shapes, the markers' names, numbers
- * and states, the sidebar and the card. `tiles.renderBody` renders only the
- * tiles of the check's collection, so the cases that need other metadata
- * keep a sample tile's source and body.
+ * and states, the sidebar and the card. The cases that open a card or render
+ * a body use the sample sites: `tiles.renderBody` renders only the tiles of
+ * the check's collection, so the cases that need other metadata keep a
+ * sample tile's source and body. The cases that only count, size or place
+ * markers mount made-up tiles, each with its own source, so they do not
+ * depend on the sample's size.
  *
  * What a hidden frame cannot show is tested in
  * e2e/sample_country_map.spec.ts: where the markers are, the colors, the
@@ -16,40 +19,36 @@
 
 const MAP_COUNTRY_COUNT = 177;
 
-/** The markers of the sample books, in the order of their countries' names. */
+/** The markers of the sample sites, in the order of their countries' names. */
 const SAMPLE_MARKER_NAMES = [
-  "Austria, 2 tiles",
-  "Belarus, 3 tiles",
-  "Canada, 6 tiles",
-  "China, 3 tiles",
-  "France, 6 tiles",
-  "Germany, 1 tile",
-  "Hungary, 3 tiles",
-  "Norway, 3 tiles",
-  "Peru, 3 tiles",
-  "Poland, 3 tiles",
-  "South Korea, 3 tiles",
-  "Sweden, 3 tiles",
-  "United Kingdom, 6 tiles",
-  "United States, 6 tiles",
+  "China, 2 tiles",
+  "Ecuador, 1 tile",
+  "Egypt, 1 tile",
+  "France, 1 tile",
+  "Greece, 1 tile",
+  "India, 1 tile",
+  "Jordan, 1 tile",
+  "Peru, 1 tile",
+  "Tanzania, 1 tile",
+  "United States, 1 tile",
 ];
 
 const SAMPLE_MARKER_NUMBERS = [
   "2",
-  "3",
-  "6",
-  "3",
-  "6",
   "1",
-  "3",
-  "3",
-  "3",
-  "3",
-  "3",
-  "3",
-  "6",
-  "6",
+  "1",
+  "1",
+  "1",
+  "1",
+  "1",
+  "1",
+  "1",
+  "1",
 ];
+
+/** The sample site whose card the card cases open, and its country. */
+const CARD_TITLE = "Machu Picchu";
+const CARD_COUNTRY = "Peru";
 
 function readTexts(elements) {
   const texts = [];
@@ -111,13 +110,31 @@ function changeTile(tile, metadata) {
   return changedTile;
 }
 
-/** `count` sample tiles from the `start`th one, each set in `country`. */
-function placeSampleTiles(context, start, count, country) {
+/**
+ * `count` made-up tiles in `country`, with an empty body and a source of
+ * their own, such as `made-up/Germany/3.md`, so none collapses into another.
+ */
+function buildMadeUpTiles(country, count) {
   const tiles = [];
-  for (const tile of context.tiles.slice(start, start + count)) {
-    tiles.push(changeTile(tile, { country }));
+  for (let number = 1; number <= count; number += 1) {
+    tiles.push({
+      source: `made-up/${country}/${number}.md`,
+      metadata: { title: `Made-up tile ${number} in ${country}`, country },
+      body: "",
+    });
   }
   return tiles;
+}
+
+/** The titles of the sample sites in `country`, in the collection's order. */
+function readSampleTitles(context, country) {
+  const titles = [];
+  for (const tile of context.tiles) {
+    if (tile.metadata.country === country) {
+      titles.push(tile.metadata.title);
+    }
+  }
+  return titles;
 }
 
 function readSidebar(context) {
@@ -225,8 +242,8 @@ function readMarkerWidth(marker) {
 
 async function widensAMarkerForMoreDigits(context) {
   const tiles = [
-    ...placeSampleTiles(context, 0, 7, "France"),
-    ...placeSampleTiles(context, 7, 12, "Germany"),
+    ...buildMadeUpTiles("France", 7),
+    ...buildMadeUpTiles("Germany", 12),
   ];
   await context.mount({ tiles });
   const france = findMarker(context, "France");
@@ -238,8 +255,8 @@ async function widensAMarkerForMoreDigits(context) {
 
 async function matchesACommonName(context) {
   const tiles = [
-    ...placeSampleTiles(context, 0, 1, "United States"),
-    ...placeSampleTiles(context, 1, 1, "usa"),
+    ...buildMadeUpTiles("United States", 1),
+    ...buildMadeUpTiles("usa", 1),
   ];
   await context.mount({ tiles });
   context.expect(readMarkerNames(context)).toEqual(["United States, 2 tiles"]);
@@ -247,9 +264,9 @@ async function matchesACommonName(context) {
 
 async function matchesANameWithoutAccentsOrCase(context) {
   const tiles = [
-    ...placeSampleTiles(context, 0, 1, " cote d'ivoire "),
-    ...placeSampleTiles(context, 1, 1, "CÔTE D’IVOIRE"),
-    ...placeSampleTiles(context, 2, 1, "Ivory Coast"),
+    ...buildMadeUpTiles(" cote d'ivoire ", 1),
+    ...buildMadeUpTiles("CÔTE D’IVOIRE", 1),
+    ...buildMadeUpTiles("Ivory Coast", 1),
   ];
   await context.mount({ tiles });
   context.expect(readMarkerNames(context)).toEqual(["cote d'ivoire, 3 tiles"]);
@@ -258,7 +275,7 @@ async function matchesANameWithoutAccentsOrCase(context) {
 
 async function leavesAHistoricalCountryOffTheMap(context) {
   await context.mount({
-    tiles: placeSampleTiles(context, 0, 1, "Soviet Union"),
+    tiles: buildMadeUpTiles("Soviet Union", 1),
   });
   context.expect(listMarkers(context).length).toBe(0);
   context
@@ -267,10 +284,10 @@ async function leavesAHistoricalCountryOffTheMap(context) {
 }
 
 async function groupsTilesNotOnTheMap(context) {
-  const soviet = changeTile(context.tiles[0], { country: "Soviet Union" });
-  const singapore = changeTile(context.tiles[1], { country: "Singapore" });
-  const years = findSampleTile(context, "The Years");
-  await context.mount({ tiles: [soviet, years, singapore] });
+  const [soviet] = buildMadeUpTiles("Soviet Union", 1);
+  const [france] = buildMadeUpTiles("France", 1);
+  const [singapore] = buildMadeUpTiles("Singapore", 1);
+  await context.mount({ tiles: [soviet, france, singapore] });
   const button = findUnplacedButton(context);
   context.expect(button.textContent).toBe("Not on the map, 2 tiles");
   context.expect(readMarkerNames(context)).toEqual(["France, 1 tile"]);
@@ -296,37 +313,39 @@ function readSelectedShapeCount(context) {
 
 async function opensACountry(context) {
   await context.mount();
-  const france = findMarker(context, "France");
+  const chineseTitles = readSampleTitles(context, "China");
+  context
+    .expect(chineseTitles)
+    .toEqual(["Great Wall of China", "Forbidden City"]);
+  const china = findMarker(context, "China");
   context.expect(readSidebar(context).hidden).toBe(true);
-  france.click();
+  china.click();
   const sidebar = readSidebar(context);
   context.expect(sidebar.hidden).toBe(false);
-  context.expect(sidebar.querySelector("h2").textContent).toBe("France");
-  context.expect(sidebar.querySelector("p").textContent).toBe("6 tiles");
-  const titles = readSidebarTitles(context);
-  context.expect(titles.length).toBe(6);
-  context.expect(titles).toContain("The Years");
-  context.expect(france.getAttribute("aria-expanded")).toBe("true");
+  context.expect(sidebar.querySelector("h2").textContent).toBe("China");
+  context.expect(sidebar.querySelector("p").textContent).toBe("2 tiles");
+  context.expect(readSidebarTitles(context)).toEqual(chineseTitles);
+  context.expect(china.getAttribute("aria-expanded")).toBe("true");
   context
-    .expect(findMarker(context, "Germany").getAttribute("aria-expanded"))
+    .expect(findMarker(context, "Peru").getAttribute("aria-expanded"))
     .toBe("false");
   context.expect(readSelectedShapeCount(context)).toBe(1);
   context
     .expect(
       sidebar.querySelectorAll('li > button[aria-haspopup="dialog"]').length,
     )
-    .toBe(6);
+    .toBe(chineseTitles.length);
 }
 
 async function replacesTheSidebarForAnotherCountry(context) {
   await context.mount();
-  findMarker(context, "France").click();
-  findMarker(context, "Germany").click();
+  findMarker(context, "China").click();
+  findMarker(context, "Peru").click();
   const sidebar = readSidebar(context);
-  context.expect(sidebar.querySelector("h2").textContent).toBe("Germany");
+  context.expect(sidebar.querySelector("h2").textContent).toBe("Peru");
   context.expect(sidebar.querySelector("p").textContent).toBe("1 tile");
   context
-    .expect(findMarker(context, "France").getAttribute("aria-expanded"))
+    .expect(findMarker(context, "China").getAttribute("aria-expanded"))
     .toBe("false");
   context.expect(readSelectedShapeCount(context)).toBe(1);
 }
@@ -375,39 +394,47 @@ async function closesTheSidebar(context) {
   context.expect(readSelectedShapeCount(context)).toBe(0);
 }
 
-async function showsTheBookMetadata(context) {
-  await context.mount();
-  findMarker(context, "France").click();
-  findTileButton(context, "The Years").click();
+/** Mounts `tiles` and opens the card of the sample site the card cases use. */
+async function mountAndOpenCard(context, tiles) {
+  await context.mount({ tiles });
+  findMarker(context, CARD_COUNTRY).click();
+  findTileButton(context, CARD_TITLE).click();
+}
+
+async function showsTheTileMetadata(context) {
+  const site = changeTile(findSampleTile(context, CARD_TITLE), {
+    inscribed: 1983,
+    criteria: ["i", "iii"],
+    area: null,
+  });
+  await mountAndOpenCard(context, [site]);
   const card = readCard(context);
   context.expect(card.open).toBe(true);
-  context.expect(card.querySelector("h2").textContent).toBe("The Years");
+  context.expect(card.querySelector("h2").textContent).toBe(CARD_TITLE);
   context
     .expect(card.getAttribute("aria-labelledby"))
     .toBe(card.querySelector("h2").id);
   const details = readCardDetails(context);
-  context.expect(details.authors).toBe("Annie Ernaux");
-  context.expect(details.country).toBe("France");
-  context.expect(details.genres).toBe("Memoir, Autobiography");
-  context.expect(Object.hasOwn(details, "pages")).toBe(false);
+  context.expect(details.country).toBe(CARD_COUNTRY);
+  context.expect(details.inscribed).toBe("1983");
+  context.expect(details.criteria).toBe("i, iii");
+  context.expect(Object.hasOwn(details, "area")).toBe(false);
   context.expect(Object.hasOwn(details, "title")).toBe(false);
   context.expect(Object.hasOwn(details, "image")).toBe(false);
   context.expect(card.querySelector("ot-tile-body")).not.toBe(null);
 }
 
 async function showsAMappingAsJson(context) {
-  const years = changeTile(findSampleTile(context, "The Years"), {
-    prizes: { nobel: 2022 },
-    reread: true,
+  const site = changeTile(findSampleTile(context, CARD_TITLE), {
+    listing: { unesco: 1983 },
+    endangered: false,
     tags: [],
     note: "",
   });
-  await context.mount({ tiles: [years] });
-  findMarker(context, "France").click();
-  findTileButton(context, "The Years").click();
+  await mountAndOpenCard(context, [site]);
   const details = readCardDetails(context);
-  context.expect(details.prizes).toBe('{"nobel":2022}');
-  context.expect(details.reread).toBe("true");
+  context.expect(details.listing).toBe('{"unesco":1983}');
+  context.expect(details.endangered).toBe("false");
   context.expect(Object.hasOwn(details, "tags")).toBe(false);
   context.expect(Object.hasOwn(details, "note")).toBe(false);
 }
@@ -417,15 +444,15 @@ function isCardClosed(context) {
 }
 
 async function closesTheCardWithItsButton(context) {
-  await context.mount();
-  findMarker(context, "France").click();
-  findTileButton(context, "The Years").click();
+  await mountAndOpenCard(context, context.tiles);
   readCard(context).querySelector('button[aria-label="Close"]').click();
   await context.waitFor(isCardClosed.bind(undefined, context));
   context
     .expect(readSidebar(context).querySelector("h2").textContent)
-    .toBe("France");
-  context.expect(readSidebarTitles(context).length).toBe(6);
+    .toBe(CARD_COUNTRY);
+  context
+    .expect(readSidebarTitles(context))
+    .toEqual(readSampleTitles(context, CARD_COUNTRY));
 }
 
 export default function registerCountryMapTests(t) {
@@ -452,7 +479,7 @@ export default function registerCountryMapTests(t) {
   );
   t.test("selects a country by its shape", selectsACountryByItsShape);
   t.test("closes the sidebar", closesTheSidebar);
-  t.test("shows the book metadata", showsTheBookMetadata);
+  t.test("shows the tile metadata", showsTheTileMetadata);
   t.test("shows a mapping as JSON", showsAMappingAsJson);
   t.test("closes the card with its button", closesTheCardWithItsButton);
 }

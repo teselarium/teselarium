@@ -161,33 +161,31 @@ export function readCountryMapModSource(page: Page): string {
   return countryMapModSource;
 }
 
-/** `/samples/tiles/literature_nobel_laureates_books/collection.yaml`: the 51 books of the country map's default mosaic. */
-export const COUNTRY_MAP_COLLECTION_PATH =
-  "/samples/tiles/literature_nobel_laureates_books/collection.yaml";
+/** `/samples/mods/country_map/sites`: the folder of the sample sites, inside the mod's folder. */
+export const COUNTRY_MAP_SITES_FOLDER_PATH = `${COUNTRY_MAP_FOLDER_PATH}/sites`;
 
-/** `/samples/tiles/literature_nobel_laureates_books`: the folder of the sample books. */
-export const COUNTRY_MAP_BOOKS_FOLDER_PATH =
-  "/samples/tiles/literature_nobel_laureates_books";
+/** `/samples/mods/country_map/sites/collection.yaml`: the 11 sites of the country map's default mosaic. */
+export const COUNTRY_MAP_COLLECTION_PATH = `${COUNTRY_MAP_SITES_FOLDER_PATH}/collection.yaml`;
 
 /** `./samples/mods/country_map`: the country map mod as a run link names it. */
 export const COUNTRY_MAP_MOD_REFERENCE = `.${COUNTRY_MAP_FOLDER_PATH}`;
 
-/** `./samples/tiles/literature_nobel_laureates_books/collection.yaml`: the sample books as a run link names them. */
+/** `./samples/mods/country_map/sites/collection.yaml`: the sample sites as a run link names them. */
 export const COUNTRY_MAP_COLLECTION_REFERENCE = `.${COUNTRY_MAP_COLLECTION_PATH}`;
 
 /** `#/run?mod=./samples/mods/country_map`: the run link of the country map mod without tiles. */
 export const COUNTRY_MAP_RUN_HASH = `#/run?mod=${COUNTRY_MAP_MOD_REFERENCE}`;
 
 /**
- * `#/run?mod=./samples/mods/country_map&collection=./samples/tiles/literature_nobel_laureates_books/collection.yaml`:
- * the run link of the country map mod on the sample books.
+ * `#/run?mod=./samples/mods/country_map&collection=./samples/mods/country_map/sites/collection.yaml`:
+ * the run link of the country map mod on the sample sites.
  */
 export const COUNTRY_MAP_COLLECTION_RUN_HASH = `${COUNTRY_MAP_RUN_HASH}&collection=${COUNTRY_MAP_COLLECTION_REFERENCE}`;
 
-/** `#/run?mosaic=./samples/mods/country_map/mosaic.yaml`: the run link of the country map mod's default mosaic, with the sample books and the covers' hosts. */
+/** `#/run?mosaic=./samples/mods/country_map/mosaic.yaml`: the run link of the country map mod's default mosaic, with the sample sites and their images' host. */
 export const COUNTRY_MAP_MOSAIC_RUN_HASH = `#/run?mosaic=.${COUNTRY_MAP_FOLDER_PATH}/mosaic.yaml`;
 
-/** `**\/samples/tiles/literature_nobel_laureates_books/collection.yaml`: the route glob of the sample books. */
+/** `**\/samples/mods/country_map/sites/collection.yaml`: the route glob of the sample sites. */
 export const COUNTRY_MAP_COLLECTION_GLOB = `**${COUNTRY_MAP_COLLECTION_PATH}`;
 
 /** The vanilla app's npm host, which `routeNpmFiles` answers. */

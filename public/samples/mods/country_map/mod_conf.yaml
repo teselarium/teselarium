@@ -1,6 +1,6 @@
 mod:
   title: "Country Map"
-  version: "1.0.0"
+  version: "1.0.1"
   api: "^0.1.14"
   description: "Shows any collection on a world map, with a marker per country, a list of its tiles and a card for each one."
   entrypoint: "./main.js"
