@@ -29,6 +29,7 @@ ui.shadcn.com
 
 # Content used while developing
 wikimedia.org
+wikipedia.org
 
 # Temporary: embed spike of the add-site-consent-dialog change
 youtube.com
