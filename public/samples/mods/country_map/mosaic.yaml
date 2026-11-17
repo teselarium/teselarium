@@ -1,0 +1,15 @@
+mosaic:
+  title: "Nobel laureates' books on the map"
+  description: "Books by Nobel Prize in Literature laureates, by the country of their author, with their covers."
+  mod: "./"
+  collection: "../../tiles/literature_nobel_laureates_books/collection.yaml"
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the book covers"
+      - host: "https://covers.openlibrary.org"
+        reason: "Shows the book covers"
+      - host: "https://*.archive.org"
+        reason: "Shows the book covers"
+      - host: "https://archive.org"
+        reason: "Shows the book covers"

@@ -29,11 +29,13 @@ import {
 } from "./mod_routes.ts";
 import {
   readTilesModSource,
+  readTilesMosaicSource,
   serveExplorerOfTilesMod,
   serveTilesMod,
   TILES_CASE_NAMES,
   TILES_COLLECTION_GLOB,
   TILES_MOD_REFERENCE,
+  TILES_MOSAIC_PATH,
   TILES_TITLE,
 } from "./test_mods.ts";
 import {
@@ -232,7 +234,7 @@ function buildTwoBooksFiles(): ModFiles {
   const files = {
     "two_books.yaml": [
       "collection:",
-      '  name: "Two books"',
+      '  title: "Two books"',
       "  tiles:",
       '    - path: "./books/kallocain.md"',
       '    - path: "./books/fictions.md"',
@@ -279,19 +281,23 @@ test.describe(
   "Mod viewer runs the mod",
   { tag: "@frames" },
   function describeViewerRuns(): void {
-    test("Run with the sample tiles", async function runsWithSampleTiles({
+    test("Run with the sample tiles", async function opensDefaultMosaic({
       page,
     }): Promise<void> {
       await openViewerForTilesMod(page);
       const viewerFrame = await findModFrame(page, "Mod Viewer");
 
       await viewerFrame
-        .getByRole("button", { name: "Run with sample tiles" })
+        .getByRole("button", { name: "Open default mosaic" })
         .click();
 
       await expect(stageBar(page)).toContainText(TILES_TITLE);
       const tilesMod = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
       await expect(tilesMod.getByRole("listitem")).toHaveCount(3);
+      expect(readRunLinkParam(page, "mosaic")).toBe(
+        readTilesMosaicSource(page),
+      );
+      expect(readRunLinkParam(page, "mod")).toBeNull();
       await expect(page.locator('[data-sandbox-id="sandbox-1"]')).toBeHidden();
       await expect(
         viewerFrame.getByRole("heading", {
@@ -412,6 +418,10 @@ test.describe(
         page,
         TILES_COLLECTION_GLOB,
       );
+      const defaultMosaicUrls = await recordHost(
+        page,
+        `**${TILES_MOSAIC_PATH}`,
+      );
       const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
       const missingCollection = new URL("/test-mods/missing.yaml", page.url())
         .href;
@@ -425,6 +435,7 @@ test.describe(
       await expect(finding).toContainText("error");
       await expect(finding).toContainText("404");
       expect(sampleCollectionUrls).toEqual([]);
+      expect(defaultMosaicUrls).toEqual([]);
     });
   },
 );
@@ -548,13 +559,13 @@ const VIEWER_CASES = [
   "says no mod was given for an empty target",
   "shows why a missing target cannot be loaded",
   "shows the format error of its target",
-  "runs with the sample tiles",
+  "opens the default mosaic",
   "runs with the typed collection, sent as typed",
   "runs nothing with an empty collection field",
   "runs without tiles",
-  "offers no sample run without a sample collection",
+  "offers no default mosaic without one",
   "shows permission statuses as badges",
-  "makes running with the sample tiles the primary action",
+  "makes opening the default mosaic the primary action",
   "keeps its own styles to layout",
 ];
 
@@ -860,14 +871,14 @@ const LAUREATES_COLLECTION_GLOB =
 
 /** What the tests serve at the first collection of the vanilla config, so they need no samples. */
 const ROUTED_COLLECTION_TEXT = `collection:
-  name: "Routed collection"
+  title: "Routed collection"
   description: "A collection the e2e tests serve."
   tiles:
     - path: "./first.md"
     - path: "./second.md"
 `;
 
-const LAUREATES_NAME = "Nobel Prize in Literature laureates";
+const LAUREATES_TITLE = "Nobel Prize in Literature laureates";
 
 /** A fixture collection of the collection viewer, which every built app serves. */
 const VIEWER_FIXTURE_REFERENCE =
@@ -906,7 +917,7 @@ test.describe(
         const cards = vanillaCollectionCards(page);
 
         await expect(cards.nth(0).getByRole("heading")).toHaveText(
-          LAUREATES_NAME,
+          LAUREATES_TITLE,
         );
         await expect(cards.nth(0)).toContainText(
           "Nobel Prize in Literature laureates from 2010 to 2026, ordered by award year.",
@@ -924,7 +935,7 @@ test.describe(
         await expect(
           vanillaCollectionCards(page).getByRole("heading"),
         ).toHaveText([
-          LAUREATES_NAME,
+          LAUREATES_TITLE,
           "Nobel Prize in Literature laureates books",
         ]);
       },
@@ -974,7 +985,7 @@ test.describe(
       async function drawsCollectionCards({ page }): Promise<void> {
         await page.goto(COLLECTION_EXPLORER_RUN_LINK);
         const card = vanillaCollectionCards(page).nth(0);
-        await expect(card.getByRole("heading")).toHaveText(LAUREATES_NAME);
+        await expect(card.getByRole("heading")).toHaveText(LAUREATES_TITLE);
         const explorer = await findModFrame(page, "Tiles");
 
         await expect(card).toHaveCSS(
@@ -982,7 +993,7 @@ test.describe(
           await explorer.evaluate(readTokenAs, ["--ot-card", "color"]),
         );
         await expect(
-          card.getByRole("button", { name: new RegExp(LAUREATES_NAME) }),
+          card.getByRole("button", { name: new RegExp(LAUREATES_TITLE) }),
         ).toBeVisible();
       },
     );
@@ -1251,7 +1262,7 @@ async function serveRoutedTiles(route: Route): Promise<void> {
   const origin = new URL(route.request().url()).origin;
   const body = [
     "collection:",
-    `  name: "${ROUTED_TILES_NAME}"`,
+    `  title: "${ROUTED_TILES_NAME}"`,
     "  tiles:",
     `    - url: "${origin}${TILE_FIXTURES_PATH}tiles/kallocain.md"`,
     `    - url: "${origin}${TILE_FIXTURES_PATH}tiles/fahrenheit_451.md"`,

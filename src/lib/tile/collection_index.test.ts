@@ -19,7 +19,7 @@ const BOOKS_URL = `${FIXTURES_BASE_URL}tiles/books/`;
 const KALLOCAIN_URL = `${BOOKS_URL}kallocain.md`;
 const MISSING_TILE_URL = `${BOOKS_URL}missing.md`;
 const MISSING_COLLECTION_URL = `${FIXTURES_BASE_URL}missing.yaml`;
-const EMPTY_COLLECTION_TEXT = 'collection:\n  name: "Empty"\n  tiles: []\n';
+const EMPTY_COLLECTION_TEXT = 'collection:\n  title: "Empty"\n  tiles: []\n';
 
 function createTestFetch(): Mock<typeof fetch> {
   const testFetch = vi.fn<typeof fetch>(fetchTestFile);
@@ -31,7 +31,7 @@ function serveTestFile(url: string, text: string): void {
 }
 
 function buildCollectionText(entryLines: string[]): string {
-  const lines = ["collection:", '  name: "Test collection"', "  tiles:"];
+  const lines = ["collection:", '  title: "Test collection"', "  tiles:"];
   for (const entryLine of entryLines) {
     lines.push(`    ${entryLine}`);
   }
@@ -91,12 +91,12 @@ describe("readTileCollectionIndex", function describeReadTileCollectionIndex(): 
       expect(Object.keys(collectionIndex).sort()).toEqual([
         "description",
         "issues",
-        "name",
         "source",
         "tiles",
+        "title",
       ]);
       expect(collectionIndex.source).toBe(SAMPLE_COLLECTION_URL);
-      expect(collectionIndex.name).toBe("Science fiction books");
+      expect(collectionIndex.title).toBe("Science fiction books");
       expect(collectionIndex.description).toBe(
         "A sample book list for demonstration purposes.",
       );
@@ -113,7 +113,7 @@ describe("readTileCollectionIndex", function describeReadTileCollectionIndex(): 
       const testFetch = createTestFetch();
       serveTestFile(
         SAMPLE_COLLECTION_URL,
-        'collection:\n  name: "A"\n  tiles: []\n',
+        'collection:\n  title: "A"\n  tiles: []\n',
       );
 
       const collectionIndex = await readTileCollectionIndex(
@@ -288,7 +288,7 @@ describe("readTileCollectionIndex", function describeReadTileCollectionIndex(): 
 
     it("Wrong structure", async function rejectsMissingTiles(): Promise<void> {
       const testFetch = createTestFetch();
-      serveTestFile(SAMPLE_COLLECTION_URL, 'collection:\n  name: "A"\n');
+      serveTestFile(SAMPLE_COLLECTION_URL, 'collection:\n  title: "A"\n');
 
       const error = await catchReadError(
         readTileCollectionIndex(SAMPLE_COLLECTION_URL, { fetch: testFetch }),

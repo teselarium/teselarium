@@ -12,8 +12,8 @@ import {
   OTHER_API_MOD_SOURCE,
   OTHER_API_RANGE,
   OTHER_APP_ORIGIN,
-  SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
+  SAMPLE_DEFAULT_MOSAIC_SOURCE,
   SAMPLE_ENTRYPOINT,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TYPE_SOURCE,
@@ -62,20 +62,22 @@ describe("inspectMod", function describeInspectMod(): void {
 
     expect(inspection).toEqual({
       source: SAMPLE_MOD_SOURCE,
-      name: "book_list",
       title: "Book List",
       version: "1.0.0",
       description: "A very simple list of books with their covers.",
       api: "^0.1.0",
       apiCompatible: true,
       typeSource: SAMPLE_TYPE_SOURCE,
-      sampleCollection: SAMPLE_COLLECTION_SOURCE,
+      defaultMosaic: SAMPLE_DEFAULT_MOSAIC_SOURCE,
       testSource: null,
       config: { show_covers: true },
       libraries: [],
       permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
     });
     expect(listRequestedUrls(testFetch)).not.toContain(SAMPLE_ENTRYPOINT);
+    expect(listRequestedUrls(testFetch)).not.toContain(
+      SAMPLE_DEFAULT_MOSAIC_SOURCE,
+    );
   });
 
   it("Inspect a mod with a library", async function inspectsModWithLibrary(): Promise<void> {
@@ -124,7 +126,7 @@ describe("inspectMod", function describeInspectMod(): void {
   it("Inspect a mod with tests", async function inspectsModWithTests(): Promise<void> {
     testTexts.set(
       CLOCK_MOD_SOURCE,
-      'mod:\n  name: "clock"\n  version: "1.0.0"\n  entrypoint: "./main.js"\n  test_path: "./test.js"',
+      'mod:\n  title: "clock"\n  version: "1.0.0"\n  entrypoint: "./main.js"\n  test_path: "./test.js"',
     );
     const testFetch = createTestFetch();
 

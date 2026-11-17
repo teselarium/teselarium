@@ -34,7 +34,7 @@ export async function drawsPrimaryAction(context: CaseContext): Promise<void> {
   await mountWithTarget(context, FIXTURE_REFERENCES.listedMod);
 
   context
-    .expect(readButtonBackground(context, "Run with sample tiles"))
+    .expect(readButtonBackground(context, "Open default mosaic"))
     .toBe(readTokenAs("--ot-primary", "color"));
   context
     .expect(readButtonBackground(context, "Run without tiles"))

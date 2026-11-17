@@ -43,7 +43,7 @@ describe("parseYaml", function describeParseYaml(): void {
 
       expect(parsed.source).toBe(TEST_SOURCE);
       expect(parsed.content.collection).toMatchObject({
-        name: "Science fiction books",
+        title: "Science fiction books",
       });
     });
 
@@ -142,7 +142,7 @@ describe("parseYaml", function describeParseYaml(): void {
 
       expect(secondParsed.content).not.toBe(firstParsed.content);
       expect(secondParsed.content.collection).toMatchObject({
-        name: "Science fiction books",
+        title: "Science fiction books",
       });
     });
   });

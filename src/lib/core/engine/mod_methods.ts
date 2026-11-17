@@ -3,7 +3,7 @@ import type { YamlMapping, YamlValue } from "../../files/index.ts";
 import type { LoadedMod, ModLoadOptions } from "../../mod/index.ts";
 import type { IssueLevel } from "../../tile/index.ts";
 import type { ModGrants, SiteDecision } from "../permissions/index.ts";
-import type { ModStorage } from "../storage/index.ts";
+import type { ModSlot, ModStorage } from "../storage/index.ts";
 import type { AppAction } from "./app_actions.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
@@ -25,10 +25,29 @@ export interface OpenLinkOptions {
  */
 export type OpenLinkOutcome = "opened" | "not-visible" | "home-mod";
 
-/** What `mods.check` asks the stage: the resolved mod file and the collection as the request gave it. */
-export interface ModCheckRequest {
+/**
+ * What `mods.check` asks the stage: the resolved mod file and the collection
+ * as the request gave it. Without a collection, the mod is checked with its
+ * default mosaic, when it declares one.
+ */
+export interface ModCheckTarget {
   source: string;
   collection: string | null;
+}
+
+/** What `mosaics.check` asks the stage: the resolved mosaic file, checked as it opens its mod. */
+export interface MosaicCheckTarget {
+  mosaic: string;
+}
+
+/** What a check request asks the stage to check: a mod or a mosaic. */
+export type ModCheckRequest = ModCheckTarget | MosaicCheckTarget;
+
+/** Whether a check request names a mosaic rather than a mod. */
+export function isMosaicCheckTarget(
+  request: ModCheckRequest,
+): request is MosaicCheckTarget {
+  return "mosaic" in request;
 }
 
 /** The level of a message a mod sends the user: the issue levels, and `info`. */
@@ -47,6 +66,8 @@ export interface ModMethodContext {
   mod: LoadedMod;
   grants: ModGrants;
   storage: ModStorage;
+  /** The slot `storage.*` reads and writes: the mod and what it was opened with. */
+  storageSlot: ModSlot;
   appOrigin: string;
   defaults: ResolvedDefaultModSettings;
   /** `baseUrl` is the app's address. */

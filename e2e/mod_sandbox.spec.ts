@@ -284,7 +284,7 @@ test.describe(
     }): Promise<void> {
       await serveAppOriginMod(page, {
         "broken/mod_conf.yaml":
-          'mod:\n  name: "broken"\n  version: "0.1.0"\n  entrypoint: "./main.js"',
+          'mod:\n  title: "broken"\n  version: "0.1.0"\n  entrypoint: "./main.js"',
         "broken/main.js": "export const notMount = 1;\n",
       });
 
@@ -302,7 +302,7 @@ test.describe(
     }): Promise<void> {
       await serveAppOriginMod(page, {
         "broken/mod_conf.yaml":
-          'mod:\n  name: "broken"\n  version: "0.1.0"\n  entrypoint: "./main.js"',
+          'mod:\n  title: "broken"\n  version: "0.1.0"\n  entrypoint: "./main.js"',
         "broken/main.js":
           'export default function mount() { throw new Error("map failed"); }\n',
       });
@@ -393,7 +393,7 @@ test.describe(
         ...buildProbeFiles("probe"),
         "remote_tiles.yaml": [
           "collection:",
-          '  name: "Remote tiles"',
+          '  title: "Remote tiles"',
           "  tiles:",
           '    - url: "https://tiles.example.net/books/kallocain.md"',
         ].join("\n"),
@@ -533,7 +533,7 @@ test.describe(
       ]);
 
       expect(answer.code).toBeUndefined();
-      expect(answer.result).toMatchObject({ name: "clock" });
+      expect(answer.result).toMatchObject({ title: "clock" });
       expect(clockUrls).toEqual([`${OTHER_MODS_HOST}/clock/mod_conf.yaml`]);
     });
 

@@ -9,7 +9,7 @@ import type { TileIssue } from "./tile_issues.ts";
 export interface TileCollectionIndex {
   /** Resolved absolute URL of the collection file. */
   source: string;
-  name: string;
+  title: string;
   /** Empty when the file has none. */
   description: string;
   /** Resolved address of each tile entry that loading the collection would request, a repeated tile once. */
@@ -41,7 +41,7 @@ export async function readTileCollectionIndex(
   }
   const collectionIndex: TileCollectionIndex = {
     source: collectionPlan.collectionUrl.href,
-    name: collectionPlan.collectionFormat.name,
+    title: collectionPlan.collectionFormat.title,
     description: collectionPlan.collectionFormat.description,
     tiles,
     issues,

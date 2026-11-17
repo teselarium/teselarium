@@ -1,23 +1,12 @@
 mod:
-  name: "book_list"
   title: "Book List"
   version: "1.1.0"
-  api: "^0.1.5"
+  api: "^0.1.14"
   description: "A grid of book covers, with a card for each book that shows its details and text."
   entrypoint: "./main.js"
   type_path: "./book_type.md"
-  sample_collection: "./book_collection.yaml"
+  default_mosaic: "./mosaic.yaml"
   test_path: "./test.js"
   config:
     show_covers: true
     columns: 6
-  permissions:
-    show:
-      - host: "https://upload.wikimedia.org"
-        reason: "Shows the book covers"
-      - host: "https://covers.openlibrary.org"
-        reason: "Shows the book covers"
-      - host: "https://*.archive.org"
-        reason: "Shows the book covers"
-      - host: "https://archive.org"
-        reason: "Shows the book covers"

@@ -20,7 +20,6 @@ Its TypeScript source, in `default_mods/mod_explorer/src/`, is a short example o
 
 ```yaml
 mod:
-  name: "mod_explorer"
   title: "Mods"
   version: "0.1.0"
   api: "^0.1.0"

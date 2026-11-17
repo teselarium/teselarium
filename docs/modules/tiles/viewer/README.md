@@ -17,7 +17,7 @@ It is an ordinary sandboxed mod. It uses only the engine API: the tile reaches i
 
 The optional `from` parameter is the address of a collection. The viewer inspects it with `collections.inspect`, which requests no tile. When the collection lists the tile's source, a breadcrumb, `<nav aria-label="Collection">`, shows above the card:
 
-- the collection's name, a button that opens the collection viewer named in the config's `collection_viewer`, with `from` as its `target`, in a new sandbox;
+- the collection's title, a button that opens the collection viewer named in the config's `collection_viewer`, with `from` as its `target`, in a new sandbox;
 - the tile's position, such as `3 of 16`, as plain text;
 - Previous and Next, which send `mods.open` for the mod named in the config's `tile_viewer`, with the neighbouring tile as `tile`, the same `from` and `replace: true`. The new viewer takes the place of this one in the same history entry, so stepping through a collection turns pages instead of adding entries and frames, and back returns to what was shown before the first tile (see [Replacing a sandbox](../../lib/core/stage/README.md#replacing-a-sandbox) in the stage module). Previous is disabled on the first tile and Next on the last: the list does not wrap around.
 
@@ -35,7 +35,7 @@ Its TypeScript source, in `default_mods/tile_viewer/src/`, gets the app's look f
 
 - the tile is an `<article>`, drawn as a card, the metadata a `<dl>`, its heading muted `<small>` text, and the separators around the metadata `<hr>`s;
 - the metadata's button is a plain `<button>`, the theme's outline button, kept no taller than its heading by layout-only CSS (a smaller minimum height and padding);
-- Next is the primary action (`data-ot-variant="primary"`), Previous an outline button, and the collection's name a ghost button;
+- Next is the primary action (`data-ot-variant="primary"`), Previous an outline button, and the collection's title a ghost button;
 - the errors of opening another view are a `role="status"` element.
 
 The mod's own CSS sets layout only: the metadata's two columns are a grid, and its lists drop their bullets. These rules are scoped to the metadata section, so they never reach the rendered body in the same card. No rule that sets `display` matches a `[hidden]` element, so a hidden thumbnail stays hidden. See "Write HTML, get the app's look" in the [theme module](../../lib/core/theme/README.md).
@@ -46,14 +46,13 @@ The mod's own CSS sets layout only: the metadata's two columns are a grid, and i
 
 ```yaml
 mod:
-  name: "tile_viewer"
   title: "Tile Viewer"
   version: "0.1.0"
   api: "^0.1.0"
   description: "Shows a tile's metadata and body and, when it is opened from a collection, its place in it, with the previous and next tiles."
   entrypoint: "./main.js"
   test_path: "./test.js"
-  sample_collection: "./fixtures/tiles_collection.yaml"
+  default_mosaic: "./mosaic.yaml"
   config:
     tile_viewer: "tile_viewer"
     collection_viewer: "collection_viewer"
@@ -63,9 +62,9 @@ mod:
         reason: "Shows the collection of the tile you are viewing and opens the tiles and collections you pick"
 ```
 
-- `tile_viewer` is the mod that linked tiles and the previous and next tiles open in, and `collection_viewer` the mod the collection's name opens. Naming them in the config keeps the links short (`mod=tile_viewer`), so a typed link equals the one the viewer opens, and lets an instantiation point to other viewers.
+- `tile_viewer` is the mod that linked tiles and the previous and next tiles open in, and `collection_viewer` the mod the collection's title opens. Naming them in the config keeps the links short (`mod=tile_viewer`), so a typed link equals the one the viewer opens, and lets an instantiation point to other viewers.
 - `open` for `"*"` lets the viewer inspect collections and open mods for any site, since `collections.inspect` and `mods.open` are both checked against `open`. It is granted because the viewer is served from the app's origin.
-- `sample_collection` is the viewer's fixture collection. It is there for its tests: `tiles.renderBody` renders only the tiles of the check's collection, so the cases can render a body only for these. "Run with sample tiles" in the mod viewer opens the viewer on its first fixture tile.
+- `default_mosaic` is `mosaic.yaml`, next to the mod file, whose `mod` is `"./"` and whose collection is the viewer's fixture collection, `./fixtures/tiles_collection.yaml`. It is there for its tests: a check without a collection takes its tiles from the default mosaic, and `tiles.renderBody` renders only the tiles of the check's collection, so the cases can render a body only for these. "Open default mosaic" in the mod viewer opens the viewer on its first fixture tile.
 
 ## Tests
 

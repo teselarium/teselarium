@@ -4,7 +4,24 @@ import {
   SAMPLE_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
 import { buildModCheckReport } from "./mod_check_report.ts";
-import type { ModCheckFinding, ModTestResult } from "./mod_check_report.ts";
+import type {
+  CheckedFiles,
+  ModCheckFinding,
+  ModTestResult,
+} from "./mod_check_report.ts";
+
+const SAMPLE_MOD_FILES: CheckedFiles = {
+  source: SAMPLE_MOD_SOURCE,
+  mosaic: null,
+};
+
+const MISSING_MOD_FILES: CheckedFiles = {
+  source: MISSING_MOD_SOURCE,
+  mosaic: null,
+};
+
+const MISSING_MOSAIC_SOURCE =
+  "https://example.org/fixtures/mosaics/missing/mosaic.yaml";
 
 const RANGE_WARNING: ModCheckFinding = {
   step: "bundle",
@@ -43,10 +60,11 @@ const FAILED_CASE_ERROR: ModCheckFinding = {
 
 describe("Check report", function describeCheckReport(): void {
   it("passes without findings", function passesWithoutFindings(): void {
-    const report = buildModCheckReport(SAMPLE_MOD_SOURCE, [], true, null);
+    const report = buildModCheckReport(SAMPLE_MOD_FILES, [], true, null);
 
     expect(report).toEqual({
       source: SAMPLE_MOD_SOURCE,
+      mosaic: null,
       status: "pass",
       mountChecked: true,
       testsChecked: false,
@@ -55,9 +73,33 @@ describe("Check report", function describeCheckReport(): void {
     });
   });
 
+  it("names the mosaic, and no mod when the mosaic failed first", function namesFailedMosaic(): void {
+    const mosaicError: ModCheckFinding = {
+      step: "bundle",
+      level: "error",
+      source: MISSING_MOSAIC_SOURCE,
+      message: `Cannot load file "${MISSING_MOSAIC_SOURCE}": HTTP 404 Not Found`,
+    };
+
+    const report = buildModCheckReport(
+      { source: null, mosaic: MISSING_MOSAIC_SOURCE },
+      [mosaicError],
+      false,
+      null,
+    );
+
+    expect(report).toMatchObject({
+      source: null,
+      mosaic: MISSING_MOSAIC_SOURCE,
+      status: "fail",
+      mountChecked: false,
+      testsChecked: false,
+    });
+  });
+
   it("Warnings only", function warnsWithWarningsOnly(): void {
     const report = buildModCheckReport(
-      SAMPLE_MOD_SOURCE,
+      SAMPLE_MOD_FILES,
       [RANGE_WARNING],
       true,
       null,
@@ -69,7 +111,7 @@ describe("Check report", function describeCheckReport(): void {
 
   it("fails when a finding is an error", function failsWithError(): void {
     const report = buildModCheckReport(
-      SAMPLE_MOD_SOURCE,
+      SAMPLE_MOD_FILES,
       [RANGE_WARNING, MOUNT_ERROR],
       true,
       null,
@@ -80,7 +122,7 @@ describe("Check report", function describeCheckReport(): void {
   });
 
   it("keeps whether the mount check ran", function keepsMountChecked(): void {
-    const report = buildModCheckReport(MISSING_MOD_SOURCE, [], false, null);
+    const report = buildModCheckReport(MISSING_MOD_FILES, [], false, null);
 
     expect(report.mountChecked).toBe(false);
   });
@@ -88,7 +130,7 @@ describe("Check report", function describeCheckReport(): void {
   it("does not share the findings it was given", function copiesFindings(): void {
     const findings = [RANGE_WARNING];
 
-    const report = buildModCheckReport(SAMPLE_MOD_SOURCE, findings, true, null);
+    const report = buildModCheckReport(SAMPLE_MOD_FILES, findings, true, null);
     findings.push(MOUNT_ERROR);
 
     expect(report.findings).toEqual([RANGE_WARNING]);
@@ -97,7 +139,7 @@ describe("Check report", function describeCheckReport(): void {
 
   it("Plain data", function isPlainData(): void {
     const report = buildModCheckReport(
-      SAMPLE_MOD_SOURCE,
+      SAMPLE_MOD_FILES,
       [RANGE_WARNING, MOUNT_ERROR],
       true,
       null,
@@ -107,7 +149,7 @@ describe("Check report", function describeCheckReport(): void {
   });
 
   it("Mod without tests", function hasNoTests(): void {
-    const report = buildModCheckReport(SAMPLE_MOD_SOURCE, [], true, null);
+    const report = buildModCheckReport(SAMPLE_MOD_FILES, [], true, null);
 
     expect(report.testsChecked).toBe(false);
     expect(report.tests).toEqual([]);
@@ -115,7 +157,7 @@ describe("Check report", function describeCheckReport(): void {
   });
 
   it("Passing case", function keepsPassingCase(): void {
-    const report = buildModCheckReport(SAMPLE_MOD_SOURCE, [], true, [
+    const report = buildModCheckReport(SAMPLE_MOD_FILES, [], true, [
       PASSING_CASE,
     ]);
 
@@ -128,7 +170,7 @@ describe("Check report", function describeCheckReport(): void {
 
   it("Failed case in the findings", function failsWithFailedCase(): void {
     const report = buildModCheckReport(
-      SAMPLE_MOD_SOURCE,
+      SAMPLE_MOD_FILES,
       [FAILED_CASE_ERROR],
       true,
       [PASSING_CASE, FAILING_CASE],
@@ -142,7 +184,7 @@ describe("Check report", function describeCheckReport(): void {
   it("does not share the test results it was given", function copiesTests(): void {
     const tests = [PASSING_CASE];
 
-    const report = buildModCheckReport(SAMPLE_MOD_SOURCE, [], true, tests);
+    const report = buildModCheckReport(SAMPLE_MOD_FILES, [], true, tests);
     tests.push(FAILING_CASE);
     report.tests[0].name = "renamed";
 
@@ -152,7 +194,7 @@ describe("Check report", function describeCheckReport(): void {
 
   it("Plain data with tests", function isPlainDataWithTests(): void {
     const report = buildModCheckReport(
-      SAMPLE_MOD_SOURCE,
+      SAMPLE_MOD_FILES,
       [FAILED_CASE_ERROR],
       true,
       [PASSING_CASE, FAILING_CASE],

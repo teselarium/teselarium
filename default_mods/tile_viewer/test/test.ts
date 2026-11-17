@@ -1,6 +1,6 @@
 /**
  * Tests of the tile viewer, which `mods.check` runs after mounting it. The
- * check's tiles are the viewer's sample collection, `fixtures/`, whose
+ * check's tiles are those of the viewer's default mosaic, `fixtures/`, whose
  * bodies `tiles.renderBody` renders, and the cases name it as `from`, so the
  * cases pass whatever samples the app ships (default_mods/README.md). The
  * tiles a case builds itself have no body. The heading and address cases

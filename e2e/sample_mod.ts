@@ -34,7 +34,7 @@ export const SAMPLE_TEST_PATH = `${SAMPLE_MOD_FOLDER_PATH}/test.js`;
 /** `/samples/mods/book_list/book_type.md`: the sample mod's tile type, `book`. */
 export const SAMPLE_TYPE_PATH = `${SAMPLE_MOD_FOLDER_PATH}/book_type.md`;
 
-/** `/samples/mods/book_list/book_collection.yaml`: the sample collection of three books. */
+/** `/samples/mods/book_list/book_collection.yaml`: the sample collection of three books, which the sample mod's default mosaic names. */
 export const SAMPLE_COLLECTION_PATH = `${SAMPLE_MOD_FOLDER_PATH}/book_collection.yaml`;
 
 /** `/samples/mods/book_list/books`: the folder of the sample book tiles. */
@@ -66,6 +66,12 @@ export const SAMPLE_RUN_HASH = `#/run?mod=${SAMPLE_MOD_REFERENCE}`;
  * the run link of the sample mod on the sample collection.
  */
 export const SAMPLE_COLLECTION_RUN_HASH = `${SAMPLE_RUN_HASH}&collection=${SAMPLE_COLLECTION_REFERENCE}`;
+
+/** `/samples/mods/book_list/mosaic.yaml`: the sample mod's default mosaic, with the sample collection and the covers' hosts. */
+export const SAMPLE_MOSAIC_PATH = `${SAMPLE_MOD_FOLDER_PATH}/mosaic.yaml`;
+
+/** `#/run?mosaic=./samples/mods/book_list/mosaic.yaml`: the run link of the sample mod's default mosaic. */
+export const SAMPLE_MOSAIC_RUN_HASH = `#/run?mosaic=.${SAMPLE_MOSAIC_PATH}`;
 
 /** `**\/samples/mods/book_list/main.js`: the route glob of the sample mod's entrypoint. */
 export const SAMPLE_ENTRYPOINT_GLOB = `**${SAMPLE_ENTRYPOINT_PATH}`;
@@ -136,6 +142,9 @@ export const FLASHCARDS_RUN_HASH = `#/run?mod=${FLASHCARDS_MOD_REFERENCE}`;
  */
 export const FLASHCARDS_COLLECTION_RUN_HASH = `${FLASHCARDS_RUN_HASH}&collection=${FLASHCARDS_COLLECTION_REFERENCE}`;
 
+/** `#/run?mosaic=./samples/mods/flashcards/mosaic.yaml`: the run link of the flashcards mod's default mosaic, with the sample deck. */
+export const FLASHCARDS_MOSAIC_RUN_HASH = `#/run?mosaic=.${FLASHCARDS_FOLDER_PATH}/mosaic.yaml`;
+
 /** `**\/samples/mods/flashcards/flashcard_collection.yaml`: the route glob of the sample deck. */
 export const FLASHCARDS_COLLECTION_GLOB = `**${FLASHCARDS_COLLECTION_PATH}`;
 
@@ -152,7 +161,7 @@ export function readCountryMapModSource(page: Page): string {
   return countryMapModSource;
 }
 
-/** `/samples/tiles/literature_nobel_laureates_books/collection.yaml`: the country map's sample collection of 51 books. */
+/** `/samples/tiles/literature_nobel_laureates_books/collection.yaml`: the 51 books of the country map's default mosaic. */
 export const COUNTRY_MAP_COLLECTION_PATH =
   "/samples/tiles/literature_nobel_laureates_books/collection.yaml";
 
@@ -174,6 +183,9 @@ export const COUNTRY_MAP_RUN_HASH = `#/run?mod=${COUNTRY_MAP_MOD_REFERENCE}`;
  * the run link of the country map mod on the sample books.
  */
 export const COUNTRY_MAP_COLLECTION_RUN_HASH = `${COUNTRY_MAP_RUN_HASH}&collection=${COUNTRY_MAP_COLLECTION_REFERENCE}`;
+
+/** `#/run?mosaic=./samples/mods/country_map/mosaic.yaml`: the run link of the country map mod's default mosaic, with the sample books and the covers' hosts. */
+export const COUNTRY_MAP_MOSAIC_RUN_HASH = `#/run?mosaic=.${COUNTRY_MAP_FOLDER_PATH}/mosaic.yaml`;
 
 /** `**\/samples/tiles/literature_nobel_laureates_books/collection.yaml`: the route glob of the sample books. */
 export const COUNTRY_MAP_COLLECTION_GLOB = `**${COUNTRY_MAP_COLLECTION_PATH}`;

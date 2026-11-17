@@ -23,8 +23,10 @@ export interface ModTestResult {
 
 /** The result of a mod check. Plain data. */
 export interface ModCheckReport {
-  /** Resolved URL of the checked mod file. */
-  source: string;
+  /** Resolved URL of the checked mod file, or `null` when a mosaic check failed before its mod was known. */
+  source: string | null;
+  /** Resolved URL of the mosaic file the check used, or `null` when it used none. */
+  mosaic: string | null;
   status: ModCheckStatus;
   /** Whether the mod was mounted, which needs a bundle without errors. */
   mountChecked: boolean;
@@ -66,19 +68,26 @@ function copyTestResults(tests: ModTestResult[] | null): ModTestResult[] {
   return testCopies;
 }
 
+/** What a check report is about: the mod file and the mosaic file the check used. */
+export interface CheckedFiles {
+  source: string | null;
+  mosaic: string | null;
+}
+
 /**
- * Builds the report of a check, with its status read from the findings'
- * levels, which already hold each failed case. `tests` is `null` when the
- * cases did not run.
+ * Builds the report of a check of `checkedFiles`, with its status read from
+ * the findings' levels, which already hold each failed case. `tests` is
+ * `null` when the cases did not run.
  */
 export function buildModCheckReport(
-  source: string,
+  checkedFiles: CheckedFiles,
   findings: ModCheckFinding[],
   mountChecked: boolean,
   tests: ModTestResult[] | null,
 ): ModCheckReport {
   const report: ModCheckReport = {
-    source,
+    source: checkedFiles.source,
+    mosaic: checkedFiles.mosaic,
     status: readCheckStatus(findings),
     mountChecked,
     testsChecked: tests !== null,

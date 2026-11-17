@@ -5,6 +5,7 @@ import {
   FLASHCARDS_CARDS_FOLDER_PATH,
   FLASHCARDS_COLLECTION_GLOB,
   FLASHCARDS_COLLECTION_RUN_HASH,
+  FLASHCARDS_MOSAIC_RUN_HASH,
   FLASHCARDS_MOD_REFERENCE,
 } from "./sample_mod.ts";
 import { readTokenAs } from "./theme_probes.ts";
@@ -44,7 +45,7 @@ function escapeRegExp(text: string): string {
 }
 
 function buildCollectionYaml(cardFiles: string[]): string {
-  const lines = ["collection:", '  name: "Test deck"', "  tiles:"];
+  const lines = ["collection:", '  title: "Test deck"', "  tiles:"];
   for (const cardFile of cardFiles) {
     lines.push(`    - path: "./cards/${cardFile}"`);
   }
@@ -121,9 +122,16 @@ function rowButton(frame: Frame, name: string): Locator {
   });
 }
 
-/** Opens the mod on the sample deck, or on the deck a route serves, and waits for its first row. */
-async function openFlashcards(page: Page, firstName: string): Promise<Frame> {
-  await page.goto(`/${FLASHCARDS_COLLECTION_RUN_HASH}`);
+/**
+ * Opens the mod at `hash`, its default mosaic with the sample deck unless
+ * given, or on the deck a route serves, and waits for its first row.
+ */
+async function openFlashcards(
+  page: Page,
+  firstName: string,
+  hash: string = FLASHCARDS_MOSAIC_RUN_HASH,
+): Promise<Frame> {
+  await page.goto(`/${hash}`);
   const frame = await findModFrame(page, "Flashcards");
   await expect(rowButton(frame, firstName)).toBeVisible();
   return frame;
@@ -324,6 +332,16 @@ test.describe(
         .getByRole("heading", { name: "Permissions" })
         .locator("xpath=following-sibling::*[1]");
       await expect(permissions).toHaveText("(none)");
+      await expect(
+        viewer
+          .locator("dt", { hasText: /^Default mosaic$/ })
+          .locator("xpath=following-sibling::dd[1]"),
+      ).toHaveText(/samples\/mods\/flashcards\/mosaic\.yaml$/);
+      await expect(
+        viewer
+          .locator("dt", { hasText: /^Tile type$/ })
+          .locator("xpath=following-sibling::dd[1]"),
+      ).toHaveText(/samples\/mods\/flashcards\/flashcard_type\.md$/);
     });
 
     test("Check mod passes", async function checksSample({
@@ -912,6 +930,29 @@ test.describe(
         "key:title",
       );
       await expect(reopenedSetup.getByLabel("Answer")).toHaveValue("body");
+    });
+
+    test("Study fields per deck", async function keepsFieldsPerDeck({
+      page,
+    }): Promise<void> {
+      const frame = await openSampleDeck(page);
+      await modeButton(frame, "Study").click();
+      const setup = setupDialog(frame);
+      await setup.getByLabel("Question").selectOption({ label: "title" });
+      await setup.getByRole("button", { name: "Start" }).click();
+      await expect(cardPosition(frame)).toHaveText("Card 1 of 8");
+
+      await page.goto("about:blank");
+      const otherDeck = await openFlashcards(
+        page,
+        "Emphasis",
+        FLASHCARDS_COLLECTION_RUN_HASH,
+      );
+      await modeButton(otherDeck, "Study").click();
+
+      await expect(
+        setupDialog(otherDeck).getByLabel("Question"),
+      ).not.toHaveValue("key:title");
     });
   },
 );

@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import type { Frame, Locator, Page, Request, Route } from "@playwright/test";
+import type {
+  Frame,
+  FrameLocator,
+  Locator,
+  Page,
+  Request,
+  Route,
+} from "@playwright/test";
 import {
   actionDialog,
   buildModConf,
@@ -21,6 +28,7 @@ import {
   SAMPLE_BOOKS_FOLDER_PATH,
   SAMPLE_COLLECTION_GLOB,
   SAMPLE_COLLECTION_RUN_HASH,
+  SAMPLE_MOSAIC_RUN_HASH,
   SAMPLE_MOD_FILE_PATH,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_TEST_PATH,
@@ -62,7 +70,7 @@ function buildDraftFiles(): ModFiles {
     "drafts/main.js": readSampleEntrypointCode(),
     "drafts/tiles.yaml": [
       "collection:",
-      '  name: "Drafts"',
+      '  title: "Drafts"',
       "  tiles:",
       '    - path: "./books/kallocain.md"',
       '    - path: "./books/untitled_draft.md"',
@@ -90,19 +98,25 @@ async function expectFrameWidth(page: Page, frameWidth: number): Promise<void> {
   expect(box?.width).toBe(frameWidth);
 }
 
-/** Opens the sample mod on the sample collection, with every cover answered, and waits for its books. */
-async function openSample(page: Page): Promise<Frame> {
+/** Opens the sample mod at `hash`, its default mosaic unless given, with every cover answered, and waits for its books. */
+async function openSample(
+  page: Page,
+  hash: string = SAMPLE_MOSAIC_RUN_HASH,
+): Promise<Frame> {
   await routeCovers(page);
-  await page.goto(`/${SAMPLE_COLLECTION_RUN_HASH}`);
+  await page.goto(`/${hash}`);
   const frame = await findModFrame(page, "Book List");
   await expect(bookButton(frame, "Kallocain")).toBeVisible();
   return frame;
 }
 
-/** Opens the sample mod again in a new document, so its frame starts from scratch. */
-async function reopenSample(page: Page): Promise<Frame> {
+/** Opens the sample mod again in a new document, at `hash`, so its frame starts from scratch. */
+async function reopenSample(
+  page: Page,
+  hash: string = SAMPLE_MOSAIC_RUN_HASH,
+): Promise<Frame> {
   await page.goto("about:blank");
-  const frame = await openSample(page);
+  const frame = await openSample(page, hash);
   return frame;
 }
 
@@ -226,7 +240,7 @@ async function answerCollectionWithoutKallocain(
     contentType: "text/yaml",
     body: [
       "collection:",
-      '  name: "Two books"',
+      '  title: "Two books"',
       "  tiles:",
       '    - path: "./books/farenheit_451.md"',
       '    - path: "./books/fictions.md"',
@@ -453,6 +467,18 @@ test.describe(
       const reopened = await reopenSample(page);
 
       await expect(booksPerRow(reopened)).toHaveValue("8");
+    });
+
+    test("Another collection", async function forgetsChoiceElsewhere({
+      page,
+    }): Promise<void> {
+      const frame = await openSample(page);
+      await booksPerRow(frame).selectOption("8");
+      await expect(frame.locator('ul[data-columns="8"]')).toHaveCount(1);
+
+      const reopened = await reopenSample(page, SAMPLE_COLLECTION_RUN_HASH);
+
+      await expect(booksPerRow(reopened)).toHaveValue("6");
     });
 
     test("Ten per row in a narrow frame", async function fitsNarrowFrame({
@@ -804,6 +830,32 @@ test.describe("Mod file", { tag: "@sample" }, function describeModFile(): void {
       ]);
   });
 
+  test("The mod declares no permissions", async function inspectsSample({
+    page,
+  }): Promise<void> {
+    await page.goto(`/#/run?mod=mod_viewer&target=${SAMPLE_MOD_REFERENCE}`);
+    const viewer = page.frameLocator('iframe[title="Mod Viewer"]');
+    await expect(
+      viewer.getByRole("heading", { level: 1, name: /Book List/ }),
+    ).toBeVisible();
+
+    await expect(viewerDefinition(viewer, "Default mosaic")).toHaveText(
+      /samples\/mods\/book_list\/mosaic\.yaml$/,
+    );
+    await expect(viewerDefinition(viewer, "API range")).toContainText(
+      "^0.1.14",
+    );
+    await expect(viewerDefinition(viewer, "API range")).toContainText(
+      "matches",
+    );
+    await expect(viewer.locator("dt", { hasText: /^Name$/ })).toHaveCount(0);
+    await expect(
+      viewer
+        .getByRole("heading", { name: "Permissions" })
+        .locator("xpath=following-sibling::*[1]"),
+    ).toHaveText("(none)");
+  });
+
   test("Sample matches the app's API", async function startsWithoutAsking({
     page,
   }): Promise<void> {
@@ -814,6 +866,13 @@ test.describe("Mod file", { tag: "@sample" }, function describeModFile(): void {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });
+
+/** The description of `term` in the mod viewer's metadata list. */
+function viewerDefinition(viewer: FrameLocator, term: string): Locator {
+  return viewer
+    .locator("dt", { hasText: new RegExp(`^${term}$`) })
+    .locator("xpath=following-sibling::dd[1]");
+}
 
 /** Records the address of each request whose path is `path`. */
 function recordRequestTo(

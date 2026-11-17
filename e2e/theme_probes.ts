@@ -56,7 +56,7 @@ export const THEME_PROBE_MOD_CODE = `export default function mount(engine, conte
     });
   });
   const heading = document.createElement("h1");
-  heading.textContent = "Probe " + context.mod.name;
+  heading.textContent = "Probe " + context.mod.title;
   document.body.append(heading);
 }
 `;

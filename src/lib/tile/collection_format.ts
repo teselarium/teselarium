@@ -4,7 +4,7 @@ import { CollectionFormatError } from "./tile_errors.ts";
 
 /** The checked content of a collection file. `entries` are the unchecked tile entries. */
 export interface CollectionFormat {
-  name: string;
+  title: string;
   description: string;
   entries: YamlValue[];
 }
@@ -39,15 +39,15 @@ function isNonEmptyString(value: YamlValue | undefined): value is string {
   return typeof value === "string" && value !== "";
 }
 
-function readCollectionName(collection: YamlMapping, source: string): string {
-  const name = collection.name;
-  if (!isNonEmptyString(name)) {
+function readCollectionTitle(collection: YamlMapping, source: string): string {
+  const title = collection.title;
+  if (!isNonEmptyString(title)) {
     throw new CollectionFormatError(
       source,
-      '"name" must be a non-empty string',
+      '"title" must be a non-empty string',
     );
   }
-  return name;
+  return title;
 }
 
 function readCollectionDescription(
@@ -77,13 +77,14 @@ function readCollectionEntries(
 
 /**
  * Checks the structure of a parsed collection file: a `collection` mapping with
- * a non-empty string `name`, an optional string `description` and a `tiles`
- * list. Other keys are ignored. Raises `CollectionFormatError`.
+ * a non-empty string `title`, an optional string `description` and a `tiles`
+ * list. Other keys are ignored, the former `name` included. Raises
+ * `CollectionFormatError`.
  */
 export function readCollectionFormat(parsedYaml: ParsedYaml): CollectionFormat {
   const collection = readCollectionMapping(parsedYaml);
   const collectionFormat: CollectionFormat = {
-    name: readCollectionName(collection, parsedYaml.source),
+    title: readCollectionTitle(collection, parsedYaml.source),
     description: readCollectionDescription(collection, parsedYaml.source),
     entries: readCollectionEntries(collection, parsedYaml.source),
   };

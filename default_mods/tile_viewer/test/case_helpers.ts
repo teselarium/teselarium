@@ -11,7 +11,7 @@ import type {
  * (default_mods/README.md).
  */
 export const FIXTURE_REFERENCES = {
-  /** The viewer's sample collection, whose tiles are the check's tiles. */
+  /** The collection of the viewer's default mosaic, whose tiles are the check's tiles. */
   tilesCollection: "./default_mods/tile_viewer/fixtures/tiles_collection.yaml",
   /** A fixture path with no file, which `collections.inspect` answers with an error. */
   missingCollection:

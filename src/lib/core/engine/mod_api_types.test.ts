@@ -32,6 +32,12 @@ describe("default_mods/mod_api.d.ts", function describeModApiTypes(): void {
     expectTypeOf<ModInspection>().toExtend<DeclaredModInspection>();
   });
 
+  it("declares the inspection's default mosaic as the engine answers it", function checksDefaultMosaic(): void {
+    expectTypeOf<DeclaredModInspection["defaultMosaic"]>().toEqualTypeOf<
+      ModInspection["defaultMosaic"]
+    >();
+  });
+
   it("declares a check report the engine's fits", function checksModCheckReport(): void {
     expectTypeOf<ModCheckReport>().toExtend<DeclaredModCheckReport>();
   });

@@ -56,9 +56,14 @@ export interface SandboxConnectParams {
   test?: SandboxTestParams;
 }
 
-/** The methods a case can script the answer to: those that ask the user, and `mods.open`. */
+/** The methods a case can script the answer to: those that ask the user, `mods.open` and `mosaics.open`. */
 export type AnswerMethod =
-  "links.open" | "files.save" | "ui.confirm" | "players.open" | "mods.open";
+  | "links.open"
+  | "files.save"
+  | "ui.confirm"
+  | "players.open"
+  | "mods.open"
+  | "mosaics.open";
 
 /** A test notification of a check's frame, read by `readSandboxTestReport`. */
 export type SandboxTestReport =
@@ -142,9 +147,9 @@ function readTestsFailed(params: unknown): SandboxTestReport | null {
   return report;
 }
 
-/** Whether `value` is an answer `method` accepts: `null` for `mods.open`, a boolean for the others. */
+/** Whether `value` is an answer `method` accepts: `null` for `mods.open` and `mosaics.open`, a boolean for the others. */
 function isAnswerValue(method: AnswerMethod, value: unknown): boolean {
-  if (method === "mods.open") {
+  if (method === "mods.open" || method === "mosaics.open") {
     return value === null;
   }
   return typeof value === "boolean";
@@ -156,7 +161,8 @@ function isAnswerMethod(method: string): method is AnswerMethod {
     method === "files.save" ||
     method === "ui.confirm" ||
     method === "players.open" ||
-    method === "mods.open"
+    method === "mods.open" ||
+    method === "mosaics.open"
   );
 }
 

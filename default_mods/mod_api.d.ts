@@ -82,7 +82,6 @@ export interface ModContextMosaic {
 export interface ModContext {
   mod: {
     source: string;
-    name: string;
     title: string;
     version: string;
     description: string;
@@ -103,7 +102,6 @@ export interface ModContext {
   layout: ModLayout;
 }
 
-/** What `mods.inspect` answers: a mod's metadata, without running it. */
 /** A file of a library a mod declares: its path as declared, its address and how the frame uses it. */
 export interface ModLibraryFile {
   path: string;
@@ -119,9 +117,9 @@ export interface ModLibrary {
   files: ModLibraryFile[];
 }
 
+/** What `mods.inspect` answers: a mod's metadata, without running it. */
 export interface ModInspection {
   source: string;
-  name: string;
   title: string;
   version: string;
   description: string;
@@ -130,7 +128,8 @@ export interface ModInspection {
   /** Whether `api` matches the app's mod API version, `null` without a range. */
   apiCompatible: boolean | null;
   typeSource: string | null;
-  sampleCollection: string | null;
+  /** The address of the mod's default mosaic file, or `null`. It is not fetched. */
+  defaultMosaic: string | null;
   testSource: string | null;
   config: ModYamlMapping;
   /** The libraries the mod declares, with the address of each file. */
@@ -145,7 +144,8 @@ export interface ModInspection {
  */
 export interface CollectionInspection {
   source: string;
-  name: string;
+  /** The collection file's `title`. */
+  title: string;
   /** Empty when the collection file has none. */
   description: string;
   /** The resolved address of each tile entry, in entry order, a repeated tile once. */
@@ -189,9 +189,12 @@ export interface ModTestResult {
   message: string | null;
 }
 
-/** What `mods.check` answers. */
+/** What `mods.check` and `mosaics.check` answer. */
 export interface ModCheckReport {
-  source: string;
+  /** The checked mod file's address, or `null` when a mosaic check failed before its mod was known. */
+  source: string | null;
+  /** The address of the mosaic file the check used, or `null` when it used none. */
+  mosaic: string | null;
   status: "pass" | "warn" | "fail";
   mountChecked: boolean;
   testsChecked: boolean;
@@ -222,7 +225,7 @@ export interface MosaicOpenParams {
   replace?: boolean;
 }
 
-/** The params of `mods.check`. A missing `collection` checks with the mod's sample collection. */
+/** The params of `mods.check`. A missing `collection` checks the mod with its default mosaic. */
 export interface ModCheckParams {
   mod: string;
   collection?: string;
@@ -239,6 +242,7 @@ export interface ModApiMethods {
   };
   "mosaics.inspect": { params: { mosaic: string }; result: MosaicInspection };
   "mosaics.open": { params: MosaicOpenParams; result: null };
+  "mosaics.check": { params: { mosaic: string }; result: ModCheckReport };
 }
 
 /** The engine events this file types: the params each one pushes. */
@@ -326,7 +330,7 @@ export interface CaseContext {
   storage: CaseStorage;
   requests: readonly CaseRequest[];
   answer(method: CaseBooleanAnswerMethod, value: boolean): void;
-  answer(method: "mods.open", value: null): void;
+  answer(method: "mods.open" | "mosaics.open", value: null): void;
   expect(actual: unknown): CaseExpectation;
   /** Resolves with the first truthy value `fn` returns. */
   waitFor<Value>(

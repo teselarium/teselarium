@@ -12,10 +12,10 @@ import {
   showsPermissionBadges,
 } from "./look_cases.ts";
 import {
-  offersNoSampleRunWithoutSample,
+  offersNoDefaultMosaicWithoutOne,
+  opensDefaultMosaic,
   runsNothingWithEmptyField,
   runsWithoutTiles,
-  runsWithSampleTiles,
   runsWithTypedCollection,
 } from "./run_cases.ts";
 import {
@@ -41,7 +41,7 @@ export default function registerViewerTests(t: ModTestRegistration): void {
     showsMissingTargetError,
   );
   t.test("shows the format error of its target", showsTargetFormatError);
-  t.test("runs with the sample tiles", runsWithSampleTiles);
+  t.test("opens the default mosaic", opensDefaultMosaic);
   t.test(
     "runs with the typed collection, sent as typed",
     runsWithTypedCollection,
@@ -52,12 +52,12 @@ export default function registerViewerTests(t: ModTestRegistration): void {
   );
   t.test("runs without tiles", runsWithoutTiles);
   t.test(
-    "offers no sample run without a sample collection",
-    offersNoSampleRunWithoutSample,
+    "offers no default mosaic without one",
+    offersNoDefaultMosaicWithoutOne,
   );
   t.test("shows permission statuses as badges", showsPermissionBadges);
   t.test(
-    "makes running with the sample tiles the primary action",
+    "makes opening the default mosaic the primary action",
     drawsPrimaryAction,
   );
   t.test("keeps its own styles to layout", keepsOwnStylesToLayout);

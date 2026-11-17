@@ -26,7 +26,7 @@ const KALLOCAIN_URL = `${BOOKS_URL}kallocain.md`;
 const LOCAL_COLLECTION_URL = "file:///library/books_collection.yaml";
 const CODE_RAN_MARKER = "openTeselaCollectionCodeRan";
 const SAMPLE_BOOK_FILES = ["farenheit_451.md", "kallocain.md", "fictions.md"];
-const EMPTY_COLLECTION_TEXT = 'collection:\n  name: "Empty"\n  tiles: []\n';
+const EMPTY_COLLECTION_TEXT = 'collection:\n  title: "Empty"\n  tiles: []\n';
 
 interface PendingFetch {
   url: string;
@@ -94,7 +94,7 @@ function buildTileText(title: string): string {
 }
 
 function buildCollectionText(entryLines: string[]): string {
-  const lines = ["collection:", '  name: "Test collection"', "  tiles:"];
+  const lines = ["collection:", '  title: "Test collection"', "  tiles:"];
   for (const entryLine of entryLines) {
     lines.push(`    ${entryLine}`);
   }
@@ -180,12 +180,12 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       expect(Object.keys(collection).sort()).toEqual([
         "description",
         "issues",
-        "name",
         "source",
         "tiles",
+        "title",
       ]);
       expect(collection.source).toBe(SAMPLE_COLLECTION_URL);
-      expect(collection.name).toBe("Science fiction books");
+      expect(collection.title).toBe("Science fiction books");
       expect(collection.description).toBe(
         "A sample book list for demonstration purposes.",
       );
@@ -204,7 +204,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       const testFetch = createTestFetch();
       serveTestFile(
         SAMPLE_COLLECTION_URL,
-        'collection:\n  name: "A"\n  tiles: []\n',
+        'collection:\n  title: "A"\n  tiles: []\n',
       );
 
       const collection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
@@ -275,7 +275,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       const testFetch = createTestFetch();
       serveTestFile(
         SAMPLE_COLLECTION_URL,
-        'collection:\n  name: "A"\n  tiles: []\n',
+        'collection:\n  title: "A"\n  tiles: []\n',
       );
 
       const collection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
@@ -289,7 +289,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       const testFetch = createTestFetch();
       serveTestFile(
         SAMPLE_COLLECTION_URL,
-        'collection:\n  name: "A"\n  license: "CC-BY"\n  tiles: []\n',
+        'collection:\n  title: "A"\n  license: "CC-BY"\n  tiles: []\n',
       );
 
       const collection = await loadTileCollection(SAMPLE_COLLECTION_URL, {
@@ -297,7 +297,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       });
 
       expect(collection).not.toHaveProperty("license");
-      expect(collection.name).toBe("A");
+      expect(collection.title).toBe("A");
     });
   });
 
@@ -308,7 +308,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
       const error = await loadFailingCollection(
         noTilesUrl,
-        'collection:\n  name: "A"\n',
+        'collection:\n  title: "A"\n',
         testFetch,
       );
 
@@ -323,7 +323,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
       const error = await loadFailingCollection(
         SAMPLE_COLLECTION_URL,
-        'name: "A"\n',
+        'title: "A"\n',
         testFetch,
       );
 
@@ -333,18 +333,18 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       expect(testFetch).toHaveBeenCalledOnce();
     });
 
-    it("Name is not a string", async function rejectsNumericName(): Promise<void> {
+    it("Title is not a string", async function rejectsNumericTitle(): Promise<void> {
       const testFetch = createTestFetch();
 
       const error = await loadFailingCollection(
         SAMPLE_COLLECTION_URL,
-        'collection:\n  name: 3\n  tiles:\n    - path: "./books/kallocain.md"\n',
+        'collection:\n  title: 3\n  tiles:\n    - path: "./books/kallocain.md"\n',
         testFetch,
       );
 
       expect(error).toBeInstanceOf(CollectionFormatError);
       expect(error).toMatchObject({ source: SAMPLE_COLLECTION_URL });
-      expect(String(error)).toContain('"name" must be a non-empty string');
+      expect(String(error)).toContain('"title" must be a non-empty string');
       expect(testFetch).toHaveBeenCalledOnce();
     });
 
@@ -398,7 +398,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
       const error = await loadFailingCollection(
         SAMPLE_COLLECTION_URL,
-        'collection:\n  name: "A"\n  cover: !!binary aGk=\n  tiles:\n    - path: "./books/kallocain.md"\n',
+        'collection:\n  title: "A"\n  cover: !!binary aGk=\n  tiles:\n    - path: "./books/kallocain.md"\n',
         testFetch,
       );
 
@@ -412,7 +412,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
       const error = await loadFailingCollection(
         SAMPLE_COLLECTION_URL,
-        `collection:\n  name: !!js/function "function () { globalThis.${CODE_RAN_MARKER} = true; }"\n  tiles: []\n`,
+        `collection:\n  title: !!js/function "function () { globalThis.${CODE_RAN_MARKER} = true; }"\n  tiles: []\n`,
         testFetch,
       );
 
@@ -427,7 +427,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
 
       const error = await loadFailingCollection(
         SAMPLE_COLLECTION_URL,
-        'collection:\n  name: "A"\n  tiles: []\n---\ncollection:\n  name: "B"\n  tiles: []\n',
+        'collection:\n  title: "A"\n  tiles: []\n---\ncollection:\n  title: "B"\n  tiles: []\n',
         testFetch,
       );
 
@@ -466,7 +466,7 @@ describe("loadTileCollection", function describeLoadTileCollection(): void {
       );
       const noTilesError = await loadFailingCollection(
         noTilesUrl,
-        'collection:\n  name: "A"\n',
+        'collection:\n  title: "A"\n',
         testFetch,
       );
 

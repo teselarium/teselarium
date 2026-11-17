@@ -30,6 +30,7 @@ export { checkModBundle } from "./mod_bundle_check.ts";
 export type { ModBundleCheck } from "./mod_bundle_check.ts";
 export { buildModCheckReport } from "./mod_check_report.ts";
 export type {
+  CheckedFiles,
   ModCheckFinding,
   ModCheckReport,
   ModCheckStatus,
@@ -69,11 +70,14 @@ export type {
 } from "./mod_launch.ts";
 export type { MosaicInspection } from "./mosaics_methods.ts";
 export type { ResponseError } from "./mod_messages.ts";
+export { isMosaicCheckTarget } from "./mod_methods.ts";
 export type {
   ModCheckRequest,
+  ModCheckTarget,
   ModMethod,
   ModMethodContext,
   ModMethodTable,
+  MosaicCheckTarget,
   OpenLinkOptions,
   OpenLinkOutcome,
   UserNotification,

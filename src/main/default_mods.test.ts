@@ -30,7 +30,6 @@ describe("default mods", function describeDefaultMods(): void {
 
     expect(explorer).toMatchObject({
       source: "https://example.org/default_mods/mod_explorer/mod_conf.yaml",
-      name: "mod_explorer",
       title: "Mods",
       typeSource: null,
       config: { viewer: "mod_viewer" },
@@ -50,10 +49,10 @@ describe("default mods", function describeDefaultMods(): void {
 
     expect(viewer).toMatchObject({
       source: "https://example.org/default_mods/mod_viewer/mod_conf.yaml",
-      name: "mod_viewer",
       typeSource: null,
-      sampleCollection: null,
+      defaultMosaic: null,
     });
+    expect(viewer).not.toHaveProperty("name");
     expect(viewer.permissions).toEqual([
       expect.objectContaining(OPEN_ANY_SITE),
     ]);
@@ -81,7 +80,7 @@ describe("default mods", function describeDefaultMods(): void {
   it("Replaced viewer", async function opensReplacedViewer(): Promise<void> {
     testTexts.set(
       "https://example.org/default_mods/mod_viewer/mod_conf.yaml",
-      'mod:\n  name: "fancy_viewer"\n  version: "2.0.0"\n  entrypoint: "./main.js"',
+      'mod:\n  title: "Fancy Viewer"\n  version: "2.0.0"\n  entrypoint: "./main.js"',
     );
 
     const launch = await launchTestMod(
@@ -92,7 +91,7 @@ describe("default mods", function describeDefaultMods(): void {
       },
     );
 
-    expect(launch.mod.name).toBe("fancy_viewer");
+    expect(launch.mod.title).toBe("Fancy Viewer");
     expect(launch.mod.source).toBe(
       "https://example.org/default_mods/mod_viewer/mod_conf.yaml",
     );

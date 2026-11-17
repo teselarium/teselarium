@@ -44,7 +44,7 @@ function buildStepButton(
 }
 
 /**
- * The breadcrumb: the collection's name as a button that opens the
+ * The breadcrumb: the collection's title as a button that opens the
  * collection viewer, the tile's position as plain text, and Previous and
  * Next. Next is the primary action. Neither wraps around.
  */
@@ -54,11 +54,11 @@ function buildPlaceNav(
   place: CollectionPlace,
 ): HTMLElement {
   const tiles = place.inspection.tiles;
-  const nameButton = document.createElement("button");
-  nameButton.type = "button";
-  nameButton.dataset.otVariant = "ghost";
-  nameButton.textContent = place.inspection.name;
-  nameButton.addEventListener(
+  const titleButton = document.createElement("button");
+  titleButton.type = "button";
+  titleButton.dataset.otVariant = "ghost";
+  titleButton.textContent = place.inspection.title;
+  titleButton.addEventListener(
     "click",
     openCollection.bind(undefined, view, from),
   );
@@ -74,7 +74,7 @@ function buildPlaceNav(
   next.dataset.otVariant = "primary";
   const nav = document.createElement("nav");
   nav.setAttribute("aria-label", "Collection");
-  nav.append(nameButton, position, previous, next);
+  nav.append(titleButton, position, previous, next);
   return nav;
 }
 

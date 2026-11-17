@@ -303,7 +303,7 @@ A mod that wants a blank frame sets `theme: "none"` in its mod file (see the [mo
 
 ```yaml
 mod:
-  name: "my_mod"
+  title: "my_mod"
   version: "0.1.0"
   entrypoint: "./main.js"
   theme: "none"

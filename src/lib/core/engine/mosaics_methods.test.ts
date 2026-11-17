@@ -4,6 +4,8 @@ import {
   buildMethodContext,
   buildOpenPermission,
   catchMethodError,
+  checkBundleOnly,
+  resolvePassingReport,
 } from "../../../test/method_contexts.ts";
 import { APP_BASE_URL, FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
@@ -18,6 +20,7 @@ import {
   testTexts,
 } from "../../../test/test_files.ts";
 import type { SiteDecision } from "../permissions/index.ts";
+import type { ModCheckReport } from "./mod_check_report.ts";
 import type { RunLink } from "./mod_launch.ts";
 import {
   INVALID_PARAMS,
@@ -25,6 +28,7 @@ import {
   PERMISSION_DENIED,
 } from "./mod_messages.ts";
 import type {
+  ModCheckRequest,
   ModMethodContext,
   OpenLinkOptions,
   OpenLinkOutcome,
@@ -375,5 +379,130 @@ describe("mosaics.open", function describeMosaicsOpen(): void {
     expect(error.code).toBe(PERMISSION_DENIED);
     expect(error.message).toContain("https://mosaics.example.net");
     expect(onOpenLink).not.toHaveBeenCalled();
+  });
+});
+
+const MISSING_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mosaics/missing/mosaic.yaml`;
+
+/** A context granted `open` for `hosts`, whose `onCheckMod` is a spy answering a passing report, or `null` for a hidden mod. */
+function buildCheckingContext(
+  hosts: string[],
+  isVisible: boolean = true,
+): {
+  context: ModMethodContext;
+  fetchSpy: Mock<typeof fetch>;
+  checkSpy: Mock<(request: ModCheckRequest) => Promise<ModCheckReport> | null>;
+} {
+  const { context, fetchSpy } = buildSpiedContext(hosts);
+  const checkSpy =
+    vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>();
+  if (isVisible) {
+    checkSpy.mockImplementation(resolvePassingReport);
+  } else {
+    checkSpy.mockReturnValue(null);
+  }
+  context.onCheckMod = checkSpy;
+  const checkingContext = { context, fetchSpy, checkSpy };
+  return checkingContext;
+}
+
+describe("Check a mosaic", function describeCheckMosaic(): void {
+  it("asks the stage with the resolved mosaic and answers the report", async function checksMosaic(): Promise<void> {
+    const { context, fetchSpy, checkSpy } = buildCheckingContext(["*"]);
+
+    const report = await callMosaicMethod("mosaics.check", context, {
+      mosaic: MAP_MOSAIC_REFERENCE,
+    });
+
+    expect(checkSpy).toHaveBeenCalledExactlyOnceWith({
+      mosaic: MAP_MOSAIC_SOURCE,
+    });
+    expect(report).toMatchObject({ mosaic: MAP_MOSAIC_SOURCE, status: "pass" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("Missing mosaic file", async function reportsMissingMosaic(): Promise<void> {
+    const { context } = buildSpiedContext([APP_ORIGIN]);
+    context.onCheckMod = checkBundleOnly.bind(undefined, context);
+
+    const report = await callMosaicMethod("mosaics.check", context, {
+      mosaic: "./fixtures/mosaics/missing",
+    });
+
+    expect(report).toMatchObject({
+      source: null,
+      mosaic: MISSING_MOSAIC_SOURCE,
+      status: "fail",
+      mountChecked: false,
+      testsChecked: false,
+    });
+    const findings = (report as ModCheckReport).findings;
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({
+      step: "bundle",
+      level: "error",
+      source: MISSING_MOSAIC_SOURCE,
+    });
+    expect(findings[0].message).toContain("404");
+  });
+});
+
+describe("Mosaic check requests follow the open rules", function describeMosaicCheckRules(): void {
+  it("Mod without the open permission", async function refusesWithoutOpen(): Promise<void> {
+    const { context, fetchSpy, checkSpy } = buildCheckingContext([]);
+
+    const error = await catchMethodError(function checkForeign() {
+      return callMosaicMethod("mosaics.check", context, {
+        mosaic: "https://mosaics.example.net/maps/",
+      });
+    });
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toContain("https://mosaics.example.net");
+    expect(error.message).toContain("permissions.open");
+    expect(checkSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("accepts a grant for the mosaic file's origin", async function checksWithOriginGrant(): Promise<void> {
+    const { context, checkSpy } = buildCheckingContext([
+      "https://mosaics.example.net",
+    ]);
+
+    await callMosaicMethod("mosaics.check", context, {
+      mosaic: FOREIGN_MOSAIC_SOURCE,
+    });
+
+    expect(checkSpy).toHaveBeenCalledExactlyOnceWith({
+      mosaic: FOREIGN_MOSAIC_SOURCE,
+    });
+  });
+
+  it("refuses a hidden mod", async function refusesHidden(): Promise<void> {
+    const { context } = buildCheckingContext(["*"], false);
+
+    const error = await catchMethodError(function checkHidden() {
+      return callMosaicMethod("mosaics.check", context, {
+        mosaic: MAP_MOSAIC_REFERENCE,
+      });
+    });
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toBe(
+      "mosaics.check: only the visible mod can check mosaics",
+    );
+  });
+
+  it("refuses a mosaic that is not a non-empty string", async function refusesBadMosaic(): Promise<void> {
+    const { context, checkSpy } = buildCheckingContext(["*"]);
+
+    for (const mosaic of ["", 3, undefined]) {
+      const error = await catchMethodError(function checkBadMosaic() {
+        return callMosaicMethod("mosaics.check", context, { mosaic });
+      });
+
+      expect(error.code).toBe(INVALID_PARAMS);
+    }
+    expect(checkSpy).not.toHaveBeenCalled();
   });
 });

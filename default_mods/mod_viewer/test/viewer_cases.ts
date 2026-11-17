@@ -2,6 +2,7 @@ import type { CaseContext } from "../../mod_api.d.ts";
 import {
   FIXTURE_REFERENCES,
   findElement,
+  findTerm,
   mountWithTarget,
   readBadge,
   readDefinition,
@@ -11,9 +12,9 @@ import {
 const LISTED_MOD_FILE_PATH =
   "/default_mods/mod_viewer/fixtures/listed_mod/mod_conf.yaml";
 
-/** The end of the listed mod's sample collection, which is never fetched. */
-const LISTED_MOD_COLLECTION_PATH =
-  "/default_mods/mod_viewer/fixtures/listed_mod/collection.yaml";
+/** The end of the listed mod's default mosaic, which is never fetched. */
+const LISTED_MOD_MOSAIC_PATH =
+  "/default_mods/mod_viewer/fixtures/listed_mod/mosaic.yaml";
 
 export async function showsTargetMetadata(context: CaseContext): Promise<void> {
   await mountWithTarget(context, FIXTURE_REFERENCES.listedMod);
@@ -27,9 +28,7 @@ export async function showsTargetMetadata(context: CaseContext): Promise<void> {
   context
     .expect(readDefinition(context, "Description").textContent)
     .toBe("A fixture mod that the viewer's tests show.");
-  context
-    .expect(readDefinition(context, "Name").textContent)
-    .toBe("listed_mod");
+  context.expect(findTerm(context, "Name")).toBe(null);
   context
     .expect(
       readDefinition(context, "Source").textContent?.endsWith(
@@ -42,8 +41,8 @@ export async function showsTargetMetadata(context: CaseContext): Promise<void> {
     .toBe("(none)");
   context
     .expect(
-      readDefinition(context, "Sample collection").textContent?.endsWith(
-        LISTED_MOD_COLLECTION_PATH,
+      readDefinition(context, "Default mosaic").textContent?.endsWith(
+        LISTED_MOD_MOSAIC_PATH,
       ),
     )
     .toBe(true);

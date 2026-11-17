@@ -1,5 +1,5 @@
 import { loadModTestCode } from "../../mod/index.ts";
-import type { ModIssue, ModLoadOptions } from "../../mod/index.ts";
+import type { LoadedMod, ModIssue, ModLoadOptions } from "../../mod/index.ts";
 import type { IssueLevel } from "../../tile/index.ts";
 import {
   buildModCheckReport,
@@ -7,12 +7,16 @@ import {
   buildModTestDocument,
   checkModBundle,
   connectModSession,
+  grantLaunchMosaic,
+  isMosaicCheckTarget,
   stopModSession,
 } from "../engine/index.ts";
 import type {
   AppAction,
+  CheckedFiles,
   ModCheckFinding,
   ModCheckReport,
+  ModBundleCheck,
   ModCheckRequest,
   ModLaunch,
   ModSession,
@@ -82,6 +86,10 @@ export interface StageCheck {
   requesterId: string;
   /** The checked mod file's source, as the report names it. */
   source: string;
+  /** The mosaic file the check used, as the report names it, or `null`. */
+  mosaic: string | null;
+  /** Whether the mod's tests run after the mount check: only for `mods.check`. */
+  runsTests: boolean;
   launch: ModLaunch;
   phase: CheckPhase;
   /** The frame running now, or `null` while the test file is fetched. */
@@ -130,7 +138,7 @@ export interface CheckServices {
 
 type CheckDraft = Pick<
   StageCheck,
-  "requesterId" | "source" | "launch" | "findings"
+  "requesterId" | "source" | "mosaic" | "runsTests" | "launch" | "findings"
 >;
 
 export function createStageChecks(): StageChecks {
@@ -217,11 +225,43 @@ function placeStageCheck(
   startCheckFrame(services, check, "mount", check.launch.sandboxDocument);
 }
 
+function buildCheckedFiles(
+  source: string | null,
+  mosaic: string | null,
+): CheckedFiles {
+  const checkedFiles: CheckedFiles = { source, mosaic };
+  return checkedFiles;
+}
+
 /**
- * Checks a mod for the sandbox `requesterId`: runs the bundle check and, when
- * it found no error and the requester still runs, adds a check whose frames
- * the page renders: the mount check, then the mod's tests. Resolves with the
- * report once the check ended.
+ * The launch the mount check mounts, as opening the target would build it:
+ * the bundle check's tiles, renamed by the mosaic's aliases, the mod's
+ * grants and the mosaic's, by the remembered decisions only, and the config
+ * merged with the mosaic's.
+ */
+function buildCheckLaunch(
+  services: CheckServices,
+  mod: LoadedMod,
+  bundleCheck: ModBundleCheck,
+): ModLaunch {
+  const decisions = services.readSiteDecisions();
+  const launch = buildModLaunch(
+    mod,
+    buildCheckLink(mod.source, bundleCheck.collection),
+    bundleCheck.modTiles,
+    grantModPermissions(mod, services.appOrigin, decisions),
+    services.loadsTileLinkedMedia,
+    grantLaunchMosaic(bundleCheck.mosaic, services.appOrigin, decisions),
+  );
+  return launch;
+}
+
+/**
+ * Checks a mod or a mosaic for the sandbox `requesterId`: runs the bundle
+ * check and, when it found no error and the requester still runs, adds a
+ * check whose frames the page renders: the mount check, then, for
+ * `mods.check`, the mod's tests. Resolves with the report once the check
+ * ended.
  */
 export async function runStageCheck(
   checks: StageChecks,
@@ -230,37 +270,29 @@ export async function runStageCheck(
   request: ModCheckRequest,
 ): Promise<ModCheckReport> {
   const bundleCheck = await checkModBundle(
-    request.source,
-    request.collection,
+    request,
+    services.defaults,
     services.fetchOptions,
   );
+  const mod = bundleCheck.mod;
   if (
-    bundleCheck.mod === null ||
+    mod === null ||
     hasErrorFinding(bundleCheck.findings) ||
     !services.isSandboxRunning(requesterId)
   ) {
     return buildModCheckReport(
-      request.source,
+      buildCheckedFiles(bundleCheck.source, bundleCheck.mosaicSource),
       bundleCheck.findings,
       false,
       null,
     );
   }
-  const launch = buildModLaunch(
-    bundleCheck.mod,
-    buildCheckLink(request.source, request.collection),
-    bundleCheck.modTiles,
-    grantModPermissions(
-      bundleCheck.mod,
-      services.appOrigin,
-      services.readSiteDecisions(),
-    ),
-    services.loadsTileLinkedMedia,
-  );
   const draft: CheckDraft = {
     requesterId,
-    source: request.source,
-    launch,
+    source: mod.source,
+    mosaic: bundleCheck.mosaicSource,
+    runsTests: !isMosaicCheckTarget(request),
+    launch: buildCheckLaunch(services, mod, bundleCheck),
     findings: [...bundleCheck.findings],
   };
   const report = await new Promise<ModCheckReport>(
@@ -343,15 +375,17 @@ function cancelCheckedAction(
   return Promise.resolve(false);
 }
 
-/** `mods.open` of a checked mod: refused, so the handler answers `-32002`. */
-function refuseCheckedOpen(check: StageCheck): OpenLinkOutcome {
-  addMountFinding(check, "warning", describeRefusedRequest("mods.open"));
+/** `mods.open`, or `mosaics.open` for a mosaic link, of a checked mod: refused, so the handler answers `-32002`. */
+function refuseCheckedOpen(check: StageCheck, link: RunLink): OpenLinkOutcome {
+  const method = (link.mosaic ?? null) === null ? "mods.open" : "mosaics.open";
+  addMountFinding(check, "warning", describeRefusedRequest(method));
   return "not-visible";
 }
 
-/** `mods.check` of a checked mod: refused, so the handler answers `-32002`. */
-function refuseCheckedCheck(check: StageCheck): null {
-  addMountFinding(check, "warning", describeRefusedRequest("mods.check"));
+/** `mods.check` or `mosaics.check` of a checked mod: refused, so the handler answers `-32002`. */
+function refuseCheckedCheck(check: StageCheck, request: ModCheckRequest): null {
+  const method = isMosaicCheckTarget(request) ? "mosaics.check" : "mods.check";
+  addMountFinding(check, "warning", describeRefusedRequest(method));
   return null;
 }
 
@@ -371,7 +405,12 @@ function endStageCheck(
   checks.entries.delete(check.id);
   services.onChange();
   check.resolveReport(
-    buildModCheckReport(check.source, check.findings, true, check.testResults),
+    buildModCheckReport(
+      buildCheckedFiles(check.source, check.mosaic),
+      check.findings,
+      true,
+      check.testResults,
+    ),
   );
 }
 
@@ -439,8 +478,8 @@ function startListFrame(
 }
 
 /**
- * The mount check ended. When the mod has a test file, the mount check found
- * no error and the requester still runs, the test file is fetched and the
+ * The mount check ended. When the check runs tests, the mod has a test file,
+ * the mount check found no error and the requester still runs, the test file is fetched and the
  * tests start; otherwise the check ends.
  */
 function endMountPhase(
@@ -452,6 +491,7 @@ function endMountPhase(
     return;
   }
   if (
+    !check.runsTests ||
     check.launch.mod.testSource === null ||
     hasErrorFinding(check.findings) ||
     !services.isSandboxRunning(check.requesterId)

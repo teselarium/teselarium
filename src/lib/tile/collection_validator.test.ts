@@ -63,7 +63,7 @@ function loadSampleCollection(): Promise<TileCollection> {
 function buildTestCollection(tiles: Tile[]): TileCollection {
   const tileCollection: TileCollection = {
     source: TEST_COLLECTION_URL,
-    name: "Test collection",
+    title: "Test collection",
     description: "",
     tiles,
     issues: [],
@@ -109,7 +109,7 @@ describe("validateTileCollection", function describeValidateTileCollection(): vo
       );
 
       expect(validatedCollection.source).toBe(SAMPLE_COLLECTION_URL);
-      expect(validatedCollection.name).toBe(tileCollection.name);
+      expect(validatedCollection.title).toBe(tileCollection.title);
       expect(validatedCollection.description).toBe(tileCollection.description);
       expect(readSources(validatedCollection.tiles)).toEqual(
         readSources(tileCollection.tiles),
@@ -245,7 +245,7 @@ describe("validateTileCollection", function describeValidateTileCollection(): vo
       const missingUrl = `${TILES_URL}missing.md`;
       serveTestFile(
         TEST_COLLECTION_URL,
-        'collection:\n  name: "Test collection"\n  tiles:\n    - path: "./missing.md"\n    - path: "./no_country.md"\n',
+        'collection:\n  title: "Test collection"\n  tiles:\n    - path: "./missing.md"\n    - path: "./no_country.md"\n',
       );
       serveTestFile(
         NO_COUNTRY_URL,

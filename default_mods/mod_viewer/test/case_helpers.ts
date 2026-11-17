@@ -71,13 +71,21 @@ export function findRequests(
   return requests;
 }
 
-/** The first `mods.open` once it settled, or `undefined`. */
-export function findSettledOpen(context: CaseContext): CaseRequest | undefined {
-  const [openRequest] = findRequests(context, "mods.open");
-  if (openRequest === undefined || !("result" in openRequest)) {
+/** The first request for `method` once it settled, or `undefined`. */
+export function findSettledRequest(
+  context: CaseContext,
+  method: string,
+): CaseRequest | undefined {
+  const [request] = findRequests(context, method);
+  if (request === undefined || !("result" in request)) {
     return undefined;
   }
-  return openRequest;
+  return request;
+}
+
+/** The first `mods.open` once it settled, or `undefined`. */
+export function findSettledOpen(context: CaseContext): CaseRequest | undefined {
+  return findSettledRequest(context, "mods.open");
 }
 
 /** The inspection the viewer got from its `mods.inspect`. */
@@ -88,6 +96,22 @@ export function readInspection(context: CaseContext): ModInspection {
     throw new Error("The viewer's mods.inspect has no result.");
   }
   return inspection;
+}
+
+/** The term of the viewer's metadata list whose text is `term`, or `null` without one. */
+export function findTerm(
+  context: CaseContext,
+  term: string,
+): HTMLElement | null {
+  for (const termElement of context.root.querySelectorAll("dt")) {
+    if (
+      termElement.textContent === term &&
+      termElement instanceof HTMLElement
+    ) {
+      return termElement;
+    }
+  }
+  return null;
 }
 
 /** The description of a term of the viewer's metadata list. */

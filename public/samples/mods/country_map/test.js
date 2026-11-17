@@ -96,7 +96,9 @@ function findSampleTile(context, title) {
       return tile;
     }
   }
-  throw new Error(`The sample collection has no tile titled "${title}"`);
+  throw new Error(
+    `The default mosaic's collection has no tile titled "${title}"`,
+  );
 }
 
 /** A sample tile with other metadata, keeping its source and body. */

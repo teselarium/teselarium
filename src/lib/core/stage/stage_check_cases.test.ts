@@ -174,6 +174,33 @@ describe("Scripted answers", function describeScriptedAnswers(): void {
     expect(report.findings).toEqual([]);
   });
 
+  it("answers mosaics.open only with an answer queued for it", async function answersQueuedMosaicOpen(): Promise<void> {
+    const { checkStage, caseFrame, reporting } = await startCaseCheck([
+      "opens a mosaic",
+    ]);
+    const sandboxCount = readStageSnapshot(checkStage.stage).sandboxes.length;
+
+    queueAnswer(caseFrame, "mods.open", null);
+    sendRequest(caseFrame, 1, "mosaics.open", { mosaic: "./m.yaml" });
+    queueAnswer(caseFrame, "mosaics.open", null);
+    sendRequest(caseFrame, 2, "mosaics.open", { mosaic: "./m.yaml" });
+    await waitForReceived(caseFrame, 2);
+    await finishPlayedCase(caseFrame, null);
+    await reporting;
+
+    expect(caseFrame.received).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32002, message: expect.any(String) },
+      },
+      { jsonrpc: "2.0", id: 2, result: null },
+    ]);
+    expect(readStageSnapshot(checkStage.stage).sandboxes).toHaveLength(
+      sandboxCount,
+    );
+  });
+
   it("keeps a queued links.open answer when the URL is bad", async function keepsAnswerForBadUrl(): Promise<void> {
     const { caseFrame, reporting } = await startCaseCheck(["opens a link"]);
 

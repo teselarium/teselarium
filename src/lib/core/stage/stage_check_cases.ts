@@ -6,6 +6,7 @@ import type {
   ModTestResult,
   OpenLinkOutcome,
   ResponseError,
+  RunLink,
 } from "../engine/index.ts";
 import type { AnswerMethod, SandboxTestReport } from "../sandbox/index.ts";
 
@@ -220,12 +221,13 @@ function answerCaseAction(
 }
 
 /**
- * `mods.open` of a case: `true` with a queued answer, so the handler answers
- * `null` and nothing opens, and `false` without one, so it answers `-32002`.
+ * A case's `mods.open`, or `mosaics.open` for a mosaic link: `"opened"` with
+ * a queued answer to that method, so the handler answers `null` and nothing
+ * opens, and otherwise refused as from a hidden mod, so it answers `-32002`.
  */
-/** A case's `mods.open`: opened when the case queued an answer, otherwise refused as from a hidden mod. */
-function answerCaseOpen(checkCase: CheckCase): OpenLinkOutcome {
-  const isAnswered = takeCaseAnswer(checkCase, "mods.open") !== undefined;
+function answerCaseOpen(checkCase: CheckCase, link: RunLink): OpenLinkOutcome {
+  const method = (link.mosaic ?? null) === null ? "mods.open" : "mosaics.open";
+  const isAnswered = takeCaseAnswer(checkCase, method) !== undefined;
   return isAnswered ? "opened" : "not-visible";
 }
 

@@ -1,0 +1,5 @@
+mosaic:
+  title: "Viewer tiles"
+  description: "The tile viewer with its fixture tiles."
+  mod: "./"
+  collection: "./fixtures/tiles_collection.yaml"

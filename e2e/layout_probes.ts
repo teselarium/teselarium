@@ -28,7 +28,7 @@ export const LAYOUT_PROBE_MOD_CODE = `export default function mount(engine, cont
     });
   });
   const heading = document.createElement("h1");
-  heading.textContent = "Probe " + context.mod.name;
+  heading.textContent = "Probe " + context.mod.title;
   document.body.append(heading);
 }
 `;

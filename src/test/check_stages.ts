@@ -22,6 +22,7 @@ import {
   waitForMessages,
 } from "./fake_frames.ts";
 import { FakeHistory } from "./fake_history.ts";
+import { describeCheckRequest } from "./method_contexts.ts";
 import { createMemorySiteDecisions } from "./memory_site_decisions.ts";
 import type { MemorySiteDecisions } from "./memory_site_decisions.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
@@ -201,7 +202,7 @@ export function listFindingMessages(report: ModCheckReport): string[] {
   return messages;
 }
 
-/** Asks the stage to check a mod for the viewer. */
+/** Asks the stage to check a mod or a mosaic for the viewer. */
 export function startCheck(
   checkStage: CheckStage,
   request: ModCheckRequest,
@@ -212,7 +213,9 @@ export function startCheck(
     request,
   );
   if (reporting === null) {
-    throw new Error(`Expected the stage to check "${request.source}"`);
+    throw new Error(
+      `Expected the stage to check "${describeCheckRequest(request)}"`,
+    );
   }
   return reporting;
 }

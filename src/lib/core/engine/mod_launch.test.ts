@@ -110,7 +110,7 @@ function serveLinkedBook(image: string, logo: string): void {
     LINKED_BOOK_COLLECTION_SOURCE,
     [
       "collection:",
-      '  name: "Linked book"',
+      '  title: "Linked book"',
       "  tiles:",
       '    - path: "./books/linked_book.md"',
     ].join("\n"),
@@ -312,7 +312,7 @@ describe("loadModLaunchInputs", function describeLoadModLaunchInputs(): void {
   it("propagates type file errors with their classes", async function propagatesTypeErrors(): Promise<void> {
     const brokenTypeSource = `${FIXTURES_BASE_URL}mods/broken_type/mod_conf.yaml`;
     serveTestMod(brokenTypeSource, [
-      '  name: "broken_type"',
+      '  title: "broken_type"',
       '  version: "0.1.0"',
       '  entrypoint: "./main.js"',
       '  type_path: "./type.md"',
@@ -881,7 +881,6 @@ describe("buildModLaunch", function describeBuildModLaunch(): void {
 
     expect(launch.context.mod).toEqual({
       source: SAMPLE_MOD_SOURCE,
-      name: "book_list",
       title: "Book List",
       version: "1.0.0",
       description: "A very simple list of books with their covers.",
@@ -1005,7 +1004,7 @@ describe("buildModLaunch", function describeBuildModLaunch(): void {
   it("builds the frame document with the mod's theme setting", async function passesTheme(): Promise<void> {
     const plainSource = `${APP_BASE_URL}mods/plain/mod_conf.yaml`;
     serveTestMod(plainSource, [
-      '  name: "plain"',
+      '  title: "plain"',
       '  version: "0.1.0"',
       '  entrypoint: "./main.js"',
       '  theme: "none"',

@@ -16,6 +16,7 @@ const ANSWER_KINDS = {
   "ui.confirm": "boolean",
   "players.open": "boolean",
   "mods.open": "null",
+  "mosaics.open": "null",
 };
 
 function isPlainMapping(value) {
@@ -187,7 +188,7 @@ function setCaseValue(key, value) {
 function checkAnswer(method, value) {
   if (typeof method !== "string" || !Object.hasOwn(ANSWER_KINDS, method)) {
     throw new Error(
-      `answer: ${describeValue(method)} cannot be answered, only links.open, files.save, ui.confirm, players.open and mods.open`,
+      `answer: ${describeValue(method)} cannot be answered, only links.open, files.save, ui.confirm, players.open, mods.open and mosaics.open`,
     );
   }
   if (ANSWER_KINDS[method] === "null" && value !== null) {

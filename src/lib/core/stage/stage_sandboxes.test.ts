@@ -99,7 +99,7 @@ function serveLinkedTile(
   }
   testTexts.set(
     LINKED_COLLECTION_SOURCE,
-    ["collection:", '  name: "Linked"', "  tiles:", ...tileLines].join("\n"),
+    ["collection:", '  title: "Linked"', "  tiles:", ...tileLines].join("\n"),
   );
   testTexts.set(LINKED_TILE_SOURCE, buildTypeText(metadataLines));
 }
@@ -975,7 +975,7 @@ describe("attachSandboxFrame", function describeAttachSandboxFrame(): void {
 
   it("passes mods.open to onOpenLink with the runtime's id", async function opensWithId(): Promise<void> {
     serveTestMod(OPENER_MOD_SOURCE, [
-      '  name: "opener"',
+      '  title: "opener"',
       '  version: "0.1.0"',
       '  entrypoint: "./main.js"',
       "  permissions:",
@@ -1143,7 +1143,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     expect(readIssues(runtime)).toHaveLength(1);
     testTexts.set(
       FOUR_BOOKS_SOURCE,
-      'collection:\n  name: "Two books"\n  tiles:\n    - path: "./books/kallocain.md"\n    - path: "./books/fictions.md"',
+      'collection:\n  title: "Two books"\n  tiles:\n    - path: "./books/kallocain.md"\n    - path: "./books/fictions.md"',
     );
 
     await reloadSandboxTiles(runtime, spied.services);
@@ -1169,7 +1169,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
     );
     testTexts.set(
       FOUR_BOOKS_SOURCE,
-      'collection:\n  name: "Two books"\n  tiles:\n    - path: "./books/kallocain.md"\n    - path: "./books/fictions.md"',
+      'collection:\n  title: "Two books"\n  tiles:\n    - path: "./books/kallocain.md"\n    - path: "./books/fictions.md"',
     );
 
     await reloadSandboxTiles(runtime, spied.services);

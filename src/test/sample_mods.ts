@@ -18,6 +18,8 @@ export const OTHER_APP_ORIGIN = "https://other.example";
 export const SAMPLE_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/book_list/mod_conf.yaml`;
 export const SAMPLE_ENTRYPOINT = `${FIXTURES_BASE_URL}mods/book_list/main.js`;
 export const SAMPLE_TYPE_SOURCE = `${FIXTURES_BASE_URL}types/book.md`;
+/** The default mosaic of the sample mod, next to its mod file. */
+export const SAMPLE_DEFAULT_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mods/book_list/mosaic.yaml`;
 export const SAMPLE_COLLECTION_SOURCE = `${FIXTURES_BASE_URL}tiles/books_collection.yaml`;
 export const SAMPLE_TILE_SOURCES = [
   `${FIXTURES_BASE_URL}tiles/books/farenheit_451.md`,
@@ -146,7 +148,7 @@ export function serveUntypedMod(
   testTexts.set(
     UNTYPED_MOD_SOURCE,
     buildTestModText(
-      ['  name: "untyped"', '  version: "0.1.0"', '  entrypoint: "./main.js"'],
+      ['  title: "untyped"', '  version: "0.1.0"', '  entrypoint: "./main.js"'],
       apiRange,
     ),
   );
@@ -175,12 +177,7 @@ export const OTHER_API_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/other_api/mod_conf
 export function serveOtherApiMod(): void {
   serveTestMod(
     OTHER_API_MOD_SOURCE,
-    [
-      '  name: "other_api"',
-      '  title: "Other API"',
-      '  version: "2.0.0"',
-      '  entrypoint: "./main.js"',
-    ],
+    ['  title: "Other API"', '  version: "2.0.0"', '  entrypoint: "./main.js"'],
     OTHER_API_RANGE,
   );
 }
@@ -204,7 +201,6 @@ export function serveProbeMod(
   apiRange: string = TEST_MOD_API_RANGE,
 ): void {
   const lines = [
-    '  name: "probe"',
     '  title: "Probe"',
     '  version: "1.0.0"',
     '  entrypoint: "./main.js"',
@@ -245,7 +241,7 @@ export function serveNoApiBookMod(): void {
   serveTestMod(
     NO_API_BOOK_MOD_SOURCE,
     [
-      '  name: "no_api_books"',
+      '  title: "no_api_books"',
       '  version: "0.1.0"',
       '  entrypoint: "./main.js"',
       '  type_path: "../../types/book.md"',
@@ -259,7 +255,7 @@ export function serveFourBooks(): void {
     FOUR_BOOKS_SOURCE,
     [
       "collection:",
-      '  name: "Four books"',
+      '  title: "Four books"',
       "  tiles:",
       '    - path: "./books/farenheit_451.md"',
       '    - path: "./books/kallocain.md"',
@@ -285,7 +281,7 @@ export function serveTwoBooks(): void {
     TWO_BOOKS_SOURCE,
     [
       "collection:",
-      '  name: "Two books"',
+      '  title: "Two books"',
       "  tiles:",
       '    - path: "./books/kallocain.md"',
       '    - path: "./books/fictions.md"',
@@ -306,7 +302,7 @@ export function serveCoverBook(): void {
     COVER_BOOK_COLLECTION_SOURCE,
     [
       "collection:",
-      '  name: "Cover book"',
+      '  title: "Cover book"',
       "  tiles:",
       '    - path: "./books/cover_book.md"',
     ].join("\n"),
@@ -332,7 +328,7 @@ export const MISSING_ENTRYPOINT_SOURCE = `${FIXTURES_BASE_URL}mods/missing_entry
 
 export function serveMissingEntrypointMod(): void {
   serveTestMod(MISSING_ENTRYPOINT_MOD_SOURCE, [
-    '  name: "missing_entrypoint"',
+    '  title: "missing_entrypoint"',
     '  version: "0.1.0"',
     '  entrypoint: "./missing.js"',
   ]);
@@ -344,16 +340,21 @@ export const MISSING_TYPE_SOURCE = `${FIXTURES_BASE_URL}mods/missing_type/book_t
 
 export function serveMissingTypeMod(): void {
   serveTestMod(MISSING_TYPE_MOD_SOURCE, [
-    '  name: "missing_type"',
+    '  title: "missing_type"',
     '  version: "0.1.0"',
     '  entrypoint: "./main.js"',
     '  type_path: "./book_type.md"',
-    '  sample_collection: "../../tiles/books_collection.yaml"',
+    '  default_mosaic: "./mosaic.yaml"',
+  ]);
+  serveTestMosaic(`${FIXTURES_BASE_URL}mods/missing_type/mosaic.yaml`, [
+    'title: "Missing type"',
+    'mod: "./"',
+    'collection: "../../tiles/books_collection.yaml"',
   ]);
 }
 
 /**
- * A mod of the sample book type whose sample collection is `FOUR_BOOKS_SOURCE`,
+ * A mod of the sample book type whose default mosaic's collection is `FOUR_BOOKS_SOURCE`,
  * where the tile at `NO_COUNTRY_TILE_SOURCE` misses `country`. Served by
  * `fetchTestFile` once `serveMismatchedSampleMod` ran, declaring `apiRange`
  * unless it is `null`.
@@ -366,14 +367,19 @@ export function serveMismatchedSampleMod(
   serveTestMod(
     MISMATCHED_SAMPLE_MOD_SOURCE,
     [
-      '  name: "mismatched_sample"',
+      '  title: "mismatched_sample"',
       '  version: "0.1.0"',
       '  entrypoint: "./main.js"',
       '  type_path: "../../types/book.md"',
-      '  sample_collection: "../../tiles/four_books.yaml"',
+      '  default_mosaic: "./mosaic.yaml"',
     ],
     apiRange,
   );
+  serveTestMosaic(`${FIXTURES_BASE_URL}mods/mismatched_sample/mosaic.yaml`, [
+    'title: "Mismatched sample"',
+    'mod: "./"',
+    'collection: "../../tiles/four_books.yaml"',
+  ]);
   serveFourBooks();
 }
 
@@ -392,7 +398,7 @@ export function serveTestedMod(
   testCode: string | null = TESTED_MOD_TEST_CODE,
 ): void {
   serveTestMod(TESTED_MOD_SOURCE, [
-    '  name: "tested"',
+    '  title: "tested"',
     '  version: "0.1.0"',
     '  entrypoint: "./main.js"',
     '  test_path: "./test.js"',
@@ -418,7 +424,7 @@ export const HELPER_SCRIPT_SOURCE = `${FIXTURES_BASE_URL}mods/with_libraries/ven
 
 export function serveLibraryMod(): void {
   serveTestMod(LIBRARY_MOD_SOURCE, [
-    '  name: "with_libraries"',
+    '  title: "with_libraries"',
     '  version: "0.1.0"',
     '  entrypoint: "./main.js"',
     "  libraries:",
@@ -445,7 +451,7 @@ export function serveNamedBooks(): void {
     NAMED_BOOKS_SOURCE,
     [
       "collection:",
-      '  name: "Named books"',
+      '  title: "Named books"',
       "  tiles:",
       '    - path: "./named_book.md"',
     ].join("\n"),

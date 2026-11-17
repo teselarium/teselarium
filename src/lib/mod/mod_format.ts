@@ -12,14 +12,13 @@ export type ModThemeSetting = "default" | "none";
 
 /** The keys of the `mod` mapping that `readModFormat` reads. Other keys are ignored. */
 export const MOD_FILE_KEYS: readonly string[] = [
-  "name",
   "version",
   "entrypoint",
   "title",
   "description",
   "api",
   "type_path",
-  "sample_collection",
+  "default_mosaic",
   "test_path",
   "config",
   "permissions",
@@ -29,7 +28,6 @@ export const MOD_FILE_KEYS: readonly string[] = [
 
 /** The checked content of a mod file. Paths are not resolved yet. */
 export interface ModFormat {
-  name: string;
   title: string;
   version: string;
   /** The mod API range the mod was written for, as written, or `null`. */
@@ -37,7 +35,7 @@ export interface ModFormat {
   description: string;
   entrypoint: string;
   typePath: string | null;
-  sampleCollection: string | null;
+  defaultMosaic: string | null;
   testPath: string | null;
   config: YamlMapping;
   permissions: ModPermission[];
@@ -158,37 +156,36 @@ function checkNoInlineSchema(mod: YamlMapping, source: string): void {
 
 /**
  * Checks the structure of a parsed mod file: a `mod` mapping with non-empty
- * string `name`, `version` and `entrypoint`, optional string `title` (defaults
- * to `name`) and `description` (defaults to `""`), an optional `api` semver
- * range, optional non-empty `type_path`, `sample_collection` and `test_path`, an optional
+ * string `title`, `version` and `entrypoint`, an optional string
+ * `description` (defaults to `""`), an optional `api` semver range, optional
+ * non-empty `type_path`, `default_mosaic` and `test_path`, an optional
  * `config` mapping, optional `permissions`, an optional `theme`
  * (`"default"` or `"none"`) and optional `libraries`. These keys are listed in `MOD_FILE_KEYS`. Other
- * keys are ignored, and an inline `schema` is rejected. Raises
+ * keys are ignored, the former `name` and `sample_collection` included, and
+ * an inline `schema` is rejected. Raises
  * `ModFormatError` at the first failure.
  */
 export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
   const source = parsedYaml.source;
   const mod = readModMapping(parsedYaml);
-  const name = readRequiredText(mod, "name", source);
+  const title = readRequiredText(mod, "title", source);
   const version = readRequiredText(mod, "version", source);
   const entrypoint = readRequiredText(mod, "entrypoint", source);
-  const title = readOptionalText(mod, "title", name, source);
   const description = readOptionalText(mod, "description", "", source);
   const api = readModApiRange(mod, source);
   const typePath = readOptionalPath(mod, "type_path", source);
-  const sampleCollection = readOptionalPath(mod, "sample_collection", source);
+  const defaultMosaic = readOptionalPath(mod, "default_mosaic", source);
   const testPath = readOptionalPath(mod, "test_path", source);
   const config = readModConfig(mod, source);
   checkNoInlineSchema(mod, source);
   const modFormat: ModFormat = {
-    name,
     title,
     version,
     api,
     description,
     entrypoint,
     typePath,
-    sampleCollection,
+    defaultMosaic,
     testPath,
     config,
     permissions: readModPermissions(mod.permissions, source),

@@ -38,7 +38,7 @@ function findSampleTile(context, fileName) {
       return tile;
     }
   }
-  throw new Error(`The sample collection has no tile ${fileName}`);
+  throw new Error(`The default mosaic's collection has no tile ${fileName}`);
 }
 
 /** A sample tile, with its source and body, and other metadata. */

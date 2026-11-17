@@ -8,7 +8,6 @@ import { matchModApiRange } from "./mod_api_version.ts";
 /** A mod's metadata, without running it. `permissions` are what it would get if it were opened. */
 export interface ModInspection {
   source: string;
-  name: string;
   title: string;
   version: string;
   description: string;
@@ -17,7 +16,8 @@ export interface ModInspection {
   /** Whether `api` matches the mod API version, `null` without a range. */
   apiCompatible: boolean | null;
   typeSource: string | null;
-  sampleCollection: string | null;
+  /** The resolved address of the mod's default mosaic file, or `null`. It is not fetched. */
+  defaultMosaic: string | null;
   /** The resolved address of the mod's test file, or `null`. It is not fetched. */
   testSource: string | null;
   config: YamlMapping;
@@ -41,14 +41,13 @@ export async function inspectMod(
   const modFile = await loadModFile(source, options);
   const inspection: ModInspection = {
     source: modFile.source,
-    name: modFile.name,
     title: modFile.title,
     version: modFile.version,
     description: modFile.description,
     api: modFile.api,
     apiCompatible: matchModApiRange(modFile.api),
     typeSource: modFile.typeSource,
-    sampleCollection: modFile.sampleCollection,
+    defaultMosaic: modFile.defaultMosaic,
     testSource: modFile.testSource,
     config: structuredClone(modFile.config),
     libraries: structuredClone(modFile.libraries),

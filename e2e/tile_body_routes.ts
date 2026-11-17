@@ -62,7 +62,7 @@ export function buildBodyTileUrl(name: string): string {
 }
 
 function buildCollectionText(tiles: BodyTile[]): string {
-  const lines = ["collection:", '  name: "Body tiles"', "  tiles:"];
+  const lines = ["collection:", '  title: "Body tiles"', "  tiles:"];
   for (const tile of tiles) {
     lines.push(`    - url: "${buildBodyTileUrl(tile.name)}"`);
   }

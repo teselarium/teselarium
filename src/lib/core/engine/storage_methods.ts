@@ -1,9 +1,24 @@
 import type { YamlMapping, YamlValue } from "../../files/index.ts";
 import { readModValue, writeModValue } from "../storage/index.ts";
+import type { ModSlot } from "../storage/index.ts";
 import { describeEngineError, ModMethodError } from "./engine_errors.ts";
+import type { ModLaunch } from "./mod_launch.ts";
 import { STORAGE_FAILED } from "./mod_messages.ts";
 import { readRequiredText, throwInvalidParams } from "./mod_methods.ts";
 import type { ModMethodContext, ModMethodTable } from "./mod_methods.ts";
+
+/**
+ * The storage slot of a launch: the mod's source, and as context the mosaic
+ * file when the mod was opened from a mosaic, otherwise the collection's or
+ * the tile's source, otherwise `""`. Mods never choose it, and "Reload
+ * tiles" keeps it.
+ */
+export function buildLaunchSlot(launch: ModLaunch): ModSlot {
+  const context =
+    launch.mosaic === null ? (launch.tilesSource ?? "") : launch.mosaic.source;
+  const slot: ModSlot = { mod: launch.mod.source, context };
+  return slot;
+}
 
 function isPlainScalar(value: unknown): boolean {
   return (
@@ -75,7 +90,7 @@ async function getStorageValue(
 ): Promise<YamlValue | null> {
   const key = readRequiredText(params, "key", "storage.get");
   try {
-    const value = readModValue(context.storage, context.mod.source, key);
+    const value = readModValue(context.storage, context.storageSlot, key);
     return value;
   } catch (error) {
     throwStorageFailed(error);
@@ -90,14 +105,14 @@ async function setStorageValue(
   const key = readRequiredText(params, "key", "storage.set");
   const value = readStorageValue(params, "storage.set");
   try {
-    writeModValue(context.storage, context.mod.source, key, value);
+    writeModValue(context.storage, context.storageSlot, key, value);
   } catch (error) {
     throwStorageFailed(error);
   }
   return null;
 }
 
-/** The `storage.*` requests: each mod's own slot, keyed by its source. */
+/** The `storage.*` requests: the slot of the mod and its context (`buildLaunchSlot`). */
 export const STORAGE_METHODS: ModMethodTable = {
   "storage.get": getStorageValue,
   "storage.set": setStorageValue,

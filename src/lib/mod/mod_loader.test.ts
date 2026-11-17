@@ -24,6 +24,7 @@ import type { LoadedMod, ModFile } from "./index.ts";
 const SAMPLE_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/book_list/mod_conf.yaml`;
 const SAMPLE_ENTRYPOINT = `${FIXTURES_BASE_URL}mods/book_list/main.js`;
 const SAMPLE_COLLECTION = `${FIXTURES_BASE_URL}tiles/books_collection.yaml`;
+const SAMPLE_DEFAULT_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mods/book_list/mosaic.yaml`;
 const BROKEN_MOD_SOURCE = "https://example.org/mods/broken/mod_conf.yaml";
 const BROKEN_ENTRYPOINT = "https://example.org/mods/broken/main.js";
 const MISSING_MOD_SOURCE = "https://example.org/mods/missing/mod_conf.yaml";
@@ -35,7 +36,7 @@ const TEST_NPM_HOST = "https://npm.example.net/npm/";
 
 const MINIMAL_MOD_TEXT = [
   "mod:",
-  '  name: "minimal"',
+  '  title: "minimal"',
   '  version: "0.1.0"',
   '  entrypoint: "./main.js"',
   '  author: "Alice"',
@@ -43,14 +44,14 @@ const MINIMAL_MOD_TEXT = [
 
 const CLOCK_MOD_TEXT = [
   "mod:",
-  '  name: "clock"',
+  '  title: "clock"',
   '  version: "0.1.0"',
   '  entrypoint: "./main.js"',
 ].join("\n");
 
 const PROBE_MOD_TEXT = [
   "mod:",
-  '  name: "probe"',
+  '  title: "probe"',
   '  version: "0.1.0"',
   '  entrypoint: "./main.js"',
   "  libraries:",
@@ -103,7 +104,7 @@ describe("loadMod", function describeLoadMod(): void {
     const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
     expect(mod.source).toBe(SAMPLE_MOD_SOURCE);
-    expect(mod.name).toBe("book_list");
+    expect(mod).not.toHaveProperty("name");
     expect(mod.title).toBe("Book List");
     expect(mod.version).toBe("1.0.0");
     expect(mod.description).toBe(
@@ -151,13 +152,35 @@ describe("loadMod", function describeLoadMod(): void {
     expect(mod.typeSource).toBe(`${FIXTURES_BASE_URL}types/book.md`);
   });
 
-  it("Sample collection outside the mod folder", async function resolvesSampleCollection(): Promise<void> {
+  it("Sample collection outside the mod folder", async function ignoresSampleCollection(): Promise<void> {
+    testTexts.set(
+      SAMPLE_MOD_SOURCE,
+      [
+        "mod:",
+        '  title: "Book List"',
+        '  version: "1.0.0"',
+        '  entrypoint: "./main.js"',
+        '  sample_collection: "../../tiles/books_collection.yaml"',
+      ].join("\n"),
+    );
     const testFetch = createTestFetch();
 
     const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: testFetch });
 
-    expect(mod.sampleCollection).toBe(SAMPLE_COLLECTION);
+    expect(mod).not.toHaveProperty("sampleCollection");
+    expect(mod.defaultMosaic).toBeNull();
     expect(listRequestedUrls(testFetch)).not.toContain(SAMPLE_COLLECTION);
+  });
+
+  it("Default mosaic next to the mod file", async function resolvesDefaultMosaic(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: testFetch });
+
+    expect(mod.defaultMosaic).toBe(SAMPLE_DEFAULT_MOSAIC_SOURCE);
+    expect(listRequestedUrls(testFetch)).not.toContain(
+      SAMPLE_DEFAULT_MOSAIC_SOURCE,
+    );
   });
 
   it("Test file next to the mod file", async function resolvesTestPath(): Promise<void> {
@@ -215,7 +238,7 @@ describe("loadMod", function describeLoadMod(): void {
     expect(mod.title).toBe("minimal");
     expect(mod.description).toBe("");
     expect(mod.typeSource).toBeNull();
-    expect(mod.sampleCollection).toBeNull();
+    expect(mod.defaultMosaic).toBeNull();
     expect(mod.config).toEqual({});
     expect(mod.permissions).toEqual([]);
   });

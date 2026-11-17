@@ -1,0 +1,5 @@
+mosaic:
+  title: "Three items"
+  description: "The tiles mod with its three items."
+  mod: "./"
+  collection: "./item_collection.yaml"

@@ -14,7 +14,7 @@ export function buildCollectionCard(
 ): HTMLElement {
   const card = document.createElement("article");
   const heading = document.createElement("h1");
-  heading.textContent = inspection.name;
+  heading.textContent = inspection.title;
   card.append(heading);
   if (inspection.description !== "") {
     const description = document.createElement("p");

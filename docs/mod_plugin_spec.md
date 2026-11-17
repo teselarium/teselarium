@@ -18,29 +18,18 @@ A same tile could be compatible with multiple mods if they have the required fie
 
 A Mod can use a generic tile type in order to be compatible with any tile, for example defining only optional parameter like title or name. Furthermore, a mod may not need any tile to work, for example a mod for an alternative visualization of the home or the settings page
 
-Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. By default, a mod is a folder that bundles its mod_conf.yaml, its code, its tile type file, a sample collection and its tests, so it can be copied or shared as one folder. `type_path`, `sample_collection` and `test_path` are resolved against the mod_conf.yaml location, and they may also point outside the mod folder or to another site, for example to share one tile type between several mods. For example, the sample country map mod the app ships, `public/samples/mods/country_map/`, shows the tiles of any collection organized by country on a world map. Its `sample_collection` points outside its folder, to the Nobel laureates' books, its `show` permissions let the cards show the books' covers, and its `libraries` are covered in [Declared libraries](#declared-libraries):
+Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. By default, a mod is a folder that bundles its mod_conf.yaml, its code, its tile type file, its default mosaic and its tests, so it can be copied or shared as one folder. `title`, the mod's name as people read it, is required. `type_path`, `default_mosaic` and `test_path` are resolved against the mod_conf.yaml location, and they may also point outside the mod folder or to another site, for example to share one tile type between several mods. For example, the sample country map mod the app ships, `public/samples/mods/country_map/`, shows the tiles of any collection organized by country on a world map. Its `default_mosaic`, `mosaic.yaml` next to it, opens it with the Nobel laureates' books, outside its folder, and declares the `show` permissions that let the cards show the books' covers, since those hosts belong to the data rather than to the mod. Its `libraries` are covered in [Declared libraries](#declared-libraries):
 
 ```yaml
 mod:
-  name: "country_map"
   title: "Country Map"
   version: "1.0.0"
-  api: "^0.1.10"
+  api: "^0.1.14"
   description: "Shows any collection on a world map, with a marker per country, a list of its tiles and a card for each one."
   entrypoint: "./main.js"
   type_path: "./country_tile_type.md"
-  sample_collection: "../../tiles/literature_nobel_laureates_books/collection.yaml"
+  default_mosaic: "./mosaic.yaml"
   test_path: "./test.js"
-  permissions:
-    show:
-      - host: "https://upload.wikimedia.org"
-        reason: "Shows the book covers"
-      - host: "https://covers.openlibrary.org"
-        reason: "Shows the book covers"
-      - host: "https://*.archive.org"
-        reason: "Shows the book covers"
-      - host: "https://archive.org"
-        reason: "Shows the book covers"
   libraries:
     leaflet:
       npm: "leaflet@1.9.4"
@@ -54,6 +43,25 @@ mod:
     world_atlas:
       npm: "world-atlas@2.0.2"
       files: ["countries-110m.json"]
+```
+
+Its default mosaic, `mosaic.yaml`, names the mod's own folder with `mod: "./"`. The mod viewer's "Open default mosaic" opens it, and `mods.check` without a collection checks the mod with it (see [Mosaics](modules/mosaics/README.md#a-mods-default-mosaic)):
+
+```yaml
+mosaic:
+  title: "Nobel laureates' books on the map"
+  mod: "./"
+  collection: "../../tiles/literature_nobel_laureates_books/collection.yaml"
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the book covers"
+      - host: "https://covers.openlibrary.org"
+        reason: "Shows the book covers"
+      - host: "https://*.archive.org"
+        reason: "Shows the book covers"
+      - host: "https://archive.org"
+        reason: "Shows the book covers"
 ```
 
 `api` is the range of mod API versions the mod was written for, in npm's semver range syntax. The mod API version is separate from the app's own version and covers what a mod relies on: the engine methods and events, the mount context, the mod file format and the test API (see [Mod tests](#mod-tests)). When the range does not match the app's mod API version, the app asks the user before starting the mod; a mod without `api` runs with a warning. A mod reads the version it runs on in its mount context, as `context.api.version`.
@@ -200,7 +208,7 @@ A mod can read what a tile collection holds without being opened with it: `colle
 const inspection = await engine.request("collections.inspect", {
   collection: "./samples/tiles/literature_nobel_laureates/collection.yaml",
 });
-showCollection(inspection.name, inspection.description, inspection.tiles);
+showCollection(inspection.title, inspection.description, inspection.tiles);
 ```
 
 The location is resolved against the app's address, and a folder means the `collection.yaml` in it, so `./samples/tiles/literature_nobel_laureates` names the same collection. A collection that cannot be loaded answers `-32001` with the load error's message, and one whose site the mod's `open` does not cover answers `-32002`, before anything is requested.
@@ -307,10 +315,9 @@ The sample country map mod, `public/samples/mods/country_map/`, is the complete 
 
 ```yaml
 mod:
-  name: "country_map"
   title: "Country Map"
   version: "1.0.0"
-  api: "^0.1.10"
+  api: "^0.1.14"
   entrypoint: "./main.js"
   libraries:
     leaflet:
@@ -348,7 +355,7 @@ The same mod with its own copy of the files, next to `mod_conf.yaml`:
 
 ```yaml
 mod:
-  name: "country_map"
+  title: "country_map"
   version: "0.1.0"
   api: "^0.1.10"
   entrypoint: "./main.js"
@@ -389,7 +396,7 @@ The app's own default mods are the worked example (see the [default mods folder]
 
 ```yaml
 mod:
-  name: "mod_viewer"
+  title: "mod_viewer"
   version: "0.1.0"
   entrypoint: "./main.js"
   test_path: "./test.js"
@@ -397,15 +404,17 @@ mod:
 
 ## Checking a mod
 
-A mod can be checked before anyone runs it, with no code from its author. Open the mod in the mod viewer (`#/run?mod=mod_viewer&target=<mod reference>`) and press "Check mod". The viewer sends `mods.check` with the mod's source, and with the collection field's address when it holds one; otherwise the mod's sample collection is used. Any visible mod with an `open` permission for the mod's site can send `mods.check` the same way.
+A mod can be checked before anyone runs it, with no code from its author. Open the mod in the mod viewer (`#/run?mod=mod_viewer&target=<mod reference>`) and press "Check mod". The viewer sends `mods.check` with the mod's source, and with the collection field's address when it holds one. With a collection, the mod is checked with its own config and permissions. Without one, it is checked as its default mosaic opens it: with the mosaic's collection, merged config, aliases and `show` permissions. A mod without a default mosaic is checked with no tiles, and a default mosaic that names another mod is an error. Any visible mod with an `open` permission for the mod's site can send `mods.check` the same way.
+
+A mosaic is checked the same way with `mosaics.check { mosaic }`, which needs an `open` permission for the mosaic file's site. It checks the mosaic's mod as the mosaic opens it, with the bundle and mount checks below, and does not run the mod's tests, which belong to the mod. A mosaic from another site gets only the `show` permissions the user allowed and remembered for it, and nothing is asked. See [Checking a mosaic](modules/lib/core/engine/README.md#checking-a-mosaic).
 
 The check has three steps:
 
-- **Bundle check**: the mod file, the entrypoint, every file of the declared libraries, the tile type and the collection must load, and the collection's tiles are validated against the tile type. A file that cannot be loaded or has the wrong format is an error naming that file; for a library file, the message names the library and ends with the host's reason, such as jsDelivr's `Couldn't find the requested file /dist/missing.js in leaflet.`, so a wrong version or path shows before anyone runs the mod. A tile that does not match the type is a warning naming the tile. A missing `api` range, or one that does not match the app's mod API version, is a warning: the check asks nothing.
-- **Mount check**: when the bundle check found no error, the mod is mounted in a hidden frame, with the permissions it would get if it were opened, the tiles of its type and an empty storage slot that is thrown away afterwards; the mod's real slot is never read nor written. The check records a `mount` that throws or rejects, a mod that left its page, blocked requests and blocked browser dialogs, every request answered with `-32600`, `-32601` or `-32602` (a message that is not a request, an unknown method, bad params), and the requests that would need the user (`links.open`, `files.save`, `ui.confirm` and `players.open` answer `false`, `mods.open` and `mods.check` are refused), without showing any dialog. `ui.notify` answers `null`, and each notification with level `"error"` or `"warning"` is a finding at that level, with the notification's source and message; an `"info"` one is none. A `mount` that has not finished after 10 seconds is an error. Only the start of the mod is watched: the mount check ends 1 second after `mount` finished, so timers and requests that start later are not recorded.
-- **Tests**: when the mod declares `test_path` and neither step found an error, the mod's own tests run, one case after another (see [Mod tests](#mod-tests)).
+- **Bundle check**: the mosaic file, when the check uses one, the mod file, the entrypoint, every file of the declared libraries, the tile type and the collection must load, and the collection's tiles are validated against the tile type, after the mosaic's aliases. A file that cannot be loaded or has the wrong format is an error naming that file; for a library file, the message names the library and ends with the host's reason, such as jsDelivr's `Couldn't find the requested file /dist/missing.js in leaflet.`, so a wrong version or path shows before anyone runs the mod. A tile that does not match the type is a warning naming the tile. A missing `api` range, or one that does not match the app's mod API version, is a warning: the check asks nothing. With a mosaic, an alias for a field the tile type does not declare, and a config key, at any depth, that the mod's config does not have, are warnings naming the field or the key path, such as `config.map.zom`, so a typo in a mosaic shows before anyone opens it.
+- **Mount check**: when the bundle check found no error, the mod is mounted in a hidden frame, with the config and permissions it would get if it were opened, the mosaic's included, the tiles of its type and an empty storage slot that is thrown away afterwards; the mod's real slot is never read nor written. The check records a `mount` that throws or rejects, a mod that left its page, blocked requests and blocked browser dialogs, every request answered with `-32600`, `-32601` or `-32602` (a message that is not a request, an unknown method, bad params), and the requests that would need the user (`links.open`, `files.save`, `ui.confirm` and `players.open` answer `false`, `mods.open`, `mosaics.open`, `mods.check` and `mosaics.check` are refused), without showing any dialog. `ui.notify` answers `null`, and each notification with level `"error"` or `"warning"` is a finding at that level, with the notification's source and message; an `"info"` one is none. A `mount` that has not finished after 10 seconds is an error. Only the start of the mod is watched: the mount check ends 1 second after `mount` finished, so timers and requests that start later are not recorded.
+- **Tests**: for `mods.check`, when the mod declares `test_path` and neither step found an error, the mod's own tests run, one case after another (see [Mod tests](#mod-tests)).
 
-The report's status is `pass` when there are no findings, `warn` when there are only warnings and `fail` when a finding is an error. Each finding names its step (`bundle`, `mount` or `test`), its level, the file or mod it is about and a message. `tests` lists each case with its status (`pass` or `fail`) and, for a failed case, the message, and `testsChecked` says whether the cases ran. The check leaves the app as it was: no new sandbox, history entry or stage bar item.
+The report's status is `pass` when there are no findings, `warn` when there are only warnings and `fail` when a finding is an error. The report names the checked mod file as `source`, and the mosaic file the check used as `mosaic`, or `null` when it used none. Each finding names its step (`bundle`, `mount` or `test`), its level, the file or mod it is about and a message. `tests` lists each case with its status (`pass` or `fail`) and, for a failed case, the message, and `testsChecked` says whether the cases ran. The check leaves the app as it was: no new sandbox, history entry or stage bar item.
 
 ## Mod tests
 
@@ -417,7 +426,7 @@ Declare the test file in mod_conf.yaml with `test_path`, resolved against mod_co
 
 ```yaml
 mod:
-  name: "book_list"
+  title: "book_list"
   version: "1.1.0"
   entrypoint: "./main.js"
   test_path: "./test.js"
@@ -504,7 +513,7 @@ Each case runs in a fresh hidden frame, with the content policy and permissions 
 |---|---|
 | `mount(options?)` | Calls the mod's real `mount` with the engine API object and a mount context built as for a check, and resolves once it finished. `options.tiles` replaces the tiles, `options.config` replaces the config keys it names, and `options.params` is the context's `params`. When the mod's `mount` throws or rejects, `mount` rejects with that error. A second call rejects with `the mod is already mounted`. |
 | `root` | The frame's body, where the mod draws. |
-| `tiles` | The tiles the check gives: the collection's, or the mod's sample collection's, of the mod's tile type. |
+| `tiles` | The tiles the check gives: the collection's, or the default mosaic's collection's, of the mod's tile type, after the mosaic's aliases. |
 | `storage` | `get(key)` and `set(key, value)` on the case's slot, with the rules of `storage.get` and `storage.set`. Usable before `mount`, to seed what the mod reads. |
 | `requests` | Each request the mod sent, in order, as `{ method, params, result }` once it resolved, or `{ method, params, error }` with the error's `code` and `message`. |
 | `answer(method, value)` | Scripts the answer to the next request for `method` (see below). |
@@ -513,7 +522,7 @@ Each case runs in a fresh hidden frame, with the content policy and permissions 
 
 ### Scripted answers
 
-A check shows no dialog. `answer(method, value)` queues the answer to the next request for `method`: `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean, or `mods.open` with `null`. The request resolves with it, a `mods.open` answered this way opens nothing, and a `players.open` answered this way requests nothing from the player's site. Requests without a queued answer get what the mount check gives: `false` for `links.open`, `files.save`, `ui.confirm` and `players.open`, and `-32002` for `mods.open` and `mods.check`. In a case, none of them is a finding. A wrong method or value throws at once, for example `the answer to ui.confirm must be a boolean`. The app still checks each request's params, so a `links.open` with a bad address fails as it would in the app, and leaves its answer queued.
+A check shows no dialog. `answer(method, value)` queues the answer to the next request for `method`: `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean, or `mods.open` or `mosaics.open` with `null` (`mosaics.open` since mod API `0.1.14`). The request resolves with it, a `mods.open` or `mosaics.open` answered this way opens nothing, and a `players.open` answered this way requests nothing from the player's site. Requests without a queued answer get what the mount check gives: `false` for `links.open`, `files.save`, `ui.confirm` and `players.open`, and `-32002` for `mods.open`, `mosaics.open`, `mods.check` and `mosaics.check`. In a case, none of them is a finding. A wrong method or value throws at once, for example `the answer to ui.confirm must be a boolean`. The app still checks each request's params, so a `links.open` with a bad address fails as it would in the app, and leaves its answer queued.
 
 ```js
 function hasNoBooks(context) {

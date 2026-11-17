@@ -1,5 +1,4 @@
 mod:
-  name: "collection_explorer"
   title: "Tiles"
   version: "0.1.0"
   api: "^0.1.0"

@@ -2,10 +2,20 @@ import { describe, expect, it } from "vitest";
 import { createFullStorage } from "../../../test/memory_storage.ts";
 import { buildMethodContext } from "../../../test/method_contexts.ts";
 import { FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
+import {
+  SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_COLLECTION_SOURCE,
+  SAMPLE_MOD_REFERENCE,
+  SAMPLE_MOD_SOURCE,
+  SAMPLE_MOSAIC_REFERENCE,
+  SAMPLE_MOSAIC_SOURCE,
+  SAMPLE_TILE_SOURCES,
+} from "../../../test/sample_mods.ts";
+import { launchTestMod } from "../../../test/test_launches.ts";
 import { ModMethodError } from "./engine_errors.ts";
 import { INVALID_PARAMS, STORAGE_FAILED } from "./mod_messages.ts";
 import type { ModMethodContext } from "./mod_methods.ts";
-import { STORAGE_METHODS } from "./storage_methods.ts";
+import { buildLaunchSlot, STORAGE_METHODS } from "./storage_methods.ts";
 
 const SELECTED_VALUE = {
   source: `${FIXTURES_BASE_URL}tiles/books/kallocain.md`,
@@ -139,5 +149,74 @@ describe("storage methods", function describeStorageMethods(): void {
 
     expect(error.code).toBe(STORAGE_FAILED);
     expect(error.message).toBe("The quota has been exceeded.");
+  });
+});
+
+describe("Storage slot of a launch", function describeLaunchSlot(): void {
+  it("is the mosaic file for a mod opened from a mosaic", async function readsMosaicContext(): Promise<void> {
+    const launch = await launchTestMod({
+      mod: "",
+      collection: null,
+      mosaic: SAMPLE_MOSAIC_REFERENCE,
+      params: {},
+    });
+
+    expect(buildLaunchSlot(launch)).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_MOSAIC_SOURCE,
+    });
+  });
+
+  it("is the collection for a mod opened with one", async function readsCollectionContext(): Promise<void> {
+    const launch = await launchTestMod({
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: SAMPLE_COLLECTION_REFERENCE,
+      params: {},
+    });
+
+    expect(buildLaunchSlot(launch)).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_COLLECTION_SOURCE,
+    });
+  });
+
+  it("is the tile for a mod opened with one", async function readsTileContext(): Promise<void> {
+    const launch = await launchTestMod({
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: null,
+      tile: SAMPLE_TILE_SOURCES[1],
+      params: {},
+    });
+
+    expect(buildLaunchSlot(launch)).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_TILE_SOURCES[1],
+    });
+  });
+
+  it("has no context for a mod opened without tiles", async function readsNoContext(): Promise<void> {
+    const launch = await launchTestMod({
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: null,
+      params: {},
+    });
+
+    expect(buildLaunchSlot(launch)).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      context: "",
+    });
+  });
+
+  it("reads and writes the session's slot", async function usesContextSlot(): Promise<void> {
+    const context = buildMethodContext([]);
+    context.storageSlot = {
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_COLLECTION_SOURCE,
+    };
+    await setValue(context, { key: "selected", value: "kallocain" });
+
+    context.storageSlot = { mod: SAMPLE_MOD_SOURCE, context: "" };
+
+    expect(await getValue(context, { key: "selected" })).toBeNull();
   });
 });

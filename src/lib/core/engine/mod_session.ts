@@ -65,7 +65,7 @@ import type {
 import type { TileBodies } from "./mod_tile_bodies.ts";
 import { MODS_METHODS } from "./mods_methods.ts";
 import { PLAYERS_METHODS } from "./players_methods.ts";
-import { STORAGE_METHODS } from "./storage_methods.ts";
+import { buildLaunchSlot, STORAGE_METHODS } from "./storage_methods.ts";
 import { TILES_METHODS } from "./tiles_methods.ts";
 import { UI_METHODS } from "./ui_methods.ts";
 
@@ -402,6 +402,7 @@ export function connectModSession(
       mod: launch.mod,
       grants: launch.context.permissions,
       storage: options.storage,
+      storageSlot: buildLaunchSlot(launch),
       appOrigin: options.appOrigin,
       defaults: options.defaults,
       fetchOptions: options.fetchOptions,

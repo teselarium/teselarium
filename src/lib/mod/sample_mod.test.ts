@@ -8,6 +8,8 @@ import {
 import type { Tile, TileCollection, TileValidator } from "../tile/index.ts";
 import type { Metadata } from "../files/index.ts";
 import { NPM_HOST } from "../../main/library_host.ts";
+import { loadMosaicFile } from "../mosaic/index.ts";
+import type { LoadedMosaic } from "../mosaic/index.ts";
 import { loadMod, loadModTestCode } from "./index.ts";
 import type { LoadedLibrary, LoadedMod, ModPermission } from "./index.ts";
 
@@ -23,19 +25,19 @@ interface ShippedSample {
 
 const SHIPPED_BOOK_LIST: ShippedSample = {
   folder: `${APP_BASE_URL}samples/mods/book_list/`,
-  api: "^0.1.5",
+  api: "^0.1.14",
   caseNames: ["lists the sample books", "remembers the books per row"],
 };
 
 const SHIPPED_FLASHCARDS: ShippedSample = {
   folder: `${APP_BASE_URL}samples/mods/flashcards/`,
-  api: "^0.1.9",
+  api: "^0.1.14",
   caseNames: ["lists the sample tiles", "remembers the chosen fields"],
 };
 
 const SHIPPED_COUNTRY_MAP: ShippedSample = {
   folder: `${APP_BASE_URL}samples/mods/country_map/`,
-  api: "^0.1.10",
+  api: "^0.1.14",
   caseNames: [
     "shows a marker per country",
     "opens a country",
@@ -102,8 +104,8 @@ const COUNTRY_MAP_LIBRARIES: LoadedLibrary[] = [
   },
 ];
 
-/** The `show` permissions of the country map: the hosts the sample books' covers load from, Open Library's redirects included. */
-const COUNTRY_MAP_PERMISSIONS: ModPermission[] = [
+/** The `show` permissions of the default mosaics of the book list and the country map: the hosts the sample books' covers load from, Open Library's redirects included. */
+const COVER_PERMISSIONS: ModPermission[] = [
   {
     category: "show",
     host: "https://upload.wikimedia.org",
@@ -132,7 +134,7 @@ const NOBEL_LAUREATES_COLLECTION = `${APP_BASE_URL}samples/tiles/literature_nobe
 interface ValidatedSample {
   /** Name of the mod's tile type. */
   typeName: string;
-  /** The mod's sample collection, validated with its tile type. */
+  /** The collection of the mod's default mosaic, validated with its tile type. */
   collection: TileCollection;
 }
 
@@ -163,14 +165,25 @@ async function buildSampleValidator(
   return tileValidator;
 }
 
-/** Loads the sample collection the mod declares and validates it with the mod's tile type. */
+/** Loads the default mosaic the mod declares, without its mod or its collection. */
+function loadDefaultMosaic(sampleMod: LoadedMod): Promise<LoadedMosaic> {
+  const defaultMosaic = readDeclaredPath(
+    sampleMod,
+    sampleMod.defaultMosaic,
+    "default_mosaic",
+  );
+  return loadMosaicFile(defaultMosaic, { fetch: fetchAppFile });
+}
+
+/** Loads the collection of the mod's default mosaic and validates it with the mod's tile type. */
 async function validateSampleCollection(
   sampleMod: LoadedMod,
 ): Promise<ValidatedSample> {
+  const defaultMosaic = await loadDefaultMosaic(sampleMod);
   const sampleCollection = readDeclaredPath(
     sampleMod,
-    sampleMod.sampleCollection,
-    "sample_collection",
+    defaultMosaic.collection,
+    "collection in its default mosaic",
   );
   const tileValidator = await buildSampleValidator(sampleMod);
   const loadedCollection = await loadTileCollection(sampleCollection, {
@@ -205,7 +218,7 @@ function validateOneTile(
   };
   const collection: TileCollection = {
     source: `${APP_BASE_URL}cards/collection.yaml`,
-    name: "One card",
+    title: "One card",
     description: "",
     tiles: [tile],
     issues: [],
@@ -215,11 +228,18 @@ function validateOneTile(
 }
 
 function describeShippedSample(sample: ShippedSample): void {
-  it("its sample collection matches its tile type", async function validatesShippedSample(): Promise<void> {
+  it("has a default mosaic of itself", async function declaresDefaultMosaic(): Promise<void> {
+    const sampleMod = await loadShippedMod(sample);
+
+    expect(sampleMod.defaultMosaic).toBe(`${sample.folder}mosaic.yaml`);
+    const defaultMosaic = await loadDefaultMosaic(sampleMod);
+    expect(defaultMosaic.mod).toBe(sampleMod.source);
+  });
+
+  it("its default mosaic's collection matches its tile type", async function validatesShippedSample(): Promise<void> {
     const sampleMod = await loadShippedMod(sample);
 
     expect(sampleMod.typeSource).not.toBeNull();
-    expect(sampleMod.sampleCollection).not.toBeNull();
 
     const { typeName, collection } = await validateSampleCollection(sampleMod);
 
@@ -247,12 +267,42 @@ function describeShippedSample(sample: ShippedSample): void {
   });
 }
 
+/** The permissions of a shipped sample, and those of its default mosaic. */
+interface SamplePermissions {
+  mod: ModPermission[];
+  mosaic: ModPermission[];
+}
+
+async function readSamplePermissions(
+  sample: ShippedSample,
+): Promise<SamplePermissions> {
+  const sampleMod = await loadShippedMod(sample);
+  const defaultMosaic = await loadDefaultMosaic(sampleMod);
+  const permissions: SamplePermissions = {
+    mod: sampleMod.permissions,
+    mosaic: defaultMosaic.permissions,
+  };
+  return permissions;
+}
+
 describe("shipped sample mod book_list", function describeBookList(): void {
   describeShippedSample(SHIPPED_BOOK_LIST);
+
+  it("declares show for the covers' hosts in its default mosaic only", async function declaresCoverHosts(): Promise<void> {
+    const permissions = await readSamplePermissions(SHIPPED_BOOK_LIST);
+
+    expect(permissions).toEqual({ mod: [], mosaic: COVER_PERMISSIONS });
+  });
 });
 
 describe("shipped sample mod flashcards", function describeFlashcards(): void {
   describeShippedSample(SHIPPED_FLASHCARDS);
+
+  it("declares no permission, nor does its default mosaic", async function declaresNoPermission(): Promise<void> {
+    const permissions = await readSamplePermissions(SHIPPED_FLASHCARDS);
+
+    expect(permissions).toEqual({ mod: [], mosaic: [] });
+  });
 });
 
 describe("shipped sample mod country_map", function describeCountryMap(): void {
@@ -264,10 +314,10 @@ describe("shipped sample mod country_map", function describeCountryMap(): void {
     expect(sampleMod.libraries).toEqual(COUNTRY_MAP_LIBRARIES);
   });
 
-  it("declares show for the hosts of the book covers only", async function declaresCoverHosts(): Promise<void> {
-    const sampleMod = await loadShippedMod(SHIPPED_COUNTRY_MAP);
+  it("declares show for the covers' hosts in its default mosaic only", async function declaresCoverHosts(): Promise<void> {
+    const permissions = await readSamplePermissions(SHIPPED_COUNTRY_MAP);
 
-    expect(sampleMod.permissions).toEqual(COUNTRY_MAP_PERMISSIONS);
+    expect(permissions).toEqual({ mod: [], mosaic: COVER_PERMISSIONS });
   });
 });
 

@@ -26,7 +26,7 @@ const MISSING_COLLECTION_SOURCE = `${FIXTURES_BASE_URL}tiles/missing.yaml`;
 const REMOTE_COLLECTION_SOURCE = "https://tiles.example.net/books.yaml";
 
 const REMOTE_COLLECTION_TEXT =
-  'collection:\n  name: "Remote books"\n  tiles:\n    - path: "./kallocain.md"\n';
+  'collection:\n  title: "Remote books"\n  tiles:\n    - path: "./kallocain.md"\n';
 
 afterEach(function clearTestTexts(): void {
   testTexts.clear();
@@ -84,7 +84,7 @@ describe("collections.inspect", function describeCollectionsInspect(): void {
 
       expect(inspection).toStrictEqual({
         source: SAMPLE_COLLECTION_SOURCE,
-        name: "Science fiction books",
+        title: "Science fiction books",
         description: "A sample book list for demonstration purposes.",
         tiles: [
           `${BOOKS_URL}farenheit_451.md`,
@@ -100,7 +100,7 @@ describe("collections.inspect", function describeCollectionsInspect(): void {
       const folderSource = `${FIXTURES_BASE_URL}tiles/books/collection.yaml`;
       testTexts.set(
         folderSource,
-        'collection:\n  name: "Folder books"\n  tiles:\n    - path: "./kallocain.md"\n',
+        'collection:\n  title: "Folder books"\n  tiles:\n    - path: "./kallocain.md"\n',
       );
       const { context } = buildSpiedContext([APP_BASE_URL.slice(0, -1)]);
 
@@ -115,7 +115,7 @@ describe("collections.inspect", function describeCollectionsInspect(): void {
       const { context } = buildSpiedContext(["*"]);
       testTexts.set(
         SAMPLE_COLLECTION_SOURCE,
-        'collection:\n  name: "A"\n  tiles:\n    - path: "./books/kallocain.md"\n    - { path: "./a.md", url: "https://example.org/a.md" }\n',
+        'collection:\n  title: "A"\n  tiles:\n    - path: "./books/kallocain.md"\n    - { path: "./a.md", url: "https://example.org/a.md" }\n',
       );
 
       const inspection = (await inspectCollection(context, {
@@ -183,7 +183,7 @@ describe("collections.inspect", function describeCollectionsInspect(): void {
 
     it("Collection without a tiles list", async function reportsMissingTiles(): Promise<void> {
       const { context } = buildSpiedContext(["*"]);
-      testTexts.set(SAMPLE_COLLECTION_SOURCE, 'collection:\n  name: "A"\n');
+      testTexts.set(SAMPLE_COLLECTION_SOURCE, 'collection:\n  title: "A"\n');
 
       const error = await catchMethodError(function sendInspect(): unknown {
         return inspectCollection(context, {
@@ -268,7 +268,7 @@ describe("collections.inspect", function describeCollectionsInspect(): void {
 
       expect(inspection).toMatchObject({
         source: REMOTE_COLLECTION_SOURCE,
-        name: "Remote books",
+        title: "Remote books",
         tiles: ["https://tiles.example.net/kallocain.md"],
       });
       expect(readRequestedUrls(fetchSpy)).toEqual([REMOTE_COLLECTION_SOURCE]);

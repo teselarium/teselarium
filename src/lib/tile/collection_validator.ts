@@ -79,7 +79,7 @@ export function validateTileCollection(
   }
   const validatedCollection: TileCollection = {
     source: copiedCollection.source,
-    name: copiedCollection.name,
+    title: copiedCollection.title,
     description: copiedCollection.description,
     tiles,
     issues,

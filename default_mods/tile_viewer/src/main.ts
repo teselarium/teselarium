@@ -22,7 +22,7 @@ import type { ViewerView } from "./viewer_view.ts";
 /** The mod a linked or a neighbouring tile opens in when the config names none. */
 const DEFAULT_TILE_VIEWER = "tile_viewer";
 
-/** The mod the collection's name opens when the config names none. */
+/** The mod the collection's title opens when the config names none. */
 const DEFAULT_COLLECTION_VIEWER = "collection_viewer";
 
 function readConfigText(

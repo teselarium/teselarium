@@ -9,7 +9,7 @@ Both are ordinary sandboxed mods. They use only the engine API: `collections.ins
 ### What it does
 
 - While the collections load, its list region ("Collections") is busy (`aria-busy="true"`) and says "Loading collections…".
-- For each location in its config's `collections`, in order, it sends `collections.inspect` and lists the collection as a card with its name, its description, its number of tiles (such as "17 tiles") and a "View" button, whose accessible name is "View <name>" so a screen reader still names the collection. A location that cannot be inspected is listed as an alert with the location and the error message (for example a missing collection file and `404`).
+- For each location in its config's `collections`, in order, it sends `collections.inspect` and lists the collection as a card with its title, its description, its number of tiles (such as "17 tiles") and a "View" button, whose accessible name is "View <title>" so a screen reader still names the collection. A location that cannot be inspected is listed as an alert with the location and the error message (for example a missing collection file and `404`).
 - When the user selects a collection, it sends `mods.open` for the mod in its config's `viewer`, with the collection's source as the `target` parameter. The stage opens the viewer in a new sandbox, and the explorer stays open behind it, so back returns to it as it was left. When the viewer cannot be opened, for example because it is switched off, the error goes to a `role="status"` region and the explorer stays visible.
 - It never requests a tile: the number of tiles is the length of the index's `tiles`.
 
@@ -21,7 +21,6 @@ It gets the app's look as the [mod explorer](../../mods/explorer/README.md) does
 
 ```yaml
 mod:
-  name: "collection_explorer"
   title: "Tiles"
   version: "0.1.0"
   api: "^0.1.0"
@@ -40,7 +39,7 @@ mod:
 ```
 
 - `viewer`: the mod reference opened for a selected collection. `collection_viewer` is the default mod name of the viewer, and the default when the config names none.
-- `collections`: the collection locations to list. Relative locations are resolved against the app's address. The vanilla config lists the two sample collections of `samples/tiles/`: the Nobel Prize in Literature laureates, then their books. It lists no sample collection of a mod.
+- `collections`: the collection locations to list. Relative locations are resolved against the app's address. The vanilla config lists the two sample collections of `samples/tiles/`: the Nobel Prize in Literature laureates, then their books. It lists none of the collections the mods' default mosaics name.
 - `open` for `"*"`: the explorer inspects collections and opens the viewer from any site. It is granted because the explorer is served from the app's origin.
 
 ## Collection viewer
@@ -49,7 +48,7 @@ mod:
 
 - It reads its `target` parameter. Without one, or with an empty one, it says "No collection was given." and sends nothing.
 - Otherwise it sends `collections.inspect` with the target, and shows "Loading the collection…" as `aria-busy` meanwhile. When the collection cannot be inspected, for any reason, it shows the error message as an alert: a missing file names the address and `404`, a file without a `tiles` list says that `tiles` must be a list, and a site that refuses the app says that the site may be unreachable or may not allow this app to read its files.
-- It shows the collection as a card, an `<article>` with the name as its heading, the description and the source.
+- It shows the collection as a card, an `<article>` with the title as its heading, the description and the source.
 - When the collection has entry issues, an "Entry issues" section lists each one with its level as a badge (`destructive` for an error, `warning` for a warning), its message and its source. There is no such section when there are none.
 - A "Tiles" section lists the tiles, in entry order, as a table in a card (an `<article>`): the theme gives the rows their separators and a highlight on hover. The "Tile" column holds each tile's label as a button named after it, the file name of its address, decoded (`caf%C3%A9.md` is labeled `café.md`; a name that is not valid percent-encoding is kept as it is), and the "Address" column its full address, in muted text. When two tiles share a file name, each is labeled by its parent folder and file name (`a/index.md`, `b/index.md`). The rare labels that still clash are kept: the addresses tell them apart.
 - A "Filter by file name" search field, at most 24rem wide, shows only the tiles whose label holds the typed text, ignoring letter case. It matches the label, the file name (with its folder when two tiles share one), not the address, which most tiles of a collection share up to the file name. A muted line under it, outside the card, says how many are shown, such as "Showing 2 of 17 tiles". The line is `aria-live="polite"`, so screen readers announce it, rather than `role="status"`, which the theme draws as a box. Hidden rows get the `hidden` attribute. An empty filter shows every tile. The field is outside any form, since the mod's sandbox does not allow forms.
@@ -64,11 +63,10 @@ Its labels and its filter are pure modules, `src/tile_labels.ts` and `src/tile_f
 
 ```yaml
 mod:
-  name: "collection_viewer"
   title: "Collection Viewer"
   version: "0.1.0"
   api: "^0.1.0"
-  description: "Shows a tile collection's name, description, entry issues and tiles, without loading them."
+  description: "Shows a tile collection's title, description, entry issues and tiles, without loading them."
   entrypoint: "./main.js"
   test_path: "./test.js"
   config:

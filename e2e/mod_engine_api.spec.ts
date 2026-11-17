@@ -20,7 +20,9 @@ import {
 } from "./mod_routes.ts";
 import {
   buildLabelsMosaicFiles,
+  buildNoteCollection,
   buildTilesModFiles,
+  buildTypedProbeFiles,
   LABELS_COLLECTION_FILE,
   LABELS_MOSAIC_HASH,
   LABELS_MOSAIC_PATH,
@@ -32,6 +34,7 @@ import {
   serveTilesMod,
   TILES_MOD_REFERENCE,
   TILES_TITLE,
+  TYPED_PROBE_COLLECTION_REFERENCE,
 } from "./test_mods.ts";
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
@@ -157,10 +160,73 @@ function countItems(items: unknown[]): number {
   return items.length;
 }
 
+/** `./test-mods/other.yaml`: a second collection of the typed probe. */
+const OTHER_PROBE_COLLECTION_REFERENCE = "./test-mods/other.yaml";
+
+/** `./test-mods/notes_mosaic.yaml`: a mosaic of the typed probe with its first collection. */
+const PROBE_MOSAIC_REFERENCE = "./test-mods/notes_mosaic.yaml";
+
+/** The typed probe with two collections and a mosaic of the first one. */
+function buildSlotContextFiles(): Record<string, string> {
+  const files = {
+    ...buildTypedProbeFiles(),
+    "collection.yaml": buildNoteCollection([]),
+    "other.yaml": buildNoteCollection(["./second.md"]),
+    "notes_mosaic.yaml": [
+      "mosaic:",
+      '  title: "Probe notes"',
+      '  mod: "./probe/"',
+      '  collection: "./collection.yaml"',
+      "",
+    ].join("\n"),
+  };
+  return files;
+}
+
+/** Opens `link` as the only sandbox, the probe, and waits for its mount. */
+async function openProbeOnly(page: Page, link: string): Promise<Frame> {
+  await page.goto(link);
+  await page.reload();
+  const frame = await findModFrame(page, "probe");
+  await waitForProbe(frame);
+  return frame;
+}
+
+function readSelected(frame: Frame): Promise<unknown> {
+  return frame.evaluate(requestFromProbe, ["storage.get", { key: "selected" }]);
+}
+
 test.describe(
-  "Storage slots are separate per mod source",
+  "Storage slots are separate per mod and context",
   { tag: "@frames" },
   function describeSlots(): void {
+    test("Two collections and a mosaic", async function separatesContexts({
+      page,
+    }): Promise<void> {
+      await serveAppOriginMod(page, buildSlotContextFiles());
+      const collectionLink = `${PROBE_LINK}&collection=${TYPED_PROBE_COLLECTION_REFERENCE}`;
+      const frame = await openProbeOnly(page, collectionLink);
+      await frame.evaluate(requestFromProbe, [
+        "storage.set",
+        { key: "selected", value: "first" },
+      ]);
+
+      const otherFrame = await openProbeOnly(
+        page,
+        `${PROBE_LINK}&collection=${OTHER_PROBE_COLLECTION_REFERENCE}`,
+      );
+      expect(await readSelected(otherFrame)).toEqual({ result: null });
+
+      const mosaicFrame = await openProbeOnly(
+        page,
+        `/#/run?mosaic=${PROBE_MOSAIC_REFERENCE}`,
+      );
+      expect(await readSelected(mosaicFrame)).toEqual({ result: null });
+
+      const sameFrame = await openProbeOnly(page, collectionLink);
+      expect(await readSelected(sameFrame)).toEqual({ result: "first" });
+    });
+
     test("Value kept after a reload", async function keepsValue({
       page,
     }): Promise<void> {

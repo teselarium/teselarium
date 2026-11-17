@@ -6,55 +6,51 @@ A mod is community JavaScript that OpenTesela runs in a sandbox (see [sandbox](.
 
 ### Mod file format
 
-A mod is a folder with a `mod_conf.yaml` file. By default, a mod bundles its tile type, its sample collection and its test file in that folder, so it can be copied or shared as one folder, and its tests go with it. The app ships three sample mods in `public/samples/mods/`, written in plain JavaScript and served as they are:
+A mod is a folder with a `mod_conf.yaml` file. By default, a mod bundles its tile type, its default mosaic and its test file in that folder, so it can be copied or shared as one folder, and its tests go with it. The app ships three sample mods in `public/samples/mods/`, written in plain JavaScript and served as they are:
 
-- The book list (`book_list/`) shows its books as a grid of covers, with a card for each one. It holds `mod_conf.yaml`, `main.js`, `test.js` (its tests, see the [guide to writing mod tests](../../../mod_plugin_spec.md#mod-tests)), `book_type.md`, `book_collection.yaml` and the `books/` it lists.
-- The flashcards mod (`flashcards/`) lists any collection in a table and studies it as question and answer cards, with a score for each round that lasts as long as the session. It holds `mod_conf.yaml`, `main.js`, `test.js`, `flashcard_type.md`, whose properties are all optional so every collection matches it, `flashcard_collection.yaml` and the `cards/` of its sample deck about markdown. It is a second example of the mod API: it reads each tile's first heading from `tiles.renderBody`, hides a rendered body around that heading after `ot-rendered`, and keeps the chosen fields with `storage.set`. Unlike the book list, whose own CSS is layout only, it also sets the study card's look from the theme's tokens, with Lucide icons drawn as inline SVG.
-- The country map (`country_map/`) shows any collection on a world map, with a marker per country holding its number of tiles, a sidebar with a country's tiles and a card for each tile, and lists the tiles whose country the map cannot place under "Not on the map". It holds `mod_conf.yaml`, `main.js`, `test.js` and `country_tile_type.md`, which requires a string `title` and `country`; its sample collection is the Nobel laureates' books in `public/samples/tiles/literature_nobel_laureates_books/`, outside its folder. It is the example of [declared libraries](#library-declarations): its mod file declares Leaflet, topojson-client, proj4 and world-atlas from npm, `libs.load` installs them, and `main.js` holds only the mod's own logic. proj4 projects the countries in Equal Earth, an equal-area projection, and Leaflet draws them on its flat CRS, with no tile server: the countries are shapes styled from the theme's tokens, and each marker stands on its country's land. Its `show` permissions are the book list's, for the covers its cards show, which Open Library redirects to archive.org.
+- The book list (`book_list/`) shows its books as a grid of covers, with a card for each one. It holds `mod_conf.yaml`, `main.js`, `test.js` (its tests, see the [guide to writing mod tests](../../../mod_plugin_spec.md#mod-tests)), `book_type.md`, `book_collection.yaml` and the `books/` it lists, and `mosaic.yaml`, its default mosaic, which opens it with those books and declares the `show` permissions their covers need.
+- The flashcards mod (`flashcards/`) lists any collection in a table and studies it as question and answer cards, with a score for each round that lasts as long as the session. It holds `mod_conf.yaml`, `main.js`, `test.js`, `flashcard_type.md`, whose properties are all optional so every collection matches it, `flashcard_collection.yaml` and the `cards/` of its sample deck about markdown, and `mosaic.yaml`, its default mosaic with that deck. It is a second example of the mod API: it reads each tile's first heading from `tiles.renderBody`, hides a rendered body around that heading after `ot-rendered`, and keeps the chosen fields with `storage.set`. Unlike the book list, whose own CSS is layout only, it also sets the study card's look from the theme's tokens, with Lucide icons drawn as inline SVG.
+- The country map (`country_map/`) shows any collection on a world map, with a marker per country holding its number of tiles, a sidebar with a country's tiles and a card for each tile, and lists the tiles whose country the map cannot place under "Not on the map". It holds `mod_conf.yaml`, `main.js`, `test.js`, `country_tile_type.md`, which requires a string `title` and `country`, and `mosaic.yaml`, its default mosaic, whose collection is the Nobel laureates' books in `public/samples/tiles/literature_nobel_laureates_books/`, outside its folder. It is the example of [declared libraries](#library-declarations): its mod file declares Leaflet, topojson-client, proj4 and world-atlas from npm, `libs.load` installs them, and `main.js` holds only the mod's own logic. proj4 projects the countries in Equal Earth, an equal-area projection, and Leaflet draws them on its flat CRS, with no tile server: the countries are shapes styled from the theme's tokens, and each marker stands on its country's land. Its default mosaic declares the book list's `show` permissions, for the covers its cards show, which Open Library redirects to archive.org; the mod file declares none, since the covers belong to the data.
 
 The book list's `mod_conf.yaml`:
 
 ```yaml
 mod:
-  name: "book_list"
   title: "Book List"
   version: "1.1.0"
-  api: "^0.1.5"
+  api: "^0.1.14"
   description: "A grid of book covers, with a card for each book that shows its details and text."
   entrypoint: "./main.js"
   type_path: "./book_type.md"
-  sample_collection: "./book_collection.yaml"
+  default_mosaic: "./mosaic.yaml"
   test_path: "./test.js"
   config:
     show_covers: true
     columns: 6
-  permissions:
-    show:
-      - host: "https://upload.wikimedia.org"
-        reason: "Shows the book covers"
 ```
+
+It declares no permission: the hosts its sample books' covers load from are declared by its default mosaic, `mosaic.yaml`, which opens it with those books (see [A mod's default mosaic](../../mosaics/README.md#a-mods-default-mosaic)).
 
 Every key lives under a `mod` mapping:
 
 | Key | Required | Meaning |
 |---|---|---|
-| `name` | yes | Non-empty string chosen by the author. It is not the mod's identity: the source is. |
+| `title` | yes | Non-empty string, the mod's name as people read it. It is not the mod's identity: the source is. |
 | `version` | yes | Non-empty string, e.g. `"1.0.0"`. A number such as `1` is rejected. |
 | `entrypoint` | yes | Path of the ES module that default-exports `mount(engine, context)`. |
-| `title` | no | String, defaults to `name`. |
 | `description` | no | String, defaults to `""`. |
 | `api` | no | The range of [mod API versions](../core/engine/README.md#mod-api-version) the mod was written for, in npm's semver range syntax, e.g. `"^0.1.0"`. The loaded mod keeps it as written, or `null` without the key. Anything that is not a non-empty string holding a valid range, such as `"latest"`, `""` or the number `0.1`, is rejected with `"api" must be a semver range, such as "^0.1.0"`. The library only checks the syntax: the [engine](../core/engine/README.md) matches the range against the app's mod API version. |
 | `type_path` | no | Path of the tile type file the mod's tiles must match. Without it, the mod receives every tile. |
-| `sample_collection` | no | Path of the sample tiles the mod comes with. It is not fetched when the mod is loaded. |
+| `default_mosaic` | no | Path of the mod's default mosaic file, the mosaic that opens the mod with the data it comes with (see [A mod's default mosaic](../../mosaics/README.md#a-mods-default-mosaic)). It is not fetched when the mod is loaded or inspected. Anything that is not a non-empty string is rejected with `"default_mosaic" must be a non-empty string`. |
 | `test_path` | no | Path of the mod's JavaScript test file, which [`mods.check`](../core/engine/README.md#mod-check) runs (see the [guide to writing mod tests](../../../mod_plugin_spec.md#mod-tests)). It is fetched only by a check's tests, never when the mod is loaded, opened or inspected. Anything that is not a non-empty string is rejected with `"test_path" must be a non-empty string`. |
 | `config` | no | Mapping given to the mod as `context.config`, defaults to `{}`. |
 | `permissions` | no | The web hosts and mods the mod needs, see below. |
 | `libraries` | no | The libraries the mod loads with [`libs.load`](../core/engine/README.md#libraries): npm packages at an exact version, or files next to the mod. See [Library declarations](#library-declarations). |
 | `theme` | no | `"default"` (the default) or `"none"`. With `"none"`, the mod's frame gets neither the theme tokens nor the base stylesheet; the mod still receives the theme in its mount context and the `theme.changed` event. Any other value is rejected. See the [theme module](../core/theme/README.md). |
 
-- `entrypoint`, `type_path`, `sample_collection` and `test_path` are resolved against the mod file's location.
-- Bundling the tile type and the sample collection is a convention, not a rule: `type_path` and `sample_collection` may still point outside the mod folder (`../../types/book.md`) or to another site (`https://types.example.net/book.md`), so several mods can share one tile type.
-- Other keys are ignored. An inline `schema` is rejected for now: use `type_path` with the path of a tile type file.
+- `entrypoint`, `type_path`, `default_mosaic` and `test_path` are resolved against the mod file's location.
+- Bundling the tile type and the default mosaic is a convention, not a rule: `type_path` and `default_mosaic` may still point outside the mod folder (`../../types/book.md`) or to another site (`https://types.example.net/book.md`), so several mods can share one tile type.
+- Other keys are ignored, among them `name` and `sample_collection`, which mod files had before mod API `0.1.14`: a mod file with only `name` fails with `"title" must be a non-empty string`. An inline `schema` is rejected for now: use `type_path` with the path of a tile type file.
 - The file follows the same plain YAML rules as a collection file.
 
 ### Library declarations
@@ -63,7 +59,7 @@ Every key lives under a `mod` mapping:
 
 ```yaml
 mod:
-  name: "country_map"
+  title: "country_map"
   version: "0.1.0"
   api: "^0.1.10"
   entrypoint: "./main.js"
@@ -131,7 +127,7 @@ Implemented in `src/lib/mod/`. Other modules import only from the public entry p
 ### Mod loader
 
 - `resolveModReference(reference, options)`: resolves a mod reference to the URL of its mod file. `options` are `{ baseUrl?, defaultModsFolder? }`. Raises `FileFetchError` when it cannot, for example for a default mod name without a default mods folder.
-- `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `name`, `title`, `version`, `api`, `description`, `entrypoint`, `typeSource`, `sampleCollection`, `testSource`, `config`, `permissions`, `theme`, `libraries`). `testSource` is the resolved address of the test file, or `null` without `test_path`. `libraries` is a list of `LoadedLibrary` (`name`, `package`, `version`, `files`), empty without the key, and each file is `{ path, source, kind }`: the path as declared, its resolved address and its kind. The entrypoint, the tile type, the sample collection, the test file and the library files are not fetched.
+- `loadModFile(reference, options?)`: resolves the reference, fetches and parses the mod file. Returns a `ModFile` (`source`, `title`, `version`, `api`, `description`, `entrypoint`, `typeSource`, `defaultMosaic`, `testSource`, `config`, `permissions`, `theme`, `libraries`). `testSource` is the resolved address of the test file, or `null` without `test_path`. `libraries` is a list of `LoadedLibrary` (`name`, `package`, `version`, `files`), empty without the key, and each file is `{ path, source, kind }`: the path as declared, its resolved address and its kind. The entrypoint, the tile type, the default mosaic, the test file and the library files are not fetched.
 - `loadModCode(modFile, options?)`: fetches the entrypoint of a `ModFile`. Returns a `LoadedMod`: the `ModFile` with `code`, the entrypoint text. An entrypoint that cannot be fetched raises `FileFetchError`, whose `source` is the entrypoint. The engine's mod check uses it to tell a failing entrypoint apart from a failing mod file.
 - `loadModTestCode(modFile, options?)`: fetches the test file of a `ModFile` and returns its text. Only the tests of a mod check call it. A test file that cannot be fetched raises `FileFetchError`, whose `source` is the test file, and a mod without `testSource` raises an `Error`.
 - `loadMod(reference, options?)`: `loadModFile`, then `loadModCode`. Returns the `LoadedMod`.
@@ -154,7 +150,7 @@ const modFile = await loadModFile("./samples/mods/book_list", {
 });
 // modFile.source === "https://example.org/samples/mods/book_list/mod_conf.yaml"
 // modFile.typeSource === "https://example.org/samples/mods/book_list/book_type.md"
-// modFile.sampleCollection === "https://example.org/samples/mods/book_list/book_collection.yaml"
+// modFile.defaultMosaic === "https://example.org/samples/mods/book_list/mosaic.yaml", not fetched
 // modFile.testSource === "https://example.org/samples/mods/book_list/test.js", not fetched
 
 const sampleMod = await loadModCode(modFile);

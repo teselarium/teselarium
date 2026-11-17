@@ -6,6 +6,7 @@ import {
   findElement,
   findRequests,
   findSettledOpen,
+  findSettledRequest,
   mountWithTarget,
   readInspection,
 } from "./case_helpers.ts";
@@ -27,17 +28,22 @@ async function expectOpenParams(
   context.expect(openRequest.result).toBe(null);
 }
 
-export async function runsWithSampleTiles(context: CaseContext): Promise<void> {
-  await mountAnsweringOpen(context);
+export async function opensDefaultMosaic(context: CaseContext): Promise<void> {
+  await mountWithTarget(context, FIXTURE_REFERENCES.listedMod);
+  context.answer("mosaics.open", null);
 
-  clickButton(context, "Run with sample tiles");
+  clickButton(context, "Open default mosaic");
 
   const inspection = readInspection(context);
-  context.expect(inspection.sampleCollection).toBeTruthy();
-  await expectOpenParams(context, {
-    mod: inspection.source,
-    collection: inspection.sampleCollection ?? "",
-  });
+  context.expect(inspection.defaultMosaic).toBeTruthy();
+  const openRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "mosaics.open"),
+  );
+  context
+    .expect(openRequest.params)
+    .toEqual({ mosaic: inspection.defaultMosaic ?? "" });
+  context.expect(openRequest.result).toBe(null);
+  context.expect(findRequests(context, "mods.open").length).toBe(0);
 }
 
 export async function runsWithTypedCollection(
@@ -73,11 +79,11 @@ export async function runsWithoutTiles(context: CaseContext): Promise<void> {
   await expectOpenParams(context, { mod: readInspection(context).source });
 }
 
-export async function offersNoSampleRunWithoutSample(
+export async function offersNoDefaultMosaicWithoutOne(
   context: CaseContext,
 ): Promise<void> {
   await mountWithTarget(context, FIXTURE_REFERENCES.noRange);
 
-  context.expect(findButton(context, "Run with sample tiles")).toBe(null);
+  context.expect(findButton(context, "Open default mosaic")).toBe(null);
   context.expect(findButton(context, "Run without tiles") !== null).toBe(true);
 }

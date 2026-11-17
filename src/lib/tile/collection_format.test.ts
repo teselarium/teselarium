@@ -34,7 +34,7 @@ describe("readCollectionFormat", function describeReadCollectionFormat(): void {
         parseCollectionText(readFixtureText(COLLECTION_PATH)),
       );
 
-      expect(collectionFormat.name).toBe("Science fiction books");
+      expect(collectionFormat.title).toBe("Science fiction books");
       expect(collectionFormat.description).toBe(
         "A sample book list for demonstration purposes.",
       );
@@ -47,7 +47,7 @@ describe("readCollectionFormat", function describeReadCollectionFormat(): void {
 
     it("Description is missing", function readsMissingDescription(): void {
       const collectionFormat = readCollectionFormat(
-        parseCollectionText('collection:\n  name: "A"\n  tiles: []\n'),
+        parseCollectionText('collection:\n  title: "A"\n  tiles: []\n'),
       );
 
       expect(collectionFormat.description).toBe("");
@@ -56,21 +56,32 @@ describe("readCollectionFormat", function describeReadCollectionFormat(): void {
     it("Unknown keys are ignored", function ignoresUnknownKeys(): void {
       const collectionFormat = readCollectionFormat(
         parseCollectionText(
-          'collection:\n  name: "A"\n  license: "CC-BY"\n  tiles: []\n',
+          'collection:\n  title: "A"\n  license: "CC-BY"\n  tiles: []\n',
         ),
       );
 
       expect(Object.keys(collectionFormat).sort()).toEqual([
         "description",
         "entries",
-        "name",
+        "title",
       ]);
+    });
+
+    it("Former name is ignored", function ignoresFormerName(): void {
+      const collectionFormat = readCollectionFormat(
+        parseCollectionText(
+          'collection:\n  title: "A"\n  name: "B"\n  tiles: []\n',
+        ),
+      );
+
+      expect(collectionFormat.title).toBe("A");
+      expect(collectionFormat).not.toHaveProperty("name");
     });
   });
 
   describe("wrong structure", function describeWrongStructure(): void {
     it("Missing collection mapping", function rejectsMissingCollection(): void {
-      const error = readExpectingError(parseCollectionText('name: "A"\n'));
+      const error = readExpectingError(parseCollectionText('title: "A"\n'));
 
       expect(error.source).toBe(TEST_SOURCE);
       expect(error.message).toContain(TEST_SOURCE);
@@ -83,35 +94,43 @@ describe("readCollectionFormat", function describeReadCollectionFormat(): void {
       expect(error.message).toContain('a "collection" mapping is required');
     });
 
-    it("rejects a missing name", function rejectsMissingName(): void {
+    it("rejects a missing title", function rejectsMissingTitle(): void {
       const error = readExpectingError(
         parseCollectionText("collection:\n  tiles: []\n"),
       );
 
       expect(error.source).toBe(TEST_SOURCE);
-      expect(error.message).toContain('"name" must be a non-empty string');
+      expect(error.message).toContain('"title" must be a non-empty string');
     });
 
-    it("rejects an empty name", function rejectsEmptyName(): void {
+    it("rejects an empty title", function rejectsEmptyTitle(): void {
       const error = readExpectingError(
-        parseCollectionText('collection:\n  name: ""\n  tiles: []\n'),
+        parseCollectionText('collection:\n  title: ""\n  tiles: []\n'),
       );
 
-      expect(error.message).toContain('"name" must be a non-empty string');
+      expect(error.message).toContain('"title" must be a non-empty string');
     });
 
-    it("Name is not a string", function rejectsNumericName(): void {
+    it("Title is not a string", function rejectsNumericTitle(): void {
+      const error = readExpectingError(
+        parseCollectionText("collection:\n  title: 3\n  tiles: []\n"),
+      );
+
+      expect(error.message).toContain('"title" must be a non-empty string');
+    });
+
+    it("Name is not a string", function rejectsNameWithoutTitle(): void {
       const error = readExpectingError(
         parseCollectionText("collection:\n  name: 3\n  tiles: []\n"),
       );
 
-      expect(error.message).toContain('"name" must be a non-empty string');
+      expect(error.message).toContain('"title" must be a non-empty string');
     });
 
     it("rejects a description that is not a string", function rejectsNumericDescription(): void {
       const error = readExpectingError(
         parseCollectionText(
-          'collection:\n  name: "A"\n  description: 3\n  tiles: []\n',
+          'collection:\n  title: "A"\n  description: 3\n  tiles: []\n',
         ),
       );
 
@@ -121,7 +140,7 @@ describe("readCollectionFormat", function describeReadCollectionFormat(): void {
 
     it("Missing tiles list", function rejectsMissingTiles(): void {
       const error = readExpectingError(
-        parseCollectionText('collection:\n  name: "A"\n'),
+        parseCollectionText('collection:\n  title: "A"\n'),
       );
 
       expect(error.source).toBe(TEST_SOURCE);
@@ -131,7 +150,7 @@ describe("readCollectionFormat", function describeReadCollectionFormat(): void {
     it("rejects tiles that are not a list", function rejectsTilesMapping(): void {
       const error = readExpectingError(
         parseCollectionText(
-          'collection:\n  name: "A"\n  tiles:\n    path: "./a.md"\n',
+          'collection:\n  title: "A"\n  tiles:\n    path: "./a.md"\n',
         ),
       );
 

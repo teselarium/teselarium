@@ -2,7 +2,11 @@ import { vi } from "vitest";
 import type { Mock } from "vitest";
 import type { AppAction } from "../lib/core/engine/app_actions.ts";
 import { ModMethodError } from "../lib/core/engine/engine_errors.ts";
+import { checkModBundle } from "../lib/core/engine/mod_bundle_check.ts";
+import { buildModCheckReport } from "../lib/core/engine/mod_check_report.ts";
+import type { ModCheckReport } from "../lib/core/engine/mod_check_report.ts";
 import { buildTileBodies } from "../lib/core/engine/mod_tile_bodies.ts";
+import { isMosaicCheckTarget } from "../lib/core/engine/mod_methods.ts";
 import type {
   ModCheckRequest,
   ModMethodContext,
@@ -36,14 +40,13 @@ export function buildOpenPermission(host: string): ModPermission {
 export function buildRequestingMod(permissions: ModPermission[]): LoadedMod {
   const mod: LoadedMod = {
     source: REQUESTING_MOD_SOURCE,
-    name: "mod_explorer",
     title: "Mods",
     version: "0.1.0",
     api: TEST_MOD_API_RANGE,
     description: "",
     entrypoint: `${APP_BASE_URL}default_mods/mod_explorer/main.js`,
     typeSource: null,
-    sampleCollection: null,
+    defaultMosaic: null,
     testSource: null,
     config: {},
     permissions,
@@ -83,10 +86,45 @@ function acceptAction(): Promise<boolean> {
   return Promise.resolve(true);
 }
 
+/** The file a check request names: its mosaic, or its mod. */
+export function describeCheckRequest(request: ModCheckRequest): string {
+  return isMosaicCheckTarget(request) ? request.mosaic : request.source;
+}
+
+/** A passing report of the request's mod or mosaic, as a spied `onCheckMod` answers it. */
+export function resolvePassingReport(
+  request: ModCheckRequest,
+): Promise<ModCheckReport> {
+  const checkedFiles = isMosaicCheckTarget(request)
+    ? { source: null, mosaic: request.mosaic }
+    : { source: request.source, mosaic: null };
+  const report = buildModCheckReport(checkedFiles, [], true, null);
+  return Promise.resolve(report);
+}
+
+/** An `onCheckMod` that runs only the bundle check, as the stage does before mounting. */
+export async function checkBundleOnly(
+  context: ModMethodContext,
+  request: ModCheckRequest,
+): Promise<ModCheckReport> {
+  const bundleCheck = await checkModBundle(
+    request,
+    context.defaults,
+    context.fetchOptions,
+  );
+  const report = buildModCheckReport(
+    { source: bundleCheck.source, mosaic: bundleCheck.mosaicSource },
+    bundleCheck.findings,
+    false,
+    null,
+  );
+  return report;
+}
+
 /** The default `onCheckMod` of handler tests: a test that checks a mod sets its own. */
 function failOnCheckMod(request: ModCheckRequest): never {
   throw new Error(
-    `onCheckMod was called for "${request.source}", but the test does not expect a check`,
+    `onCheckMod was called for "${describeCheckRequest(request)}", but the test does not expect a check`,
   );
 }
 
@@ -105,6 +143,7 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
     mod: buildRequestingMod(granted),
     grants: { granted, denied: [] },
     storage: createMemoryStorage(),
+    storageSlot: { mod: REQUESTING_MOD_SOURCE, context: "" },
     appOrigin: APP_ORIGIN,
     defaults: TEST_DEFAULTS,
     fetchOptions: {

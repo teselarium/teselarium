@@ -1,6 +1,6 @@
-# The tile viewer's sample collection and the fixture its tests view (test/), so that the check's tiles are these and `tiles.renderBody` renders their bodies.
+# The collection of the tile viewer's default mosaic (../mosaic.yaml) and the fixture its tests view (test/), so that the check's tiles are these and `tiles.renderBody` renders their bodies.
 collection:
-  name: "Viewer tiles"
+  title: "Viewer tiles"
   description: "A fixture collection that the tile viewer's tests show."
   tiles:
     - path: "./tiles/kallocain.md"

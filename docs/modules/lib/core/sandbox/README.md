@@ -8,10 +8,10 @@ Each mod runs isolated from the app in its own sandboxed frame. This module buil
 
 The content hosts of a mod are the `http:` and `https:` origins of the files the engine read to start it: the mosaic file (when the mod was opened from a mosaic), the mod file, its entrypoint, its tile type file, the collection file (when the mod was opened with one) and each tile. They are always allowed for `show`, so a mod can show images from where its tiles live. `file:` and `data:` sources are dropped, and the list is sorted and without duplicates.
 
-- The sample collection is not a content host unless the mod was opened with it.
+- The collection of the mod's default mosaic is not a content host unless the mod was opened with it, from the mosaic or by a run link.
 - Content hosts are fixed when the mod starts. Tiles reloaded later from a new host are blocked, and the block is reported.
 
-Example: the sample book list mod opened with the sample collection from the app at `https://example.org/` has one content host, `https://example.org`. Opened from a mosaic at `https://mosaics.example.net/maps/mosaic.yaml`, it also has `https://mosaics.example.net`, so a mosaic's author can show media from their own site, as a collection's author can.
+Example: the sample book list mod opened from its default mosaic, or with its books by a run link, from the app at `https://example.org/` has one content host, `https://example.org`. Opened from a mosaic at `https://mosaics.example.net/maps/mosaic.yaml`, it also has `https://mosaics.example.net`, so a mosaic's author can show media from their own site, as a collection's author can.
 
 ### Permissions of a mosaic
 

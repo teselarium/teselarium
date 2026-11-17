@@ -3,6 +3,8 @@ import type { Mock } from "vitest";
 import {
   buildMethodContext,
   buildOpenPermission,
+  checkBundleOnly,
+  resolvePassingReport,
 } from "../../../test/method_contexts.ts";
 import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import {
@@ -15,6 +17,7 @@ import {
   OTHER_APP_ORIGIN,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_SOURCE,
+  SAMPLE_DEFAULT_MOSAIC_SOURCE,
   SAMPLE_COVERS_PERMISSION,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
@@ -26,8 +29,6 @@ import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
 import type { SiteDecision } from "../permissions/index.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
-import { checkModBundle } from "./mod_bundle_check.ts";
-import { buildModCheckReport } from "./mod_check_report.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { RunLink } from "./mod_launch.ts";
 import {
@@ -126,10 +127,6 @@ type CheckModSpy = Mock<
   (request: ModCheckRequest) => Promise<ModCheckReport> | null
 >;
 
-function buildPassingReport(source: string): ModCheckReport {
-  return buildModCheckReport(source, [], true, null);
-}
-
 /** A context whose `onCheckMod` is a spy: it answers a passing report, or `null` for a hidden mod. */
 function buildCheckingContext(
   hosts: string[],
@@ -152,31 +149,6 @@ function buildCheckingContext(
   return checkingContext;
 }
 
-function resolvePassingReport(
-  request: ModCheckRequest,
-): Promise<ModCheckReport> {
-  return Promise.resolve(buildPassingReport(request.source));
-}
-
-/** An `onCheckMod` that runs only the bundle check, as the stage does before mounting. */
-async function checkBundleOnly(
-  context: ModMethodContext,
-  request: ModCheckRequest,
-): Promise<ModCheckReport> {
-  const bundleCheck = await checkModBundle(
-    request.source,
-    request.collection,
-    context.fetchOptions,
-  );
-  const report = buildModCheckReport(
-    request.source,
-    bundleCheck.findings,
-    false,
-    null,
-  );
-  return report;
-}
-
 describe("mods.inspect", function describeModsInspect(): void {
   it("Inspect the sample mod", async function inspectsSampleMod(): Promise<void> {
     const { context } = buildSpiedContext(["https://example.org"]);
@@ -188,7 +160,7 @@ describe("mods.inspect", function describeModsInspect(): void {
     expect(inspection).toMatchObject({
       source: SAMPLE_MOD_SOURCE,
       title: "Book List",
-      sampleCollection: SAMPLE_COLLECTION_SOURCE,
+      defaultMosaic: SAMPLE_DEFAULT_MOSAIC_SOURCE,
       permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
       api: "^0.1.0",
       apiCompatible: true,
@@ -199,7 +171,7 @@ describe("mods.inspect", function describeModsInspect(): void {
     const { context, fetchSpy } = buildSpiedContext(["https://example.org"]);
     testTexts.set(
       CLOCK_MOD_SOURCE,
-      'mod:\n  name: "clock"\n  version: "1.0.0"\n  entrypoint: "./main.js"\n  test_path: "./test.js"',
+      'mod:\n  title: "clock"\n  version: "1.0.0"\n  entrypoint: "./main.js"\n  test_path: "./test.js"',
     );
 
     const inspection = await inspect(context, { mod: CLOCK_MOD_SOURCE });
@@ -282,14 +254,14 @@ describe("mods.inspect", function describeModsInspect(): void {
     const { context, fetchSpy } = buildSpiedContext(["*"]);
     testTexts.set(
       "https://mods.example.net/clock/mod_conf.yaml",
-      'mod:\n  name: "clock"\n  version: "1.0.0"\n  entrypoint: "./main.js"',
+      'mod:\n  title: "clock"\n  version: "1.0.0"\n  entrypoint: "./main.js"',
     );
 
     const inspection = await inspect(context, {
       mod: "https://mods.example.net/clock/",
     });
 
-    expect(inspection).toMatchObject({ name: "clock" });
+    expect(inspection).toMatchObject({ title: "clock" });
     expect(fetchSpy).toHaveBeenCalledOnce();
   });
 
@@ -629,7 +601,15 @@ describe("Check a mod", function describeCheckMod(): void {
       source: SAMPLE_MOD_SOURCE,
       collection: SAMPLE_COLLECTION_REFERENCE,
     });
-    expect(report).toEqual(buildPassingReport(SAMPLE_MOD_SOURCE));
+    expect(report).toEqual({
+      source: SAMPLE_MOD_SOURCE,
+      mosaic: null,
+      status: "pass",
+      mountChecked: true,
+      testsChecked: false,
+      tests: [],
+      findings: [],
+    });
   });
 
   it("defaults the collection to null", async function defaultsCollection(): Promise<void> {

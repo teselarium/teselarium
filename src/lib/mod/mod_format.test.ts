@@ -21,7 +21,7 @@ function buildModFile(content: YamlMapping): ParsedYaml {
 /** The fields of the "Minimal mod file" scenario, plus the given ones. */
 function buildMinimalMod(fields: YamlMapping): ParsedYaml {
   const mod: YamlMapping = {
-    name: "minimal",
+    title: "Minimal",
     version: "0.1.0",
     entrypoint: "./main.js",
     ...fields,
@@ -58,14 +58,13 @@ describe("readModFormat", function describeReadModFormat(): void {
     const modFormat = readModFormat(parsedYaml);
 
     expect(modFormat).toEqual({
-      name: "book_list",
       title: "Book List",
       version: "1.0.0",
       api: "^0.1.0",
       description: "A very simple list of books with their covers.",
       entrypoint: "./main.js",
       typePath: "../../types/book.md",
-      sampleCollection: "../../tiles/books_collection.yaml",
+      defaultMosaic: "./mosaic.yaml",
       testPath: null,
       config: { show_covers: true },
       permissions: [
@@ -84,14 +83,13 @@ describe("readModFormat", function describeReadModFormat(): void {
     const modFormat = readModFormat(buildMinimalMod({}));
 
     expect(modFormat).toEqual({
-      name: "minimal",
-      title: "minimal",
+      title: "Minimal",
       version: "0.1.0",
       api: null,
       description: "",
       entrypoint: "./main.js",
       typePath: null,
-      sampleCollection: null,
+      defaultMosaic: null,
       testPath: null,
       config: {},
       permissions: [],
@@ -106,8 +104,21 @@ describe("readModFormat", function describeReadModFormat(): void {
     expect(modFormat).not.toHaveProperty("author");
   });
 
+  it("Former keys are ignored", function ignoresFormerKeys(): void {
+    const modFormat = readModFormat(
+      buildMinimalMod({
+        name: "book_list",
+        sample_collection: "./books.yaml",
+      }),
+    );
+
+    expect(modFormat).not.toHaveProperty("name");
+    expect(modFormat).not.toHaveProperty("sampleCollection");
+    expect(modFormat.defaultMosaic).toBeNull();
+  });
+
   it("No mod mapping", function rejectsMissingMod(): void {
-    const error = catchFormatError(buildModFile({ name: "minimal" }));
+    const error = catchFormatError(buildModFile({ title: "Minimal" }));
 
     expect(error.source).toBe(MOD_SOURCE);
     expect(error.message).toBe(
@@ -121,16 +132,19 @@ describe("readModFormat", function describeReadModFormat(): void {
     expect(error.message).toContain('a "mod" mapping is required');
   });
 
-  it("rejects a missing name", function rejectsMissingName(): void {
-    const error = catchFormatError(buildModWithout("name"));
+  it("Missing title", function rejectsMissingTitle(): void {
+    const parsedYaml = buildModWithout("title");
+    (parsedYaml.content.mod as YamlMapping).name = "clock";
 
-    expect(error.message).toContain('"name" must be a non-empty string');
+    const error = catchFormatError(parsedYaml);
+
+    expect(error.message).toContain('"title" must be a non-empty string');
   });
 
-  it("rejects a name that is not a string", function rejectsNameNumber(): void {
-    const error = catchFormatError(buildMinimalMod({ name: 3 }));
+  it("rejects an empty title", function rejectsEmptyTitle(): void {
+    const error = catchFormatError(buildMinimalMod({ title: "" }));
 
-    expect(error.message).toContain('"name" must be a non-empty string');
+    expect(error.message).toContain('"title" must be a non-empty string');
   });
 
   it("rejects a missing version", function rejectsMissingVersion(): void {
@@ -160,7 +174,7 @@ describe("readModFormat", function describeReadModFormat(): void {
   it("rejects a title that is not a string", function rejectsTitleList(): void {
     const error = catchFormatError(buildMinimalMod({ title: ["Book"] }));
 
-    expect(error.message).toContain('"title" must be a string');
+    expect(error.message).toContain('"title" must be a non-empty string');
   });
 
   it("rejects a description that is not a string", function rejectsDescription(): void {
@@ -175,11 +189,17 @@ describe("readModFormat", function describeReadModFormat(): void {
     expect(error.message).toContain('"type_path" must be a non-empty string');
   });
 
-  it("Empty sample collection", function rejectsEmptySampleCollection(): void {
-    const error = catchFormatError(buildMinimalMod({ sample_collection: "" }));
+  it("Empty sample collection", function ignoresEmptySampleCollection(): void {
+    const modFormat = readModFormat(buildMinimalMod({ sample_collection: "" }));
+
+    expect(modFormat.title).toBe("Minimal");
+  });
+
+  it("Empty default mosaic", function rejectsEmptyDefaultMosaic(): void {
+    const error = catchFormatError(buildMinimalMod({ default_mosaic: "" }));
 
     expect(error.message).toContain(
-      '"sample_collection" must be a non-empty string',
+      '"default_mosaic" must be a non-empty string',
     );
   });
 
@@ -315,7 +335,7 @@ describe("readModFormat", function describeReadModFormat(): void {
 /** The example of "Library declarations" in docs/modules/lib/mod/README.md. */
 const README_LIBRARIES_EXAMPLE = [
   "mod:",
-  '  name: "country_map"',
+  '  title: "country_map"',
   '  version: "0.1.0"',
   '  api: "^0.1.10"',
   '  entrypoint: "./main.js"',

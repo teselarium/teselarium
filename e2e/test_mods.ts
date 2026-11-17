@@ -21,7 +21,7 @@ import type { CheckTestResult, ModFiles } from "./mod_routes.ts";
  * - the probe: a mod that keeps its engine API object on `globalThis.probe`
  * - the typed probe: the probe with a `note` tile type and two notes
  * - the tiles mod: the files of `e2e/test_mods/tiles/`, with a tile type, a
- *   sample collection of three items, a `show` host, a config key, a storage
+ *   default mosaic with a collection of three items, a `show` host, a config key, a storage
  *   key and a test file
  */
 
@@ -87,7 +87,7 @@ export function buildTypedProbeFiles(): ModFiles {
 export function buildNoteCollection(extraPaths: string[]): string {
   const lines = [
     "collection:",
-    '  name: "Probe notes"',
+    '  title: "Probe notes"',
     "  tiles:",
     '    - path: "./first.md"',
   ];
@@ -176,7 +176,7 @@ export const TILES_TITLE = "Tiles";
 /** `1.0.0`: the tiles mod's version. */
 export const TILES_VERSION = "1.0.0";
 
-/** The titles of the three items of the tiles mod's sample collection, in its order. */
+/** The titles of the three items of the tiles mod's default mosaic, in its order. */
 export const TILES_ITEM_TITLES = ["First item", "Second item", "Third item"];
 
 /** `/test-mods/tiles`: the tiles mod's folder on the app's origin. */
@@ -191,13 +191,13 @@ export const TILES_ENTRYPOINT_PATH = `${TILES_FOLDER_PATH}/main.js`;
 /** `/test-mods/tiles/test.js`: the tiles mod's test file. */
 export const TILES_TEST_PATH = `${TILES_FOLDER_PATH}/test.js`;
 
-/** `/test-mods/tiles/item_collection.yaml`: the tiles mod's sample collection of three items. */
+/** `/test-mods/tiles/item_collection.yaml`: the collection of three items of the tiles mod's default mosaic. */
 export const TILES_COLLECTION_PATH = `${TILES_FOLDER_PATH}/item_collection.yaml`;
 
 /** `./test-mods/tiles/`: the tiles mod as a run link names it. */
 export const TILES_MOD_REFERENCE = `.${TILES_FOLDER_PATH}/`;
 
-/** `./test-mods/tiles/item_collection.yaml`: the tiles mod's sample collection as a run link names it. */
+/** `./test-mods/tiles/item_collection.yaml`: the tiles mod's collection of three items as a run link names it. */
 export const TILES_COLLECTION_REFERENCE = `.${TILES_COLLECTION_PATH}`;
 
 /** `./test-mods/mosaics/labels.yaml`: the labels mosaic as a run link names it. */
@@ -225,7 +225,7 @@ export function buildLabelledTile(label: string): string {
 export function buildLabelsCollection(extraPaths: string[] = []): string {
   const lines = [
     "collection:",
-    '  name: "Labelled tiles"',
+    '  title: "Labelled tiles"',
     "  tiles:",
     '    - path: "./first.md"',
   ];
@@ -265,16 +265,25 @@ export function buildLabelsMosaicFiles(): ModFiles {
 /** `#/run?mod=./test-mods/tiles/`: the run link of the tiles mod without tiles. */
 export const TILES_RUN_HASH = `#/run?mod=${TILES_MOD_REFERENCE}`;
 
-/** `#/run?mod=./test-mods/tiles/&collection=./test-mods/tiles/item_collection.yaml`: the tiles mod on its sample collection. */
+/** `#/run?mod=./test-mods/tiles/&collection=./test-mods/tiles/item_collection.yaml`: the tiles mod on its collection of three items. */
 export const TILES_COLLECTION_RUN_HASH = `${TILES_RUN_HASH}&collection=${TILES_COLLECTION_REFERENCE}`;
 
-/** `**\/test-mods/tiles/item_collection.yaml`: the route glob of the tiles mod's sample collection. */
+/** `**\/test-mods/tiles/item_collection.yaml`: the route glob of the tiles mod's collection of three items. */
 export const TILES_COLLECTION_GLOB = `**${TILES_COLLECTION_PATH}`;
 
 /** The tiles mod's source on the page's origin, e.g. `http://127.0.0.1:4173/test-mods/tiles/mod_conf.yaml`. */
 export function readTilesModSource(page: Page): string {
   const tilesModSource = new URL(TILES_MOD_FILE_PATH, page.url()).href;
   return tilesModSource;
+}
+
+/** `/test-mods/tiles/mosaic.yaml`: the tiles mod's default mosaic, with its three items. */
+export const TILES_MOSAIC_PATH = `${TILES_FOLDER_PATH}/mosaic.yaml`;
+
+/** The address of the tiles mod's default mosaic on the page's origin. */
+export function readTilesMosaicSource(page: Page): string {
+  const tilesMosaicSource = new URL(TILES_MOSAIC_PATH, page.url()).href;
+  return tilesMosaicSource;
 }
 
 /** The cases of the tiles mod's test file, in the order it registers them. */
@@ -305,7 +314,7 @@ export async function serveTilesMod(
 }
 
 /**
- * Serves the tiles mod and opens it at `hash`, its sample collection unless
+ * Serves the tiles mod and opens it at `hash`, its collection of three items unless
  * given, and waits for its mount.
  */
 export async function openTilesMod(

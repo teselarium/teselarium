@@ -1,6 +1,5 @@
-# A fixture mod for the viewer's tests, with no API range and no sample collection.
+# A fixture mod for the viewer's tests, with no API range and no default mosaic.
 mod:
-  name: "no_range"
   title: "No Range"
   version: "1.0.0"
   description: "A fixture mod that declares no API range."

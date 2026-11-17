@@ -1,4 +1,4 @@
-import type { ModOpenParams } from "../../mod_api.d.ts";
+import type { ModOpenParams, MosaicOpenParams } from "../../mod_api.d.ts";
 import { checkMod } from "./mod_check.ts";
 import { buildButton } from "./page_elements.ts";
 import { readTypedCollection, showError } from "./viewer_view.ts";
@@ -17,10 +17,18 @@ function openMod(view: ViewerView, collection: string | null): void {
   request.catch(showError.bind(undefined, view));
 }
 
-function runWithSampleTiles(view: ViewerView, event: MouseEvent): void {
-  // The sandbox has no `allow-forms`: the form is never submitted, the click runs the mod.
+/** Opens the viewed mod's default mosaic, which names the mod and its collection. */
+function openDefaultMosaic(
+  view: ViewerView,
+  defaultMosaic: string,
+  event: MouseEvent,
+): void {
+  // The sandbox has no `allow-forms`: the form is never submitted, the click opens the mosaic.
   event.preventDefault();
-  openMod(view, view.inspection.sampleCollection);
+  const params: MosaicOpenParams = { mosaic: defaultMosaic };
+  view.messages.replaceChildren();
+  const request = view.engine.request("mosaics.open", params);
+  request.catch(showError.bind(undefined, view));
 }
 
 function runWithoutTiles(view: ViewerView): void {
@@ -36,24 +44,32 @@ function runWithTypedCollection(view: ViewerView, event: MouseEvent): void {
   openMod(view, collection);
 }
 
-/** "Run with sample tiles": the page's one primary action, a submit button. */
-function buildSampleRunButton(view: ViewerView): HTMLButtonElement {
-  const runButton = document.createElement("button");
-  runButton.type = "submit";
-  runButton.textContent = "Run with sample tiles";
-  runButton.addEventListener("click", runWithSampleTiles.bind(undefined, view));
-  return runButton;
+/** "Open default mosaic": the page's one primary action, a submit button. */
+function buildDefaultMosaicButton(
+  view: ViewerView,
+  defaultMosaic: string,
+): HTMLButtonElement {
+  const openButton = document.createElement("button");
+  openButton.type = "submit";
+  openButton.textContent = "Open default mosaic";
+  openButton.addEventListener(
+    "click",
+    openDefaultMosaic.bind(undefined, view, defaultMosaic),
+  );
+  return openButton;
 }
 
 /**
- * The run choices, and "Check mod" next to them: running with the sample
- * tiles is the page's one primary action, a submit button.
+ * The run choices, and "Check mod" next to them: opening the default
+ * mosaic, when the mod declares one, is the page's one primary action, a
+ * submit button.
  */
 export function buildRunChoices(view: ViewerView): HTMLElement {
   const form = document.createElement("form");
   form.setAttribute("aria-label", "Run");
-  if (view.inspection.sampleCollection !== null) {
-    form.append(buildSampleRunButton(view));
+  const defaultMosaic = view.inspection.defaultMosaic;
+  if (defaultMosaic !== null) {
+    form.append(buildDefaultMosaicButton(view, defaultMosaic));
   }
   form.append(
     buildButton("Run without tiles", runWithoutTiles.bind(undefined, view)),

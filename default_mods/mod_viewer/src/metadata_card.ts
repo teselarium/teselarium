@@ -105,7 +105,6 @@ function buildMetadataList(
   const list = document.createElement("dl");
   addDefinition(list, "Title", inspection.title);
   addDefinition(list, "Description", inspection.description);
-  addDefinition(list, "Name", inspection.name);
   addDefinition(list, "Source", inspection.source);
   addDefinition(
     list,
@@ -113,11 +112,7 @@ function buildMetadataList(
     buildApiRangeDescription(inspection, apiVersion),
   );
   addDefinition(list, "Tile type", inspection.typeSource ?? "(none)");
-  addDefinition(
-    list,
-    "Sample collection",
-    inspection.sampleCollection ?? "(none)",
-  );
+  addDefinition(list, "Default mosaic", inspection.defaultMosaic ?? "(none)");
   addDefinition(list, "Config", buildConfigText(inspection.config));
   return list;
 }

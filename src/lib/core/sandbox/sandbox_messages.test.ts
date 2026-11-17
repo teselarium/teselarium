@@ -154,6 +154,19 @@ describe("readSandboxTestReport", function describeReadTestReport(): void {
     });
   });
 
+  it("reads a null answer to mosaics.open", function readsMosaicsOpenAnswer(): void {
+    const report = readSandboxTestReport("sandbox.answerQueued", {
+      method: "mosaics.open",
+      value: null,
+    });
+
+    expect(report).toEqual({
+      kind: "answerQueued",
+      method: "mosaics.open",
+      value: null,
+    });
+  });
+
   it("gives null for an answer whose value has the wrong type for its method", function rejectsAnswerType(): void {
     expect(
       readSandboxTestReport("sandbox.answerQueued", {
@@ -177,6 +190,12 @@ describe("readSandboxTestReport", function describeReadTestReport(): void {
       readSandboxTestReport("sandbox.answerQueued", {
         method: "mods.open",
         value: true,
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "mosaics.open",
+        value: false,
       }),
     ).toBeNull();
   });

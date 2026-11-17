@@ -94,7 +94,6 @@ export interface LaunchMosaic {
 export interface ModContext {
   mod: {
     source: string;
-    name: string;
     title: string;
     version: string;
     description: string;
@@ -270,7 +269,7 @@ export function selectModTiles(
  * The collection with each tile's metadata renamed by a mosaic's aliases
  * (`applyMosaicAliases`). The tiles' `source`, `body` and `types` are kept.
  */
-function aliasCollectionTiles(
+export function aliasCollectionTiles(
   collection: TileCollection,
   aliases: MosaicAliases,
 ): TileCollection {
@@ -326,11 +325,11 @@ export async function loadModTiles(
   return selectLoadedModTiles(mod, collection, aliases, options);
 }
 
-/** A collection of one tile, with the tile's source, no name and no issues. */
+/** A collection of one tile, with the tile's source, no title and no issues. */
 function buildSingleTileCollection(tile: Tile): TileCollection {
   const collection: TileCollection = {
     source: tile.source,
-    name: "",
+    title: "",
     description: "",
     tiles: [tile],
     issues: [],
@@ -528,7 +527,6 @@ function buildModContext(
   const context: LaunchContext = {
     mod: {
       source: mod.source,
-      name: mod.name,
       title: mod.title,
       version: mod.version,
       description: mod.description,

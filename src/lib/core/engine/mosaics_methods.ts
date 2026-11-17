@@ -7,6 +7,7 @@ import {
 } from "../permissions/index.ts";
 import type { ModGrants } from "../permissions/index.ts";
 import { describeEngineError, ModMethodError } from "./engine_errors.ts";
+import type { ModCheckReport } from "./mod_check_report.ts";
 import type { RunLink } from "./mod_launch.ts";
 import { LOAD_FAILED, PERMISSION_DENIED } from "./mod_messages.ts";
 import {
@@ -23,6 +24,7 @@ import type {
 
 const INSPECT_METHOD = "mosaics.inspect";
 const OPEN_METHOD = "mosaics.open";
+const CHECK_METHOD = "mosaics.check";
 
 /**
  * A mosaic file's content, without opening it. `mod` and `collection` are
@@ -148,8 +150,32 @@ async function openRequestedMosaic(
   return null;
 }
 
-/** The `mosaics.*` requests: reading and opening mosaic files. */
+/**
+ * `mosaics.check { mosaic }`: asks the stage to check the mosaic as it opens
+ * its mod, after the same checks as `mosaics.inspect`, and answers the
+ * report. The stage grants a foreign mosaic's lines only by remembered
+ * decisions, and asks nothing.
+ */
+async function checkRequestedMosaic(
+  context: ModMethodContext,
+  params: YamlMapping,
+): Promise<ModCheckReport> {
+  const reference = readRequiredText(params, "mosaic", CHECK_METHOD);
+  const source = resolveRequestedMosaic(context, reference, CHECK_METHOD);
+  checkMosaicAccess(context, source);
+  const report = context.onCheckMod({ mosaic: source });
+  if (report === null) {
+    throw new ModMethodError(
+      PERMISSION_DENIED,
+      `${CHECK_METHOD}: only the visible mod can check mosaics`,
+    );
+  }
+  return report;
+}
+
+/** The `mosaics.*` requests: reading, opening and checking mosaic files. */
 export const MOSAICS_METHODS: ModMethodTable = {
   "mosaics.inspect": inspectRequestedMosaic,
   "mosaics.open": openRequestedMosaic,
+  "mosaics.check": checkRequestedMosaic,
 };

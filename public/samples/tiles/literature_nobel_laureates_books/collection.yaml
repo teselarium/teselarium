@@ -1,5 +1,5 @@
 collection:
-  name: "Nobel Prize in Literature laureates books"
+  title: "Nobel Prize in Literature laureates books"
   description: "Notable books by Nobel Prize in Literature laureates (2010–2026), ordered by award year."
   tiles:
     - path: "./mario_vargas_llosa__the_time_of_the_hero__1963.md"

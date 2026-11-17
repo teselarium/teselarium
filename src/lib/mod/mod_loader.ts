@@ -11,7 +11,6 @@ import { resolveModReference } from "./mod_reference.ts";
 export interface ModFile {
   /** Resolved URL of the mod file: the mod's identity. */
   source: string;
-  name: string;
   title: string;
   version: string;
   /** The mod API range the mod was written for, as written, or `null`. */
@@ -21,8 +20,8 @@ export interface ModFile {
   entrypoint: string;
   /** Resolved URL of the tile type file, or `null`. */
   typeSource: string | null;
-  /** Resolved URL of the sample collection, or `null`. It is not fetched. */
-  sampleCollection: string | null;
+  /** Resolved URL of the mod's default mosaic file, or `null`. It is not fetched. */
+  defaultMosaic: string | null;
   /** Resolved URL of the test file, or `null`. It is fetched only by `loadModTestCode`. */
   testSource: string | null;
   config: YamlMapping;
@@ -69,14 +68,13 @@ function buildModFile(
 ): ModFile {
   const modFile: ModFile = {
     source,
-    name: modFormat.name,
     title: modFormat.title,
     version: modFormat.version,
     api: modFormat.api,
     description: modFormat.description,
     entrypoint: resolveLocation(modFormat.entrypoint, source).href,
     typeSource: resolveModPath(modFormat.typePath, source),
-    sampleCollection: resolveModPath(modFormat.sampleCollection, source),
+    defaultMosaic: resolveModPath(modFormat.defaultMosaic, source),
     testSource: resolveModPath(modFormat.testPath, source),
     config: modFormat.config,
     permissions: modFormat.permissions,

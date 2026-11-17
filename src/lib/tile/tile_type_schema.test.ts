@@ -42,6 +42,14 @@ describe("readTileTypeSchema", function describeReadTileTypeSchema(): void {
     const tileTypeSchema = readTileTypeSchema(parsedBookType);
 
     expect(tileTypeSchema.typeName).toBe("book");
+    expect(tileTypeSchema.fieldNames).toEqual([
+      "title",
+      "date",
+      "authors",
+      "country",
+      "genres",
+      "language",
+    ]);
     expect(tileTypeSchema.schema).toMatchObject({
       ref: "book",
       definitions: { book: { additionalProperties: true } },

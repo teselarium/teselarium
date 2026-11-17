@@ -12,6 +12,8 @@ export interface TileValidator {
   source: string;
   /** The schema's `ref`. */
   typeName: string;
+  /** The top-level fields the `ref` definition declares, required or optional. */
+  fieldNames: string[];
   /** Compiled by Ajv. Use `validateTile`, not this function. */
   validateMetadata: ValidateFunction;
 }
@@ -57,6 +59,7 @@ export async function buildTileValidator(
   const tileValidator: TileValidator = {
     source: typeFile.source,
     typeName: tileTypeSchema.typeName,
+    fieldNames: tileTypeSchema.fieldNames,
     validateMetadata: compileTileTypeSchema(
       tileTypeSchema.schema,
       typeFile.source,

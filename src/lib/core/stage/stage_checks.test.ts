@@ -35,6 +35,7 @@ import {
   PROBE_MOD_SOURCE,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
+  SAMPLE_DEFAULT_MOSAIC_SOURCE,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
   SAMPLE_TILE_SOURCES,
@@ -42,6 +43,7 @@ import {
   serveMissingTypeMod,
   serveProbeMod,
   serveTestMod,
+  serveTestMosaic,
   serveTwoBooks,
   serveTestedMod,
   serveUntypedMod,
@@ -66,6 +68,50 @@ import {
 import type { Stage } from "./stage_controller.ts";
 import { CHECK_MOUNT_LIMIT_MS, CHECK_SETTLE_MS } from "./stage_checks.ts";
 
+/** A mod with a `columns` config and the default mosaic `MOSAIC_MOD_MOSAIC_SOURCE`. */
+const MOSAIC_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/with_mosaic/mod_conf.yaml`;
+const MOSAIC_MOD_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mods/with_mosaic/mosaic.yaml`;
+/** A mosaic of `MOSAIC_MOD_SOURCE` on another origin. */
+const FOREIGN_MOSAIC_SOURCE = "https://mosaics.example.net/books/mosaic.yaml";
+/** A mosaic of the tested mod, whose tests a mosaic check does not run. */
+const TESTED_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mosaics/tested/mosaic.yaml`;
+const COVERS_HOST = "https://covers.example.net";
+
+/** The lines a mosaic of the mosaic mod gives after `mod`: the sample books, `columns: 4` and `show` for the covers. */
+const MOSAIC_LINES = [
+  'collection: "https://example.org/fixtures/tiles/books_collection.yaml"',
+  "config:",
+  "  columns: 4",
+  "permissions:",
+  "  show:",
+  `    - host: "${COVERS_HOST}"`,
+  '      reason: "Shows the covers"',
+];
+
+function serveMosaicMod(): void {
+  serveTestMod(MOSAIC_MOD_SOURCE, [
+    '  title: "with_mosaic"',
+    '  version: "0.1.0"',
+    '  entrypoint: "./main.js"',
+    '  default_mosaic: "./mosaic.yaml"',
+    "  config:",
+    "    columns: 6",
+  ]);
+  serveTestMosaic(MOSAIC_MOD_MOSAIC_SOURCE, [
+    'title: "With a mosaic"',
+    'mod: "./"',
+    ...MOSAIC_LINES,
+  ]);
+}
+
+function listGrantedHosts(context: ModContext): string[] {
+  const hosts: string[] = [];
+  for (const permission of context.permissions.granted) {
+    hosts.push(permission.host);
+  }
+  return hosts;
+}
+
 /** A fixture mod on the app's origin with `open` for `"*"`, so its `mods.open` reaches the stage. */
 const OPENING_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/opening/mod_conf.yaml`;
 
@@ -81,7 +127,7 @@ afterEach(function cleanUp(): void {
 
 function serveOpeningMod(): void {
   serveTestMod(OPENING_MOD_SOURCE, [
-    '  name: "opening"',
+    '  title: "opening"',
     '  version: "0.1.0"',
     '  entrypoint: "./main.js"',
     "  permissions:",
@@ -129,6 +175,7 @@ describe("Check a mod", function describeCheckMod(): void {
 
     expect(report).toEqual({
       source: SAMPLE_MOD_SOURCE,
+      mosaic: SAMPLE_DEFAULT_MOSAIC_SOURCE,
       status: "pass",
       mountChecked: true,
       testsChecked: false,
@@ -255,6 +302,7 @@ describe("Check a mod", function describeCheckMod(): void {
         id: 1,
         result: {
           source: SAMPLE_MOD_SOURCE,
+          mosaic: SAMPLE_DEFAULT_MOSAIC_SOURCE,
           status: "pass",
           mountChecked: true,
           testsChecked: false,
@@ -726,7 +774,7 @@ describe("Requests that need the user", function describeUserRequests(): void {
     expect(report.findings[0].message).toContain("ui.confirm");
   });
 
-  it("answers links.open and files.save false, and refuses mods.open and mods.check", async function answersUserRequests(): Promise<void> {
+  it("answers links.open and files.save false, and refuses mods.open, mods.check, mosaics.open and mosaics.check", async function answersUserRequests(): Promise<void> {
     serveOpeningMod();
     const checkStage = await startCheckStage();
     const sandboxCount = readStageSnapshot(checkStage.stage).sandboxes.length;
@@ -740,7 +788,9 @@ describe("Requests that need the user", function describeUserRequests(): void {
     sendRequest(checkFrame, 2, "files.save", { name: "a.txt", content: "x" });
     sendRequest(checkFrame, 3, "mods.open", { mod: "mod_viewer" });
     sendRequest(checkFrame, 4, "mods.check", { mod: "mod_viewer" });
-    await waitForReceived(checkFrame, 4);
+    sendRequest(checkFrame, 5, "mosaics.open", { mosaic: "./m.yaml" });
+    sendRequest(checkFrame, 6, "mosaics.check", { mosaic: "./m.yaml" });
+    await waitForReceived(checkFrame, 6);
     await finishMount(checkFrame);
     const report = await reporting;
 
@@ -757,13 +807,25 @@ describe("Requests that need the user", function describeUserRequests(): void {
         id: 4,
         error: { code: -32002, message: expect.any(String) },
       },
+      {
+        jsonrpc: "2.0",
+        id: 5,
+        error: { code: -32002, message: expect.any(String) },
+      },
+      {
+        jsonrpc: "2.0",
+        id: 6,
+        error: { code: -32002, message: expect.any(String) },
+      },
     ]);
     const messages = listFindingMessages(report);
-    expect(messages).toHaveLength(4);
+    expect(messages).toHaveLength(6);
     expect(messages[0]).toContain("links.open");
     expect(messages[1]).toContain("files.save");
     expect(messages[2]).toContain("mods.open");
     expect(messages[3]).toContain("mods.check");
+    expect(messages[4]).toContain("mosaics.open");
+    expect(messages[5]).toContain("mosaics.check");
     expect(report.status).toBe("warn");
     expect(readStageSnapshot(checkStage.stage).sandboxes).toHaveLength(
       sandboxCount,
@@ -774,12 +836,11 @@ describe("Requests that need the user", function describeUserRequests(): void {
 describe("Throwaway storage slot", function describeThrowawaySlot(): void {
   it("Real slot untouched", async function keepsRealSlot(): Promise<void> {
     const checkStage = await startCheckStage();
-    writeModValue(
-      checkStage.storage,
-      SAMPLE_MOD_SOURCE,
-      "selected",
-      "kallocain",
-    );
+    const realSlot = {
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_DEFAULT_MOSAIC_SOURCE,
+    };
+    writeModValue(checkStage.storage, realSlot, "selected", "kallocain");
     const storedItems = new Map(checkStage.storage.items);
 
     const reporting = startCheck(checkStage, {
@@ -802,9 +863,9 @@ describe("Throwaway storage slot", function describeThrowawaySlot(): void {
       result: null,
     });
     expect(checkStage.storage.items).toEqual(storedItems);
-    expect(
-      readModValue(checkStage.storage, SAMPLE_MOD_SOURCE, "selected"),
-    ).toBe("kallocain");
+    expect(readModValue(checkStage.storage, realSlot, "selected")).toBe(
+      "kallocain",
+    );
   });
 });
 
@@ -1154,6 +1215,7 @@ describe("Case results", function describeCaseResults(): void {
 
     expect(report).toEqual({
       source: TESTED_MOD_SOURCE,
+      mosaic: null,
       status: "pass",
       mountChecked: true,
       testsChecked: true,
@@ -1202,5 +1264,105 @@ describe("Each case in a fresh frame", function describeFreshFrames(): void {
       { jsonrpc: "2.0", id: 1, result: null },
     ]);
     expect(checkStage.storage.items.size).toBe(0);
+  });
+});
+
+describe("Checks with a mosaic", function describeMosaicChecks(): void {
+  it("Check with the default mosaic", async function checksWithDefaultMosaic(): Promise<void> {
+    serveMosaicMod();
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, {
+      source: MOSAIC_MOD_SOURCE,
+      collection: null,
+    });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(report).toMatchObject({
+      source: MOSAIC_MOD_SOURCE,
+      mosaic: MOSAIC_MOD_MOSAIC_SOURCE,
+      status: "pass",
+      mountChecked: true,
+    });
+    expect(listTileSources(checkFrame.context)).toEqual(SAMPLE_TILE_SOURCES);
+    expect(checkFrame.context.config).toEqual({ columns: 4 });
+    expect(checkFrame.context.mosaic?.source).toBe(MOSAIC_MOD_MOSAIC_SOURCE);
+    expect(listGrantedHosts(checkFrame.context)).toEqual([COVERS_HOST]);
+  });
+
+  it("Foreign mosaic without decisions", async function deniesForeignMosaicLines(): Promise<void> {
+    serveMosaicMod();
+    serveTestMosaic(FOREIGN_MOSAIC_SOURCE, [
+      'title: "Books elsewhere"',
+      `mod: "${MOSAIC_MOD_SOURCE}"`,
+      ...MOSAIC_LINES,
+    ]);
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, { mosaic: FOREIGN_MOSAIC_SOURCE });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(report.mosaic).toBe(FOREIGN_MOSAIC_SOURCE);
+    expect(report.source).toBe(MOSAIC_MOD_SOURCE);
+    expect(readStageSnapshot(checkStage.stage).sandboxes).toHaveLength(1);
+    expect(listGrantedHosts(checkFrame.context)).toEqual([]);
+    expect(checkFrame.context.permissions.denied).toHaveLength(1);
+    expect(checkFrame.context.permissions.denied[0].host).toBe(COVERS_HOST);
+  });
+
+  it("grants a foreign mosaic's line the user allowed for it", async function grantsRememberedMosaicLine(): Promise<void> {
+    serveMosaicMod();
+    serveTestMosaic(FOREIGN_MOSAIC_SOURCE, [
+      'title: "Books elsewhere"',
+      `mod: "${MOSAIC_MOD_SOURCE}"`,
+      ...MOSAIC_LINES,
+    ]);
+    const checkStage = await startCheckStage(
+      createMemorySiteDecisions([
+        {
+          mosaic: FOREIGN_MOSAIC_SOURCE,
+          title: "Books elsewhere",
+          category: "show",
+          host: COVERS_HOST,
+          allowed: true,
+        },
+      ]),
+    );
+
+    const reporting = startCheck(checkStage, { mosaic: FOREIGN_MOSAIC_SOURCE });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    await reporting;
+
+    expect(listGrantedHosts(checkFrame.context)).toEqual([COVERS_HOST]);
+  });
+
+  it("runs no tests for a mosaic check", async function skipsTestsForMosaic(): Promise<void> {
+    serveTestedMod();
+    serveTestMosaic(TESTED_MOSAIC_SOURCE, [
+      'title: "Tested"',
+      `mod: "${TESTED_MOD_SOURCE}"`,
+    ]);
+    const checkStage = await startCheckStage();
+
+    const reporting = startCheck(checkStage, { mosaic: TESTED_MOSAIC_SOURCE });
+    const checkFrame = await attachCheckingFrame(checkStage);
+    await finishMount(checkFrame);
+    const report = await reporting;
+
+    expect(report).toMatchObject({
+      source: TESTED_MOD_SOURCE,
+      mosaic: TESTED_MOSAIC_SOURCE,
+      mountChecked: true,
+      testsChecked: false,
+      tests: [],
+    });
+    expect(listRequestedUrls(checkStage.fetchSpy)).not.toContain(
+      TESTED_MOD_TEST_SOURCE,
+    );
   });
 });

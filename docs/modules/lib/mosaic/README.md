@@ -56,6 +56,14 @@ A mosaic is named by a reference, which follows the rule of mod and collection r
 - A folder's query and fragment are dropped.
 - Mosaics have no default names.
 
+The `mod` and `collection` a mosaic file holds are references too, resolved against the mosaic file. A mosaic next to its mod file names it with `mod: "./"`: the mosaic file's own folder, which means the `mod_conf.yaml` in it (see [Mod references](../mod/README.md#mod-references)). This is how a mod's default mosaic, the `mosaic.yaml` its mod file names with `default_mosaic`, opens the mod it belongs to:
+
+| Mosaic file | `mod` | Mod file |
+|---|---|---|
+| `https://example.org/samples/mods/book_list/mosaic.yaml` | `"./"` | `https://example.org/samples/mods/book_list/mod_conf.yaml` |
+| `https://example.org/samples/mosaics/nobel_map/mosaic.yaml` | `"../../mods/country_map"` | `https://example.org/samples/mods/country_map/mod_conf.yaml` |
+| `https://example.org/samples/mosaics/viewer/mosaic.yaml` | `"mod_viewer"` | the `mod_viewer` folder of the default mods folder |
+
 ### Config merge
 
 When a mosaic opens, the mod's `context.config` is the mod's config merged with the mosaic's:

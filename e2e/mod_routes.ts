@@ -44,7 +44,7 @@ const PIXEL_PNG = Buffer.from(
 export const PROBE_MOD_CODE = `export default function mount(engine, context) {
   globalThis.probe = { engine, context };
   const heading = document.createElement("h1");
-  heading.textContent = "Probe " + context.mod.name;
+  heading.textContent = "Probe " + context.mod.title;
   document.body.append(heading);
 }
 `;
@@ -197,7 +197,7 @@ async function answerLinkedTiles(
     url === LINKED_COLLECTION_URL
       ? [
           "collection:",
-          '  name: "Linked tiles"',
+          '  title: "Linked tiles"',
           "  tiles:",
           `    - url: "${LINKED_TILE_URL}"`,
         ].join("\n")
@@ -233,15 +233,26 @@ export async function serveLinkedTiles(
  */
 export const TEST_MOD_API_RANGE = "^0.1.0";
 
-/** `0.1.13`: the app's mod API version, as mods read it in `context.api.version`. */
-export const APP_MOD_API_VERSION = "0.1.13";
+/** `0.1.14`: the app's mod API version, as mods read it in `context.api.version`. */
+export const APP_MOD_API_VERSION = "0.1.14";
 
 /** `^0.2.0`: an `api` range for a later mod API, which the app's version does not match. */
 export const OTHER_API_RANGE = "^0.2.0";
 
+/** Whether the extra lines of a mod file give their own `title`. */
+function hasTitleLine(extraLines: string[]): boolean {
+  for (const line of extraLines) {
+    if (line.startsWith("  title:")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
- * The text of a `mod_conf.yaml` with the given name and extra lines under
- * `mod`. Its first line under `mod` declares `apiRange`, unless it is `null`.
+ * The text of a `mod_conf.yaml` with the given extra lines under `mod`, and
+ * `name` as its `title` unless the extra lines give one. Its first line
+ * under `mod` declares `apiRange`, unless it is `null`.
  */
 export function buildModConf(
   name: string,
@@ -252,12 +263,10 @@ export function buildModConf(
   if (apiRange !== null) {
     lines.push(`  api: "${apiRange}"`);
   }
-  lines.push(
-    `  name: "${name}"`,
-    '  version: "0.1.0"',
-    '  entrypoint: "./main.js"',
-    ...extraLines,
-  );
+  if (!hasTitleLine(extraLines)) {
+    lines.push(`  title: "${name}"`);
+  }
+  lines.push('  version: "0.1.0"', '  entrypoint: "./main.js"', ...extraLines);
   const modConf = lines.join("\n");
   return modConf;
 }
@@ -1029,6 +1038,93 @@ export function buildUndeclaredImageFiles(): ModFiles {
   ]);
 }
 
+/** The routed host the default mosaic of `buildMosaicBooksFiles` declares `show` for. */
+export const MOSAIC_COVERS_HOST = "https://covers.example.net";
+
+/** `mosaic_books`: the folder of `buildMosaicBooksFiles`. */
+export const MOSAIC_BOOKS_NAME = "mosaic_books";
+
+/** The lines of a mosaic of `mosaic_books`, after its `mod`: its three books, `columns: 4` and `show` for the covers host. */
+function buildMosaicBooksLines(collection: string): string[] {
+  const lines = [
+    `  collection: "${collection}"`,
+    "  config:",
+    "    columns: 4",
+    "  permissions:",
+    "    show:",
+    `      - host: "${MOSAIC_COVERS_HOST}"`,
+    '        reason: "Shows the covers"',
+  ];
+  return lines;
+}
+
+/** A mosaic file of `mosaic_books` titled `title`, whose `mod` and `collection` are as given. */
+export function buildMosaicBooksMosaic(
+  title: string,
+  mod: string,
+  collection: string,
+): string {
+  const mosaic = [
+    "mosaic:",
+    `  title: "${title}"`,
+    `  mod: "${mod}"`,
+    ...buildMosaicBooksLines(collection),
+    "",
+  ].join("\n");
+  return mosaic;
+}
+
+/** A note tile titled `title`, which an untyped mod receives as it is. */
+function buildBookNote(title: string): string {
+  const note = ["---", `title: "${title}"`, "---", "", "A book.", ""].join(
+    "\n",
+  );
+  return note;
+}
+
+/**
+ * A mod without a tile type whose config sets `columns: 6`, and whose default
+ * mosaic gives it three books, `columns: 4` and `show` for
+ * `MOSAIC_COVERS_HOST`. Its `mount` reports `columns`, the number of `tiles`
+ * and whether a `cover` from the covers host loaded.
+ */
+export function buildMosaicBooksFiles(): ModFiles {
+  const files = buildCheckedModFiles(
+    MOSAIC_BOOKS_NAME,
+    [
+      '  reportToTest(context, "columns", context.config.columns);',
+      '  reportToTest(context, "tiles", context.tiles.length);',
+      '  const image = document.createElement("img");',
+      `  image.src = "${MOSAIC_COVERS_HOST}/cover.png";`,
+      "  document.body.append(image);",
+      "  const loaded = await image.decode().then(",
+      "    function reportLoaded() { return true; },",
+      "    function reportBlocked() { return false; },",
+      "  );",
+      '  reportToTest(context, "cover", loaded);',
+    ],
+    ['  default_mosaic: "./mosaic.yaml"', "  config:", "    columns: 6"],
+  );
+  files[`${MOSAIC_BOOKS_NAME}/mosaic.yaml`] = buildMosaicBooksMosaic(
+    "Books in a mosaic",
+    "./",
+    "./books.yaml",
+  );
+  files[`${MOSAIC_BOOKS_NAME}/books.yaml`] = [
+    "collection:",
+    '  title: "Three books"',
+    "  tiles:",
+    '    - path: "./books/first.md"',
+    '    - path: "./books/second.md"',
+    '    - path: "./books/third.md"',
+    "",
+  ].join("\n");
+  files[`${MOSAIC_BOOKS_NAME}/books/first.md`] = buildBookNote("First book");
+  files[`${MOSAIC_BOOKS_NAME}/books/second.md`] = buildBookNote("Second book");
+  files[`${MOSAIC_BOOKS_NAME}/books/third.md`] = buildBookNote("Third book");
+  return files;
+}
+
 /** A mod whose `mount` awaits an animation frame, as a mod that measures its layout does. */
 export function buildAnimationFrameFiles(): ModFiles {
   return buildCheckedModFiles("animation_frame", [
@@ -1073,7 +1169,8 @@ export function buildPassedResults(names: string[]): CheckTestResult[] {
 }
 
 export interface CheckReport {
-  source: string;
+  source: string | null;
+  mosaic: string | null;
   status: string;
   mountChecked: boolean;
   testsChecked: boolean;
@@ -1099,22 +1196,39 @@ export async function openChecker(
   return seenUrls;
 }
 
-/** Sends `mods.check` from the checker and returns the report. */
-export async function checkFromChecker(
+/** Sends a check request, `mods.check` or `mosaics.check`, from the checker and returns the report. */
+async function requestCheckFromChecker(
   page: Page,
-  mod: string,
+  method: string,
+  params: Record<string, string>,
 ): Promise<CheckReport> {
   const checkerFrame = await findModFrame(page, CHECKER_TITLE);
   const answer: ProbeAnswer = await checkerFrame.evaluate(requestFromProbe, [
-    "mods.check",
-    { mod },
+    method,
+    params,
   ]);
   if (answer.result === undefined) {
     throw new Error(
-      `Expected a report for "${mod}", got error ${answer.code}: ${answer.message}`,
+      `Expected a report for ${method} ${JSON.stringify(params)}, got error ${answer.code}: ${answer.message}`,
     );
   }
   return answer.result as CheckReport;
+}
+
+/** Sends `mods.check` from the checker and returns the report. */
+export function checkFromChecker(
+  page: Page,
+  mod: string,
+): Promise<CheckReport> {
+  return requestCheckFromChecker(page, "mods.check", { mod });
+}
+
+/** Sends `mosaics.check` from the checker and returns the report. */
+export function checkMosaicFromChecker(
+  page: Page,
+  mosaic: string,
+): Promise<CheckReport> {
+  return requestCheckFromChecker(page, "mosaics.check", { mosaic });
 }
 
 /** The time limit of a check's mount and of each test case (`CHECK_MOUNT_LIMIT_MS`, `CHECK_CASE_LIMIT_MS`). */

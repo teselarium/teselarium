@@ -6,6 +6,8 @@ import { TileTypeError } from "./tile_errors.ts";
 export interface TileTypeSchema {
   /** The schema's `ref`. */
   typeName: string;
+  /** The top-level fields of the `ref` definition: its `properties`, then its `optionalProperties`. */
+  fieldNames: string[];
   /** With `additionalProperties: true` added wherever it is omitted. */
   schema: YamlMapping;
 }
@@ -54,6 +56,29 @@ function readTypeName(schema: YamlMapping, source: string): string {
   return ref;
 }
 
+function listSchemaMapNames(schemaMap: YamlValue | undefined): string[] {
+  if (!isYamlMapping(schemaMap)) {
+    const noNames: string[] = [];
+    return noNames;
+  }
+  return Object.keys(schemaMap);
+}
+
+/** The names of the `properties` and `optionalProperties` of the definition `typeName`, which `readTypeName` found. */
+function readTypeFieldNames(schema: YamlMapping, typeName: string): string[] {
+  const definitions = schema.definitions as YamlMapping;
+  const definition = definitions[typeName];
+  if (!isYamlMapping(definition)) {
+    const noNames: string[] = [];
+    return noNames;
+  }
+  const fieldNames = [
+    ...listSchemaMapNames(definition.properties),
+    ...listSchemaMapNames(definition.optionalProperties),
+  ];
+  return fieldNames;
+}
+
 /**
  * Reads the schema of a parsed tile type file and applies structural typing.
  * Raises `TileTypeError` when `schema` is missing or not a mapping, or when
@@ -67,6 +92,7 @@ export function readTileTypeSchema(
   const typeName = readTypeName(schema, parsedMarkdown.source);
   const tileTypeSchema: TileTypeSchema = {
     typeName,
+    fieldNames: readTypeFieldNames(schema, typeName),
     schema: applyStructuralTyping(schema),
   };
   return tileTypeSchema;

@@ -6,7 +6,7 @@ import { readFixtureText } from "../../test/sample_files.ts";
 
 interface CollectionFile {
   collection: {
-    name: string;
+    title: string;
     tiles: { path: string }[];
   };
 }
@@ -24,7 +24,7 @@ describe("tile module dependencies", function describeDependencies(): void {
       readFixtureText("tiles/books_collection.yaml"),
     ) as CollectionFile;
 
-    expect(collectionFile.collection.name).toBe("Science fiction books");
+    expect(collectionFile.collection.title).toBe("Science fiction books");
     expect(collectionFile.collection.tiles).toHaveLength(3);
   });
 

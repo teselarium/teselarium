@@ -57,14 +57,15 @@ Method names are looked up as own properties of the engine's handler tables, so 
 
 | Method | Params | Result |
 |---|---|---|
-| `storage.get` | `{ key }`, a non-empty string | The value stored under `key` in the mod's slot, or `null`. |
+| `storage.get` | `{ key }`, a non-empty string | The value stored under `key` in the mod's slot for what it was opened with (see [Storage slots](#storage-slots)), or `null`. Slots per mosaic or collection since mod API `0.1.14`. |
 | `storage.set` | `{ key, value }`, with `value` plain data (strings, finite numbers, booleans, null, lists and mappings) | `null`. Storing `null` removes the key. |
 | `mods.inspect` | `{ mod }`, a mod reference | The mod's metadata, without running it (see below). |
 | `mods.open` | `{ mod, collection?, tile?, params?, replace? }`, where `params` cannot hold `mod`, `collection`, `tile` or `mosaic` | `null`, once the stage opened the mod in a new sandbox. With `replace: true`, the requester is replaced and gets no answer (see [Inspecting and opening mods](#inspecting-and-opening-mods)). `tile` and `replace` added in mod API `0.1.12`. |
-| `mods.check` | `{ mod, collection? }` | The check report of the mod, once the check is done (see below). Added in mod API `0.1.1`. |
+| `mods.check` | `{ mod, collection? }` | The check report of the mod, once the check is done (see below). Without `collection`, the mod is checked with its default mosaic. Added in mod API `0.1.1`; default mosaics since `0.1.14`. |
 | `collections.inspect` | `{ collection }`, a collection reference: the collection file, or a folder holding `collection.yaml` | The collection's index, without loading any tile (see [Inspecting collections](#inspecting-collections)). Added in mod API `0.1.11`; folders since `0.1.13`. |
 | `mosaics.inspect` | `{ mosaic }`, a mosaic reference | The mosaic file's content, without opening it (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
 | `mosaics.open` | `{ mosaic, params?, replace? }` | `null`, once the stage opened the mosaic in a new sandbox. With `replace: true`, the requester is replaced and gets no answer (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
+| `mosaics.check` | `{ mosaic }`, a mosaic reference | The check report of the mosaic's mod, checked as the mosaic opens it, without the mod's tests (see [Checking a mosaic](#checking-a-mosaic)). Added in mod API `0.1.14`. |
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
@@ -97,9 +98,9 @@ The second argument of `mount(engine, context)`. Plain data:
 
 | Field | Content |
 |---|---|
-| `mod` | `source`, `name`, `title`, `version`, `description`. |
+| `mod` | `source`, `title`, `version`, `description`. `name` was removed in mod API `0.1.14`. |
 | `mosaic` | `source`, `title`, `description` of the mosaic the mod was opened from (see the [mosaic module](../../mosaic/README.md)), or `null` for a mod opened from a mod link. It never holds the mosaic's `config`, `aliases` or `permissions`: the mod receives their effect in `config`, `tiles` and `permissions`. Added in mod API `0.1.13`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.13"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.14"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. For a mod opened from a mosaic, the mod's config merged with the mosaic's: mappings are merged key by key, and any other mosaic value, `null` included, replaces the mod's (see [Config merge](../../mosaic/README.md#config-merge)). `mods.inspect` still gives the mod's own config. |
 | `params` | The link's parameters other than `mod`, `collection`, `tile` and `mosaic`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection, or its one tile, that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -167,16 +168,17 @@ Before any file is requested, the engine checks:
 
 Then:
 
-- `mods.inspect` loads the mod file, without its entrypoint, and answers `source`, `name`, `title`, `version`, `description`, `api` (the mod's `api` range as written, or `null` when it declares none), `apiCompatible` (`true` when the range matches the mod API version, `false` when it does not, `null` without a range), `typeSource`, `sampleCollection`, `testSource` (the resolved address of the mod's test file, or `null` when it declares none; the test file is not requested), `config`, `libraries` (the mod's declared libraries, each `{ name, package, version, files }` with every file's `path`, `source` and `kind`; no library file is requested; added in mod API `0.1.10`) and `permissions` (the `granted` and `denied` lists that mod would get if it were opened without being asked: for a mod from another origin, what the user allowed and remembered). Inspecting a mod for another API asks the user nothing. A load failure is `-32001` with the load error's message.
+- `mods.inspect` loads the mod file, without its entrypoint, and answers `source`, `title`, `version`, `description`, `api` (the mod's `api` range as written, or `null` when it declares none), `apiCompatible` (`true` when the range matches the mod API version, `false` when it does not, `null` without a range), `typeSource`, `defaultMosaic` (the resolved address of the mod's default mosaic file, or `null`; it is not requested; added in mod API `0.1.14`), `testSource` (the resolved address of the mod's test file, or `null` when it declares none; the test file is not requested), `config`, `libraries` (the mod's declared libraries, each `{ name, package, version, files }` with every file's `path`, `source` and `kind`; no library file is requested; added in mod API `0.1.10`) and `permissions` (the `granted` and `denied` lists that mod would get if it were opened without being asked: for a mod from another origin, what the user allowed and remembered). Inspecting a mod for another API asks the user nothing. A load failure is `-32001` with the load error's message.
 - `mods.open` asks the stage to open the link in a new sandbox, with the requesting sandbox as its opener, and answers `null`. Only the visible mod can open mods: a hidden one gets `-32002` with `mods.open: only the visible mod can open mods`. The new mod's load failures belong to its own sandbox, not to the response, so a missing `tile` is an error of the new sandbox that names the tile's address.
 - `mods.open` with `replace: true` opens the link in place of the requesting sandbox instead: the new sandbox takes the requester's history entry, opener and section, and the stage closes the requester (see the [stage module](../stage/README.md#replacing-a-sandbox)). The requester's session is stopped before the handler returns, so it gets no answer. The Home mod shown at `#/` cannot be replaced: it gets `-32002` with `mods.open: the home mod cannot be replaced`, and nothing opens. The handler gets the stage's answer from `onOpenLink(link, { replace })`, an `OpenLinkOutcome` (`"opened"`, `"not-visible"` or `"home-mod"`), and maps each refusal to its message.
-- `mods.check` asks the stage to check the mod without running it for the user, and answers the report once the check is done. `collection`, resolved against the app's address, gives the tiles to mount; without it, the mod's sample collection does, and a mod without one is mounted with no tiles. Only the visible mod can check mods: a hidden one gets `-32002` with `mods.check: only the visible mod can check mods`. A mod file that cannot be loaded is a report with status `"fail"`, not an error response. Checking a mod for another API asks the user nothing.
+- `mods.check` asks the stage to check the mod without running it for the user, and answers the report once the check is done. `collection`, resolved against the app's address, gives the tiles to mount, with the mod's own config and permissions. Without it, the mod is checked as its default mosaic (`default_mosaic`) opens it: with the mosaic's collection, merged config, aliases and `show` lines. A default mosaic that names another mod is a `bundle` error, and a mod without a default mosaic is mounted with no tiles. Only the visible mod can check mods: a hidden one gets `-32002` with `mods.check: only the visible mod can check mods`. A mod file that cannot be loaded is a report with status `"fail"`, not an error response. Checking a mod for another API asks the user nothing.
 
-The check has three steps. The bundle check loads the mod file, the entrypoint, the files of the declared libraries, the tile type and the collection, and validates the tiles (see [Mod check](#mod-check)). When it found no error, the mount check mounts the mod in a hidden frame, with the content policy and permissions it would get if it were opened, the tiles of its type and a throwaway storage slot, and records what happens until 1 second after `mount` finished (see the [stage module](../stage/README.md#mod-checks)). When the mod declares `test_path` and the mount check found no error either, the test step fetches the test file and runs each of its cases in a fresh hidden frame of its own (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). The report is plain data:
+The check has three steps. The bundle check loads the mosaic file when the check uses one, the mod file, the entrypoint, the files of the declared libraries, the tile type and the collection, and validates the tiles, after the mosaic's aliases (see [Mod check](#mod-check)). When it found no error, the mount check mounts the mod in a hidden frame, with the content policy, config and permissions it would get if it were opened, the mosaic's included, the tiles of its type and a throwaway storage slot, and records what happens until 1 second after `mount` finished (see the [stage module](../stage/README.md#mod-checks)). When the mod declares `test_path` and the mount check found no error either, the test step fetches the test file and runs each of its cases in a fresh hidden frame of its own (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). The report is plain data:
 
 ```json
 {
   "source": "https://example.org/samples/mods/book_list/mod_conf.yaml",
+  "mosaic": "https://example.org/samples/mods/book_list/mosaic.yaml",
   "status": "warn",
   "mountChecked": true,
   "testsChecked": true,
@@ -195,7 +197,7 @@ The check has three steps. The bundle check loads the mod file, the entrypoint, 
 }
 ```
 
-`status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none. `mountChecked` is `false` when a bundle error skipped the mount. `testsChecked` is `true` when the mod's cases ran, and `false` for a mod without `test_path`, when a bundle or mount error skipped the tests, or when the test file could not be loaded. `tests` lists each case the test file registers, in order, as `{ name, status, message }`, with `status` `"pass"` or `"fail"` and `message` `null` for a passing case and the failure's message otherwise; it is empty when the cases did not run. Findings are in the order they were found, and `step` is `"bundle"`, `"mount"` or `"test"`. A `test` finding comes from the tests: a test file that cannot be loaded or registers no valid case, a failed case (`The test "<name>" failed: <message>`, whose source is the test file), or what a case's mod did that the mount check would record, with the message prefixed by `In the test "<name>": `.
+`source` is the checked mod file's address, and `null` only when a mosaic check failed before its mod was known. `mosaic` is the address of the mosaic file the check used, loaded or not, and `null` when it used none: a check with `collection`, or of a mod without a default mosaic. `status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none. `mountChecked` is `false` when a bundle error skipped the mount. `testsChecked` is `true` when the mod's cases ran, and `false` for a mod without `test_path`, when a bundle or mount error skipped the tests, or when the test file could not be loaded. `tests` lists each case the test file registers, in order, as `{ name, status, message }`, with `status` `"pass"` or `"fail"` and `message` `null` for a passing case and the failure's message otherwise; it is empty when the cases did not run. Findings are in the order they were found, and `step` is `"bundle"`, `"mount"` or `"test"`. A `test` finding comes from the tests: a test file that cannot be loaded or registers no valid case, a failed case (`The test "<name>" failed: <message>`, whose source is the test file), or what a case's mod did that the mount check would record, with the message prefixed by `In the test "<name>": `.
 
 Mods never build app addresses: they send what to run, and only the stage turns it into a run link and a history entry (see the [stage module](../stage/README.md)).
 
@@ -213,7 +215,7 @@ Collections are not default mods, so there is no switched-off check. Hidden mods
 Then the engine reads the index (see the [tile module](../../tile/README.md#collection-index)) and answers it as plain data:
 
 - `source`: the resolved address of the collection file;
-- `name` and `description` (`""` when the file has none);
+- `title` and `description` (`""` when the file has none). Before mod API `0.1.14`, `title` was `name`;
 - `tiles`: the resolved address of each tile entry that loading the collection would request, in entry order, with a repeated tile listed once;
 - `issues`: the entry issues, each `{ level, source, message }` with level `"warning"` or `"error"`: malformed entries, relative `url`s, local files in a remote collection, and repeated tiles. A tile that would fail to load is listed with no issue, since it is never requested.
 
@@ -224,7 +226,7 @@ const inspection = await engine.request("collections.inspect", {
   collection: "./samples/tiles/literature_nobel_laureates/collection.yaml",
 });
 // inspection.source === "https://example.org/samples/tiles/literature_nobel_laureates/collection.yaml"
-// inspection.name === "Nobel Prize in Literature laureates"
+// inspection.title === "Nobel Prize in Literature laureates"
 // inspection.tiles[0] === "https://example.org/samples/tiles/literature_nobel_laureates/2010__mario_vargas_llosa.md"
 // inspection.issues is []
 ```
@@ -265,6 +267,30 @@ await engine.request("mosaics.open", { mosaic: inspection.source });
 ```
 
 A mod opened from a mosaic reads it in `context.mosaic` (`source`, `title`, `description`), and `null` otherwise (see [Mount context](#mount-context)).
+
+#### Checking a mosaic
+
+`mosaics.check { mosaic }` checks a mosaic's mod as the mosaic opens it, and answers the report once the check is done. Its params and its `open` rule are those of `mosaics.inspect`: `mosaic` must be a non-empty string (`-32602`), and the requester needs a granted `open` permission for `"*"` or the mosaic file's origin (`-32002`, with the same `Opening mosaics from <origin> …` messages), checked before any request. Only the visible mod can check mosaics: a hidden one gets `-32002` with `mosaics.check: only the visible mod can check mosaics`.
+
+The check runs the bundle check and the mount check of [`mods.check`](#inspecting-and-opening-mods), and not the mod's tests, which belong to the mod and use its own fixtures:
+
+- The bundle check loads the mosaic file first. A mosaic file that cannot be loaded is a `bundle` error whose source is the file, in a report whose `source` is `null`. The mosaic's `mod` is resolved as when the mosaic opens, so a default mod name means its folder, and a switched-off default mod is a `bundle` error, with none of its files requested. Then the mod's files are checked with the mosaic's collection, whose tiles are renamed by the mosaic's aliases before they are validated.
+- The mount check mounts the mod with the merged config, the aliased tiles and the mosaic's `show` lines. A mosaic from another origin gets only the lines the user allowed and remembered for that mosaic file, and nothing is asked. A request the mosaic declared but was not granted is a `mount` warning that says so.
+- The report has `testsChecked` `false`, and the mosaic file's address as `mosaic`.
+
+Two `bundle` warnings, whose source is the mosaic file, are specific to checks with a mosaic, by `mosaics.check` or by `mods.check` with a default mosaic:
+
+- an alias for a field the tile type's `ref` definition does not declare, among its `properties` and `optionalProperties`, such as `The mosaic gives aliases for "contry", a field the tile type "book" does not declare.` A mod without a tile type accepts every field, so it gets none;
+- a key of the mosaic's config, at any depth of nested mappings, that the mod's config does not have at the same path, such as `The mosaic sets "config.map.zom", a key the mod's config does not have.` A list or a scalar the mosaic sets in place of a mapping replaces it, and is not reported.
+
+```js
+const report = await engine.request("mosaics.check", {
+  mosaic: "./samples/mosaics/nobel_map",
+});
+// report.mosaic === "https://example.org/samples/mosaics/nobel_map/mosaic.yaml"
+// report.source === "https://example.org/samples/mods/country_map/mod_conf.yaml"
+// report.testsChecked === false
+```
 
 ### Asking the user: links, files and confirmations
 
@@ -542,7 +568,8 @@ A mod never builds an app address. It sends what to run, and the stage turns it 
 | Request | Run link it becomes |
 |---|---|
 | `engine.request("mods.open", { mod: "mod_viewer", params: { target: inspection.source } })` | `#/run?mod=mod_viewer&target=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml` |
-| `engine.request("mods.open", { mod: inspection.source, collection: inspection.sampleCollection })` | `#/run?mod=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml&collection=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fbook_collection.yaml` |
+| `engine.request("mosaics.open", { mosaic: inspection.defaultMosaic })` | `#/run?mosaic=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmosaic.yaml` |
+| `engine.request("mods.open", { mod: inspection.source, collection: "./samples/mods/book_list/book_collection.yaml" })` | `#/run?mod=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fmod_conf.yaml&collection=.%2Fsamples%2Fmods%2Fbook_list%2Fbook_collection.yaml` |
 | `engine.request("mods.open", { mod: "./samples/mods/book_list" })` | `#/run?mod=.%2Fsamples%2Fmods%2Fbook_list` |
 | `engine.request("mods.open", { mod: "tile_viewer", tile: "https://example.org/samples/mods/book_list/books/kallocain.md" })` | `#/run?mod=tile_viewer&tile=https%3A%2F%2Fexample.org%2Fsamples%2Fmods%2Fbook_list%2Fbooks%2Fkallocain.md` |
 
@@ -560,7 +587,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.13` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.14` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -580,6 +607,13 @@ Version notes:
 
 - `0.1.12` added `tile` and `replace` to `mods.open`, the `tile` run link field and the mount context filled from a tile. It also made `tile` a reserved link name, like `mod` and `collection`: a link parameter named `tile` is no longer passed in `params`, and `mods.open` refuses `params` named `mod`, `collection` or `tile` with `-32602`. That could break a mod that read a `tile` parameter or passed one of those names in `params`, which would call for a minor bump. No shipped, test or known mod does, and a minor bump would make every `^0.1.x` mod ask the user before it starts, so it was taken as a patch. The surface guard's `0.1.12` entry repeats `0.1.11`'s, since it records names and no name was added.
 - `0.1.13` added mosaics: the methods `mosaics.inspect` and `mosaics.open`, the mount context key `mosaic` (`source`, `title`, `description`, or `null`), the run link field `mosaic`, and the collection folder, a collection reference without `.yaml` or `.yml` that means the `collection.yaml` in it. A mod not opened from a mosaic gets the same context, config, tiles and grants as before. It also made `mosaic` a reserved link name: a link parameter named `mosaic` is no longer passed in `params`, and `mods.open` refuses `params.mosaic` with `-32602`. As with `tile` in `0.1.12`, no shipped, test or known mod reads or passes a `mosaic` parameter, and no shipped, sample, fixture or known collection is named without `.yaml` or `.yml`, so it was taken as a patch.
+- `0.1.14` reworked the mod and collection file formats around mosaics. What breaks:
+  - mod files need `title`, and `name` is ignored, so a mod file with only `name` fails with `"title" must be a non-empty string`; `context.mod.name` and `mods.inspect`'s `name` are gone;
+  - `sample_collection` is ignored, and `mods.inspect`'s `sampleCollection` is gone;
+  - collection files need `title` in place of `name`, and loaded collections, collection indexes and `collections.inspect` answer `title`;
+  - a storage slot is kept per mod and context (the mosaic, otherwise the collection or the tile), so values stored before are no longer read.
+
+  What was added: the mod file key `default_mosaic`, `mods.inspect`'s `defaultMosaic`, `mods.check` without a collection checking the mod with its default mosaic, the method `mosaics.check`, the check report's `mosaic`, and `answer("mosaics.open", null)` in the test API. Each break above would call for a minor bump. It was taken as a patch, as `0.1.12` was, because no mod or collection exists outside this repository, and every mod and collection in it moved to the new formats in the same change, so no `^0.1.x` range had a reader to protect. This holds only while the project is not shared: once mods or collections exist outside the repository, the minor rule above applies. The sample mods declare `^0.1.14`, the first version with `default_mosaic`; the default mods keep `^0.1.0`.
 
 An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `openspec/config.yaml` asks.
 
@@ -595,24 +629,36 @@ Implemented in `src/lib/core/engine/`. Other modules import only from the public
 
 Implemented in `src/lib/core/storage/` and exported from `src/lib/core/storage/index.ts`.
 
-Each mod has its own storage slot, identified by the mod's source, so two mods with the same `name` from different sources never read each other's values. A slot keeps its values when the app is reloaded.
+Each mod has one storage slot per context, a `ModSlot` (`{ mod, context }`): the mod's source, and the context the engine derives from the link that opened the mod. Mods never choose it. The context is:
 
-- `readModValue(storage, modSource, key)`: the value stored under `key` in the mod's slot, or `null`.
-- `writeModValue(storage, modSource, key, value)`: stores the value as JSON. Storing `null` removes the key. Storage errors propagate.
-- Types: `ModStorage`, the `getItem`, `setItem` and `removeItem` part of `Storage`. The app passes `localStorage`, and tests pass a `createMemoryStorage()` (see the [storage module](../storage/README.md)).
+- the mosaic file's address, when the mod was opened from a mosaic;
+- otherwise the collection's source, when the link names a collection;
+- otherwise the tile's source, when the link names a tile;
+- otherwise `""`, for a mod opened without tiles.
 
-The storage key is `"opentesela.mod-storage:" + JSON.stringify([modSource, key])`, so keys made of `:` parts never collide.
+So two mods from different sources never read each other's values, and a mod keeps one set of values per mosaic and per collection: `flashcards` remembers study fields per deck, and two mosaics of the same mod and collection, or a mosaic and a run link with its mod and collection, have their own values. A slot keeps its values when the app is reloaded, and "Reload tiles" keeps it. The session builds the slot once, with `buildLaunchSlot(launch)` from `storage_methods.ts`, and gives it to the `storage.*` handlers as the method context's `storageSlot`.
+
+- `readModValue(storage, slot, key)`: the value stored under `key` in the slot, or `null`.
+- `writeModValue(storage, slot, key, value)`: stores the value as JSON. Storing `null` removes the key. Storage errors propagate.
+- Types: `ModSlot`; `ModStorage`, the `getItem`, `setItem` and `removeItem` part of `Storage`. The app passes `localStorage`, and tests pass a `createMemoryStorage()` (see the [storage module](../storage/README.md)).
+
+The storage key is `"opentesela.mod-storage:" + JSON.stringify([mod, context, key])`, so keys made of `:` parts never collide. Before mod API `0.1.14`, slots had no context and the key was `JSON.stringify([modSource, key])`. A three-element key never equals one of those, so values stored before are no longer read, and they are not deleted.
 
 Example:
 
 ```ts
 import { readModValue, writeModValue } from "./lib/core/storage/index.ts";
 
-const source = "https://example.org/samples/mods/book_list/mod_conf.yaml";
-writeModValue(localStorage, source, "selected", "kallocain");
-readModValue(localStorage, source, "selected"); // "kallocain"
-writeModValue(localStorage, source, "selected", null);
-readModValue(localStorage, source, "selected"); // null
+const mod = "https://example.org/samples/mods/flashcards/mod_conf.yaml";
+const sampleDeck = {
+  mod,
+  context: "https://example.org/samples/mods/flashcards/mosaic.yaml",
+};
+writeModValue(localStorage, sampleDeck, "study_fields", ["term", "body"]);
+readModValue(localStorage, sampleDeck, "study_fields"); // ["term", "body"]
+readModValue(localStorage, { mod, context: "" }, "study_fields"); // null
+writeModValue(localStorage, sampleDeck, "study_fields", null);
+readModValue(localStorage, sampleDeck, "study_fields"); // null
 ```
 
 ### Default mod settings
@@ -656,7 +702,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.13"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.14"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.10` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -674,7 +720,7 @@ Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `a
   Returns a `ModLaunch` (`mod`, `mosaic`, the `LoadedMosaic` or `null`, `tilesKind`, `tilesSource`, `context`, `contentHosts`, `tileLinks`, `tileBodies`, `policy`, `sandboxDocument`, `apiCompatible`, `fileIssues`, `issues`), where `context` is a `LaunchContext`: the mount context without `theme`, which the session adds when the frame connects, and whose `permissions` are `grants`. `apiCompatible` is `matchModApiRange(mod.api)`: the stage asks the user before starting a mod whose range does not match. `fileIssues` holds the issues of the mod file itself, today only the warning of a missing `api` range, whose source is the mod file's source. `issues` holds one warning per denied permission. `tilesKind` is `"collection"` or `"tile"`, and `tilesSource` the resolved location the link's tiles come from, both `null` when the link names neither: the stage's "Reload tiles", its availability and the loaded and reloaded notifications follow them. `tileBodies` is the `TileBodies` of the tiles the mod receives (`buildTileBodies`, below), which the session keeps. `tileLinks` is the `TileLinks` of the tiles the mod receives and their body media (`collectModTileLinks`, below, see [Media linked by tiles](../sandbox/README.md#media-linked-by-tiles)): `sources`, the files the policy allows as images, video and audio, and `issues`, the left-out links and the iframes the bodies left out, kept apart from `issues` so the stage can replace them after "Reload tiles". It is `{ sources: [], issues: [] }` without a collection or a tile, and `null` when `loadsTileLinkedMedia` is `false`: then nothing is collected or reported, and blocked image reports get no redirect hint. The mount context does not list the tile links, so the mod API does not change.
 - `buildModTestDocument(launch)`: the `srcdoc` HTML of a frame of the mod's tests: the launch's `policy` (the frame's Content-Security-Policy) and the mod's theme setting, as in `sandboxDocument`, with the assertions and the test runner after the frame loader (see the [sandbox module](../sandbox/README.md#frames-of-a-checks-tests)). So a case runs the mod with the content policy it gets when it is opened.
 - `loadModTiles(mod, collectionLocation, options?, aliases?)`: loads a collection for a mod, renames its tiles by `aliases` (none by default) and selects them with `selectModTiles`. Returns `ModTiles` (`tilesSource`, the collection's source, `tiles`, `issues`).
-- `loadModTile(mod, tileLocation, options?)`: loads one tile for a mod (`loadTile`), wraps it in a collection whose `source` is the tile's, with an empty `name` and `description` and no issues, and selects it with `selectModTiles`. Returns `ModTiles` whose `tilesSource` is the tile's source. A tile that cannot be fetched or parsed throws `FileFetchError` or `MarkdownParseError` with the tile as its source.
+- `loadModTile(mod, tileLocation, options?)`: loads one tile for a mod (`loadTile`), wraps it in a collection whose `source` is the tile's, with an empty `title` and `description` and no issues, and selects it with `selectModTiles`. Returns `ModTiles` whose `tilesSource` is the tile's source. A tile that cannot be fetched or parsed throws `FileFetchError` or `MarkdownParseError` with the tile as its source.
 - `loadModTilesOfKind(mod, kind, location, options?, aliases?)`: `loadModTile` for `"tile"`, `loadModTiles` with the aliases for `"collection"`. The stage's "Reload tiles" calls it with the launch's `tilesKind`, `tilesSource` and `readMosaicAliases(launch.mosaic)`, so a mosaic's reloaded tiles are renamed as at the start, and the mosaic file is not requested again.
 - `readMosaicAliases(mosaic)`: the aliases of a launch's mosaic, or none for `null`.
 - `RUN_LINK_RESERVED_NAMES`: `mod`, `collection`, `tile` and `mosaic`, the link names the stage reads itself. They are never in `context.params`, and `mods.open` and `mosaics.open` refuse them in their `params`.
@@ -722,28 +768,41 @@ Implemented in `mod_tile_bodies.ts`, with the renderer of the [tile bodies modul
 
 ### Mod check
 
-The bundle check and the report of `mods.check`. Neither needs a DOM, so a Node script can import them.
+The bundle check and the report of `mods.check` and `mosaics.check`. Neither needs a DOM, so a Node script can import them.
 
-- `checkModBundle(source, collectionLocation, options?, libraryFiles?)`: checks the files of the mod at `source`, a resolved mod file address. `options` are the mod module's `ModLoadOptions`, whose `npmHost` resolves the mod's npm files. `libraryFiles` is the cache the library files go through, by default the page's (`PAGE_LIBRARY_FILES`), so the mount check's `libs.load` reuses what the bundle check fetched. Returns a `ModBundleCheck`: `findings`, `mod` (the `LoadedMod`, or `null` when the mod file or the entrypoint failed) and `modTiles` (the `ModTiles` to mount, or `null` without a collection). It never throws for a file. The steps run in this order, and the findings follow it:
-  1. The mod file (`loadModFile`). An error here ends the check, with this one finding.
-  2. The `api` range (`matchModApiRange`): a missing range is a warning with the text of `describeMissingApiRange`, the warning the stage bar shows, and a range that does not match is a warning naming the range and `MOD_API_VERSION`. Both have the mod file as their source. So the range finding comes right after the mod file's, as in the stage bar.
-  3. The entrypoint (`loadModCode`).
-  4. The files of the declared libraries, each fetched through `libraryFiles`. Each file that cannot be fetched is an error whose source is the file's address, and whose message names the library and ends with the host's reason when it is short plain text, as `libs.load`'s does (see [Libraries](#libraries)): `the library "leaflet" could not be loaded: Cannot load file "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/missing.js": HTTP 404 Not Found: Couldn't find the requested file /dist/missing.js in leaflet.`
-  5. The tile type (`buildTileValidator`), when the mod has a `type_path`.
-  6. The collection: `collectionLocation`, or else the mod's `sampleCollection`, or none. It is loaded and its tiles are selected with `selectModTiles`. Each of its issues becomes a finding with the issue's level and source. When the tile type failed, the collection is not loaded, since it could not be validated.
+- `checkModBundle(request, defaults, options?, libraryFiles?)`: checks the files of a `ModCheckRequest`: a `ModCheckTarget` (`{ source, collection }`, the resolved mod file and the collection as `mods.check` gave it, or `null`) or a `MosaicCheckTarget` (`{ mosaic }`, the resolved mosaic file); `isMosaicCheckTarget` tells them apart. `defaults` are the resolved default mod settings, which resolve a mosaic's default mod name and refuse a switched-off mod. `options` are the mod module's `ModLoadOptions`, whose `npmHost` resolves the mod's npm files. `libraryFiles` is the cache the library files go through, by default the page's (`PAGE_LIBRARY_FILES`), so the mount check's `libs.load` reuses what the bundle check fetched. Returns a `ModBundleCheck`: `findings`, `source` (the checked mod file, or `null` when a mosaic failed before its mod was known), `mosaicSource` (the mosaic file the check used, or `null`), `mosaic` (the `LoadedMosaic` whose config, aliases and lines the mount check uses, or `null`), `collection` (the collection the tiles came from, or `null`), `mod` (the `LoadedMod`, or `null` when the mod file or the entrypoint failed) and `modTiles` (the `ModTiles` to mount, or `null` without a collection). It never throws for a file. The steps run in this order, and the findings follow it:
+  1. For a mosaic target, the mosaic file (`loadMosaicFile`), then the switched-off list for its mod. An error here ends the check, with this one finding.
+  2. The mod file (`loadModFile`). An error here ends the check, with this one finding.
+  3. The `api` range (`matchModApiRange`): a missing range is a warning with the text of `describeMissingApiRange`, the warning the stage bar shows, and a range that does not match is a warning naming the range and `MOD_API_VERSION`. Both have the mod file as their source. So the range finding comes right after the mod file's, as in the stage bar.
+  4. For a mod target without a collection, the mod's default mosaic, when it declares one: a file that cannot be loaded, or a mosaic whose `mod` is not the checked mod's file, is an error whose source is the mosaic file. The check goes on without tiles, so the other files are still checked.
+  5. The entrypoint (`loadModCode`).
+  6. The files of the declared libraries, each fetched through `libraryFiles`. Each file that cannot be fetched is an error whose source is the file's address, and whose message names the library and ends with the host's reason when it is short plain text, as `libs.load`'s does (see [Libraries](#libraries)): `the library "leaflet" could not be loaded: Cannot load file "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/missing.js": HTTP 404 Not Found: Couldn't find the requested file /dist/missing.js in leaflet.`
+  7. The tile type (`buildTileValidator`), when the mod has a `type_path`.
+  8. The collection: the target's `collection`, or else the mosaic's, or none. It is loaded, its tiles are renamed by the mosaic's aliases (`aliasCollectionTiles`) and selected with `selectModTiles`. Each of its issues becomes a finding with the issue's level and source. When the tile type failed, the collection is not loaded, since it could not be validated.
+  9. With a mosaic, the mosaic findings (`mosaic_findings.ts`): `checkMosaicAliases` warns about each alias field the tile type's `fieldNames` lack, and `checkMosaicConfig` about each key path of the mosaic's config that the mod's config lacks (see [Checking a mosaic](#checking-a-mosaic)).
 
   A file that cannot be loaded, or has the wrong format, is an error finding whose source is the error's `source` (the failing file) and whose message is the error's message.
-- `buildModCheckReport(source, findings, mountChecked, tests)`: the `ModCheckReport` of a check. `tests` is the list of `ModTestResult`, or `null` when the cases did not run, which gives `testsChecked` `false` and an empty `tests`. Its `status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none: it is read from the findings alone, which already hold an error for each failed case. The findings and the test results are copied.
-- Types: `ModCheckFinding` (`step`, `level`, `source`, `message`), with `step` a `ModCheckStep` (`"bundle"`, `"mount"` or `"test"`) and `level` `"error"` or `"warning"`; `ModTestResult` (`name`, `status` `"pass"` or `"fail"`, `message`); `ModCheckReport` (`source`, `status`, `mountChecked`, `testsChecked`, `tests`, `findings`), plain data; `ModCheckStatus` (`"pass" | "warn" | "fail"`); `ModBundleCheck`.
+- `buildModCheckReport(checkedFiles, findings, mountChecked, tests)`: the `ModCheckReport` of a check of `checkedFiles`, a `CheckedFiles` (`{ source, mosaic }`). `tests` is the list of `ModTestResult`, or `null` when the cases did not run, which gives `testsChecked` `false` and an empty `tests`. Its `status` is `"fail"` when a finding is an error, `"warn"` when there are only warnings and `"pass"` when there are none: it is read from the findings alone, which already hold an error for each failed case. The findings and the test results are copied.
+- Types: `ModCheckFinding` (`step`, `level`, `source`, `message`), with `step` a `ModCheckStep` (`"bundle"`, `"mount"` or `"test"`) and `level` `"error"` or `"warning"`; `ModTestResult` (`name`, `status` `"pass"` or `"fail"`, `message`); `ModCheckReport` (`source`, `mosaic`, `status`, `mountChecked`, `testsChecked`, `tests`, `findings`), plain data; `ModCheckStatus` (`"pass" | "warn" | "fail"`); `ModBundleCheck`.
 
 ```ts
 import { buildModCheckReport, checkModBundle } from "./lib/core/engine/index.ts";
 
 const source = "https://example.org/samples/mods/book_list/mod_conf.yaml";
-const bundleCheck = await checkModBundle(source, null, { baseUrl: "https://example.org/" });
-// bundleCheck.findings is [] and bundleCheck.modTiles.tiles has the three sample books
-const report = buildModCheckReport(source, bundleCheck.findings, false, null);
-// report.status === "pass" and report.testsChecked === false
+const bundleCheck = await checkModBundle(
+  { source, collection: null },
+  { folder: "https://example.org/default_mods/", switchedOff: [] },
+  { baseUrl: "https://example.org/" },
+);
+// bundleCheck.findings is [], bundleCheck.mosaicSource is the default mosaic
+// and bundleCheck.modTiles.tiles has the three sample books
+const report = buildModCheckReport(
+  { source: bundleCheck.source, mosaic: bundleCheck.mosaicSource },
+  bundleCheck.findings,
+  false,
+  null,
+);
+// report.status === "pass", report.mosaic ends in book_list/mosaic.yaml and report.testsChecked === false
 ```
 
 ### Library files

@@ -19,6 +19,7 @@ import {
   COUNTRY_MAP_COLLECTION_PATH,
   COUNTRY_MAP_COLLECTION_RUN_HASH,
   COUNTRY_MAP_MOD_REFERENCE,
+  COUNTRY_MAP_MOSAIC_RUN_HASH,
   NPM_HOST,
   routeNpmFiles,
 } from "./sample_mod.ts";
@@ -212,9 +213,12 @@ function tileCard(frame: Frame): Locator {
   return frame.getByRole("dialog");
 }
 
-/** Opens the sample on the sample books and waits for France's marker. */
-async function openSample(page: Page): Promise<Frame> {
-  await page.goto(`/${COUNTRY_MAP_COLLECTION_RUN_HASH}`);
+/** Opens the sample at `hash`, its default mosaic with the sample books unless given, and waits for France's marker. */
+async function openSample(
+  page: Page,
+  hash: string = COUNTRY_MAP_MOSAIC_RUN_HASH,
+): Promise<Frame> {
+  await page.goto(`/${hash}`);
   const frame = await findModFrame(page, MOD_TITLE);
   await expect(markerButton(frame, "France")).toBeVisible();
   return frame;
@@ -483,6 +487,11 @@ const ARCHIVE_COVER_URL =
   "https://archive.org/download/m_covers_0000/968944-L.jpg";
 const ARCHIVE_MIRROR_COVER_URL =
   "https://ia800100.us.archive.org/view_archive.php?archive=m_covers_0000.zip&file=968944-L.jpg";
+
+/** Answers a route with a redirect to `location`, as Open Library answers a cover. */
+async function answerRedirect(location: string, route: Route): Promise<void> {
+  await route.fulfill({ status: 302, headers: { Location: location } });
+}
 
 /** Runs in the page before the app: "Load media linked by tiles" off. */
 function turnOffTileLinkedMedia(): void {
@@ -1023,7 +1032,8 @@ test.describe(
   function describeTileCard(): void {
     // Playwright routes only the first request of a redirect, so the test
     // checks each host of Open Library's redirect on its own, with "Load
-    // media linked by tiles" off: only the mod's permissions allow them.
+    // media linked by tiles" off: only the default mosaic's permissions
+    // allow them.
     test("Open Library cover", async function showsRedirectedCover({
       page,
     }): Promise<void> {
@@ -1046,6 +1056,32 @@ test.describe(
         ]),
       ).toEqual([true, true]);
       await expectNoIssues(page);
+    });
+
+    test("Without the default mosaic", async function blocksRedirectedCover({
+      page,
+      browserName,
+    }): Promise<void> {
+      // Playwright's WebKit cannot fulfill a route with a redirect status.
+      test.skip(
+        browserName === "webkit",
+        "Playwright cannot fulfill a route with a 302 in WebKit",
+      );
+      await routeSampleHosts(page);
+      await page.route(
+        OPEN_LIBRARY_COVERS_GLOB,
+        answerRedirect.bind(undefined, ARCHIVE_COVER_URL),
+      );
+      const archiveUrls = await routeImages(page, "https://archive.org/**");
+      const frame = await openSample(page, COUNTRY_MAP_COLLECTION_RUN_HASH);
+
+      await openYearsCard(frame);
+
+      const warnings = await openMessages(page, "Warnings");
+      await expect(warnings).toContainText(
+        /Blocked image request to https:\/\/(covers\.openlibrary|archive)\.org/,
+      );
+      expect(archiveUrls).toEqual([]);
     });
 
     test("Open a book", async function opensBookCard({ page }): Promise<void> {

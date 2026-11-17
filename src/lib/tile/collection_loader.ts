@@ -15,7 +15,7 @@ import type { Tile } from "./tile_loader.ts";
 export interface TileCollection {
   /** Resolved absolute URL of the collection file. */
   source: string;
-  name: string;
+  title: string;
   /** Empty when the file has none. */
   description: string;
   tiles: Tile[];
@@ -137,7 +137,7 @@ function assembleTileCollection(
   }
   const tileCollection: TileCollection = {
     source: collectionUrl.href,
-    name: collectionFormat.name,
+    title: collectionFormat.title,
     description: collectionFormat.description,
     tiles,
     issues,

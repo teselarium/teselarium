@@ -1,0 +1,5 @@
+mosaic:
+  title: "Book List"
+  description: "The fixture book list with its books."
+  mod: "./"
+  collection: "../../tiles/books_collection.yaml"

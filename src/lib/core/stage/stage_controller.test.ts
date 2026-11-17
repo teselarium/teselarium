@@ -810,7 +810,7 @@ const OPENER_MOD_SOURCE = `${APP_BASE_URL}test-mods/opener/mod_conf.yaml`;
 
 function serveOpenerMod(): void {
   serveTestMod(OPENER_MOD_SOURCE, [
-    '  name: "opener"',
+    '  title: "opener"',
     '  version: "0.1.0"',
     '  entrypoint: "./main.js"',
     "  permissions:",

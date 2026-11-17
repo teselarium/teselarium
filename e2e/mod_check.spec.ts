@@ -3,6 +3,8 @@ import type { Route } from "@playwright/test";
 import {
   buildAnimationFrameFiles,
   buildCheckerFiles,
+  buildMosaicBooksFiles,
+  buildMosaicBooksMosaic,
   buildConfirmingFiles,
   buildProbeFiles,
   buildSlotReporterFiles,
@@ -16,13 +18,19 @@ import {
   CHECKER_HASH,
   CHECKER_TITLE,
   checkFromChecker,
+  checkMosaicFromChecker,
   checkPastLimit,
   findModFrame,
+  FOREIGN_HOST,
+  MOSAIC_BOOKS_NAME,
+  MOSAIC_COVERS_HOST,
   openChecker,
   readReportedValue,
   readTestModSource,
   requestFromProbe,
+  routeImages,
   serveAppOriginMod,
+  serveForeignMod,
   SLOT_REPORTER_KEY,
   SLOT_REPORTER_NAME,
   UNDECLARED_IMAGE_HOST,
@@ -31,6 +39,7 @@ import {
 import {
   buildTilesModFiles,
   readTilesModSource,
+  readTilesMosaicSource,
   TILES_MOD_REFERENCE,
   TILES_TEST_RESULTS,
 } from "./test_mods.ts";
@@ -51,6 +60,7 @@ test.describe(
 
       expect(report).toEqual({
         source: readTilesModSource(page),
+        mosaic: readTilesMosaicSource(page),
         status: "pass",
         mountChecked: true,
         testsChecked: true,
@@ -73,6 +83,79 @@ test.describe(
           findings: [],
         });
       }
+    });
+  },
+);
+
+/** The mosaic of `mosaic_books` on another origin, naming the mod and its books on the app's origin. */
+const FOREIGN_MOSAIC_URL = `${FOREIGN_HOST}/mosaics/books.yaml`;
+
+test.describe(
+  "Checks with a mosaic",
+  { tag: "@frames" },
+  function describeMosaicChecks(): void {
+    test("Check with the default mosaic", async function checksDefaultMosaic({
+      page,
+    }): Promise<void> {
+      const coverUrls = await routeImages(page, `${MOSAIC_COVERS_HOST}/**`);
+      const seenUrls = await openChecker(page, buildMosaicBooksFiles());
+
+      const report = await checkFromChecker(
+        page,
+        buildTestModReference(MOSAIC_BOOKS_NAME),
+      );
+
+      expect(report).toMatchObject({
+        source: readTestModSource(page, MOSAIC_BOOKS_NAME),
+        mosaic: new URL(
+          `../${MOSAIC_BOOKS_NAME}/mosaic.yaml`,
+          readTestModSource(page, MOSAIC_BOOKS_NAME),
+        ).href,
+        status: "pass",
+        mountChecked: true,
+        findings: [],
+      });
+      expect(readReportedValue(seenUrls, "tiles")).toBe(3);
+      expect(readReportedValue(seenUrls, "columns")).toBe(4);
+      expect(readReportedValue(seenUrls, "cover")).toBe(true);
+      expect(coverUrls).toHaveLength(1);
+    });
+
+    test("Foreign mosaic without decisions", async function blocksForeignLines({
+      page,
+    }): Promise<void> {
+      const coverUrls = await routeImages(page, `${MOSAIC_COVERS_HOST}/**`);
+      const seenUrls = await openChecker(page, buildMosaicBooksFiles());
+      const modSource = readTestModSource(page, MOSAIC_BOOKS_NAME);
+      await serveForeignMod(page, {
+        "mosaics/books.yaml": buildMosaicBooksMosaic(
+          "Books elsewhere",
+          modSource,
+          new URL("./books.yaml", modSource).href,
+        ),
+      });
+
+      const report = await checkMosaicFromChecker(page, FOREIGN_MOSAIC_URL);
+
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      expect(report).toMatchObject({
+        source: modSource,
+        mosaic: FOREIGN_MOSAIC_URL,
+        status: "warn",
+        mountChecked: true,
+        testsChecked: false,
+      });
+      expect(report.findings).toHaveLength(1);
+      expect(report.findings[0]).toMatchObject({
+        step: "mount",
+        level: "warning",
+      });
+      expect(report.findings[0].message).toContain(MOSAIC_COVERS_HOST);
+      expect(report.findings[0].message).toContain(
+        "the mosaic declares it in permissions.show, but the permission was not granted",
+      );
+      expect(readReportedValue(seenUrls, "cover")).toBe(false);
+      expect(coverUrls).toEqual([]);
     });
   },
 );

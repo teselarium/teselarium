@@ -12,7 +12,7 @@
 
 ### Mosaic
 
-A mosaic is a file that names two other things: a mod and, optionally, a tile collection. The tile collection contains the tiles to be displayed, each one a markdown file with metadata in its frontmatter. The mod includes the javascript plugin, the tile type required by the plugin, its default configuration and a sample tile collection with example tiles. The mosaic file holds only what this pairing needs: the configuration values that override the mod's defaults, the aliases that rename the collection's fields to the tile type's, and the `show` permissions for the hosts of the tiles' media. Mod, collection and mosaic can each live on a different site.
+A mosaic is a file that names two other things: a mod and, optionally, a tile collection. The tile collection contains the tiles to be displayed, each one a markdown file with metadata in its frontmatter. The mod includes the javascript plugin, the tile type required by the plugin, its default configuration and, optionally, its default mosaic: a mosaic file next to the mod file whose `mod` is the mod itself (`"./"`), with example tiles. The mosaic file holds only what this pairing needs: the configuration values that override the mod's defaults, the aliases that rename the collection's fields to the tile type's, and the `show` permissions for the hosts of the tiles' media. Mod, collection and mosaic can each live on a different site.
 
 ```mermaid
 flowchart TD
@@ -28,8 +28,8 @@ flowchart TD
       plugin["Plugin (js)"]
       schema["Tile Type (schema)"]
       mod_conf["Default Configuration"]
-      subgraph SampleTileCollection["Sample Tile collection"]
-        SampleTiles@{ shape: docs, label: "Sample Tile" }
+      subgraph DefaultMosaic["Default mosaic (optional)"]
+        DefaultMosaicFile["mosaic.yaml\n(mod: ./, collection)"]
       end
     end
     MosaicFile -- "mod" --> Mod
@@ -102,7 +102,7 @@ Metadata strings that are absolute `http:` or `https:` URLs of images, audio or 
 Tiles are organized in collections inside a yaml file. They are used as indexes of paths or urls, for example a collection of tiles named `science_fictions_books.yaml`:
 ```yaml
 collection:
-  name: "Science fiction books"
+  title: "Science fiction books"
   description: "A sample book list for demonstration purposes."
   tiles:
     - url: "https://.../books/the_martian_chronicles.md"
@@ -184,7 +184,6 @@ A same tile could be compatible with multiple mods if they have the required fie
 Mods use configuration files called mod_conf.yaml for defining mod metadata and configuration default values. For example for a mod called "country_markers_map" that shows input tiles organized by country in a map:
 ```yaml
 mod:
-  name: "country_markers_map"
   title: "Country Markers Map"
   version: "1.0.0"
   description: "An interactive world map that display tiles as markers organized by country."

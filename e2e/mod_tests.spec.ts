@@ -31,6 +31,7 @@ import {
 import {
   buildTilesCaseFiles,
   readTilesModSource,
+  readTilesMosaicSource,
   TILES_CONTEXT_TEST_CODE,
   TILES_MOD_REFERENCE,
   TILES_TEST_RESULTS,
@@ -93,13 +94,20 @@ const PLAYER_ANSWER_TEST_CODE = buildTestCode(
   [["plays the answered player", "playsAnswered"]],
 );
 
-/** A probe whose sample collection is the body tiles, with `PLAYER_ANSWER_TEST_CODE` as its tests. */
+/** A probe whose default mosaic has the body tiles, with `PLAYER_ANSWER_TEST_CODE` as its tests. */
 function buildPlayerAnswerFiles(): ModFiles {
   const files: ModFiles = {
     "player_answer/mod_conf.yaml": buildModConf("player_answer", [
       '  test_path: "./test.js"',
-      `  sample_collection: "${BODIES_COLLECTION_URL}"`,
+      '  default_mosaic: "./mosaic.yaml"',
     ]),
+    "player_answer/mosaic.yaml": [
+      "mosaic:",
+      '  title: "Body tiles"',
+      '  mod: "./"',
+      `  collection: "${BODIES_COLLECTION_URL}"`,
+      "",
+    ].join("\n"),
     "player_answer/main.js": PROBE_MOD_CODE,
     "player_answer/test.js": PLAYER_ANSWER_TEST_CODE,
   };
@@ -119,6 +127,7 @@ test.describe(
 
       expect(report).toEqual({
         source: readTilesModSource(page),
+        mosaic: readTilesMosaicSource(page),
         status: "pass",
         mountChecked: true,
         testsChecked: true,

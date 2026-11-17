@@ -1,6 +1,5 @@
 # A fixture mod for the explorer's tests (test/explorer_cases.ts), which only inspect it: it has no code.
 mod:
-  name: "listed_mod"
   title: "Listed Mod"
   version: "1.0.0"
   api: "^0.1.0"

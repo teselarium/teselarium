@@ -25,6 +25,7 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "findSwitchedOffMod",
       "grantLaunchMosaic",
       "inspectMod",
+      "isMosaicCheckTarget",
       "loadLaunchMod",
       "loadLaunchMosaic",
       "loadLaunchTiles",

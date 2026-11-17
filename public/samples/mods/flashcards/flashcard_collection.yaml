@@ -1,5 +1,5 @@
 collection:
-  name: "Markdown flashcards"
+  title: "Markdown flashcards"
   description: "A sample deck about general markdown, for the flashcards mod."
   tiles:
     - path: "./cards/emphasis.md"

@@ -11,14 +11,14 @@ function describeTileCount(count: number): string {
   return tileCount;
 }
 
-/** A collection as a card: an `<article>` with its name, description, number of tiles and a button. */
+/** A collection as a card: an `<article>` with its title, description, number of tiles and a button. */
 function buildCollectionCard(
   view: ExplorerView,
   inspection: CollectionInspection,
 ): HTMLElement {
   const card = document.createElement("article");
-  const name = document.createElement("h2");
-  name.textContent = inspection.name;
+  const title = document.createElement("h2");
+  title.textContent = inspection.title;
   const description = document.createElement("p");
   description.textContent = inspection.description;
   const tileCount = document.createElement("p");
@@ -29,12 +29,12 @@ function buildCollectionCard(
   // repeat it. The accessible name keeps it, for a screen reader moving
   // between buttons.
   viewButton.textContent = "View";
-  viewButton.ariaLabel = `View ${inspection.name}`;
+  viewButton.ariaLabel = `View ${inspection.title}`;
   viewButton.addEventListener(
     "click",
     openViewer.bind(undefined, view, inspection),
   );
-  card.append(name, description, tileCount, viewButton);
+  card.append(title, description, tileCount, viewButton);
   return card;
 }
 

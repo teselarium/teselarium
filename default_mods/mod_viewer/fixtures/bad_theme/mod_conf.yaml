@@ -1,6 +1,5 @@
 # A fixture mod for the viewer's tests, whose mod file has a format error.
 mod:
-  name: "bad_theme"
   title: "Bad Theme"
   version: "1.0.0"
   api: "^0.1.0"

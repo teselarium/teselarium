@@ -60,7 +60,7 @@ function buildMixedCollectionFiles(): ModFiles {
   const files: ModFiles = {
     "mixed.yaml": [
       "collection:",
-      '  name: "Mixed"',
+      '  title: "Mixed"',
       "  tiles:",
       '    - path: "./first.md"',
       '    - path: "./untitled.md"',
@@ -77,7 +77,6 @@ function buildLaterExplorerFiles(): ModFiles {
     "explorer/mod_conf.yaml": [
       "mod:",
       `  api: "${TEST_MOD_API_RANGE}"`,
-      '  name: "mod_explorer"',
       '  title: "Later explorer"',
       '  version: "0.1.0"',
       '  entrypoint: "./main.js"',

@@ -1,10 +1,9 @@
 mod:
-  name: "flashcards"
   title: "Flashcards"
   version: "1.0.0"
-  api: "^0.1.9"
+  api: "^0.1.14"
   description: "Explore any collection as a table, and study it as question and answer cards."
   entrypoint: "./main.js"
   type_path: "./flashcard_type.md"
-  sample_collection: "./flashcard_collection.yaml"
+  default_mosaic: "./mosaic.yaml"
   test_path: "./test.js"
