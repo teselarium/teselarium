@@ -227,7 +227,7 @@ export interface ModOpenParams {
   collection?: string;
   /** The location of one tile file, which the opened mod receives as its tiles. */
   tile?: string;
-  /** Parameters other than `mod`, `collection`, `tile` and `mosaic`, which are reserved. */
+  /** Parameters other than `mod`, `collection`, `tile`, `mosaic` and `sites`, which are reserved. */
   params?: Record<string, string>;
   /** Opens the mod in place of the requesting sandbox, which is closed and gets no answer. */
   replace?: boolean;
@@ -237,7 +237,7 @@ export interface ModOpenParams {
 export interface MosaicOpenParams {
   /** A mosaic reference: the mosaic file, or a folder holding `mosaic.yaml`. */
   mosaic: string;
-  /** Parameters other than `mod`, `collection`, `tile` and `mosaic`, which are reserved. */
+  /** Parameters other than `mod`, `collection`, `tile`, `mosaic` and `sites`, which are reserved. */
   params?: Record<string, string>;
   /** Opens the mosaic in place of the requesting sandbox, which is closed and gets no answer. */
   replace?: boolean;

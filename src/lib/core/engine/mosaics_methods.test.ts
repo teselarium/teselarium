@@ -219,6 +219,21 @@ describe("mosaics.inspect", function describeMosaicsInspect(): void {
     expect(error.message).toContain("404");
   });
 
+  it("Sites is a reserved parameter", async function refusesSitesParam(): Promise<void> {
+    const { context, onOpenLink } = buildSpiedContext(["*"]);
+
+    const error = await catchMethodError(function openWithSites() {
+      return callMosaicMethod("mosaics.open", context, {
+        mosaic: "./m.yaml",
+        params: { sites: "./n.yaml" },
+      });
+    });
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe('mosaics.open: "params.sites" is reserved');
+    expect(onOpenLink).not.toHaveBeenCalled();
+  });
+
   it("Missing reference", async function refusesMissingReference(): Promise<void> {
     const { context, fetchSpy } = buildSpiedContext(["*"]);
 

@@ -433,6 +433,18 @@ describe("mods.open", function describeModsOpen(): void {
     expect(openLinkSpy).not.toHaveBeenCalled();
   });
 
+  it("Sites is a reserved parameter", async function rejectsSitesParam(): Promise<void> {
+    const { context, openLinkSpy } = buildSpiedContext(["*"]);
+
+    const error = await catchMethodError(
+      open(context, { mod: "tile_viewer", params: { sites: "./m.yaml" } }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe('mods.open: "params.sites" is reserved');
+    expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+
   it("Replace that is not a boolean", async function rejectsReplaceText(): Promise<void> {
     const { context, openLinkSpy } = buildSpiedContext(["*"]);
 

@@ -204,6 +204,36 @@ test.describe(
   },
 );
 
+/** Flashcards with the sample books and the books' mosaic as `sites`. */
+const FLASHCARDS_SITES_LINK = `/#/run?mod=./samples/mods/flashcards&collection=./samples/tiles/literature_nobel_laureates_books/collection.yaml&sites=${BOOKS_MOSAIC_REFERENCE}`;
+
+/** An Open Library cover of a sample book, which only the books' mosaic allows. */
+const OPEN_LIBRARY_COVER_URL =
+  "https://covers.openlibrary.org/b/id/11426109-L.jpg";
+
+test.describe(
+  "The books' sites for another mod",
+  { tag: "@sample" },
+  function describeBooksSites(): void {
+    test("Covers kept for another mod", async function keepsCovers({
+      page,
+    }): Promise<void> {
+      await page.addInitScript(turnOffTileLinkedMedia);
+      await routeSampleImages(page);
+
+      await page.goto(FLASHCARDS_SITES_LINK);
+      const frame = await findModFrame(page, "Flashcards");
+
+      await expect(frame.getByRole("row")).toHaveCount(SAMPLE_BOOK_COUNT + 1);
+      expect(
+        await frame.evaluate(loadImages, [OPEN_LIBRARY_COVER_URL]),
+      ).toEqual([true]);
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expectNoIssues(page);
+    });
+  },
+);
+
 test.describe(
   "Nobel laureates on the map",
   { tag: "@sample" },

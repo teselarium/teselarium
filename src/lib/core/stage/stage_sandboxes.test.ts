@@ -41,6 +41,7 @@ import {
   serveNoApiBookMod,
   serveProbeMod,
   serveTestMod,
+  serveTestMosaic,
   serveUntypedMod,
   TEST_DEFAULTS,
   UNTYPED_MOD_SOURCE,
@@ -57,6 +58,7 @@ import {
   resolveDefaultModSettings,
 } from "../engine/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
+import type { SiteDecision } from "../permissions/index.ts";
 import type {
   AppAction,
   FrameLayout,
@@ -1131,6 +1133,201 @@ describe("Mosaic sandboxes", function describeMosaicSandboxes(): void {
     expect(params.tiles[0].metadata.country).toBe("Sweden");
     expect(params.tiles[0].metadata).not.toHaveProperty("name");
     expect(countRequests(testFetch, ALIASED_MOSAIC_SOURCE)).toBe(1);
+  });
+});
+
+const SITES_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mosaics/sites/mosaic.yaml`;
+const FOREIGN_SITES_MOSAIC_SOURCE =
+  "https://mosaics.example.net/covers/mosaic.yaml";
+const OPEN_LIBRARY_LINE = {
+  category: "show",
+  host: "https://covers.openlibrary.org",
+  reason: "Shows the book covers",
+} as const;
+const MOSAIC_COVERS_KEY = "mosaic show https://covers.openlibrary.org";
+
+/** Serves a mosaic at `source` that declares the Open Library covers line. */
+function serveCoversMosaic(source: string): void {
+  serveTestMosaic(source, [
+    'title: "Covers"',
+    `mod: "${UNTYPED_MOD_SOURCE}"`,
+    "permissions:",
+    "  show:",
+    `    - host: "${OPEN_LIBRARY_LINE.host}"`,
+    `      reason: "${OPEN_LIBRARY_LINE.reason}"`,
+  ]);
+}
+
+/** A sandbox of the sample mod and collection whose link names `sites`. */
+function buildSitesSandbox(sites: string): StageSandbox {
+  const sandbox: StageSandbox = {
+    ...buildSandbox(SAMPLE_MOD_REFERENCE, SAMPLE_COLLECTION_REFERENCE),
+    link: {
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: SAMPLE_COLLECTION_REFERENCE,
+      tile: null,
+      sites,
+      params: {},
+    },
+  };
+  return sandbox;
+}
+
+/** The decision a user remembered for the covers line of the foreign mosaic. */
+function buildForeignMosaicDecision(allowed: boolean): SiteDecision {
+  const decision: SiteDecision = {
+    mosaic: FOREIGN_SITES_MOSAIC_SOURCE,
+    title: "Covers",
+    category: "show",
+    host: OPEN_LIBRARY_LINE.host,
+    allowed,
+  };
+  return decision;
+}
+
+describe("Sites sandboxes", function describeSitesSandboxes(): void {
+  it("Missing sites mosaic", async function warnsMissingSites(): Promise<void> {
+    const missingSource = `${FIXTURES_BASE_URL}mosaics/missing/mosaic.yaml`;
+
+    const runtime = await settleSandbox(
+      buildSitesSandbox("./fixtures/mosaics/missing"),
+      buildServices(),
+    );
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.loadedMosaic).toBeNull();
+    const warnings = readSandboxMessages(runtime).filter(isWarning);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      producer: "app",
+      source: missingSource,
+    });
+    expect(warnings[0].text).toContain("404");
+    expect(warnings[0].text).toContain("Its sites were not granted.");
+  });
+
+  it("keeps the sandbox a mod sandbox", async function keepsModSandbox(): Promise<void> {
+    serveCoversMosaic(SITES_MOSAIC_SOURCE);
+
+    const runtime = await settleSandbox(
+      buildSitesSandbox(SITES_MOSAIC_SOURCE),
+      buildServices(),
+    );
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.loadedMosaic).toBeNull();
+    expect(runtime.modReference).toBe(SAMPLE_MOD_SOURCE);
+    expect(runtime.tilesLocation).toBe(SAMPLE_COLLECTION_SOURCE);
+    expect(runtime.launch?.context.mosaic).toBeNull();
+    expect(runtime.launch?.context.permissions.granted).toEqual([
+      SAMPLE_COVERS_PERMISSION,
+      OPEN_LIBRARY_LINE,
+    ]);
+  });
+
+  it("Asked once for a new mosaic", async function asksForeignSites(): Promise<void> {
+    serveCoversMosaic(FOREIGN_SITES_MOSAIC_SOURCE);
+
+    const runtime = await settleSandbox(
+      buildSitesSandbox(FOREIGN_SITES_MOSAIC_SOURCE),
+      buildServices(),
+    );
+
+    expect(runtime.status).toBe("asking");
+    expect(runtime.question).toBe("sites");
+    expect(runtime.consentLines).toEqual([
+      { ...OPEN_LIBRARY_LINE, subject: "mosaic" },
+    ]);
+    expect(runtime.launch).toBeNull();
+    expect(runtime.loadedMosaic).toBeNull();
+  });
+
+  it("remembers the answer for the mosaic file", async function remembersForMosaic(): Promise<void> {
+    serveCoversMosaic(FOREIGN_SITES_MOSAIC_SOURCE);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSitesSandbox(FOREIGN_SITES_MOSAIC_SOURCE),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [MOSAIC_COVERS_KEY],
+      remember: true,
+    });
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.launch?.context.permissions.granted).toContainEqual(
+      OPEN_LIBRARY_LINE,
+    );
+    expect(spied.siteDecisions.decisions).toEqual([
+      buildForeignMosaicDecision(true),
+    ]);
+  });
+
+  it("Remembered from the mosaic", async function appliesMosaicDecision(): Promise<void> {
+    serveCoversMosaic(FOREIGN_SITES_MOSAIC_SOURCE);
+    const siteDecisions = createMemorySiteDecisions([
+      buildForeignMosaicDecision(true),
+    ]);
+
+    const runtime = await settleSandbox(
+      buildSitesSandbox(FOREIGN_SITES_MOSAIC_SOURCE),
+      buildServices(APP_ORIGIN, siteDecisions),
+    );
+
+    expect(runtime.status).toBe("running");
+    expect(runtime.question).toBeNull();
+    expect(runtime.launch?.context.permissions.granted).toEqual([
+      SAMPLE_COVERS_PERMISSION,
+      OPEN_LIBRARY_LINE,
+    ]);
+  });
+
+  it("Refused line of a foreign sites mosaic", async function reportsRefusedLine(): Promise<void> {
+    serveCoversMosaic(FOREIGN_SITES_MOSAIC_SOURCE);
+    const spied = buildServices();
+    const runtime = await settleSandbox(
+      buildSitesSandbox(FOREIGN_SITES_MOSAIC_SOURCE),
+      spied,
+    );
+
+    answerSandboxSiteConsent(runtime, spied.services, {
+      allowed: [],
+      remember: false,
+    });
+
+    const issues = readIssues(runtime);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].level).toBe("warning");
+    expect(issues[0].source).toBe(FOREIGN_SITES_MOSAIC_SOURCE);
+    expect(issues[0].message).toContain(OPEN_LIBRARY_LINE.host);
+    expect(issues[0].message).toContain(OPEN_LIBRARY_LINE.reason);
+    expect(issues[0].message).toContain(FOREIGN_SITES_MOSAIC_SOURCE);
+  });
+
+  it("names the sites mosaic file in a blocked image report", async function hintsSitesMosaic(): Promise<void> {
+    serveCoversMosaic(SITES_MOSAIC_SOURCE);
+    const spied = buildServices();
+    const { runtime, modPort } = await startSandbox(
+      buildSitesSandbox(SITES_MOSAIC_SOURCE),
+      spied,
+    );
+
+    modPort.postMessage({
+      jsonrpc: "2.0",
+      method: "sandbox.blocked",
+      params: {
+        directive: "img-src",
+        blockedUrl: "https://images.example.net/a.jpg",
+      },
+    });
+    await waitForMessages();
+
+    const warnings = readSandboxMessages(runtime).filter(isWarning);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].text).toContain(
+      `in the mosaic file "${SITES_MOSAIC_SOURCE}"`,
+    );
   });
 });
 

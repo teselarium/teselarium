@@ -62,7 +62,7 @@ function buildAskingSandbox(lines: SiteConsentLine[]): SandboxSnapshot {
     collection: null,
     errorMessage: null,
     apiMismatch: null,
-    siteConsent: { lines },
+    siteConsent: { lines, mosaic: null },
   };
   return sandbox;
 }
@@ -92,6 +92,22 @@ describe("SiteConsentDialog", function describeSiteConsentDialog(): void {
     expect(dialog.open).toBe(true);
     expect(screen.getByRole("heading", { name: "Probe" })).toBeInTheDocument();
     expect(dialog).toHaveTextContent(PROBE_MOD_SOURCE);
+  });
+
+  it("names the sites mosaic of a mod sandbox in its group", function namesSitesMosaic(): void {
+    const sitesSource = "https://mosaics.example.net/covers/mosaic.yaml";
+    const sandbox: SandboxSnapshot = {
+      ...buildAskingSandbox([]),
+      siteConsent: {
+        lines: [{ ...COVERS_LINE, key: "mosaic show", subject: "mosaic" }],
+        mosaic: { title: "Covers", source: sitesSource },
+      },
+    };
+
+    render(<SiteConsentDialog sandbox={sandbox} onAnswer={onAnswer} />);
+
+    expect(screen.getByRole("heading", { name: "Covers" })).toBeInTheDocument();
+    expect(document.querySelector("dialog")).toHaveTextContent(sitesSource);
   });
 
   it("Lines of a foreign mod", function listsLines(): void {

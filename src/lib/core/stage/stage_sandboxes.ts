@@ -13,9 +13,10 @@ import {
   connectModSession,
   describeCancelledApiMismatch,
   expandMosaicRequest,
-  grantLaunchMosaic,
+  grantInputsMosaic,
   loadLaunchMod,
   loadLaunchMosaic,
+  loadLaunchSites,
   loadLaunchTiles,
   loadModTilesOfKind,
   matchModApiRange,
@@ -23,6 +24,7 @@ import {
   pushLayoutChanged,
   pushThemeChanged,
   pushTilesChanged,
+  readDeclaringMosaic,
   readMosaicAliases,
   stopModSession,
 } from "../engine/index.ts";
@@ -360,7 +362,8 @@ function startPendingRuntime(
     inputs.modTiles,
     grants,
     services.loadsTileLinkedMedia,
-    grantLaunchMosaic(inputs.mosaic, services.appOrigin, decisions),
+    grantInputsMosaic(inputs, services.appOrigin, decisions),
+    inputs.sitesIssues,
   );
   runtime.pending = null;
   runtime.question = null;
@@ -370,7 +373,8 @@ function startPendingRuntime(
 
 /**
  * The second question: asks once about the sites of the pending mod and of
- * its mosaic, or starts it when there is nothing to ask.
+ * its mosaic, or of the mosaic its link names as `sites`, or starts it when
+ * there is nothing to ask.
  */
 function askSitesOrStart(
   runtime: SandboxRuntime,
@@ -381,7 +385,7 @@ function askSitesOrStart(
     inputs.mod,
     services.appOrigin,
     services.readSiteDecisions(),
-    inputs.mosaic,
+    readDeclaringMosaic(inputs),
   );
   if (lines.length === 0) {
     startPendingRuntime(runtime, services, inputs, [], null);
@@ -474,17 +478,21 @@ function isLineAllowed(
   return answer.allowed.includes(buildConsentLineKey(line));
 }
 
-/** The decision of one consent line, for the mod or for the mosaic that declared it. */
+/**
+ * The decision of one consent line, for the mod or for the mosaic that
+ * declared it, whether opened from it or named as `sites`.
+ */
 function buildConsentDecision(
   inputs: ModLaunchInputs,
   line: ConsentLine,
   allowed: boolean,
 ): SiteDecision {
   const fields = { category: line.category, host: line.host, allowed };
-  if (line.subject === "mosaic" && inputs.mosaic !== null) {
+  const mosaic = readDeclaringMosaic(inputs);
+  if (line.subject === "mosaic" && mosaic !== null) {
     const mosaicDecision: SiteDecision = {
-      mosaic: inputs.mosaic.source,
-      title: inputs.mosaic.title,
+      mosaic: mosaic.source,
+      title: mosaic.title,
       ...fields,
     };
     return mosaicDecision;
@@ -615,8 +623,9 @@ function keepRuntimeMosaic(
 }
 
 /**
- * Loads the link's mosaic, if any, and keeps it on the runtime, then the mod,
- * which it keeps too, then the tiles of the link or of the mosaic.
+ * Loads the link's mosaic, if any, and keeps it on the runtime, then the
+ * mosaic the link names as `sites`, if any, then the mod, which it keeps too,
+ * then the tiles of the link or of the mosaic.
  */
 async function loadRuntimeInputs(
   runtime: SandboxRuntime,
@@ -629,6 +638,7 @@ async function loadRuntimeInputs(
   };
   const mosaic = await loadLaunchMosaic(request, services.fetchOptions);
   keepRuntimeMosaic(runtime, services, mosaic);
+  const sites = await loadLaunchSites(request, services.fetchOptions);
   const launchRequest = expandMosaicRequest(request, mosaic);
   const mod = await loadLaunchMod(launchRequest, services.fetchOptions);
   runtime.loadedMod = mod;
@@ -637,6 +647,7 @@ async function loadRuntimeInputs(
     launchRequest.link,
     services.fetchOptions,
     mosaic,
+    sites,
   );
 }
 

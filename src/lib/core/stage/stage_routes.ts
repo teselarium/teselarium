@@ -142,7 +142,8 @@ function haveSameParams(
 
 /**
  * Whether two links are the same: same mod reference, collection, tile,
- * mosaic and params. An absent tile or mosaic is the same as a `null` one.
+ * mosaic, sites and params. An absent tile, mosaic or sites is the same as a
+ * `null` one.
  */
 export function areSameLinks(first: RunLink, second: RunLink): boolean {
   return (
@@ -150,6 +151,7 @@ export function areSameLinks(first: RunLink, second: RunLink): boolean {
     first.collection === second.collection &&
     (first.tile ?? null) === (second.tile ?? null) &&
     (first.mosaic ?? null) === (second.mosaic ?? null) &&
+    (first.sites ?? null) === (second.sites ?? null) &&
     haveSameParams(first.params, second.params)
   );
 }

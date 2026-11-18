@@ -89,7 +89,7 @@ A name listed under two fields (`{ title: ["name"], label: ["name"] }`), or a na
 
 `permissions` is a mapping whose only key is `show`: the hosts the collection's images, media, fonts and stylesheets come from. Each line is a mapping with a non-empty string `host` and a non-empty string `reason`, and the host follows the mod file's [rules for `show` hosts](../mod/README.md#permission-categories), wildcard hosts included. Any other category, such as `connect` or `open`, raises `MosaicFormatError` saying that a mosaic can only declare `show` permissions: a mosaic chooses data, not what the mod's code may reach.
 
-The loaded lines keep the file order, as `{ category: "show", host, reason }`. How they are granted, and when the user is asked, is described in the [sandbox module](../core/sandbox/README.md#permissions-of-a-mosaic).
+The loaded lines keep the file order, as `{ category: "show", host, reason }`. They apply to the sandbox opened from the mosaic, and to a sandbox whose run link names the mosaic as `sites`, which gets these lines and nothing else of the mosaic (see the [stage module](../core/stage/README.md#run-links)). How they are granted, and when the user is asked, is described in the [sandbox module](../core/sandbox/README.md#permissions-of-a-mosaic).
 
 ## Module Details
 

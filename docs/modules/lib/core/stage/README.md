@@ -21,7 +21,7 @@ What a page shows is up to the app (`src/main/pages/`): the stage only records w
 A run link's address hash is:
 
 ```
-#/run?mod=<reference>&collection=<location>&<params>
+#/run?mod=<reference>&collection=<location>&sites=<reference>&<params>
 #/run?mod=<reference>&tile=<location>&<params>
 #/run?mosaic=<reference>&<params>
 ```
@@ -32,8 +32,9 @@ A run link's address hash is:
 - Without a `collection` or a `tile`, the mod gets no tiles. An empty `collection` or `tile` is the same as none.
 - A link has a collection or a tile, not both. A link with both opens a sandbox that shows `A link cannot have both a collection and a tile.`, requests no file and starts no frame (`RunLinkConflictError`, see [Messages and load failures](#messages-and-load-failures)).
 - `mosaic` is a mosaic reference (see the [mosaic module](../../mosaic/README.md#mosaic-references)): a mosaic file, or a folder, which means the `mosaic.yaml` in it. The stage loads the mosaic file, then opens its mod with its collection as a link with that `mod` and `collection` would, with the mosaic's config, aliases and `show` permissions (see the [engine module](../engine/README.md#launch)). The address stays the mosaic link: it never shows the mod or the collection the file names.
-- A link to a mosaic has no `mod`, `collection` or `tile`. A link with a non-empty `mosaic` and any of them opens a sandbox that shows `A link to a mosaic cannot also have a mod, a collection or a tile.`, requests no file and starts no frame (`MosaicLinkConflictError`).
-- Every other parameter is passed to the mod as `context.params`, in link order, with the first value of a repeated key. `mod`, `collection`, `tile` and `mosaic` are reserved: they are never in `params`. The engine's `RUN_LINK_RESERVED_NAMES` lists them, and `mods.open` and `mosaics.open` refuse them in their `params`.
+- `sites` is the optional mosaic reference of a link with `mod`. Before the mod's frame starts, the stage loads that mosaic file and grants its `show` lines to the sandbox, as for a mod opened from that mosaic: a mosaic from another origin is asked about in the mosaic's group of the site consent dialog and remembered for that mosaic file, refused lines are warnings whose source is the mosaic file, and blocked `show` requests name it. Nothing else of it is used: not its mod, collection, config or aliases, the mount context's `mosaic` stays `null`, and the stage bar shows no mosaic. A `sites` mosaic that cannot be loaded does not stop the mod: it runs without those lines, with a `warning` from the app whose source is the mosaic file's address and whose text gives the reason and says `Its sites were not granted.`. An empty `sites` is the same as none. Only the app builds such links: mods cannot send `sites`.
+- A link to a mosaic has no `mod`, `collection`, `tile` or `sites`. A link with a non-empty `mosaic` and any of them opens a sandbox that shows `A link to a mosaic cannot also have a mod, a collection, a tile or sites.`, requests no file and starts no frame (`MosaicLinkConflictError`).
+- Every other parameter is passed to the mod as `context.params`, in link order, with the first value of a repeated key. `mod`, `collection`, `tile`, `mosaic` and `sites` are reserved: they are never in `params`. The engine's `RUN_LINK_RESERVED_NAMES` lists them, and `mods.open` and `mosaics.open` refuse them in their `params`.
 - Values are percent-encoded, and relative ones are resolved against the app's address when the mod is launched. So a link means the same in the address bar, in a `mods.open` request and after a reload, also under a sub-path such as GitHub Pages' `/<repo>/`.
 
 Examples, for an app at `https://example.org/`:
@@ -50,10 +51,11 @@ Examples, for an app at `https://example.org/`:
 | `#/run?mod=./samples/mods/country_map&collection=./samples/tiles/literature_nobel_laureates` | the country map with the collection file `./samples/tiles/literature_nobel_laureates/collection.yaml` |
 | `#/run?mosaic=./samples/mosaics/nobel_map.yaml&from=x` | the mosaic's mod with its collection, and `params` `{ "from": "x" }` |
 | `#/run?mosaic=./samples/mosaics/nobel_map` | the mosaic file `./samples/mosaics/nobel_map/mosaic.yaml` |
+| `#/run?mod=./samples/mods/flashcards&collection=./samples/tiles/literature_nobel_laureates_books/collection.yaml&sites=./samples/mosaics/nobel_books_list.yaml` | Flashcards with the books, and the `show` lines of the books' mosaic, so the covers load |
 | `#/run?mosaic=./samples/mosaics/nobel_map.yaml&mod=mod_viewer` | an error: a link to a mosaic cannot also have a mod |
 | `#/run?mosaic=` | Home |
 
-`buildRunLink` writes `mosaic` when present, `mod` unless it is the empty `mod` of a mosaic link, then `collection` and `tile` when present, then the params. A mosaic link is the `RunLink` `{ mod: "", collection: null, tile: null, mosaic, params }`. Mods never build these addresses. A mod sends `mods.open` with `{ mod, collection, tile, params, replace }`, or `mosaics.open` with `{ mosaic, params, replace }`, and the stage turns it into the run link.
+`buildRunLink` writes `mosaic` when present, `mod` unless it is the empty `mod` of a mosaic link, then `collection`, `tile` and `sites` when present, then the params. A mosaic link is the `RunLink` `{ mod: "", collection: null, tile: null, mosaic, params }`. Mods never build these addresses. A mod sends `mods.open` with `{ mod, collection, tile, params, replace }`, or `mosaics.open` with `{ mosaic, params, replace }`, and the stage turns it into the run link.
 
 ### Sandboxes and their ids
 
@@ -126,10 +128,10 @@ Each sandbox keeps its own messages, which the stage bar shows for the visible s
 
 Every message stays in memory only: a page reload or a new sandbox starts again with none.
 
-When the mosaic file, the mod file, its entrypoint, its tile type file, the collection or the tile cannot be loaded, a link names a switched-off default mod, a link has both a collection and a tile, or a link to a mosaic also has a mod, a collection or a tile, the sandbox shows the error and no frame, and keeps its history entry and its ×. A mosaic file that cannot be loaded, or does not follow the mosaic file format, requests neither the mod nor the collection. The same error is an `error` message from the app, whose text is the error's message. Its source is:
+When the mosaic file, the mod file, its entrypoint, its tile type file, the collection or the tile cannot be loaded, a link names a switched-off default mod, a link has both a collection and a tile, or a link to a mosaic also has a mod, a collection, a tile or sites, the sandbox shows the error and no frame, and keeps its history entry and its ×. A mosaic file that cannot be loaded, or does not follow the mosaic file format, requests neither the mod nor the collection. The same error is an `error` message from the app, whose text is the error's message. Its source is:
 
 - the file that failed, for the errors that name one (`FileFetchError`, `MarkdownParseError`, `YamlParseError`, `ModFormatError`, `MosaicFormatError`, `CollectionFormatError`, `TileTypeError`): the mosaic file, the mod file, the entrypoint, the tile type file, the collection or the tile;
-- the link's mosaic reference resolved against the app's address, for a link to a mosaic that also has a mod, a collection or a tile (`MosaicLinkConflictError`);
+- the link's mosaic reference resolved against the app's address, for a link to a mosaic that also has a mod, a collection, a tile or sites (`MosaicLinkConflictError`);
 - otherwise the loaded mod's source, for a cancelled mod API question, or the link's mod reference resolved against the app's address, for a switched-off default mod or a link with both a collection and a tile.
 
 The stage bar shows a mosaic's title before the mod's name once the mosaic file is loaded, and "Loading mosaic…" or "Mosaic not loaded" before (see the [stage bar](../../../main/README.md#the-stage-bar)), from the snapshot's `mosaicReference` and `mosaic`.

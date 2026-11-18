@@ -26,7 +26,7 @@ export class RunLinkConflictError extends Error {
 }
 
 /**
- * A run link names a mosaic and also a mod, a collection or a tile. `source`
+ * A run link names a mosaic and also a mod, a collection, a tile or sites. `source`
  * is the link's mosaic reference, resolved. It is thrown before any file is
  * requested.
  */
@@ -35,7 +35,7 @@ export class MosaicLinkConflictError extends Error {
 
   constructor(source: string, options?: ErrorOptions) {
     super(
-      "A link to a mosaic cannot also have a mod, a collection or a tile.",
+      "A link to a mosaic cannot also have a mod, a collection, a tile or sites.",
       options,
     );
     this.name = "MosaicLinkConflictError";

@@ -179,6 +179,7 @@ describe("findLinkSection", function describeFindLinkSection(): void {
       { mod: "mod_explorer", collection: "./c.yaml", params: {} },
       { mod: "mod_explorer", collection: null, tile: "./a.md", params: {} },
       { mod: "mod_explorer", collection: null, params: { from: "home" } },
+      { mod: "mod_explorer", collection: null, sites: "./m.yaml", params: {} },
     ];
 
     for (const link of otherLinks) {

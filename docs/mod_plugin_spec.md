@@ -223,7 +223,7 @@ await engine.request("mosaics.open", {
 });
 ```
 
-`mosaics.inspect` answers the mosaic's `source`, `title`, `description`, the resolved `mod` and `collection`, its own `config` and `aliases`, and `permissions`, the `granted` and `denied` lists its `show` lines would get without asking; it requests nothing else and never asks the user. `mosaics.open` takes `params`, without `mod`, `collection`, `tile` or `mosaic`, and `replace`, as `mods.open` does, and only the visible mod can open mosaics. The mosaic's load failures belong to the new sandbox.
+`mosaics.inspect` answers the mosaic's `source`, `title`, `description`, the resolved `mod` and `collection`, its own `config` and `aliases`, and `permissions`, the `granted` and `denied` lists its `show` lines would get without asking; it requests nothing else and never asks the user. `mosaics.open` takes `params`, without `mod`, `collection`, `tile`, `mosaic` or `sites`, and `replace`, as `mods.open` does, and only the visible mod can open mosaics. The mosaic's load failures belong to the new sandbox.
 
 The mod opened from a mosaic tells it apart from a mod link with `context.mosaic`:
 
@@ -237,7 +237,7 @@ export default function mount(engine, context) {
 
 ## Opening a tile
 
-A mod opens another mod with `mods.open`, which needs the same `open` permission. With `tile`, the location of one tile file, the opened mod receives that tile as `context.tiles`, loaded and validated before its frame starts, with its media allowed as for the tiles of a collection (see [Inspecting and opening mods](modules/lib/core/engine/README.md#inspecting-and-opening-mods) in the engine's README). A link has a collection or a tile, not both, and `mod`, `collection`, `tile` and `mosaic` cannot be passed in `params`:
+A mod opens another mod with `mods.open`, which needs the same `open` permission. With `tile`, the location of one tile file, the opened mod receives that tile as `context.tiles`, loaded and validated before its frame starts, with its media allowed as for the tiles of a collection (see [Inspecting and opening mods](modules/lib/core/engine/README.md#inspecting-and-opening-mods) in the engine's README). A link has a collection or a tile, not both, and `mod`, `collection`, `tile`, `mosaic` and `sites` cannot be passed in `params`:
 
 ```js
 await engine.request("mods.open", {

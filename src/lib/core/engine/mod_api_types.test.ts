@@ -48,9 +48,9 @@ describe("default_mods/mod_api.d.ts", function describeModApiTypes(): void {
     expectTypeOf<TileCollectionIndex>().toExtend<DeclaredCollectionInspection>();
   });
 
-  it("declares the mods.open params the engine reads: the link's fields but mosaic, and replace", function checksModOpenParams(): void {
+  it("declares the mods.open params the engine reads: the link's fields but mosaic and sites, and replace", function checksModOpenParams(): void {
     expectTypeOf<keyof DeclaredModOpenParams>().toEqualTypeOf<
-      Exclude<keyof RunLink, "mosaic"> | "replace"
+      Exclude<keyof RunLink, "mosaic" | "sites"> | "replace"
     >();
     expectTypeOf<DeclaredModOpenParams["replace"]>().toEqualTypeOf<
       boolean | undefined

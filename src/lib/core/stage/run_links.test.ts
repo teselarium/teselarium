@@ -186,6 +186,37 @@ describe("readAppRoute", function describeReadAppRoute(): void {
     });
   });
 
+  it("Link with sites", function readsSites(): void {
+    const route = readAppRoute(
+      "#/run?mod=flashcards&collection=./c.yaml&sites=./m.yaml&from=x",
+    );
+
+    expect(route).toEqual({
+      page: "run",
+      link: {
+        mod: "flashcards",
+        collection: "./c.yaml",
+        tile: null,
+        sites: "./m.yaml",
+        params: { from: "x" },
+      },
+    });
+  });
+
+  it("Sites is not a parameter of the mod, and empty means none", function reservesSites(): void {
+    const route = readAppRoute("#/run?mod=flashcards&sites=&from=x");
+
+    expect(route).toEqual({
+      page: "run",
+      link: {
+        mod: "flashcards",
+        collection: null,
+        tile: null,
+        params: { from: "x" },
+      },
+    });
+  });
+
   it("No hash", function readsNoHash(): void {
     expect(readAppRoute("")).toEqual({ page: "home" });
     expect(readAppRoute("#/")).toEqual({ page: "home" });
@@ -256,6 +287,20 @@ describe("buildRunLink", function describeBuildRunLink(): void {
     );
   });
 
+  it("writes sites after the collection and the tile, before the params", function buildsSites(): void {
+    const runLink = buildRunLink({
+      mod: "flashcards",
+      collection: "./c.yaml",
+      tile: null,
+      sites: "./m.yaml",
+      params: { from: "x" },
+    });
+
+    expect(runLink).toBe(
+      "#/run?mod=flashcards&collection=.%2Fc.yaml&sites=.%2Fm.yaml&from=x",
+    );
+  });
+
   it("gives the link back when read", function roundTrips(): void {
     const links: RunLink[] = [
       { mod: "mod_viewer", collection: null, tile: null, params: {} },
@@ -276,6 +321,13 @@ describe("buildRunLink", function describeBuildRunLink(): void {
         collection: null,
         tile: null,
         mosaic: "https://example.org/a b&c/mosaic.yaml",
+        params: { from: "y" },
+      },
+      {
+        mod: "flashcards",
+        collection: "https://example.org/c.yaml",
+        tile: null,
+        sites: "https://example.org/a b&c/mosaic.yaml",
         params: { from: "y" },
       },
     ];

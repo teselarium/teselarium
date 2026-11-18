@@ -432,6 +432,56 @@ async function answerRemoteTile(route: Route): Promise<void> {
   });
 }
 
+/** A mosaic of the probe on the app's origin that declares `show` for `IMAGES_HOST`, and nothing the probe needs. */
+const SITES_MOSAIC_FILE = [
+  "mosaic:",
+  '  title: "Images"',
+  '  mod: "../probe/"',
+  "  config:",
+  "    from_mosaic: true",
+  "  permissions:",
+  "    show:",
+  `      - host: "${IMAGES_HOST}"`,
+  '        reason: "Shows the images"',
+].join("\n");
+
+test.describe(
+  "Sites from a mosaic",
+  { tag: "@frames" },
+  function describeSites(): void {
+    test("Sites link from the app's origin", async function grantsSitesLines({
+      page,
+    }): Promise<void> {
+      await routeImages(page, `${IMAGES_HOST}/**`);
+      await serveAppOriginMod(page, {
+        ...buildProbeFiles("other"),
+        "mosaics/images.yaml": SITES_MOSAIC_FILE,
+      });
+
+      await page.goto(
+        "/#/run?mod=./test-mods/other/&sites=./test-mods/mosaics/images.yaml",
+      );
+      const frame = await findModFrame(page, "other");
+      await waitForProbe(frame);
+
+      expect(await frame.evaluate(showImage, `${IMAGES_HOST}/other.jpg`)).toBe(
+        true,
+      );
+      const context = await frame.evaluate(readProbeContext);
+      expect(context.mosaic).toBeNull();
+      expect(context.params).toEqual({});
+      expect(context.config).not.toHaveProperty("from_mosaic");
+      expect(context.permissions).toEqual({
+        granted: [
+          { category: "show", host: IMAGES_HOST, reason: "Shows the images" },
+        ],
+        denied: [],
+      });
+      await expectNoIssues(page);
+    });
+  },
+);
+
 test.describe(
   "Grant declared permissions to mods from the app's origin",
   { tag: "@frames" },

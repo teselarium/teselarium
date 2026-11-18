@@ -331,6 +331,13 @@ const OPEN_LIBRARY_COVER_URL = `${OPEN_LIBRARY_HOST}/b/id/1.jpg`;
 const OPEN_LIBRARY_LINE = `show content from ${OPEN_LIBRARY_HOST}`;
 const APP_PROBE_TITLE = "App probe";
 const APP_PROBE_FOLDER = `${PREVIEW_URL}/test-mods/probe/`;
+const OTHER_PROBE_TITLE = "Other probe";
+
+/** The run link of the second app-origin probe with the mosaic file `source` as `sites`. */
+function buildSitesHash(source: string): string {
+  const hash = `#/run?mod=./test-mods/other/&sites=${encodeURIComponent(source)}`;
+  return hash;
+}
 
 /** The run link of a mosaic file. */
 function buildMosaicHash(source: string): string {
@@ -353,17 +360,17 @@ function buildCoversMosaic(mod: string, title: string = MOSAIC_TITLE): string {
 }
 
 /**
- * Serves the app-origin probe, titled `App probe` and declaring nothing, the
- * foreign mosaics `maps/mosaic.yaml` and `maps/other.yaml` of it, and the
- * covers of both image hosts.
+ * Serves the app-origin probe, titled `App probe` and declaring nothing, a
+ * second one, titled `Other probe`, the foreign mosaics `maps/mosaic.yaml`
+ * and `maps/other.yaml` of the first, and the covers of both image hosts.
  */
 async function serveCoversMosaics(page: Page): Promise<void> {
   await routeCovers(page);
   await routeImages(page, `${OPEN_LIBRARY_HOST}/**`);
-  await serveAppOriginMod(
-    page,
-    buildProbeFiles("probe", [`  title: "${APP_PROBE_TITLE}"`]),
-  );
+  await serveAppOriginMod(page, {
+    ...buildProbeFiles("probe", [`  title: "${APP_PROBE_TITLE}"`]),
+    ...buildProbeFiles("other", [`  title: "${OTHER_PROBE_TITLE}"`]),
+  });
   await serveForeignMod(
     page,
     {
@@ -549,6 +556,49 @@ test.describe("Remember keeps the answer for that mosaic", function describeMosa
     expect(await frame.evaluate(showImage, OPEN_LIBRARY_COVER_URL)).toBe(false);
     const context = await frame.evaluate(readProbeContext);
     expect(context.permissions).toEqual({ granted: [], denied: [] });
+  });
+});
+
+test.describe("Sites links ask as their mosaic does", function describeSitesAsk(): void {
+  test("Asked once for a new mosaic", async function asksForSites({
+    page,
+  }): Promise<void> {
+    await serveCoversMosaics(page);
+
+    await page.goto(`/${buildSitesHash(MOSAIC_SOURCE)}`);
+
+    const mosaicGroup = consentGroup(page, MOSAIC_TITLE);
+    await expect(mosaicGroup).toContainText(MOSAIC_SOURCE);
+    await expect(mosaicGroup.getByRole("checkbox")).toHaveAccessibleName(
+      OPEN_LIBRARY_LINE,
+    );
+    await expect(lineCheckbox(page, MOSAIC_REMEMBER_LABEL)).toBeVisible();
+    await expect(visibleSandbox(page).locator("iframe")).toHaveCount(0);
+
+    await answerSiteConsent(page, "Allow");
+    const frame = await waitForProbeFrame(page, OTHER_PROBE_TITLE);
+    expect(await frame.evaluate(showImage, OPEN_LIBRARY_COVER_URL)).toBe(true);
+  });
+
+  test("Remembered from the mosaic", async function appliesMosaicDecision({
+    page,
+  }): Promise<void> {
+    await serveCoversMosaics(page);
+    await page.goto(`/${buildMosaicHash(MOSAIC_SOURCE)}`);
+    await clickCheckedTo(lineCheckbox(page, MOSAIC_REMEMBER_LABEL), true);
+    await siteConsentDialog(page)
+      .getByRole("button", { name: "Allow" })
+      .click();
+    await waitForProbeFrame(page, APP_PROBE_TITLE);
+    await stageBar(page).getByRole("button", { name: "Close" }).click();
+
+    await followLink(page, buildSitesHash(MOSAIC_SOURCE));
+    const frame = await waitForProbeFrame(page, OTHER_PROBE_TITLE);
+
+    await expectNoDialog(page);
+    expect(await frame.evaluate(showImage, OPEN_LIBRARY_COVER_URL)).toBe(true);
+    const context = await frame.evaluate(readProbeContext);
+    expect(context.mosaic).toBeNull();
   });
 });
 

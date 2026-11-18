@@ -27,12 +27,12 @@ function readLinkParams(query: URLSearchParams): Record<string, string> {
 }
 
 /**
- * Reads an address hash. `#/run?mod=<reference>&collection=<location>&tile=<location>&...`
+ * Reads an address hash. `#/run?mod=<reference>&collection=<location>&tile=<location>&sites=<reference>&...`
  * with a non-empty `mod`, or `#/run?mosaic=<reference>&...` with a non-empty
  * `mosaic`, is a run route; every other hash, including `""`, `#/` and old
  * links such as `#/mods/view`, is home. A link with both a collection and a
- * tile, or with a mosaic and a mod, a collection or a tile, is read as
- * written; launching it fails.
+ * tile, or with a mosaic and a mod, a collection, a tile or sites, is read as
+ * written; launching it fails. An empty `sites` means none.
  */
 export function readAppRoute(hash: string): AppRoute {
   const queryStart = hash.indexOf("?");
@@ -55,14 +55,18 @@ export function readAppRoute(hash: string): AppRoute {
   if (mosaic !== null) {
     link.mosaic = mosaic;
   }
+  const sites = readLinkLocation(query, "sites");
+  if (sites !== null) {
+    link.sites = sites;
+  }
   const runRoute: AppRoute = { page: "run", link };
   return runRoute;
 }
 
 /**
  * Builds the run link hash of a link: `mosaic` when present, `mod` unless it
- * is the empty mod of a mosaic link, then `collection` and `tile` when
- * present, then the params. A mosaic link's address therefore never shows the
+ * is the empty mod of a mosaic link, then `collection`, `tile` and `sites`
+ * when present, then the params. A mosaic link's address therefore never shows the
  * mod or the collection its file names.
  */
 export function buildRunLink(link: RunLink): string {
@@ -80,6 +84,10 @@ export function buildRunLink(link: RunLink): string {
   const tile = link.tile ?? null;
   if (tile !== null) {
     query.append("tile", tile);
+  }
+  const sites = link.sites ?? null;
+  if (sites !== null) {
+    query.append("sites", sites);
   }
   for (const [name, value] of Object.entries(link.params)) {
     query.append(name, value);

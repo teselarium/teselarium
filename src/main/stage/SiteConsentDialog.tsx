@@ -101,13 +101,17 @@ function listSubjectLines(
   return subjectLines;
 }
 
-/** The mosaic's title and address, or its reference while it has no title. */
+/**
+ * The asked mosaic's title and address (the sandbox's mosaic, or the one its
+ * link names as `sites`), or its reference while it has no title.
+ */
 function readMosaicHeading(sandbox: SandboxSnapshot): {
   title: string;
   source: string;
 } {
-  const source = sandbox.mosaic?.source ?? sandbox.mosaicReference ?? "";
-  const heading = { title: sandbox.mosaic?.title ?? "Mosaic", source };
+  const mosaic = sandbox.siteConsent?.mosaic ?? sandbox.mosaic;
+  const source = mosaic?.source ?? sandbox.mosaicReference ?? "";
+  const heading = { title: mosaic?.title ?? "Mosaic", source };
   return heading;
 }
 

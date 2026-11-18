@@ -1,6 +1,6 @@
 import {
   buildModLaunch,
-  grantLaunchMosaic,
+  grantInputsMosaic,
   loadModLaunchInputs,
 } from "../lib/core/engine/index.ts";
 import type {
@@ -25,7 +25,7 @@ export interface TestLaunchOptions {
 }
 
 /**
- * Loads a mod, or a mosaic and its mod, as the stage does and builds its launch with the grants of
+ * Loads a mod, or a mosaic and its mod, and a link's `sites`, as the stage does and builds its launch with the grants of
  * `decisions`: by default on `APP_ORIGIN`, with `TEST_DEFAULTS`, no decision,
  * "Load media linked by tiles" on and `fetchTestFile` at `APP_BASE_URL`.
  */
@@ -46,7 +46,8 @@ export async function launchTestMod(
     inputs.modTiles,
     grants,
     options.loadsTileLinkedMedia ?? true,
-    grantLaunchMosaic(inputs.mosaic, appOrigin, decisions),
+    grantInputsMosaic(inputs, appOrigin, decisions),
+    inputs.sitesIssues,
   );
   return launch;
 }

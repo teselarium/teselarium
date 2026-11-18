@@ -19,6 +19,7 @@ import {
   markFrame,
   MEDIA_HOST,
   readMessages,
+  readProbeContext,
   routeImages,
   serveAppOriginMod,
   serveForeignMod,
@@ -232,6 +233,83 @@ test.describe("Open a mosaic from a run link", function describeMosaicLinks(): v
   });
 });
 
+const IMAGES_HOST = "https://images.example.net";
+
+/** `./test-mods/mosaics/images.yaml`: a mosaic of the probe that declares `show` for `IMAGES_HOST`. */
+const SITES_MOSAIC_REFERENCE = "./test-mods/mosaics/images.yaml";
+
+/** The second probe opened with the images mosaic as `sites`. */
+const SITES_HASH = `${OTHER_PROBE_HASH}&sites=${SITES_MOSAIC_REFERENCE}`;
+
+/** Serves the probe, the second probe and the images mosaic of the probe, and answers the images. */
+async function serveSitesMosaic(page: Page): Promise<void> {
+  await routeImages(page, `${IMAGES_HOST}/**`);
+  await serveAppOriginMod(page, {
+    ...buildProbeFiles("probe"),
+    ...buildProbeFiles("other"),
+    "mosaics/images.yaml": [
+      "mosaic:",
+      '  title: "Images"',
+      '  mod: "../probe/"',
+      "  permissions:",
+      "    show:",
+      `      - host: "${IMAGES_HOST}"`,
+      '        reason: "Shows the images"',
+    ].join("\n"),
+  });
+}
+
+test.describe("Sites of a mosaic in a run link", function describeSitesLinks(): void {
+  test("Shared link after a reload", async function opensSharedSitesLink({
+    page,
+    context,
+  }): Promise<void> {
+    await serveSitesMosaic(page);
+    await page.goto(`/${SITES_HASH}`);
+    const frame = await findModFrame(page, "other");
+    await waitForProbe(frame);
+    const granted = await frame.evaluate(readProbeContext);
+    const sharedLink = page.url();
+
+    const newPage = await context.newPage();
+    await serveSitesMosaic(newPage);
+    await newPage.goto(sharedLink);
+    const newFrame = await findModFrame(newPage, "other");
+    await waitForProbe(newFrame);
+
+    expect(sharedLink).toContain("sites=");
+    const newContext = await newFrame.evaluate(readProbeContext);
+    expect(newContext.permissions).toEqual(granted.permissions);
+    expect(newContext.permissions).toMatchObject({
+      granted: [{ category: "show", host: IMAGES_HOST }],
+    });
+    expect(await newFrame.evaluate(showImage, `${IMAGES_HOST}/a.jpg`)).toBe(
+      true,
+    );
+  });
+
+  test("Missing sites mosaic", async function warnsMissingSites({
+    page,
+  }): Promise<void> {
+    await serveAppOriginMod(page, buildProbeFiles("other"));
+
+    await page.goto(
+      `/${OTHER_PROBE_HASH}&sites=./test-mods/mosaics/missing.yaml`,
+    );
+    const frame = await findModFrame(page, "other");
+    await waitForProbe(frame);
+    const mosaicSource = new URL("/test-mods/mosaics/missing.yaml", page.url())
+      .href;
+
+    await expectMessageCount(page, "Warnings", 1);
+    const warnings = await readMessages(page, "Warnings");
+    expect(warnings[0].producer).toBe("App");
+    expect(warnings[0].source).toBe(mosaicSource);
+    expect(warnings[0].text).toContain("404");
+    expect(warnings[0].text).toContain("Its sites were not granted.");
+  });
+});
+
 test.describe("A mosaic link has no mod, collection or tile", function describeMosaicConflict(): void {
   test("Mosaic and mod", async function refusesMosaicWithMod({
     page,
@@ -242,7 +320,7 @@ test.describe("A mosaic link has no mod, collection or tile", function describeM
     await page.goto(`/${LABELS_MOSAIC_HASH}&mod=mod_viewer`);
 
     await expect(page.getByRole("alert")).toContainText(
-      "A link to a mosaic cannot also have a mod, a collection or a tile.",
+      "A link to a mosaic cannot also have a mod, a collection, a tile or sites.",
     );
     await expect(page.locator("iframe")).toHaveCount(0);
     for (const url of requestedUrls) {
@@ -262,7 +340,7 @@ test.describe("A mosaic link has no mod, collection or tile", function describeM
     );
 
     await expect(page.getByRole("alert")).toContainText(
-      "A link to a mosaic cannot also have a mod, a collection or a tile.",
+      "A link to a mosaic cannot also have a mod, a collection, a tile or sites.",
     );
     await expect(page.locator("iframe")).toHaveCount(0);
     for (const url of requestedUrls) {

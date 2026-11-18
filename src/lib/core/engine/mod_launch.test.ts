@@ -559,7 +559,7 @@ describe("Mosaic links", function describeMosaicLinks(): void {
 
     await expect(launching).rejects.toThrow(MosaicLinkConflictError);
     await expect(launching).rejects.toThrow(
-      "A link to a mosaic cannot also have a mod, a collection or a tile.",
+      "A link to a mosaic cannot also have a mod, a collection, a tile or sites.",
     );
     await expect(launching).rejects.toHaveProperty(
       "source",
@@ -585,6 +585,21 @@ describe("Mosaic links", function describeMosaicLinks(): void {
 
     await expect(withCollection).rejects.toThrow(MosaicLinkConflictError);
     await expect(withTile).rejects.toThrow(MosaicLinkConflictError);
+    expect(testFetch).not.toHaveBeenCalled();
+  });
+
+  it("Mosaic and sites", async function refusesMosaicWithSites(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const launching = loadInputs(
+      { ...buildMosaicLink(SAMPLE_MOSAIC_REFERENCE), sites: "./m.yaml" },
+      testFetch,
+    );
+
+    await expect(launching).rejects.toThrow(MosaicLinkConflictError);
+    await expect(launching).rejects.toThrow(
+      "A link to a mosaic cannot also have a mod, a collection, a tile or sites.",
+    );
     expect(testFetch).not.toHaveBeenCalled();
   });
 
@@ -855,6 +870,167 @@ describe("Permissions of a mosaic", function describeMosaicPermissions(): void {
     expect(readDirective(modLaunch.policy, "img-src")).not.toContain(
       "archive.org",
     );
+  });
+});
+
+const SITES_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mosaics/sites/mosaic.yaml`;
+const MISSING_SITES_MOSAIC_SOURCE = `${FIXTURES_BASE_URL}mosaics/missing/mosaic.yaml`;
+
+/** Serves a mosaic of the untyped mod at `source` with a config and the archive's `show` line. */
+function serveSitesMosaic(source: string): void {
+  serveTestMosaic(source, [
+    'title: "Covers"',
+    `mod: "${UNTYPED_MOD_SOURCE}"`,
+    "config:",
+    "  show_covers: false",
+    "permissions:",
+    "  show:",
+    `    - host: "${ARCHIVE_LINE.host}"`,
+    `      reason: "${ARCHIVE_LINE.reason}"`,
+  ]);
+}
+
+/** A link to the sample mod and collection that names `sites`, as the stage reads `#/run?mod=…&sites=…`. */
+function buildSitesLink(sites: string): RunLink {
+  const link: RunLink = {
+    mod: SAMPLE_MOD_REFERENCE,
+    collection: SAMPLE_COLLECTION_REFERENCE,
+    tile: null,
+    sites,
+    params: {},
+  };
+  return link;
+}
+
+describe("Sites of a mosaic", function describeSitesOfMosaic(): void {
+  it("Covers kept for another mod", async function keepsOnlyShowLines(): Promise<void> {
+    serveSitesMosaic(SITES_MOSAIC_SOURCE);
+
+    const inputs = await loadInputs(buildSitesLink(SITES_MOSAIC_SOURCE));
+    const launch = await launchMod(buildSitesLink(SITES_MOSAIC_SOURCE));
+
+    expect(inputs.mosaic).toBeNull();
+    expect(inputs.sites?.source).toBe(SITES_MOSAIC_SOURCE);
+    expect(inputs.sitesIssues).toEqual([]);
+    expect(launch.mod.source).toBe(SAMPLE_MOD_SOURCE);
+    expect(launch.mosaic).toBeNull();
+    expect(launch.sites?.source).toBe(SITES_MOSAIC_SOURCE);
+    expect(launch.context.mosaic).toBeNull();
+    expect(launch.context.params).toEqual({});
+    expect(launch.context.config).toEqual({ show_covers: true });
+    expect(launch.context.tiles).toHaveLength(3);
+    expect(launch.tilesSource).toBe(SAMPLE_COLLECTION_SOURCE);
+  });
+
+  it("Covers of the books' mosaic for Flashcards", async function grantsSitesLines(): Promise<void> {
+    serveSitesMosaic(SITES_MOSAIC_SOURCE);
+
+    const launch = await launchMod(buildSitesLink(SITES_MOSAIC_SOURCE));
+
+    expect(launch.context.permissions).toEqual({
+      granted: [SAMPLE_COVERS_PERMISSION, ARCHIVE_LINE],
+      denied: [],
+    });
+    expect(launch.issues).toEqual([]);
+  });
+
+  it("Other mod with sites", async function grantsToOtherMod(): Promise<void> {
+    serveUntypedMosaic(PERMISSIONS_MOSAIC_SOURCE, ARCHIVE_LINE);
+    await launchMod(buildMosaicLink(PERMISSIONS_MOSAIC_SOURCE));
+
+    const otherLaunch = await launchMod(
+      buildSitesLink(PERMISSIONS_MOSAIC_SOURCE),
+    );
+
+    expect(readDirective(otherLaunch.policy, "img-src")).toContain(
+      ARCHIVE_LINE.host,
+    );
+  });
+
+  it("does not make the sites mosaic's origin a content host", async function keepsContentHosts(): Promise<void> {
+    serveSitesMosaic(FOREIGN_PERMISSIONS_MOSAIC_SOURCE);
+
+    const launch = await launchMod(
+      buildSitesLink(FOREIGN_PERMISSIONS_MOSAIC_SOURCE),
+    );
+
+    expect(launch.contentHosts).not.toContain("https://mosaics.example.net");
+  });
+
+  it("Missing sites mosaic", async function warnsMissingSites(): Promise<void> {
+    const testFetch = createTestFetch();
+
+    const launch = await launchMod(
+      buildSitesLink(`${FIXTURES_REFERENCE}mosaics/missing`),
+      APP_ORIGIN,
+      testFetch,
+    );
+
+    expect(launch.mod.source).toBe(SAMPLE_MOD_SOURCE);
+    expect(launch.sites).toBeNull();
+    expect(launch.context.permissions.granted).toEqual([
+      SAMPLE_COVERS_PERMISSION,
+    ]);
+    expect(launch.issues).toHaveLength(1);
+    expect(launch.issues[0].level).toBe("warning");
+    expect(launch.issues[0].source).toBe(MISSING_SITES_MOSAIC_SOURCE);
+    expect(launch.issues[0].message).toContain("404");
+    expect(launch.issues[0].message).toContain("Its sites were not granted.");
+    expect(listRequestedUrls(testFetch)).toContain(MISSING_SITES_MOSAIC_SOURCE);
+  });
+
+  it("warns about a sites mosaic that does not follow the format", async function warnsUntitledSites(): Promise<void> {
+    serveTestMosaic(SITES_MOSAIC_SOURCE, [`mod: "${UNTYPED_MOD_SOURCE}"`]);
+
+    const launch = await launchMod(buildSitesLink(SITES_MOSAIC_SOURCE));
+
+    expect(launch.sites).toBeNull();
+    expect(launch.issues).toHaveLength(1);
+    expect(launch.issues[0].source).toBe(SITES_MOSAIC_SOURCE);
+    expect(launch.issues[0].message).toContain("Its sites were not granted.");
+  });
+
+  it("Refused line of a foreign sites mosaic", async function reportsRefusedSitesLine(): Promise<void> {
+    serveUntypedMosaic(FOREIGN_PERMISSIONS_MOSAIC_SOURCE, OPEN_LIBRARY_LINE);
+
+    const launch = await launchMod(
+      buildSitesLink(FOREIGN_PERMISSIONS_MOSAIC_SOURCE),
+    );
+
+    expect(launch.context.permissions.denied).toEqual([OPEN_LIBRARY_LINE]);
+    expect(launch.issues).toHaveLength(1);
+    expect(launch.issues[0].level).toBe("warning");
+    expect(launch.issues[0].source).toBe(FOREIGN_PERMISSIONS_MOSAIC_SOURCE);
+    expect(launch.issues[0].message).toContain(OPEN_LIBRARY_LINE.host);
+    expect(launch.issues[0].message).toContain(OPEN_LIBRARY_LINE.reason);
+    expect(launch.issues[0].message).toContain(
+      FOREIGN_PERMISSIONS_MOSAIC_SOURCE,
+    );
+  });
+
+  it("grants a foreign sites mosaic's line remembered for that mosaic", async function grantsRememberedSitesLine(): Promise<void> {
+    serveUntypedMosaic(FOREIGN_PERMISSIONS_MOSAIC_SOURCE, OPEN_LIBRARY_LINE);
+
+    const launch = await launchTestMod(
+      buildSitesLink(FOREIGN_PERMISSIONS_MOSAIC_SOURCE),
+      {
+        decisions: [
+          {
+            mosaic: FOREIGN_PERMISSIONS_MOSAIC_SOURCE,
+            title: "Covers",
+            category: "show",
+            host: OPEN_LIBRARY_LINE.host,
+            allowed: true,
+          },
+        ],
+      },
+    );
+
+    expect(launch.context.permissions.granted).toEqual([
+      SAMPLE_COVERS_PERMISSION,
+      OPEN_LIBRARY_LINE,
+    ]);
+    expect(launch.issues).toEqual([]);
   });
 });
 

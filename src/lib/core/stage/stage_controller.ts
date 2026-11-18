@@ -2,6 +2,7 @@ import type { ModLoadOptions, ModPermission } from "../../mod/index.ts";
 import {
   buildCatalogListing,
   MOD_API_VERSION,
+  readDeclaringMosaic,
   resolveDefaultModSettings,
 } from "../engine/index.ts";
 import type {
@@ -205,8 +206,15 @@ export interface SandboxSnapshot {
   errorMessage: string | null;
   /** The mod's `api` range and the app's mod API version, only while the sandbox asks the mod API question. */
   apiMismatch: { range: string; apiVersion: string } | null;
-  /** The lines to ask about, in the order declared, only while the sandbox asks the site consent question. */
-  siteConsent: { lines: readonly SiteConsentLine[] } | null;
+  /**
+   * The lines to ask about, in the order declared, and the mosaic whose lines
+   * they include (the one the sandbox was opened from, or the one its link
+   * names as `sites`), only while the sandbox asks the site consent question.
+   */
+  siteConsent: {
+    lines: readonly SiteConsentLine[];
+    mosaic: { title: string; source: string } | null;
+  } | null;
 }
 
 /** What the page renders of one check: its hidden frame running now. Frozen. */
@@ -433,6 +441,19 @@ function buildApiMismatch(
   return Object.freeze(mismatch);
 }
 
+/** The title and address of the mosaic whose lines a pending launch asks about, or `null`. */
+function buildConsentMosaic(
+  runtime: SandboxRuntime,
+): NonNullable<SandboxSnapshot["siteConsent"]>["mosaic"] {
+  const mosaic =
+    runtime.pending === null ? null : readDeclaringMosaic(runtime.pending);
+  if (mosaic === null) {
+    return null;
+  }
+  const heading = { title: mosaic.title, source: mosaic.source };
+  return Object.freeze(heading);
+}
+
 function buildSiteConsent(
   runtime: SandboxRuntime | undefined,
 ): SandboxSnapshot["siteConsent"] {
@@ -450,7 +471,10 @@ function buildSiteConsent(
     };
     lines.push(Object.freeze(consentLine));
   }
-  const siteConsent = { lines: Object.freeze(lines) };
+  const siteConsent = {
+    lines: Object.freeze(lines),
+    mosaic: buildConsentMosaic(runtime),
+  };
   return Object.freeze(siteConsent);
 }
 

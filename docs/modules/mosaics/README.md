@@ -68,7 +68,7 @@ mosaic:
 
 - A mosaic declares `show` lines only, never `connect`, `embed`, `code` or `open`: it chooses data, not what the mod's code may reach.
 - A mosaic file served from the app's origin is granted its lines. For a mosaic from another origin, the site consent dialog asks about its lines in a group of their own, next to the mod's, and the answers are remembered per mosaic file and listed in Settings.
-- The grants last only for the sandbox opened from that mosaic, and the mosaic file's origin is a content host of that sandbox (see [Permissions of a mosaic](../lib/core/sandbox/README.md#permissions-of-a-mosaic) in the sandbox module).
+- The grants last only for the sandbox opened from that mosaic, or one whose run link names it as `sites`, and the mosaic file's origin is a content host of the sandbox opened from it (see [Permissions of a mosaic](../lib/core/sandbox/README.md#permissions-of-a-mosaic) in the sandbox module).
 - The mod a mosaic opens keeps its own trust: its mod API question and its own site consent, whatever mosaic opened it.
 
 ## Components

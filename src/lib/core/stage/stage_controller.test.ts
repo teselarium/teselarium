@@ -33,6 +33,7 @@ import {
   serveOtherApiMod,
   serveProbeMod,
   serveTestMod,
+  serveTestMosaic,
   serveUntypedMod,
   TEST_CATALOG,
   TEST_NPM_HOST,
@@ -1463,6 +1464,38 @@ describe("answerSiteConsent", function describeAnswerSiteConsent(): void {
     expect(Object.isFrozen(readVisible(stage).siteConsent?.lines[0])).toBe(
       true,
     );
+  });
+
+  it("names the foreign sites mosaic of a mod link it asks about", async function namesSitesMosaic(): Promise<void> {
+    const sitesSource = "https://mosaics.example.net/covers/mosaic.yaml";
+    serveTestMosaic(sitesSource, [
+      'title: "Covers"',
+      `mod: "${UNTYPED_MOD_SOURCE}"`,
+      "permissions:",
+      "  show:",
+      '    - host: "https://covers.openlibrary.org"',
+      '      reason: "Shows the book covers"',
+    ]);
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+
+    await follow(
+      stage,
+      history.followLink(
+        `${SAMPLE_RUN_HASH}&sites=${encodeURIComponent(sitesSource)}`,
+      ),
+    );
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "asking",
+      mosaic: null,
+      mosaicReference: null,
+      siteConsent: {
+        lines: [{ key: "mosaic show https://covers.openlibrary.org" }],
+        mosaic: { title: "Covers", source: sitesSource },
+      },
+    });
   });
 
   it("Allow with one line unchecked", async function allowsCheckedLines(): Promise<void> {
