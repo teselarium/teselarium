@@ -78,7 +78,7 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 - **THEN** `requests` lists the `storage.get` for that key with its result, and then the `storage.set` with that key and the written value
 
 ### Requirement: Scripted answers
-`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean value, or `mods.open` or `mosaics.open` with `null`. The request SHALL resolve with the queued value without any dialog. A `mods.open` or `mosaics.open` answered this way SHALL NOT open anything. Requests without a queued answer SHALL be answered as in the mount check, and `mods.check` and `mosaics.check`, which cannot be answered, SHALL be answered with error code `-32002`. In cases, no request that needs the user SHALL be a finding, answered or not.
+`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean value, `mods.open` or `mosaics.open` with `null`, or `catalog.list` with a catalog (see "Scripted catalog"). The request SHALL resolve with the queued value without any dialog. A `mods.open` or `mosaics.open` answered this way SHALL NOT open anything. Requests without a queued answer SHALL be answered as in the mount check, and `mods.check` and `mosaics.check`, which cannot be answered, SHALL be answered with error code `-32002`. In cases, no request that needs the user SHALL be a finding, answered or not.
 
 #### Scenario: Confirm answered yes
 - **WHEN** a case calls `answer("ui.confirm", true)` and the mod then sends `ui.confirm`
@@ -182,3 +182,21 @@ A `ui.notify` sent while a case runs SHALL resolve with `null` and SHALL NOT be 
 #### Scenario: Expected error notification
 - **WHEN** a case mounts a mod with no tiles, and the mod sends `ui.notify` with `{ "message": "No books found", "level": "error" }`
 - **THEN** the request resolves with `null`, the report has no finding whose message includes `No books found`, and `requests` lists `ui.notify` with those params and result `null`
+
+### Requirement: Scripted catalog
+The answer to `catalog.list` SHALL be a mapping whose optional `mods`, `collections` and `mosaics` are lists of entries with a non-empty string `source`, and, for a mosaic, an optional `defaultOf` that is `null` or `{ source, title }` with non-empty strings. A missing list SHALL be empty and a missing `defaultOf` `null`. The request SHALL resolve with the catalog in that complete form. Any other value SHALL make `answer` throw.
+
+#### Scenario: Fixture catalog
+- **WHEN** a case calls `answer("catalog.list", { "mods": [{ "source": "./default_mods/mod_explorer/fixtures/listed_mod" }] })` and the mod then sends `catalog.list`
+- **THEN** the request resolves with that mod entry, empty `collections` and empty `mosaics`, and nothing is requested
+
+#### Scenario: Wrong catalog
+- **WHEN** a case calls `answer("catalog.list", { "mods": ["./listed_mod"] })`
+- **THEN** the call throws an error that says the answer to `catalog.list` must be a catalog and names `mods`
+
+### Requirement: Unanswered catalog
+A `catalog.list` without a queued answer, in a case or in the mount check, SHALL be answered with the app's catalog, as in the app.
+
+#### Scenario: Case without a scripted catalog
+- **WHEN** the mod sends `catalog.list` in a case that queued no answer for it
+- **THEN** the request resolves with the app's catalog, and the report has no finding about `catalog.list`
