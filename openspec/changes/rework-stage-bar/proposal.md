@@ -26,7 +26,7 @@ The stage bar says which mod runs, but changing what runs means going back throu
 
 Mod API version bump: **none**. The change touches no mod API spec: the engine's methods, events, mount context and mod file format stay as `add-mosaic-sites-link` leaves them (`0.1.16`).
 
-This change builds on two changes, which must be applied first:
+This change builds on two changes, both applied and archived:
 - `add-app-catalog`: this change reads the catalog, and its Settings delta starts from that change's text;
 - `add-mosaic-sites-link`: it provides the `sites` link that the mod swap and the shield chip build.
 

@@ -2,7 +2,7 @@
 
 ## 1. Prerequisite
 
-- [ ] 1.1 Check that `add-app-catalog` and `add-mosaic-sites-link` are applied: `APP_CATALOG`, `catalog.list`, the Catalog group, `RunLink.sites` and mod API `0.1.16` are in the code. Re-read the archived (or still active) `app-settings` text of `add-app-catalog`, and make sure this change's MODIFIED block starts from it. Verify with `openspec validate rework-stage-bar --strict`.
+- [ ] 1.1 `add-app-catalog` and `add-mosaic-sites-link` are applied and archived, and this change's deltas start from their archived texts. Verify with `openspec validate rework-stage-bar --strict`.
 
 ## 2. Stage: snapshot, combination opening and recording
 
@@ -10,12 +10,12 @@
 - [ ] 2.2 Add `combination_links.ts` with `buildModChoice`, `buildCollectionChoice`, `buildMosaicChoice` and `buildSitesDrop`, plus `isCombinationSandbox`. Verify with unit tests for each rule of "Choosing a mod", "Choosing a collection", "Choosing a mosaic" and "Combination sandboxes", including the current-entry `null`, kept and dropped params, and `sites` from a mosaic or kept from a sites link.
 - [ ] 2.3 Add `openStageCombination`, extracting the replace path's shared steps, with a new history entry and the home-mod fallback. Export it from the stage's `index.ts`. Verify with `stage_history.test.ts` and `stage_controller.test.ts` cases for "Back to the previous combination", "Close after a swap", "Section after a swap" and "Swap from a home mod".
 - [ ] 2.4 Add `onFilesLoaded` to `StageOptions` and call it per "What is recorded". Verify with stage tests: a mosaic link records mod, collection and mosaic, a sites mosaic is not recorded, an explorer is not recorded, and a failed mod file is not recorded.
-- [ ] 2.5 Document the snapshot fields, `openStageCombination` and `onFilesLoaded` in the stage README ("Replacing a sandbox", "Public API"). Verify that each new name appears there.
+- [ ] 2.5 Document the snapshot fields, `openStageCombination`, `onFilesLoaded` and `readStageCatalog` in the stage README ("Replacing a sandbox", "Public API"). Verify that each new name appears there.
 
 ## 3. Combination catalog (counts and summaries)
 
 - [ ] 3.1 Add `src/lib/core/combinations/` with `createCombinationCatalog`, its summary caches, `requestCounts` and `dropCollection`, plus a README. Verify with unit tests on a recording fake fetch for "Laureates without aliases" (`0/17`), "Mod without a tile type" (`any`), a tile target (`1/1` and `0/1`), "Second opening" (no new request), `dropCollection`, and that no entrypoint, library or mosaic file is requested by a count.
-- [ ] 3.2 Call `dropCollection` when the stage reloads tiles. Wire the combination catalog in `main.tsx` with `readCatalog` from the stage. Verify with a stage test that "Reload tiles" drops that collection's counts.
+- [ ] 3.2 Call `dropCollection` when the stage reloads tiles. Export `readStageCatalog` from the stage's `index.ts`, and wire the combination catalog in `main.tsx` with it as `readCatalog`. Verify with a stage test that "Reload tiles" drops that collection's counts, and one that `readStageCatalog` follows the default-mosaics switch.
 
 ## 4. Recently used store and Settings
 
@@ -32,7 +32,7 @@
 - [ ] 5.5 Add `MoreActionsMenu.tsx` (Copy link with feedback, Reload tiles) and `SitesChip.tsx` (count, popover of lines, "Stop using these sites"). Delete `ShareMenu.tsx` and `ModInfoPopover.tsx` and move their tests' still-valid checks. Extend `StageBarPanel` so every new popover follows the outside-click and sandbox-change rules. Verify with component tests for "More actions menu" (all four scenarios), "Sites chip" and the "Popovers and menus close on a click outside" scenarios.
 - [ ] 5.6 Make the bar an `@container`, with the shrink weights, `max-w-[16rem]`, truncation with tooltips, and the four width steps with the folded capsule menu. Verify with e2e tests at 1100px, 800px, 600px and 400px bar widths for "Long collection title", "Narrow bar" and "Phone width", and that the right side's buttons keep their positions across the widths.
 - [ ] 5.7 Rewrite the left-side tests of `e2e/stage_bar.spec.ts` for the new requirements, and add e2e tests for the swap flows: "Book List on the laureates' map data", "Other collection for the same mod", "None", "Other combination", "Kept covers", "Stop using them", and Back after a swap. Verify that `npm run test:e2e` passes.
-- [ ] 5.8 Update the stage bar docs (`docs/modules/main/README.md`, the stage README's "How the page wires the stage", and any guide page that shows the info or Share buttons). Verify that no doc still mentions the information button or the Share menu (`grep -ri "information button\|share menu" docs`).
+- [ ] 5.8 Update the stage bar docs (`docs/modules/main/README.md`, the stage README's "How the page wires the stage" and its "Run links" `sites` item, which says the bar shows no mosaic but must now name the Sites chip, and any guide page that shows the info or Share buttons). Verify that no doc still mentions the information button or the Share menu (`grep -ri "information button\|share menu" docs`).
 
 ## 6. Release note
 

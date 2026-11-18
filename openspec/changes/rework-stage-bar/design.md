@@ -5,7 +5,7 @@
 See proposal.md for why. The current state this builds on:
 
 - `src/main/stage/StageBar.tsx` renders the bar from a `SandboxSnapshot`. It keeps one `OpenPanel` (a message level, `"mod-info"` or `"share"`) per sandbox, closes it on a frame focus (`listenForFrameFocus`) and on a sandbox change, and wraps shadcn `Popover`. `ShareMenu.tsx` copies the link, and `ModInfoPopover.tsx` shows sources.
-- `SandboxSnapshot` (`stage_controller.ts`) has `mod`, `mosaic` (`title`, `source`), `mosaicReference`, `modReference` and `collection`. It has no tile, no link params, no collection title, no aliases and no mosaic grants.
+- `SandboxSnapshot` (`stage_controller.ts`) has `mod`, `mosaic` (`title`, `source`), `mosaicReference`, `modReference` and `collection`. It has no tile, no link params, no collection title and no aliases. Its only mosaic grants are in `siteConsent.mosaic` (the opening mosaic or the `sites` one), and only while the site consent question is open.
 - The stage already opens a link "in place" for `mods.open` with `replace` (`openStageLink(…, { replace })`): the new sandbox takes the requester's opener, section and history entry. Back and forward reopen closed sandboxes from their links.
 - `add-mosaic-sites-link` gives run links `sites`: a mosaic whose `show` lines are granted to another mod, held as `LaunchMosaicGrants` with `role: "sites"`.
 - The lib already has what a tile-match count needs: `loadModFile`, `buildTileValidator`, `loadTileCollection` (6 parallel tile loads), `validateTileCollection`, `readTileCollectionIndex` and `loadMosaicFile`.
@@ -71,6 +71,8 @@ This change only builds links with `sites` (`buildModChoice`, `buildSitesDrop`) 
 - validators: from `buildTileValidator`, once per type source;
 - counts: per mod and collection or tile, `{ matching, total } | "any" | error`.
 
+`readCatalog` comes from a new stage export, `readStageCatalog(stage)`: today's private `readStageCatalog` in `stage_controller.ts`, which gives the listing `catalog.list` answers, with the current default-mosaics switch. Exporting it keeps the page and the mods reading one catalog.
+
 `requestCounts(modSources, target)` starts only the measures a list shows. Tile loads use the loader's existing parallel limit. `dropCollection(source)` is called when the stage reloads the tiles of that collection or tile. It holds no UI state.
 
 *Alternative:* counting through the engine (`mods.check`) would run frames and the bundle check, which is far too heavy for a list.
@@ -104,7 +106,7 @@ Shrink order comes from `flex-shrink` weights (collection 3, mod 2, mosaic 1, sw
 
 ### Specs order
 
-This change's `app-settings` delta and its catalog references start from `add-app-catalog`'s texts, and its swaps rely on `add-mosaic-sites-link`. Both are archived first.
+This change's `app-settings` delta and its catalog references start from `add-app-catalog`'s texts, and its swaps rely on `add-mosaic-sites-link`. Both are archived.
 
 ## Risks / Trade-offs
 
@@ -114,8 +116,6 @@ This change's `app-settings` delta and its catalog references start from `add-ap
 - [Recently used is a local history of what the user opened] → Stored only in the app's storage, unreachable by mods. Settings says so and offers "Clear".
 - [The stage bar e2e suite is largely rewritten] → Unchanged requirements (messages, theater, fullscreen, close) keep their tests. Only the left side's tests are replaced.
 - [Both folded and unfolded layouts are in the DOM] → Only one is displayed. Component tests query by role, so hidden duplicates are not found.
-- [`add-app-catalog` and `add-mosaic-sites-link` are not applied yet] → Tasks start with a check that both are applied. The delta that copies `add-app-catalog`'s text is re-read against the archived spec before this change is archived.
-
 ## Migration Plan
 
 No data migration. Links made before keep working. Rollback is a revert. Stored recently used entries are then ignored.
