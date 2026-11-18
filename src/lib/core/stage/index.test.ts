@@ -10,6 +10,7 @@ describe("stage module entry point", function describeEntryPoint(): void {
       "attachCheckFrame",
       "attachFrame",
       "buildSectionHash",
+      "changeStageCatalogDefaultMosaics",
       "changeStageColorScheme",
       "changeStageFullscreen",
       "changeStageTheaterMode",

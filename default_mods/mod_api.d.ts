@@ -174,6 +174,24 @@ export interface MosaicInspection {
   permissions: ModGrants;
 }
 
+/** A mod or collection of the app's catalog: the resolved address of its file. */
+export interface CatalogEntry {
+  source: string;
+}
+
+/** A mosaic of the app's catalog. `defaultOf` is the mod whose default mosaic it is, or `null`. */
+export interface CatalogMosaicEntry {
+  source: string;
+  defaultOf: { source: string; title: string } | null;
+}
+
+/** What `catalog.list` answers and `catalog.changed` pushes: the app's catalog, each list in catalog order. */
+export interface CatalogListing {
+  mods: CatalogEntry[];
+  collections: CatalogEntry[];
+  mosaics: CatalogMosaicEntry[];
+}
+
 /** A problem found by a mod check. */
 export interface ModCheckFinding {
   step: "bundle" | "mount" | "test";
@@ -243,11 +261,13 @@ export interface ModApiMethods {
   "mosaics.inspect": { params: { mosaic: string }; result: MosaicInspection };
   "mosaics.open": { params: MosaicOpenParams; result: null };
   "mosaics.check": { params: { mosaic: string }; result: ModCheckReport };
+  "catalog.list": { params: Record<string, never>; result: CatalogListing };
 }
 
 /** The engine events this file types: the params each one pushes. */
 export interface ModApiEvents {
   "layout.changed": ModLayoutChangedParams;
+  "catalog.changed": CatalogListing;
 }
 
 /** An error the engine answers a request with. `code` is the JSON-RPC error code. */
@@ -315,6 +335,13 @@ export interface CaseStorage {
 export type CaseBooleanAnswerMethod =
   "links.open" | "files.save" | "ui.confirm" | "players.open";
 
+/** A catalog a case answers `catalog.list` with: missing lists are empty, and a missing `defaultOf` is `null`. */
+export interface CaseCatalogAnswer {
+  mods?: CatalogEntry[];
+  collections?: CatalogEntry[];
+  mosaics?: { source: string; defaultOf?: CatalogMosaicEntry["defaultOf"] }[];
+}
+
 /** The values of `Value` that are truthy, which `waitFor` resolves with. */
 export type CaseTruthy<Value> = Exclude<
   Value,
@@ -331,6 +358,7 @@ export interface CaseContext {
   requests: readonly CaseRequest[];
   answer(method: CaseBooleanAnswerMethod, value: boolean): void;
   answer(method: "mods.open" | "mosaics.open", value: null): void;
+  answer(method: "catalog.list", value: CaseCatalogAnswer): void;
   expect(actual: unknown): CaseExpectation;
   /** Resolves with the first truthy value `fn` returns. */
   waitFor<Value>(

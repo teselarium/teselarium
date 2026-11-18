@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
+import { readEmptyCatalog } from "../../../test/method_contexts.ts";
 import {
   collectMessages,
   createFakeFrame,
@@ -235,6 +236,7 @@ function buildServices(
     readLayout: readContainedLayout,
     loadsTileLinkedMedia: true,
     readSiteDecisions: siteDecisions.read,
+    readCatalog: readEmptyCatalog,
     rememberSiteDecisions: siteDecisions.remember,
   };
   const spiedServices: SpiedServices = {

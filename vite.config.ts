@@ -119,6 +119,13 @@ const E2E_INSTANTIATIONS: Record<string, Alias[]> = {
       ),
     },
   ],
+  // The catalog lists the test-owned mod and mosaic of `/test-mods/`.
+  "e2e-test-catalog": [
+    {
+      find: /^\.\/main\/app_catalog\.ts$/,
+      replacement: resolveRepoPath("./src/test/registries/test_catalog.ts"),
+    },
+  ],
 };
 
 function buildAliases(mode: string): Alias[] {

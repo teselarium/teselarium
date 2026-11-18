@@ -19,6 +19,7 @@ import {
   loadLaunchTiles,
   loadModTilesOfKind,
   matchModApiRange,
+  pushCatalogChanged,
   pushLayoutChanged,
   pushThemeChanged,
   pushTilesChanged,
@@ -27,6 +28,7 @@ import {
 } from "../engine/index.ts";
 import type {
   AppAction,
+  CatalogListing,
   FrameLayout,
   ModCheckReport,
   ModCheckRequest,
@@ -104,6 +106,8 @@ export interface SandboxServices {
   loadsTileLinkedMedia: boolean;
   /** The remembered site decisions, read before the site consent question and when a mod starts. */
   readSiteDecisions: () => readonly SiteDecision[];
+  /** The app's catalog as `catalog.list` answers it, read anew for each request. */
+  readCatalog: () => Promise<CatalogListing>;
   /** Keeps the decisions of an answer whose Remember was checked. */
   rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
 }
@@ -776,6 +780,7 @@ export function attachSandboxFrame(
     defaults: services.defaults,
     fetchOptions: services.fetchOptions,
     readSiteDecisions: services.readSiteDecisions,
+    readCatalog: services.readCatalog,
     onIssue: addRuntimeIssue.bind(undefined, runtime, services),
     onOpenLink: services.onOpenLink.bind(undefined, runtime.id),
     onRequestAction: services.onRequestAction.bind(undefined, runtime.id),
@@ -795,6 +800,20 @@ export function pushSandboxTheme(runtime: SandboxRuntime, theme: Theme): void {
     return;
   }
   pushThemeChanged(runtime.session, theme);
+}
+
+/**
+ * Pushes `catalog.changed` to a running sandbox with a session. A sandbox
+ * still loading reads the catalog with `catalog.list` once it runs.
+ */
+export function pushSandboxCatalog(
+  runtime: SandboxRuntime,
+  listing: CatalogListing,
+): void {
+  if (runtime.status !== "running" || runtime.session === null) {
+    return;
+  }
+  pushCatalogChanged(runtime.session, listing);
 }
 
 /**

@@ -2,14 +2,15 @@
 
 The collection explorer is the Explore component for tiles, and the collection viewer its Viewer component. They ship as the default mods `collection_explorer` in `default_mods/collection_explorer/` and `collection_viewer` in `default_mods/collection_viewer/` (see the [default mods folder](../../../../default_mods/README.md)), and the vanilla app's Tiles section opens the explorer.
 
-Both are ordinary sandboxed mods. They use only the engine API: `collections.inspect` to read a collection's file without loading its tiles (see [Inspecting collections](../../lib/core/engine/README.md#inspecting-collections)), and `mods.open`, for the explorer to open the collection viewer and for the viewer to open a tile in the [tile viewer](../viewer/README.md). An instantiation can switch them off or replace them by putting another mod in their folder.
+Both are ordinary sandboxed mods. They use only the engine API: `catalog.list`, for the explorer to read the app's catalog, `collections.inspect` to read a collection's file without loading its tiles (see [Inspecting collections](../../lib/core/engine/README.md#inspecting-collections)), and `mods.open`, for the explorer to open the collection viewer and for the viewer to open a tile in the [tile viewer](../viewer/README.md). An instantiation can switch them off or replace them by putting another mod in their folder.
 
 ## Collection explorer
 
 ### What it does
 
 - While the collections load, its list region ("Collections") is busy (`aria-busy="true"`) and says "Loading collections…".
-- For each location in its config's `collections`, in order, it sends `collections.inspect` and lists the collection as a card with its title, its description, its number of tiles (such as "17 tiles") and a "View" button, whose accessible name is "View <title>" so a screen reader still names the collection. A location that cannot be inspected is listed as an alert with the location and the error message (for example a missing collection file and `404`).
+- It reads the collections of the [app catalog](../../main/README.md#the-app-catalog) with `catalog.list`. For each of them, in catalog order, it sends `collections.inspect` and lists the collection as a card with its title, its description, its number of tiles (such as "17 tiles") and a "View" button, whose accessible name is "View <title>" so a screen reader still names the collection. A collection that cannot be inspected is listed as an alert with its source, the resolved address, and the error message (for example a missing collection file and `404`).
+- When the catalog changes (`catalog.changed`), it lists the new catalog's collections in place of its list, inspected again, without reloading its frame. The list is busy meanwhile, and the latest catalog wins.
 - When the user selects a collection, it sends `mods.open` for the mod in its config's `viewer`, with the collection's source as the `target` parameter. The stage opens the viewer in a new sandbox, and the explorer stays open behind it, so back returns to it as it was left. When the viewer cannot be opened, for example because it is switched off, the error goes to a `role="status"` region and the explorer stays visible.
 - It never requests a tile: the number of tiles is the length of the index's `tiles`.
 
@@ -29,17 +30,14 @@ mod:
   test_path: "./test.js"
   config:
     viewer: "collection_viewer"
-    collections:
-      - "./samples/tiles/literature_nobel_laureates/collection.yaml"
-      - "./samples/tiles/literature_nobel_laureates_books/collection.yaml"
   permissions:
     open:
       - host: "*"
-        reason: "Lists the collections of its config and opens the one you pick"
+        reason: "Lists the app's collections and opens the one you pick"
 ```
 
 - `viewer`: the mod reference opened for a selected collection. `collection_viewer` is the default mod name of the viewer, and the default when the config names none.
-- `collections`: the collection locations to list. Relative locations are resolved against the app's address. The vanilla config lists the two sample collections of `samples/tiles/`: the Nobel Prize in Literature laureates, then their books. It lists none of the collections the mods' default mosaics name.
+- The collections it lists are the app catalog's, set by the instantiation in `src/main/app_catalog.ts`; the vanilla catalog lists the two sample collections of `samples/tiles/`: the Nobel Prize in Literature laureates, then their books, and none of the collections the mods' default mosaics name. A `collections` key in its config is ignored.
 - `open` for `"*"`: the explorer inspects collections and opens the viewer from any site. It is granted because the explorer is served from the app's origin.
 
 ## Collection viewer
@@ -82,7 +80,7 @@ mod:
 
 ## Tests
 
-The tests of both mods ship with them, in `test/`, built into `test.js` and declared with `test_path`, so checking `collection_explorer` or `collection_viewer` in the mod viewer runs them (see [Tests](../../../../default_mods/README.md#tests) in the default mods folder). They mount the mod with the fixture collections of its `fixtures/` folder and check what it draws, the requests it sends and its look. The collection viewer's cases also select a tile, answering `mods.open` with `null` to check the request, or leaving it unanswered to check that the refusal (`-32002`) is shown. `e2e/default_mods.spec.ts` tests what a case cannot see: the sandbox, the stage, the links they open, a site that refuses the app, that the explorer requests no tile, and that a tile selected in the viewer opens in the tile viewer with its place in the collection.
+The tests of both mods ship with them, in `test/`, built into `test.js` and declared with `test_path`, so checking `collection_explorer` or `collection_viewer` in the mod viewer runs them (see [Tests](../../../../default_mods/README.md#tests) in the default mods folder). They mount the mod with the fixture collections of its `fixtures/` folder, which the explorer's cases give it by answering `catalog.list`, and check what it draws, the requests it sends and its look. The collection viewer's cases also select a tile, answering `mods.open` with `null` to check the request, or leaving it unanswered to check that the refusal (`-32002`) is shown. `e2e/default_mods.spec.ts` tests what a case cannot see: the sandbox, the stage, the links they open, a site that refuses the app, that the explorer requests no tile, and that a tile selected in the viewer opens in the tile viewer with its place in the collection.
 
 ## Links
 

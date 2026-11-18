@@ -8,9 +8,17 @@ const EXPLORER_STYLE = `
   li { display: grid; }
   li > * { margin: 0; }
   article { display: grid; grid-template-rows: auto 1fr auto; }
+  header { display: grid; gap: var(--ot-space-1); }
+  header > * { margin: 0; }
   article > p:last-child { display: flex; flex-wrap: wrap; gap: var(--ot-space-2); margin-bottom: 0; }
   code { overflow-wrap: anywhere; }
 `;
+
+/** Marks the list region busy while the mosaics load, in place of the list. */
+export function showMosaicsLoading(view: ExplorerView): void {
+  view.content.setAttribute("aria-busy", "true");
+  view.content.textContent = "Loading mosaics…";
+}
 
 /** The page while the mosaics load: the region is busy, and the status region waits, empty. */
 export function buildExplorerPage(view: ExplorerView, title: string): void {
@@ -19,8 +27,7 @@ export function buildExplorerPage(view: ExplorerView, title: string): void {
   document.head.append(style);
   const heading = document.createElement("h1");
   heading.textContent = title;
-  view.content.setAttribute("aria-busy", "true");
-  view.content.textContent = "Loading mosaics…";
+  showMosaicsLoading(view);
   document.body.replaceChildren(heading, view.content, view.status);
 }
 

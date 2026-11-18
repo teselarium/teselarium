@@ -23,6 +23,8 @@ import type { LoadedMosaic } from "../../mosaic/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
+import { CATALOG_METHODS } from "./catalog_methods.ts";
+import type { CatalogListing } from "./catalog_listing.ts";
 import { COLLECTIONS_METHODS } from "./collections_methods.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { describeEngineError, ModMethodError } from "./engine_errors.ts";
@@ -78,6 +80,8 @@ export interface ModSessionOptions {
   fetchOptions: ModLoadOptions;
   /** The remembered site decisions, read by `mods.inspect`. */
   readSiteDecisions: () => readonly SiteDecision[];
+  /** The app's catalog, read by `catalog.list`. */
+  readCatalog: () => Promise<CatalogListing>;
   onIssue: (issue: ModIssue) => void;
   /** Asks the stage to open a link (see `ModMethodContext.onOpenLink`). */
   onOpenLink: (link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome;
@@ -145,6 +149,9 @@ export interface LayoutChangedParams {
   layout: FrameLayout;
 }
 
+/** Engine to mod: the app's catalog changed. Its params are the new catalog, as `catalog.list` answers it. */
+export const CATALOG_CHANGED_METHOD = "catalog.changed";
+
 /** Engine to mod: "Reload tiles" reloaded the mod's collection. */
 export const TILES_CHANGED_METHOD = "tiles.changed";
 
@@ -157,6 +164,7 @@ export const ENGINE_METHODS: ModMethodTable = {
   ...MODS_METHODS,
   ...COLLECTIONS_METHODS,
   ...MOSAICS_METHODS,
+  ...CATALOG_METHODS,
   ...LINKS_METHODS,
   ...FILES_METHODS,
   ...UI_METHODS,
@@ -408,6 +416,7 @@ export function connectModSession(
       fetchOptions: options.fetchOptions,
       tileBodies: launch.tileBodies,
       readSiteDecisions: options.readSiteDecisions,
+      readCatalog: options.readCatalog,
       onOpenLink: options.onOpenLink,
       onRequestAction: options.onRequestAction,
       onCheckMod: options.onCheckMod,
@@ -447,6 +456,14 @@ export function pushTilesChanged(
 /** Pushes `theme.changed` with the new theme. */
 export function pushThemeChanged(session: ModSession, theme: Theme): void {
   sendToMod(session, buildNotification(THEME_CHANGED_METHOD, theme));
+}
+
+/** Pushes `catalog.changed` with the new catalog. */
+export function pushCatalogChanged(
+  session: ModSession,
+  listing: CatalogListing,
+): void {
+  sendToMod(session, buildNotification(CATALOG_CHANGED_METHOD, listing));
 }
 
 /** Pushes `layout.changed` with the frame's new layout. */

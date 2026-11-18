@@ -94,6 +94,37 @@ const PLAYER_ANSWER_TEST_CODE = buildTestCode(
   [["plays the answered player", "playsAnswered"]],
 );
 
+/** The fixture mod source the catalog cases script, which is never requested. */
+const LISTED_MOD_SOURCE = "./default_mods/mod_explorer/fixtures/listed_mod";
+
+/** Cases that script `catalog.list` with a fixture catalog, with a wrong catalog, and send it unanswered. */
+const CATALOG_ANSWER_TEST_CODE = buildTestCode(
+  [
+    "async function listsFixtureCatalog(context) {",
+    `  context.answer("catalog.list", { mods: [{ source: "${LISTED_MOD_SOURCE}" }] });`,
+    "  await context.mount();",
+    '  const catalog = await globalThis.probe.engine.request("catalog.list", {});',
+    `  context.expect(catalog).toEqual({ mods: [{ source: "${LISTED_MOD_SOURCE}" }], collections: [], mosaics: [] });`,
+    "}",
+    "",
+    "function answersWrongCatalog(context) {",
+    '  context.answer("catalog.list", { mods: ["./listed_mod"] });',
+    "}",
+    "",
+    "async function listsAppCatalog(context) {",
+    "  await context.mount();",
+    '  const catalog = await globalThis.probe.engine.request("catalog.list", {});',
+    '  context.expect(catalog.mods[0].source.endsWith("/samples/mods/book_list/mod_conf.yaml")).toBe(true);',
+    "  context.expect(catalog.mosaics[0].defaultOf).toBe(null);",
+    "}",
+  ],
+  [
+    ["lists a fixture catalog", "listsFixtureCatalog"],
+    ["answers a wrong catalog", "answersWrongCatalog"],
+    ["lists the app's catalog", "listsAppCatalog"],
+  ],
+);
+
 /** A probe whose default mosaic has the body tiles, with `PLAYER_ANSWER_TEST_CODE` as its tests. */
 function buildPlayerAnswerFiles(): ModFiles {
   const files: ModFiles = {
@@ -365,6 +396,66 @@ test.describe(
       expect(report.findings).toEqual([]);
       await expect(page.getByRole("dialog")).toHaveCount(0);
       expect(playerRequests).toEqual([]);
+    });
+
+    test("Fixture catalog", async function answersCatalog({
+      page,
+    }): Promise<void> {
+      const requestedUrls: string[] = [];
+      page.on("request", function recordRequest(request): void {
+        requestedUrls.push(request.url());
+      });
+
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("catalog_answer", CATALOG_ANSWER_TEST_CODE),
+        "catalog_answer",
+      );
+
+      expect(findCase(report, "lists a fixture catalog")).toEqual({
+        name: "lists a fixture catalog",
+        status: "pass",
+        message: null,
+      });
+      for (const url of requestedUrls) {
+        expect(url).not.toContain("listed_mod");
+      }
+    });
+
+    test("Wrong catalog", async function rejectsWrongCatalog({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("catalog_answer", CATALOG_ANSWER_TEST_CODE),
+        "catalog_answer",
+      );
+
+      const result = findCase(report, "answers a wrong catalog");
+      expect(result.status).toBe("fail");
+      expect(result.message).toContain(
+        "the answer to catalog.list must be a catalog",
+      );
+      expect(result.message).toContain("mods");
+    });
+
+    test("Case without a scripted catalog", async function answersAppCatalog({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("catalog_answer", CATALOG_ANSWER_TEST_CODE),
+        "catalog_answer",
+      );
+
+      expect(findCase(report, "lists the app's catalog")).toEqual({
+        name: "lists the app's catalog",
+        status: "pass",
+        message: null,
+      });
+      for (const message of listFindingMessages(report)) {
+        expect(message).not.toContain("lists the app's catalog");
+      }
     });
 
     test("Wrong answer type", async function rejectsWrongAnswer({

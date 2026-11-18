@@ -1,6 +1,8 @@
+import type { YamlValue } from "../../files/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
 import type {
   AppAction,
+  CatalogListing,
   ModCheckFinding,
   ModSessionOptions,
   ModTestResult,
@@ -46,6 +48,10 @@ export type CheckFrameHooks = Pick<
   | "onTestReport"
 >;
 
+/** The hooks of a case frame's session: a check frame's, and the case's own `catalog.list` answers. */
+export type CaseFrameHooks = CheckFrameHooks &
+  Pick<ModSessionOptions, "readCatalog">;
+
 /** What a list frame reports: the case names, or why there are none. */
 export type CaseListing =
   { kind: "listed"; names: string[] } | { kind: "failed"; message: string };
@@ -60,7 +66,7 @@ export interface CheckCase {
   /** The check's findings, where the case adds its own. */
   findings: ModCheckFinding[];
   /** The scripted answers of each method, oldest first. */
-  answers: Map<AnswerMethod, (boolean | null)[]>;
+  answers: Map<AnswerMethod, YamlValue[]>;
 }
 
 /** The message of an error response, as the mount check and the cases record it. Shared with the mount check. */
@@ -192,7 +198,7 @@ function recordCaseErrorResponse(
 function queueCaseAnswer(
   checkCase: CheckCase,
   method: AnswerMethod,
-  value: boolean | null,
+  value: YamlValue,
 ): void {
   const queue = checkCase.answers.get(method) ?? [];
   queue.push(value);
@@ -203,7 +209,7 @@ function queueCaseAnswer(
 function takeCaseAnswer(
   checkCase: CheckCase,
   method: AnswerMethod,
-): boolean | null | undefined {
+): YamlValue | undefined {
   const queue = checkCase.answers.get(method);
   if (queue === undefined) {
     return undefined;
@@ -231,6 +237,21 @@ function answerCaseOpen(checkCase: CheckCase, link: RunLink): OpenLinkOutcome {
   return isAnswered ? "opened" : "not-visible";
 }
 
+/**
+ * A case's `catalog.list`: the queued catalog, which the test runner checked
+ * and completed, or otherwise the app's catalog, as in the app.
+ */
+function answerCaseCatalog(
+  checkCase: CheckCase,
+  readAppCatalog: () => Promise<CatalogListing>,
+): Promise<CatalogListing> {
+  const answer = takeCaseAnswer(checkCase, "catalog.list");
+  if (answer === undefined) {
+    return readAppCatalog();
+  }
+  return Promise.resolve(answer as unknown as CatalogListing);
+}
+
 function readCaseReport(
   checkCase: CheckCase,
   onFinished: (status: ModTestResult["status"], message: string | null) => void,
@@ -247,14 +268,16 @@ function readCaseReport(
 /**
  * The hooks of a case frame's session: what the mount check records as
  * `mount` findings becomes `test` findings that name the case, requests that
- * need the user get the queued answers and add no finding, `mods.check` is
+ * need the user get the queued answers and add no finding, `catalog.list`
+ * gets the queued catalog or else `readAppCatalog`'s, `mods.check` is
  * refused, and `sandbox.caseFinished` goes to `onFinished`.
  */
 export function buildCaseFrameHooks(
   checkCase: CheckCase,
   onFinished: (status: ModTestResult["status"], message: string | null) => void,
-): CheckFrameHooks {
-  const hooks: CheckFrameHooks = {
+  readAppCatalog: () => Promise<CatalogListing>,
+): CaseFrameHooks {
+  const hooks: CaseFrameHooks = {
     onIssue: recordCaseIssue.bind(undefined, checkCase),
     onOpenLink: answerCaseOpen.bind(undefined, checkCase),
     onRequestAction: answerCaseAction.bind(undefined, checkCase),
@@ -262,6 +285,7 @@ export function buildCaseFrameHooks(
     onNotify: ignoreNotification,
     onErrorResponse: recordCaseErrorResponse.bind(undefined, checkCase),
     onTestReport: readCaseReport.bind(undefined, checkCase, onFinished),
+    readCatalog: answerCaseCatalog.bind(undefined, checkCase, readAppCatalog),
   };
   return hooks;
 }

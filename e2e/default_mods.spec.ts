@@ -17,7 +17,9 @@ import {
   FAILING_CASE_TEST_CODE,
   findModFrame,
   followLink,
+  isFrameMarked,
   LINKED_TILE_URL,
+  markFrame,
   MEDIA_HOST,
   readMessages,
   readParentDocumentError,
@@ -51,7 +53,10 @@ import {
   openSection,
   pageBody,
 } from "./app_layout.ts";
-import { EXPLORER_OFF_PREVIEW_URL } from "./app_servers.ts";
+import {
+  EXPLORER_OFF_PREVIEW_URL,
+  TEST_CATALOG_PREVIEW_URL,
+} from "./app_servers.ts";
 import { listOwnLookDeclarations, readTokenAs } from "./theme_probes.ts";
 
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
@@ -100,7 +105,7 @@ test.describe(
       page,
     }): Promise<void> {
       await serveExplorerOfTilesMod(page);
-      await page.goto("/");
+      await page.goto(`${TEST_CATALOG_PREVIEW_URL}/`);
       await openModsSection(page);
       const explorer = await findModFrame(page, "Mods");
 
@@ -157,7 +162,7 @@ test.describe(
   function describeExplorer(): void {
     test("Select a mod", async function selectsMod({ page }): Promise<void> {
       await serveExplorerOfTilesMod(page);
-      await page.goto(EXPLORER_RUN_LINK);
+      await page.goto(`${TEST_CATALOG_PREVIEW_URL}${EXPLORER_RUN_LINK}`);
 
       await expectExplorerOpensMod(page, TILES_TITLE, readTilesModSource(page));
     });
@@ -549,7 +554,7 @@ test.describe(
 // The default mods' look is tested by their own cases (default_mods/README.md).
 /** The cases of the explorer's test file (default_mods/mod_explorer/test/test.ts), in order. */
 const EXPLORER_CASES = [
-  "lists the mods of its config as cards",
+  "lists the mods of the catalog as cards",
   "lists a mod that cannot be inspected as an alert",
   "opens the viewer for the selected mod",
   "keeps its own styles to layout",
@@ -578,7 +583,7 @@ const VIEWER_CASES = [
 
 /** The cases of the collection explorer's test file (default_mods/collection_explorer/test/test.ts), in order. */
 const COLLECTION_EXPLORER_CASES = [
-  "lists the collections of its config as cards",
+  "lists the collections of the catalog as cards",
   "lists a collection that cannot be inspected as an alert",
   "opens the viewer for the selected collection",
   "keeps its own styles to layout",
@@ -619,7 +624,8 @@ const COLLECTION_VIEWER_CASES = [
 
 /** The cases of the mosaic explorer's test file (default_mods/mosaic_explorer/test/test.ts), in order. */
 const MOSAIC_EXPLORER_CASES = [
-  "lists the mosaics of its config as cards",
+  "lists the mosaics of the catalog as cards",
+  "marks a mod's default mosaic",
   "lists a mosaic that cannot be inspected as an alert",
   "opens the selected mosaic",
   "opens the viewer for the selected mosaic",
@@ -1072,7 +1078,10 @@ test.describe(
       const alert = collectionExplorerFrame(page).getByRole("alert").first();
 
       await expect(alert).toContainText(
-        "./samples/tiles/literature_nobel_laureates/collection.yaml",
+        new URL(
+          "./samples/tiles/literature_nobel_laureates/collection.yaml",
+          page.url(),
+        ).href,
       );
       await expect(alert).toContainText("404");
       const explorer = await findModFrame(page, "Tiles");
@@ -1405,6 +1414,45 @@ const BOOKS_MOSAIC_REFERENCE = "./samples/mosaics/nobel_books_list.yaml";
 const BOOKS_MOSAIC_TITLE = "Books by Nobel laureates";
 const MAP_MOSAIC_TITLE = "Nobel laureates on the map";
 
+/** The default mosaics of the vanilla catalog's mods, in mod order: Book List, Flashcards, Country Map. */
+const DEFAULT_MOSAIC_TITLES = [
+  "Science fiction books",
+  "Markdown flashcards",
+  "UNESCO World Heritage Sites Example",
+];
+
+const CATALOG_SWITCH_LABEL = "List the default mosaics of mods";
+
+/** Opens Settings and turns "List the default mosaics of mods" to `isOn`, as a user clicks it. */
+async function switchDefaultMosaics(page: Page, isOn: boolean): Promise<void> {
+  await openSection(page, "Settings");
+  const catalogSwitch = page.getByRole("switch", {
+    name: CATALOG_SWITCH_LABEL,
+  });
+  await catalogSwitch.click();
+  await expect(catalogSwitch).toHaveAttribute("aria-checked", String(isOn));
+}
+
+/** The card headings of the mosaic explorer, once it listed its mosaics. */
+async function readMosaicTitles(page: Page): Promise<string[]> {
+  await waitForMosaicList(page);
+  const titles = await mosaicExplorerCards(page)
+    .getByRole("heading")
+    .allTextContents();
+  return titles;
+}
+
+/** What a test serves at the first mosaic of the vanilla catalog, so it needs no samples. The mosaic is only inspected. */
+const ROUTED_MOSAIC_TEXT = `mosaic:
+  title: "Routed mosaic"
+  description: "A mosaic the e2e tests serve."
+  mod: "./routed_mod"
+`;
+
+async function serveRoutedMosaic(route: Route): Promise<void> {
+  await route.fulfill({ status: 200, body: ROUTED_MOSAIC_TEXT });
+}
+
 function mosaicExplorerFrame(page: Page): FrameLocator {
   return visibleSandbox(page).frameLocator('iframe[title="Mosaics"]');
 }
@@ -1483,13 +1531,60 @@ test.describe(
           .getByRole("heading")
           .allTextContents();
         expect(titles).toEqual([BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE]);
-        for (const defaultMosaicTitle of [
-          "Science fiction books",
-          "Nobel laureates' books on the map",
-          "Markdown flashcards",
-        ]) {
+        for (const defaultMosaicTitle of DEFAULT_MOSAIC_TITLES) {
           expect(titles).not.toContain(defaultMosaicTitle);
         }
+      },
+    );
+
+    test(
+      "Vanilla default mosaics",
+      { tag: "@sample" },
+      async function listsDefaultMosaics({ page }): Promise<void> {
+        await page.goto("/#/settings");
+        await switchDefaultMosaics(page, true);
+        await openSection(page, "Mosaics");
+
+        await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
+          [BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE, ...DEFAULT_MOSAIC_TITLES],
+        );
+        const cards = mosaicExplorerCards(page);
+        await expect(cards.nth(2).locator("small")).toHaveText(
+          "Default mosaic of Book List",
+        );
+        await expect(cards.nth(0).locator("small")).toHaveCount(0);
+        await expect(cards.nth(1).locator("small")).toHaveCount(0);
+      },
+    );
+
+    test(
+      "Switch turned on behind the explorer",
+      { tag: "@sample" },
+      async function followsSwitch({ page }): Promise<void> {
+        await page.goto("/");
+        await openSection(page, "Mosaics");
+        expect(await readMosaicTitles(page)).toEqual([
+          BOOKS_MOSAIC_TITLE,
+          MAP_MOSAIC_TITLE,
+        ]);
+        const explorer = await findModFrame(page, "Mosaics");
+        await markFrame(explorer);
+
+        await switchDefaultMosaics(page, true);
+        await openSection(page, "Mosaics");
+
+        await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
+          [BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE, ...DEFAULT_MOSAIC_TITLES],
+        );
+        expect(await isFrameMarked(explorer)).toBe(true);
+
+        await switchDefaultMosaics(page, false);
+        await openSection(page, "Mosaics");
+
+        await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
+          [BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE],
+        );
+        expect(await isFrameMarked(explorer)).toBe(true);
       },
     );
 
@@ -1511,13 +1606,15 @@ test.describe(
       await page.goto(MOSAIC_EXPLORER_RUN_LINK);
       const alert = mosaicExplorerFrame(page).getByRole("alert").first();
 
-      await expect(alert).toContainText(BOOKS_MOSAIC_REFERENCE);
+      await expect(alert).toContainText(
+        new URL(BOOKS_MOSAIC_REFERENCE, page.url()).href,
+      );
       await expect(alert).toContainText("404");
     });
 
     test("Open a mosaic", async function opensMosaic({ page }): Promise<void> {
       await serveMosaicExplorerOfLabels(page);
-      await page.goto("/");
+      await page.goto(`${TEST_CATALOG_PREVIEW_URL}/`);
       await openSection(page, "Mosaics");
 
       await mosaicExplorerFrame(page)
@@ -1538,7 +1635,7 @@ test.describe(
 
     test("View a mosaic", async function viewsMosaic({ page }): Promise<void> {
       await serveMosaicExplorerOfLabels(page);
-      await page.goto("/");
+      await page.goto(`${TEST_CATALOG_PREVIEW_URL}/`);
       await openSection(page, "Mosaics");
 
       await mosaicExplorerFrame(page)
@@ -1562,12 +1659,15 @@ test.describe(
     test("Mosaic viewer switched off", async function showsSwitchedOffMosaicViewer({
       page,
     }): Promise<void> {
-      await serveMosaicExplorerOfLabels(page);
+      await page.route(
+        `**${BOOKS_MOSAIC_REFERENCE.slice(1)}`,
+        serveRoutedMosaic,
+      );
       await page.goto(`${EXPLORER_OFF_PREVIEW_URL}${MOSAIC_EXPLORER_RUN_LINK}`);
       const explorer = mosaicExplorerFrame(page);
 
       await explorer
-        .getByRole("button", { name: `View ${LABELS_MOSAIC_TITLE}` })
+        .getByRole("button", { name: "View Routed mosaic" })
         .click();
 
       await expect(explorer.getByRole("status")).toContainText("mosaic_viewer");

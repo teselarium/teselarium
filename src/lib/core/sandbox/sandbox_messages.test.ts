@@ -167,6 +167,40 @@ describe("readSandboxTestReport", function describeReadTestReport(): void {
     });
   });
 
+  it("reads a catalog answer to catalog.list", function readsCatalogAnswer(): void {
+    const catalog = {
+      mods: [{ source: "./default_mods/mod_explorer/fixtures/listed_mod" }],
+      collections: [],
+      mosaics: [],
+    };
+
+    const report = readSandboxTestReport("sandbox.answerQueued", {
+      method: "catalog.list",
+      value: catalog,
+    });
+
+    expect(report).toEqual({
+      kind: "answerQueued",
+      method: "catalog.list",
+      value: catalog,
+    });
+  });
+
+  it("gives null for a catalog.list answer that is not a mapping", function rejectsCatalogType(): void {
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "catalog.list",
+        value: null,
+      }),
+    ).toBeNull();
+    expect(
+      readSandboxTestReport("sandbox.answerQueued", {
+        method: "catalog.list",
+        value: ["./listed_mod"],
+      }),
+    ).toBeNull();
+  });
+
   it("gives null for an answer whose value has the wrong type for its method", function rejectsAnswerType(): void {
     expect(
       readSandboxTestReport("sandbox.answerQueued", {

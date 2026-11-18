@@ -28,7 +28,7 @@ import type { MemorySiteDecisions } from "./memory_site_decisions.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import type { MemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
-import { APP_ORIGIN, TEST_NPM_HOST } from "./sample_mods.ts";
+import { APP_ORIGIN, TEST_CATALOG, TEST_NPM_HOST } from "./sample_mods.ts";
 import { fetchTestFile, readRequestedUrl } from "./test_files.ts";
 import { PAGE_HOME_ROUTING } from "./test_stages.ts";
 
@@ -88,6 +88,8 @@ export async function startCheckStage(
     fetch: fetchSpy,
     colorScheme: "light",
     loadsTileLinkedMedia: true,
+    catalog: TEST_CATALOG,
+    catalogDefaultMosaics: false,
     theaterMode: false,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,

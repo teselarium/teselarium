@@ -18,8 +18,14 @@ const MISSING_MOD_REFERENCE =
 /** The viewer of the explorer's own config. */
 const CONFIG_VIEWER = "mod_viewer";
 
-function mountWithMods(context: CaseContext, mods: string[]): Promise<void> {
-  const mounting = context.mount({ config: { mods } });
+/** Answers `catalog.list` with `sources` as the catalog's mods, then mounts the explorer. */
+function mountWithMods(context: CaseContext, sources: string[]): Promise<void> {
+  const mods: { source: string }[] = [];
+  for (const source of sources) {
+    mods.push({ source });
+  }
+  context.answer("catalog.list", { mods });
+  const mounting = context.mount();
   return mounting;
 }
 

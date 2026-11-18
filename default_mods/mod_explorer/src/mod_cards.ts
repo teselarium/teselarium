@@ -28,14 +28,14 @@ function buildModCard(
 }
 
 /** A mod that cannot be inspected: `role="alert"` gives it the app's destructive alert look. */
-function buildFailureAlert(reference: string, error: string): HTMLElement {
+function buildFailureAlert(source: string, error: string): HTMLElement {
   const failure = document.createElement("div");
   failure.setAttribute("role", "alert");
-  const referenceCode = document.createElement("code");
-  referenceCode.textContent = reference;
+  const sourceCode = document.createElement("code");
+  sourceCode.textContent = source;
   const message = document.createElement("p");
   message.textContent = error;
-  failure.append(referenceCode, message);
+  failure.append(sourceCode, message);
   return failure;
 }
 
@@ -43,7 +43,7 @@ function buildFailureAlert(reference: string, error: string): HTMLElement {
 export function buildModItem(view: ExplorerView, entry: ModEntry): HTMLElement {
   const item = document.createElement("li");
   if (entry.inspection === null) {
-    item.append(buildFailureAlert(entry.reference, entry.error));
+    item.append(buildFailureAlert(entry.source, entry.error));
     return item;
   }
   item.append(buildModCard(view, entry.inspection));

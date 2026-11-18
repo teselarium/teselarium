@@ -1,3 +1,4 @@
+import type { YamlValue } from "../../files/index.ts";
 import type { BlockedDialogName, BlockedRequest } from "./sandbox_reports.ts";
 
 /** Engine to frame, on `window`: carries the port and the mod's code and context. */
@@ -56,20 +57,21 @@ export interface SandboxConnectParams {
   test?: SandboxTestParams;
 }
 
-/** The methods a case can script the answer to: those that ask the user, `mods.open` and `mosaics.open`. */
+/** The methods a case can script the answer to: those that ask the user, `mods.open`, `mosaics.open` and `catalog.list`. */
 export type AnswerMethod =
   | "links.open"
   | "files.save"
   | "ui.confirm"
   | "players.open"
   | "mods.open"
-  | "mosaics.open";
+  | "mosaics.open"
+  | "catalog.list";
 
 /** A test notification of a check's frame, read by `readSandboxTestReport`. */
 export type SandboxTestReport =
   | { kind: "listed"; names: string[] }
   | { kind: "listFailed"; message: string }
-  | { kind: "answerQueued"; method: AnswerMethod; value: boolean | null }
+  | { kind: "answerQueued"; method: AnswerMethod; value: YamlValue }
   | { kind: "caseFinished"; status: "pass" | "fail"; message: string | null };
 
 function isParamsMapping(params: unknown): params is Record<string, unknown> {
@@ -147,10 +149,17 @@ function readTestsFailed(params: unknown): SandboxTestReport | null {
   return report;
 }
 
-/** Whether `value` is an answer `method` accepts: `null` for `mods.open` and `mosaics.open`, a boolean for the others. */
+/**
+ * Whether `value` is an answer `method` accepts: `null` for `mods.open` and
+ * `mosaics.open`, a mapping for `catalog.list`, whose catalog the test runner
+ * checked, and a boolean for the others.
+ */
 function isAnswerValue(method: AnswerMethod, value: unknown): boolean {
   if (method === "mods.open" || method === "mosaics.open") {
     return value === null;
+  }
+  if (method === "catalog.list") {
+    return isParamsMapping(value);
   }
   return typeof value === "boolean";
 }
@@ -162,7 +171,8 @@ function isAnswerMethod(method: string): method is AnswerMethod {
     method === "ui.confirm" ||
     method === "players.open" ||
     method === "mods.open" ||
-    method === "mosaics.open"
+    method === "mosaics.open" ||
+    method === "catalog.list"
   );
 }
 
@@ -180,7 +190,7 @@ function readAnswerQueued(params: unknown): SandboxTestReport | null {
   const report: SandboxTestReport = {
     kind: "answerQueued",
     method,
-    value: params.value as boolean | null,
+    value: params.value as YamlValue,
   };
   return report;
 }

@@ -69,6 +69,7 @@ export async function drawsBusyListWhileLoading(
     viewer: "mosaic_viewer",
     content: document.createElement("section"),
     status: document.createElement("p"),
+    listingCount: 0,
   };
 
   buildExplorerPage(view, "Mosaics");

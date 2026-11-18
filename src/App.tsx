@@ -7,6 +7,7 @@ import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import type { SectionSwitches } from "./main/sections/section_switches.ts";
 import type { PlayerSites } from "./main/settings/player_sites.ts";
 import type { SiteDecisions } from "./main/settings/site_decisions.ts";
+import type { CatalogSetting } from "./main/settings/catalog_setting.ts";
 import type { TileMediaSetting } from "./main/settings/tile_media_setting.ts";
 import { Sidebar } from "./main/sidebar/Sidebar.tsx";
 import {
@@ -30,6 +31,7 @@ interface AppProps {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
+  catalogSetting: CatalogSetting;
   theater: TheaterSetting;
   siteDecisions: SiteDecisions;
   playerSites: PlayerSites;
@@ -58,6 +60,7 @@ function App({
   sections,
   switches,
   tileMedia,
+  catalogSetting,
   theater,
   siteDecisions,
   playerSites,
@@ -89,6 +92,7 @@ function App({
               sections={sections}
               switches={switches}
               tileMedia={tileMedia}
+              catalogSetting={catalogSetting}
               siteDecisions={siteDecisions}
               playerSites={playerSites}
             />

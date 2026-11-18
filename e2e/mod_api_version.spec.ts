@@ -25,9 +25,9 @@ import {
   buildTilesModFiles,
   NOTE_TYPE,
   openTilesMod,
-  TILES_MOD_REFERENCE,
   TILES_TITLE,
 } from "./test_mods.ts";
+import { TEST_CATALOG_PREVIEW_URL } from "./app_servers.ts";
 
 /** A probe mod titled "Later API", written for `OTHER_API_RANGE`. */
 const LATER_API_HASH = "#/run?mod=./test-mods/later/";
@@ -71,7 +71,11 @@ function buildMixedCollectionFiles(): ModFiles {
   return files;
 }
 
-/** A copy of the explorer whose viewer is the later-API mod, so picking a mod opens it. */
+/**
+ * A copy of the explorer whose viewer is the later-API mod, so picking a mod
+ * opens it. It lists the catalog, so it lists the tiles mod on the
+ * `e2e-test-catalog` build.
+ */
 function buildLaterExplorerFiles(): ModFiles {
   const files: ModFiles = {
     "explorer/mod_conf.yaml": [
@@ -82,8 +86,6 @@ function buildLaterExplorerFiles(): ModFiles {
       '  entrypoint: "./main.js"',
       "  config:",
       '    viewer: "./test-mods/later/"',
-      "    mods:",
-      `      - "${TILES_MOD_REFERENCE}"`,
       "  permissions:",
       "    open:",
       '      - host: "*"',
@@ -235,7 +237,9 @@ test.describe("Cancelled mods do not start", function describeCancel(): void {
       ...buildLaterExplorerFiles(),
       ...buildTilesModFiles(),
     });
-    await page.goto("/#/run?mod=./test-mods/explorer/");
+    await page.goto(
+      `${TEST_CATALOG_PREVIEW_URL}/#/run?mod=./test-mods/explorer/`,
+    );
     const explorer = await findModFrame(page, "Later explorer");
     await explorer.getByRole("button", { name: /Tiles/ }).click();
     await expect(apiMismatchDialog(page)).toBeVisible();

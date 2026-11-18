@@ -1,4 +1,8 @@
-import type { CaseContext, CaseRequest } from "../../mod_api.d.ts";
+import type {
+  CaseContext,
+  CaseRequest,
+  CatalogMosaicEntry,
+} from "../../mod_api.d.ts";
 
 /**
  * The fixture mosaics the cases list, by their address in the default mods
@@ -21,14 +25,32 @@ const LISTED_MOSAIC_PATH =
 /** The viewer of the explorer's own config. */
 const CONFIG_VIEWER = "mosaic_viewer";
 
+/** The mod a fixture default mosaic is marked with. Only its title is drawn. */
+const LISTED_MOD_MARK = {
+  source: "./default_mods/mosaic_explorer/fixtures/fixture_mod/mod_conf.yaml",
+  title: "Listed mod",
+};
+
+/** Answers `catalog.list` with `mosaics` as the catalog's mosaics, then mounts the explorer. */
+function mountWithCatalogMosaics(
+  context: CaseContext,
+  mosaics: CatalogMosaicEntry[],
+): Promise<void> {
+  context.answer("catalog.list", { mosaics });
+  const mounting = context.mount({ config: { viewer: CONFIG_VIEWER } });
+  return mounting;
+}
+
+/** Answers `catalog.list` with `sources` as the catalog's own mosaics, then mounts the explorer. */
 export function mountWithMosaics(
   context: CaseContext,
-  mosaics: string[],
+  sources: string[],
 ): Promise<void> {
-  const mounting = context.mount({
-    config: { viewer: CONFIG_VIEWER, mosaics },
-  });
-  return mounting;
+  const mosaics: CatalogMosaicEntry[] = [];
+  for (const source of sources) {
+    mosaics.push({ source, defaultOf: null });
+  }
+  return mountWithCatalogMosaics(context, mosaics);
 }
 
 export function findElement(
@@ -122,9 +144,26 @@ export async function listsMosaicsAsCards(context: CaseContext): Promise<void> {
   context
     .expect(findElement(context, 'section[aria-label="Mosaics"]').ariaBusy)
     .toBe(null);
+  context.expect(cards[0].querySelector("small")).toBe(null);
   context
     .expect(listRequestMethods(context))
-    .toEqual(["mosaics.inspect", "mosaics.inspect"]);
+    .toEqual(["catalog.list", "mosaics.inspect", "mosaics.inspect"]);
+}
+
+export async function marksDefaultMosaic(context: CaseContext): Promise<void> {
+  await mountWithCatalogMosaics(context, [
+    { source: OTHER_MOSAIC_LOCATION, defaultOf: null },
+    { source: LISTED_MOSAIC_LOCATION, defaultOf: LISTED_MOD_MARK },
+  ]);
+
+  const cards = context.root.querySelectorAll("li > article");
+  context.expect(cards[0].querySelector("small")).toBe(null);
+  context
+    .expect(cards[1].querySelector("h2 + small")?.textContent)
+    .toBe("Default mosaic of Listed mod");
+  context
+    .expect(cards[1].querySelector("p")?.textContent)
+    .toBe("A fixture mosaic that the explorer's tests list.");
 }
 
 export async function listsFailureAsAlert(context: CaseContext): Promise<void> {

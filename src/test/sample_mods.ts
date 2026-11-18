@@ -3,6 +3,7 @@ import {
   FIXTURES_BASE_URL,
   FIXTURES_REFERENCE,
 } from "./sample_files.ts";
+import type { ResolvedAppCatalog } from "../lib/core/engine/app_catalog.ts";
 import type {
   ModSiteDecision,
   SiteDecision,
@@ -101,6 +102,18 @@ export function buildSampleCoversDecision(allowed: boolean): ModSiteDecision {
  * app's host, so tests show that the engine uses the host it is given.
  */
 export const TEST_NPM_HOST = "https://npm.example.net/npm/";
+
+/**
+ * The catalog of test stages: the fixture book list mod, its collection and
+ * its fixture mosaic, resolved. The mod declares a default mosaic, so with
+ * "List the default mosaics of mods" on, the mosaics also hold
+ * `SAMPLE_DEFAULT_MOSAIC_SOURCE`.
+ */
+export const TEST_CATALOG: ResolvedAppCatalog = {
+  mods: [SAMPLE_MOD_SOURCE],
+  collections: [SAMPLE_COLLECTION_SOURCE],
+  mosaics: [SAMPLE_MOSAIC_SOURCE],
+};
 
 /** The vanilla default mod settings, resolved for the app at `APP_BASE_URL`. */
 export const TEST_DEFAULTS = {

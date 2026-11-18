@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { TEST_CATALOG_PREVIEW_URL } from "./app_servers.ts";
 import type { Page, Request } from "@playwright/test";
 import {
   answerSiteConsent,
@@ -372,7 +373,7 @@ test.describe("Close a sandbox", function describeClose(): void {
     page,
   }): Promise<void> {
     await serveExplorerOfTilesMod(page);
-    await page.goto(`/${EXPLORER_LINK}`);
+    await page.goto(`${TEST_CATALOG_PREVIEW_URL}/${EXPLORER_LINK}`);
     const explorer = await findModFrame(page, "Mods");
     await markFrame(explorer);
     await explorer.getByRole("button", { name: /Tiles/ }).click();

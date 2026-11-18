@@ -13,6 +13,7 @@ import {
 } from "../engine/index.ts";
 import type {
   AppAction,
+  CatalogListing,
   CheckedFiles,
   ModCheckFinding,
   ModCheckReport,
@@ -134,6 +135,8 @@ export interface CheckServices {
    * allow, and nothing is asked. Its `mods.inspect` reads them too.
    */
   readSiteDecisions: () => readonly SiteDecision[];
+  /** The app's catalog, which answers a `catalog.list` that no case answered. */
+  readCatalog: () => Promise<CatalogListing>;
 }
 
 type CheckDraft = Pick<
@@ -603,7 +606,9 @@ function connectCheckSession(
   services: CheckServices,
   check: StageCheck,
   frameTarget: Pick<Window, "postMessage">,
-  hooks: CheckFrameHooks & Pick<ModSessionOptions, "onMounted" | "test">,
+  hooks: CheckFrameHooks &
+    Partial<Pick<ModSessionOptions, "readCatalog">> &
+    Pick<ModSessionOptions, "onMounted" | "test">,
 ): ModSession {
   return connectModSession(frameTarget, check.launch, {
     storage: createMemoryStorage(),
@@ -611,6 +616,7 @@ function connectCheckSession(
     defaults: services.defaults,
     fetchOptions: services.fetchOptions,
     readSiteDecisions: services.readSiteDecisions,
+    readCatalog: services.readCatalog,
     theme: services.readTheme(),
     // A check's frames are never shown, so they always lay out as contained.
     layout: "contained",
@@ -684,7 +690,7 @@ function attachCaseFrame(
     checkCase,
   );
   frame.session = connectCheckSession(services, check, frameTarget, {
-    ...buildCaseFrameHooks(checkCase, onFinished),
+    ...buildCaseFrameHooks(checkCase, onFinished, services.readCatalog),
     test: { code: check.testCode ?? "", caseName: checkCase.name },
   });
   frame.limitTimer = setTimeout(

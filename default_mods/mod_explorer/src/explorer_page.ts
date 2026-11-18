@@ -11,6 +11,12 @@ const EXPLORER_STYLE = `
   article button { justify-self: start; }
 `;
 
+/** Marks the list region busy while the mods load, in place of the list. */
+export function showModsLoading(view: ExplorerView): void {
+  view.content.setAttribute("aria-busy", "true");
+  view.content.textContent = "Loading mods…";
+}
+
 /** The page while the mods load: the region is busy, and the status region waits, empty. */
 export function buildExplorerPage(view: ExplorerView, title: string): void {
   const style = document.createElement("style");
@@ -18,8 +24,7 @@ export function buildExplorerPage(view: ExplorerView, title: string): void {
   document.head.append(style);
   const heading = document.createElement("h1");
   heading.textContent = title;
-  view.content.setAttribute("aria-busy", "true");
-  view.content.textContent = "Loading mods…";
+  showModsLoading(view);
   document.body.replaceChildren(heading, view.content, view.status);
 }
 

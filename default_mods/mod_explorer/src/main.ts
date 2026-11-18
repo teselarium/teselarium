@@ -1,6 +1,6 @@
 /**
- * Default mod: lists the mods of its config and opens the viewer for the one
- * the user picks.
+ * Default mod: lists the mods of the app's catalog and opens the viewer for
+ * the one the user picks. It lists the catalog again when it changes.
  *
  * It is also an example of getting the app's look without classes: the
  * theme's base stylesheet styles semantic HTML like the app's components (an
@@ -9,13 +9,53 @@
  * app's look" in docs/modules/lib/core/theme/README.md.
  */
 
-import type { ModContext, ModEngine } from "../../mod_api.d.ts";
-import { buildExplorerPage, renderModList } from "./explorer_page.ts";
+import type { CatalogListing, ModContext, ModEngine } from "../../mod_api.d.ts";
+import {
+  buildExplorerPage,
+  renderModList,
+  showModsLoading,
+} from "./explorer_page.ts";
 import type { ExplorerView } from "./explorer_view.ts";
-import { inspectMods, readModReferences } from "./mod_entries.ts";
+import { inspectMods, readModSources } from "./mod_entries.ts";
 
 /** The viewer opened for a selected mod when the config names none. */
 const DEFAULT_VIEWER = "mod_viewer";
+
+/** Starts a listing: the list is busy, and any listing started before is dropped. Returns its number. */
+function startListing(view: ExplorerView): number {
+  view.listingCount += 1;
+  showModsLoading(view);
+  return view.listingCount;
+}
+
+/** Inspects the catalog's mods and draws them, unless a newer listing started meanwhile. */
+async function drawListing(
+  view: ExplorerView,
+  listing: number,
+  catalog: CatalogListing,
+): Promise<void> {
+  const entries = await inspectMods(view.engine, readModSources(catalog));
+  if (listing !== view.listingCount) {
+    return;
+  }
+  renderModList(view, entries);
+}
+
+/** Lists the catalog the engine answers now. */
+async function listCatalog(view: ExplorerView): Promise<void> {
+  const listing = startListing(view);
+  const catalog = await view.engine.request("catalog.list", {});
+  await drawListing(view, listing, catalog);
+}
+
+/** `catalog.changed`: lists the new catalog in place of the list, without reloading the frame. */
+function followCatalogChange(
+  view: ExplorerView,
+  catalog: CatalogListing,
+): void {
+  const listing = startListing(view);
+  void drawListing(view, listing, catalog);
+}
 
 /** Entry point called by the frame loader with the engine API object and the mount context. */
 export default async function mount(
@@ -27,10 +67,11 @@ export default async function mount(
     viewer: String(context.config.viewer ?? DEFAULT_VIEWER),
     content: document.createElement("section"),
     status: document.createElement("p"),
+    listingCount: 0,
   };
   view.content.setAttribute("aria-label", "Mods");
   view.status.setAttribute("role", "status");
   buildExplorerPage(view, context.mod.title);
-  const entries = await inspectMods(engine, readModReferences(context.config));
-  renderModList(view, entries);
+  engine.on("catalog.changed", followCatalogChange.bind(undefined, view));
+  await listCatalog(view);
 }

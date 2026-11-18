@@ -513,6 +513,31 @@ test.describe("The media switch is remembered", function describeTileMediaKept()
   });
 });
 
+/** The text of each group heading of the Settings page, in page order. */
+async function readGroupHeadings(page: Page): Promise<string[]> {
+  const headings = await page
+    .getByRole("main")
+    .locator('[data-slot="card"]')
+    .getByRole("heading", { level: 2 })
+    .allTextContents();
+  return headings;
+}
+
+test.describe("Catalog group", function describeCatalogGroup(): void {
+  test("Vanilla settings page", async function showsCatalogGroup({
+    page,
+  }): Promise<void> {
+    await page.goto("/#/settings");
+
+    await expect(
+      page.getByRole("switch", { name: "List the default mosaics of mods" }),
+    ).not.toBeChecked();
+    const headings = await readGroupHeadings(page);
+    expect(headings.indexOf("Catalog")).toBe(headings.indexOf("Sidebar") + 1);
+    expect(headings.indexOf("Privacy")).toBe(headings.indexOf("Catalog") + 1);
+  });
+});
+
 test.describe("Versions on the Settings page", function describeVersions(): void {
   test("Copy the versions", async function copiesVersions({
     page,

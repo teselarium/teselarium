@@ -1,40 +1,35 @@
 import type {
+  CatalogListing,
   ModEngine,
   ModInspection,
-  ModYamlMapping,
 } from "../../mod_api.d.ts";
 import { describeError } from "./error_messages.ts";
 
-/** A mod of the explorer's config: its inspection, or why it cannot be inspected. */
+/** A mod of the app's catalog: its inspection, or why it cannot be inspected. */
 export type ModEntry =
-  | { reference: string; inspection: ModInspection; error: null }
-  | { reference: string; inspection: null; error: string };
+  | { source: string; inspection: ModInspection; error: null }
+  | { source: string; inspection: null; error: string };
 
-/** The mod references of the config's `mods`, in order. Items that are not text are left out. */
-export function readModReferences(config: ModYamlMapping): string[] {
-  const references: string[] = [];
-  if (!Array.isArray(config.mods)) {
-    return references;
+/** The sources of the catalog's mods, in catalog order. */
+export function readModSources(catalog: CatalogListing): string[] {
+  const sources: string[] = [];
+  for (const entry of catalog.mods) {
+    sources.push(entry.source);
   }
-  for (const reference of config.mods) {
-    if (typeof reference === "string") {
-      references.push(reference);
-    }
-  }
-  return references;
+  return sources;
 }
 
-async function inspectReference(
+async function inspectSource(
   engine: ModEngine,
-  reference: string,
+  source: string,
 ): Promise<ModEntry> {
   try {
-    const inspection = await engine.request("mods.inspect", { mod: reference });
-    const entry: ModEntry = { reference, inspection, error: null };
+    const inspection = await engine.request("mods.inspect", { mod: source });
+    const entry: ModEntry = { source, inspection, error: null };
     return entry;
   } catch (error) {
     const failedEntry: ModEntry = {
-      reference,
+      source,
       inspection: null,
       error: describeError(error),
     };
@@ -42,14 +37,14 @@ async function inspectReference(
   }
 }
 
-/** Inspects each reference, one after another, so the list keeps the config's order. */
+/** Inspects each source, one after another, so the list keeps the catalog's order. */
 export async function inspectMods(
   engine: ModEngine,
-  references: string[],
+  sources: string[],
 ): Promise<ModEntry[]> {
   const entries: ModEntry[] = [];
-  for (const reference of references) {
-    entries.push(await inspectReference(engine, reference));
+  for (const source of sources) {
+    entries.push(await inspectSource(engine, source));
   }
   return entries;
 }

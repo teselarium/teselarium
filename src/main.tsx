@@ -2,13 +2,17 @@ import { StrictMode } from "react";
 import type { ReactElement } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
-import { resolveDefaultModSettings } from "./lib/core/engine/index.ts";
+import {
+  resolveAppCatalog,
+  resolveDefaultModSettings,
+} from "./lib/core/engine/index.ts";
+import type { ResolvedAppCatalog } from "./lib/core/engine/index.ts";
 import { createStage, followHistory } from "./lib/core/stage/index.ts";
 import type { Stage } from "./lib/core/stage/index.ts";
 import { buildThemeTokenStyles } from "./lib/core/theme/index.ts";
+import { APP_CATALOG } from "./main/app_catalog.ts";
 import { DEFAULT_MODS } from "./main/default_mods.ts";
 import { NPM_HOST } from "./main/library_host.ts";
-import { RegistryErrorScreen } from "./main/sections/RegistryErrorScreen.tsx";
 import {
   availableSections,
   buildStageRouting,
@@ -17,6 +21,10 @@ import {
 import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import { createSectionSwitches } from "./main/sections/section_switches.ts";
 import { VANILLA_SECTIONS } from "./main/sections/vanilla_sections.ts";
+import {
+  createCatalogSetting,
+  readStartCatalogDefaultMosaics,
+} from "./main/settings/catalog_setting.ts";
 import { createPlayerSites } from "./main/settings/player_sites.ts";
 import {
   createSiteDecisions,
@@ -37,6 +45,7 @@ import {
   NARROW_VIEWPORT_QUERY,
 } from "./main/sidebar/sidebar_layout.ts";
 import type { SidebarLayoutStore } from "./main/sidebar/sidebar_layout.ts";
+import { StartErrorScreen } from "./main/StartErrorScreen.tsx";
 import {
   createAppTheme,
   readStartColorScheme,
@@ -67,10 +76,13 @@ function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
 
 /**
  * Builds the site decisions, the player sites, the stage, the app theme, the
- * sidebar layout, the section switches and the tile media setting once, outside React, so
- * StrictMode's double effect run in dev does not launch mods twice.
+ * sidebar layout, the section switches, the tile media setting and the catalog setting once,
+ * outside React, so StrictMode's double effect run in dev does not launch mods twice.
  */
-function startApp(sections: readonly SectionDefinition[]): ReactElement {
+function startApp(
+  sections: readonly SectionDefinition[],
+  catalog: ResolvedAppCatalog,
+): ReactElement {
   const systemQuery = window.matchMedia("(prefers-color-scheme: dark)");
   // Before the stage, which reads and remembers the decisions through it.
   const siteDecisions = createSiteDecisions({ storage: window.localStorage });
@@ -85,6 +97,8 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
     npmHost: NPM_HOST,
     colorScheme: readStartColorScheme(window.localStorage, systemQuery),
     loadsTileLinkedMedia: readStartTileLinkedMedia(window.localStorage),
+    catalog,
+    catalogDefaultMosaics: readStartCatalogDefaultMosaics(window.localStorage),
     theaterMode: readStartTheaterMode(window.localStorage),
     readSiteDecisions: readSiteDecisionsSnapshot.bind(undefined, siteDecisions),
     rememberSiteDecisions: rememberSiteDecisions.bind(undefined, siteDecisions),
@@ -114,6 +128,11 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
     storage: window.localStorage,
     stage,
   });
+  // Same lifetime as the stage: it tells the stage when it is switched.
+  const catalogSetting = createCatalogSetting({
+    storage: window.localStorage,
+    stage,
+  });
   // Same lifetime as the stage: it tells the stage when theater mode is turned on or off.
   const theater = createTheaterSetting({
     storage: window.localStorage,
@@ -132,6 +151,7 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
       sections={sections}
       switches={switches}
       tileMedia={tileMedia}
+      catalogSetting={catalogSetting}
       theater={theater}
       siteDecisions={siteDecisions}
       playerSites={playerSites}
@@ -140,18 +160,32 @@ function startApp(sections: readonly SectionDefinition[]): ReactElement {
   );
 }
 
-/** The app, or the registry's errors when it breaks a rule: then no stage is created. */
+/**
+ * The app, or the errors of the registry and the catalog when either breaks
+ * a rule: then no stage is created.
+ */
 function buildRootElement(): ReactElement {
+  const defaults = resolveDefaultModSettings(DEFAULT_MODS, document.baseURI);
   const registryErrors = validateRegistry(VANILLA_SECTIONS);
-  if (registryErrors.length > 0) {
-    return <RegistryErrorScreen errors={registryErrors} />;
+  const catalogResolution = resolveAppCatalog(
+    APP_CATALOG,
+    document.baseURI,
+    defaults,
+  );
+  if (registryErrors.length > 0 || catalogResolution.errors.length > 0) {
+    return (
+      <StartErrorScreen
+        registryErrors={registryErrors}
+        catalogErrors={catalogResolution.errors}
+      />
+    );
   }
   const sections = availableSections(
     VANILLA_SECTIONS,
-    resolveDefaultModSettings(DEFAULT_MODS, document.baseURI),
+    defaults,
     document.baseURI,
   );
-  return startApp(sections);
+  return startApp(sections, catalogResolution.catalog);
 }
 
 createRoot(document.getElementById("root")!).render(

@@ -17,7 +17,11 @@ const ANSWER_KINDS = {
   "players.open": "boolean",
   "mods.open": "null",
   "mosaics.open": "null",
+  "catalog.list": "catalog",
 };
+
+// The lists of a scripted catalog, and whether their entries may have `defaultOf`.
+const CATALOG_LISTS = { mods: false, collections: false, mosaics: true };
 
 function isPlainMapping(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -185,11 +189,96 @@ function setCaseValue(key, value) {
   return requestEngine("storage.set", { key, value });
 }
 
+function isNonEmptyText(value) {
+  return typeof value === "string" && value !== "";
+}
+
+function throwNotCatalog(reason) {
+  throw new Error(`the answer to catalog.list must be a catalog: ${reason}`);
+}
+
+// A mosaic entry's `defaultOf`: `null`, or `{ source, title }` with non-empty strings.
+function readCatalogMark(mark, place) {
+  if (mark === undefined || mark === null) {
+    return null;
+  }
+  if (
+    !isPlainMapping(mark) ||
+    !isNonEmptyText(mark.source) ||
+    !isNonEmptyText(mark.title) ||
+    Object.keys(mark).length !== 2
+  ) {
+    throwNotCatalog(
+      `"${place}.defaultOf" must be null or { source, title } with non-empty strings`,
+    );
+  }
+  const readMark = { source: mark.source, title: mark.title };
+  return readMark;
+}
+
+function readCatalogEntry(entry, place, hasMark) {
+  const keys = hasMark ? ["source", "defaultOf"] : ["source"];
+  if (!isPlainMapping(entry) || !isNonEmptyText(entry.source)) {
+    throwNotCatalog(`"${place}" must be a mapping with a non-empty "source"`);
+  }
+  for (const key of Object.keys(entry)) {
+    if (!keys.includes(key)) {
+      throwNotCatalog(`"${place}" has the unknown key "${key}"`);
+    }
+  }
+  if (!hasMark) {
+    const readEntry = { source: entry.source };
+    return readEntry;
+  }
+  const readEntry = {
+    source: entry.source,
+    defaultOf: readCatalogMark(entry.defaultOf, place),
+  };
+  return readEntry;
+}
+
+function readCatalogList(entries, listName, hasMark) {
+  if (entries === undefined) {
+    const emptyList = [];
+    return emptyList;
+  }
+  if (!Array.isArray(entries)) {
+    throwNotCatalog(`"${listName}" must be a list`);
+  }
+  const readEntries = [];
+  for (const [index, entry] of entries.entries()) {
+    readEntries.push(readCatalogEntry(entry, `${listName}[${index}]`, hasMark));
+  }
+  return readEntries;
+}
+
+// The scripted catalog in its complete form: a missing list is empty and a
+// missing `defaultOf` is `null`. Throws naming the first key that is wrong.
+function readCatalogAnswer(value) {
+  if (!isPlainMapping(value)) {
+    throwNotCatalog(`got ${describeValue(value)}`);
+  }
+  for (const key of Object.keys(value)) {
+    if (!Object.hasOwn(CATALOG_LISTS, key)) {
+      throwNotCatalog(`the unknown key "${key}"`);
+    }
+  }
+  const catalog = {};
+  for (const [listName, hasMark] of Object.entries(CATALOG_LISTS)) {
+    catalog[listName] = readCatalogList(value[listName], listName, hasMark);
+  }
+  return catalog;
+}
+
+// Checks an answer, and returns the value the engine queues.
 function checkAnswer(method, value) {
   if (typeof method !== "string" || !Object.hasOwn(ANSWER_KINDS, method)) {
     throw new Error(
-      `answer: ${describeValue(method)} cannot be answered, only links.open, files.save, ui.confirm, players.open, mods.open and mosaics.open`,
+      `answer: ${describeValue(method)} cannot be answered, only links.open, files.save, ui.confirm, players.open, mods.open, mosaics.open and catalog.list`,
     );
+  }
+  if (ANSWER_KINDS[method] === "catalog") {
+    return readCatalogAnswer(value);
   }
   if (ANSWER_KINDS[method] === "null" && value !== null) {
     throw new Error(`the answer to ${method} must be null`);
@@ -197,12 +286,13 @@ function checkAnswer(method, value) {
   if (ANSWER_KINDS[method] === "boolean" && typeof value !== "boolean") {
     throw new Error(`the answer to ${method} must be a boolean`);
   }
+  return value;
 }
 
 // `answer(method, value)`: the engine queues it for the next request for `method`.
 function queueAnswer(method, value) {
-  checkAnswer(method, value);
-  sendNotification(ANSWER_QUEUED_METHOD, { method, value });
+  const queuedValue = checkAnswer(method, value);
+  sendNotification(ANSWER_QUEUED_METHOD, { method, value: queuedValue });
 }
 
 function buildCaseContext(params) {

@@ -4,6 +4,7 @@ import * as engineModule from "./index.ts";
 describe("engine module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(engineModule).sort()).toEqual([
+      "CATALOG_CHANGED_METHOD",
       "LAYOUT_CHANGED_METHOD",
       "MOD_API_VERSION",
       "ModMethodError",
@@ -12,6 +13,7 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "RUN_LINK_RESERVED_NAMES",
       "RunLinkConflictError",
       "THEME_CHANGED_METHOD",
+      "buildCatalogListing",
       "buildModCheckReport",
       "buildModLaunch",
       "buildModTestDocument",
@@ -34,10 +36,12 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "loadModTiles",
       "loadModTilesOfKind",
       "matchModApiRange",
+      "pushCatalogChanged",
       "pushLayoutChanged",
       "pushThemeChanged",
       "pushTilesChanged",
       "readMosaicAliases",
+      "resolveAppCatalog",
       "resolveDefaultModSettings",
       "selectModTiles",
       "stopModSession",

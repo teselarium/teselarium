@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Frame, Page, Route } from "@playwright/test";
+import type { Frame, Page } from "@playwright/test";
 import {
   APP_ORIGIN_MOD_PATH,
   buildPassedResults,
@@ -328,70 +328,21 @@ export async function openTilesMod(
   return frame;
 }
 
-/** `**\/default_mods/mod_explorer/mod_conf.yaml`: the route glob of the mod explorer's file. */
-const EXPLORER_MOD_FILE_GLOB = "**/default_mods/mod_explorer/mod_conf.yaml";
-
-/** The `mods` list of the explorer's file: the line `mods:` and its items. */
-const EXPLORER_MODS_LIST = /^ {4}mods:\n(?: {6}- .*\n?)+/m;
-
-async function answerExplorerOfTilesMod(route: Route): Promise<void> {
-  const response = await route.fetch();
-  const modFile = await response.text();
-  if (!EXPLORER_MODS_LIST.test(modFile)) {
-    throw new Error(
-      `The mod explorer's file has no config.mods list:\n${modFile}`,
-    );
-  }
-  await route.fulfill({
-    response,
-    body: modFile.replace(
-      EXPLORER_MODS_LIST,
-      `    mods:\n      - "${TILES_MOD_REFERENCE}"\n`,
-    ),
-  });
-}
-
 /**
- * Serves the tiles mod, and the mod explorer's own file with a `config.mods`
- * that lists only the tiles mod, so the explorer lists `Tiles`.
+ * Serves the tiles mod, which the catalog of the `e2e-test-catalog` build
+ * lists, so its mod explorer at `TEST_CATALOG_PREVIEW_URL` lists `Tiles`.
  */
 export async function serveExplorerOfTilesMod(page: Page): Promise<void> {
   await serveTilesMod(page);
-  await page.route(EXPLORER_MOD_FILE_GLOB, answerExplorerOfTilesMod);
-}
-
-/** `**\/default_mods/mosaic_explorer/mod_conf.yaml`: the route glob of the mosaic explorer's file. */
-const MOSAIC_EXPLORER_MOD_FILE_GLOB =
-  "**/default_mods/mosaic_explorer/mod_conf.yaml";
-
-/** The `mosaics` list of the mosaic explorer's file: the line `mosaics:` and its items. */
-const MOSAIC_EXPLORER_MOSAICS_LIST = /^ {4}mosaics:\n(?: {6}- .*\n?)+/m;
-
-async function answerMosaicExplorerOfLabels(route: Route): Promise<void> {
-  const response = await route.fetch();
-  const modFile = await response.text();
-  if (!MOSAIC_EXPLORER_MOSAICS_LIST.test(modFile)) {
-    throw new Error(
-      `The mosaic explorer's file has no config.mosaics list:\n${modFile}`,
-    );
-  }
-  await route.fulfill({
-    response,
-    body: modFile.replace(
-      MOSAIC_EXPLORER_MOSAICS_LIST,
-      `    mosaics:\n      - "${LABELS_MOSAIC_REFERENCE}"\n`,
-    ),
-  });
 }
 
 /**
- * Serves the tiles mod and the labels mosaic, and the mosaic explorer's own
- * file with a `config.mosaics` that lists only the labels mosaic, so the
- * explorer lists `Labelled items`.
+ * Serves the tiles mod and the labels mosaic, which the catalog of the
+ * `e2e-test-catalog` build lists, so its mosaic explorer at
+ * `TEST_CATALOG_PREVIEW_URL` lists the labels mosaic.
  */
 export async function serveMosaicExplorerOfLabels(page: Page): Promise<void> {
   await serveTilesMod(page, buildLabelsMosaicFiles());
-  await page.route(MOSAIC_EXPLORER_MOD_FILE_GLOB, answerMosaicExplorerOfLabels);
 }
 
 /**

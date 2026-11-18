@@ -1,5 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type {
+  CatalogListing as DeclaredCatalogListing,
   CollectionInspection as DeclaredCollectionInspection,
   ModCheckReport as DeclaredModCheckReport,
   ModContext as DeclaredModContext,
@@ -10,6 +11,7 @@ import type {
   MosaicOpenParams as DeclaredMosaicOpenParams,
 } from "../../../../default_mods/mod_api.d.ts";
 import type { TileCollectionIndex } from "../../tile/index.ts";
+import type { CatalogListing } from "./catalog_listing.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModInspection } from "./mod_inspection.ts";
 import type { ModContext, RunLink } from "./mod_launch.ts";
@@ -66,6 +68,11 @@ describe("default_mods/mod_api.d.ts", function describeModApiTypes(): void {
 
   it("declares a mosaic inspection the engine's fits", function checksMosaicInspection(): void {
     expectTypeOf<MosaicInspection>().toExtend<DeclaredMosaicInspection>();
+  });
+
+  it("declares a catalog listing the engine's fits, and the engine's fits it", function checksCatalogListing(): void {
+    expectTypeOf<CatalogListing>().toExtend<DeclaredCatalogListing>();
+    expectTypeOf<DeclaredCatalogListing>().toExtend<CatalogListing>();
   });
 
   it("declares the mosaics.open params the engine reads: mosaic, params and replace", function checksMosaicOpenParams(): void {

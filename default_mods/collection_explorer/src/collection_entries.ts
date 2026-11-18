@@ -1,42 +1,37 @@
 import type {
+  CatalogListing,
   CollectionInspection,
   ModEngine,
-  ModYamlMapping,
 } from "../../mod_api.d.ts";
 import { describeError } from "./error_messages.ts";
 
-/** A collection of the explorer's config: its inspection, or why it cannot be inspected. */
+/** A collection of the app's catalog: its inspection, or why it cannot be inspected. */
 export type CollectionEntry =
-  | { location: string; inspection: CollectionInspection; error: null }
-  | { location: string; inspection: null; error: string };
+  | { source: string; inspection: CollectionInspection; error: null }
+  | { source: string; inspection: null; error: string };
 
-/** The collection locations of the config's `collections`, in order. Items that are not text are left out. */
-export function readCollectionLocations(config: ModYamlMapping): string[] {
-  const locations: string[] = [];
-  if (!Array.isArray(config.collections)) {
-    return locations;
+/** The sources of the catalog's collections, in catalog order. */
+export function readCollectionSources(catalog: CatalogListing): string[] {
+  const sources: string[] = [];
+  for (const entry of catalog.collections) {
+    sources.push(entry.source);
   }
-  for (const location of config.collections) {
-    if (typeof location === "string") {
-      locations.push(location);
-    }
-  }
-  return locations;
+  return sources;
 }
 
-async function inspectLocation(
+async function inspectSource(
   engine: ModEngine,
-  location: string,
+  source: string,
 ): Promise<CollectionEntry> {
   try {
     const inspection = await engine.request("collections.inspect", {
-      collection: location,
+      collection: source,
     });
-    const entry: CollectionEntry = { location, inspection, error: null };
+    const entry: CollectionEntry = { source, inspection, error: null };
     return entry;
   } catch (error) {
     const failedEntry: CollectionEntry = {
-      location,
+      source,
       inspection: null,
       error: describeError(error),
     };
@@ -44,14 +39,14 @@ async function inspectLocation(
   }
 }
 
-/** Inspects each location, one after another, so the list keeps the config's order. */
+/** Inspects each source, one after another, so the list keeps the catalog's order. */
 export async function inspectCollections(
   engine: ModEngine,
-  locations: string[],
+  sources: string[],
 ): Promise<CollectionEntry[]> {
   const entries: CollectionEntry[] = [];
-  for (const location of locations) {
-    entries.push(await inspectLocation(engine, location));
+  for (const source of sources) {
+    entries.push(await inspectSource(engine, source));
   }
   return entries;
 }

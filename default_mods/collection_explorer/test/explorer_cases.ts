@@ -19,13 +19,17 @@ const MISSING_COLLECTION_LOCATION =
 /** The viewer of the explorer's own config. */
 const CONFIG_VIEWER = "collection_viewer";
 
+/** Answers `catalog.list` with `sources` as the catalog's collections, then mounts the explorer. */
 function mountWithCollections(
   context: CaseContext,
-  collections: string[],
+  sources: string[],
 ): Promise<void> {
-  const mounting = context.mount({
-    config: { viewer: CONFIG_VIEWER, collections },
-  });
+  const collections: { source: string }[] = [];
+  for (const source of sources) {
+    collections.push({ source });
+  }
+  context.answer("catalog.list", { collections });
+  const mounting = context.mount({ config: { viewer: CONFIG_VIEWER } });
   return mounting;
 }
 

@@ -3,6 +3,7 @@ import {
   EXPLORER_OFF_PREVIEW_URL,
   HOME_MOD_PREVIEW_URL,
   PREVIEW_URL,
+  TEST_CATALOG_PREVIEW_URL,
 } from "./e2e/app_servers.ts";
 
 /** Builds the app in an e2e mode (vite.config.ts) and previews it on its own port. */
@@ -115,6 +116,11 @@ export default defineConfig({
       "e2e-explorer-off",
       4175,
       EXPLORER_OFF_PREVIEW_URL,
+    ),
+    buildInstantiationServer(
+      "e2e-test-catalog",
+      4176,
+      TEST_CATALOG_PREVIEW_URL,
     ),
   ],
 });

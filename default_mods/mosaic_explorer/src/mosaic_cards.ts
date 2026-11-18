@@ -1,4 +1,4 @@
-import type { MosaicInspection } from "../../mod_api.d.ts";
+import type { CatalogMosaicEntry, MosaicInspection } from "../../mod_api.d.ts";
 import type { MosaicEntry } from "./mosaic_entries.ts";
 import { openMosaic, openViewer } from "./explorer_view.ts";
 import type { ExplorerView } from "./explorer_view.ts";
@@ -42,29 +42,50 @@ function buildCardActions(
   return actions;
 }
 
-/** A mosaic as a card: an `<article>` with its title, its description and its actions. */
+/**
+ * The default mosaic mark, under the title: a `<small>`, not a `<p>`, so the
+ * card's first paragraph stays its description.
+ */
+function buildDefaultMark(
+  defaultOf: NonNullable<CatalogMosaicEntry["defaultOf"]>,
+): HTMLElement {
+  const mark = document.createElement("small");
+  mark.textContent = `Default mosaic of ${defaultOf.title}`;
+  return mark;
+}
+
+/**
+ * A mosaic as a card: an `<article>` with its title, the mark of a mod's
+ * default mosaic, its description and its actions.
+ */
 function buildMosaicCard(
   view: ExplorerView,
   inspection: MosaicInspection,
+  defaultOf: CatalogMosaicEntry["defaultOf"],
 ): HTMLElement {
   const card = document.createElement("article");
+  const heading = document.createElement("header");
   const title = document.createElement("h2");
   title.textContent = inspection.title;
+  heading.append(title);
+  if (defaultOf !== null) {
+    heading.append(buildDefaultMark(defaultOf));
+  }
   const description = document.createElement("p");
   description.textContent = inspection.description;
-  card.append(title, description, buildCardActions(view, inspection));
+  card.append(heading, description, buildCardActions(view, inspection));
   return card;
 }
 
 /** A mosaic that cannot be inspected: `role="alert"` gives it the app's destructive alert look. */
-function buildFailureAlert(location: string, error: string): HTMLElement {
+function buildFailureAlert(source: string, error: string): HTMLElement {
   const failure = document.createElement("div");
   failure.setAttribute("role", "alert");
-  const locationCode = document.createElement("code");
-  locationCode.textContent = location;
+  const sourceCode = document.createElement("code");
+  sourceCode.textContent = source;
   const message = document.createElement("p");
   message.textContent = error;
-  failure.append(locationCode, message);
+  failure.append(sourceCode, message);
   return failure;
 }
 
@@ -75,9 +96,9 @@ export function buildMosaicItem(
 ): HTMLElement {
   const item = document.createElement("li");
   if (entry.inspection === null) {
-    item.append(buildFailureAlert(entry.location, entry.error));
+    item.append(buildFailureAlert(entry.source, entry.error));
     return item;
   }
-  item.append(buildMosaicCard(view, entry.inspection));
+  item.append(buildMosaicCard(view, entry.inspection, entry.defaultOf));
   return item;
 }

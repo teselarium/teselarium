@@ -17,6 +17,9 @@ import type {
   PlayedCheckFrame,
 } from "../../../test/check_stages.ts";
 import {
+  SAMPLE_COLLECTION_SOURCE,
+  SAMPLE_MOD_SOURCE,
+  SAMPLE_MOSAIC_SOURCE,
   serveTestedMod,
   TESTED_MOD_SOURCE,
   TESTED_MOD_TEST_SOURCE,
@@ -61,7 +64,7 @@ async function startCaseCheck(names: string[]): Promise<CaseCheck> {
 function queueAnswer(
   caseFrame: PlayedCheckFrame,
   method: string,
-  value: boolean | null,
+  value: unknown,
 ): void {
   sendNotification(caseFrame, "sandbox.answerQueued", { method, value });
 }
@@ -223,6 +226,52 @@ describe("Scripted answers", function describeScriptedAnswers(): void {
     expect(report.findings[0]).toMatchObject({ step: "test", level: "error" });
     expect(report.findings[0].message).toContain('In the test "opens a link"');
     expect(report.findings[0].message).toContain("-32602");
+  });
+
+  it("answers catalog.list with the queued catalog", async function answersQueuedCatalog(): Promise<void> {
+    const { caseFrame, reporting } = await startCaseCheck(["lists mods"]);
+    const catalog = {
+      mods: [{ source: "./default_mods/mod_explorer/fixtures/listed_mod" }],
+      collections: [],
+      mosaics: [],
+    };
+
+    queueAnswer(caseFrame, "catalog.list", catalog);
+    sendRequest(caseFrame, 1, "catalog.list", {});
+    await waitForReceived(caseFrame, 1);
+    await finishPlayedCase(caseFrame, null);
+    const report = await reporting;
+
+    expect(caseFrame.received).toEqual([
+      { jsonrpc: "2.0", id: 1, result: catalog },
+    ]);
+    expect(report.findings).toEqual([]);
+  });
+
+  it("Case without a scripted catalog", async function answersAppCatalog(): Promise<void> {
+    const { caseFrame, reporting } = await startCaseCheck(["lists mods"]);
+    const catalog = { mods: [], collections: [], mosaics: [] };
+
+    queueAnswer(caseFrame, "catalog.list", catalog);
+    sendRequest(caseFrame, 1, "catalog.list", {});
+    sendRequest(caseFrame, 2, "catalog.list", {});
+    await waitForReceived(caseFrame, 2);
+    await finishPlayedCase(caseFrame, null);
+    const report = await reporting;
+
+    expect(caseFrame.received).toEqual([
+      { jsonrpc: "2.0", id: 1, result: catalog },
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        result: {
+          mods: [{ source: SAMPLE_MOD_SOURCE }],
+          collections: [{ source: SAMPLE_COLLECTION_SOURCE }],
+          mosaics: [{ source: SAMPLE_MOSAIC_SOURCE, defaultOf: null }],
+        },
+      },
+    ]);
+    expect(report.findings).toEqual([]);
   });
 
   it("refuses mods.check from a case without a finding", async function refusesCheck(): Promise<void> {

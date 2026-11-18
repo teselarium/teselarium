@@ -63,6 +63,12 @@ The addresses come from the instantiation, not from the mod, and are public, sin
 
 Each explorer replaces `read…Locations(config)` with a `read…Catalog(engine)` that sends `catalog.list` and takes its own list. It also registers `engine.on("catalog.changed", …)` to re-list with the event's params. The render takes entries `{ source, … }`. A failed inspection shows the source, now the resolved address. A list counter drops a re-list that a newer one overtook. The mosaic explorer draws the default-mosaic mark as a `<small>` under the `<h2>`, not a `<p>`, so the card's first `<p>` stays the description. The three copies are small, and the build rule that keeps mods standalone outweighs DRY here.
 
+### e2e tests that list test-owned entries use a test-catalog build
+
+Some e2e tests made an explorer list a test-owned mod or mosaic by rewriting the explorer's `config.mods` or `config.mosaics` in its served mod file. Those keys are now ignored, and the tests outside the sample specs must not need the shipped samples (`isolate-tests-from-samples`). They run against an instantiation built in the e2e mode `e2e-test-catalog`, which imports `src/test/registries/test_catalog.ts` in place of `src/main/app_catalog.ts`, as `e2e-home-mod` and `e2e-explorer-off` swap their modules. Its catalog lists the test-owned tiles mod and labels mosaic under `/test-mods/`, which each test serves as before. Tests that need another build too, such as a switched-off viewer, route the catalog's sample address to a test-owned file instead, as the collection explorer's tests already do.
+
+*Alternatives:* moving the tests to the vanilla catalog and `@sample` breaks the sample isolation. Routing the vanilla catalog's sample addresses everywhere ties the tests to which entries the vanilla catalog holds. The cost of the chosen way is one more e2e build at the start of every run.
+
 ### Mod API surface
 
 `MOD_API_VERSION` becomes `0.1.15`. The surface guard gets a `0.1.15` entry with the method `catalog.list` and the event `catalog.changed`. `default_mods/mod_api.d.ts` types the request, the event and `CatalogListing`, and `mod_api_types.test.ts` checks the engine's type against it. The engine README gets a `0.1.15` version note. Default mods keep `api: "^0.1.0"` (required by `mod-api-version`). They ship with the app, so they always run against a version that has the method.

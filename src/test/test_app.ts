@@ -13,6 +13,8 @@ import {
   rememberSiteDecisions,
 } from "../main/settings/site_decisions.ts";
 import type { SiteDecisions } from "../main/settings/site_decisions.ts";
+import { createCatalogSetting } from "../main/settings/catalog_setting.ts";
+import type { CatalogSetting } from "../main/settings/catalog_setting.ts";
 import { createTileMediaSetting } from "../main/settings/tile_media_setting.ts";
 import type { TileMediaSetting } from "../main/settings/tile_media_setting.ts";
 import { createTheaterSetting } from "../main/stage/theater_setting.ts";
@@ -36,6 +38,7 @@ export interface AppFixture {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
+  catalogSetting: CatalogSetting;
   theater: TheaterSetting;
   siteDecisions: SiteDecisions;
   playerSites: PlayerSites;
@@ -96,6 +99,7 @@ export async function startTestApp(
       optionalIds: listOptionalIds(sections),
     }),
     tileMedia: createTileMediaSetting({ storage, stage }),
+    catalogSetting: createCatalogSetting({ storage, stage }),
     theater: createTheaterSetting({ storage, stage }),
     siteDecisions,
     playerSites: createPlayerSites({ storage }),

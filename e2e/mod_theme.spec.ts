@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { TEST_CATALOG_PREVIEW_URL } from "./app_servers.ts";
 import type { Frame, Page } from "@playwright/test";
 import {
   coverPermissionRow,
@@ -293,7 +294,7 @@ test.describe(
       await recordDefaultModThemes(page);
       await page.emulateMedia({ colorScheme: "light" });
       await serveExplorerOfTilesMod(page);
-      await page.goto(EXPLORER_RUN_LINK);
+      await page.goto(`${TEST_CATALOG_PREVIEW_URL}${EXPLORER_RUN_LINK}`);
       const explorer = await findModFrame(page, "Mods");
       await explorer.getByRole("button", { name: /Tiles/ }).click();
       const viewer = await findModFrame(page, "Mod Viewer");
@@ -356,7 +357,7 @@ test.describe(
     }): Promise<void> {
       await page.emulateMedia({ colorScheme: "dark" });
       await serveExplorerOfTilesMod(page);
-      await page.goto(EXPLORER_RUN_LINK);
+      await page.goto(`${TEST_CATALOG_PREVIEW_URL}${EXPLORER_RUN_LINK}`);
       const explorer = await findModFrame(page, "Mods");
       const explorerColors = await explorer.evaluate(readBodyColors);
       await explorer.getByRole("button", { name: /Tiles/ }).click();

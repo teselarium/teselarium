@@ -1,42 +1,39 @@
 import type {
+  CatalogListing,
+  CatalogMosaicEntry,
   ModEngine,
-  ModYamlMapping,
   MosaicInspection,
 } from "../../mod_api.d.ts";
 import { describeError } from "./error_messages.ts";
 
-/** A mosaic of the explorer's config: its inspection, or why it cannot be inspected. */
+/** The mod whose default mosaic a catalog mosaic is, or `null`. */
+type DefaultOf = CatalogMosaicEntry["defaultOf"];
+
+/** A mosaic of the app's catalog, with its mod mark: its inspection, or why it cannot be inspected. */
 export type MosaicEntry =
-  | { location: string; inspection: MosaicInspection; error: null }
-  | { location: string; inspection: null; error: string };
-
-/** The mosaic locations of the config's `mosaics`, in order. Items that are not text are left out. */
-export function readMosaicLocations(config: ModYamlMapping): string[] {
-  const locations: string[] = [];
-  if (!Array.isArray(config.mosaics)) {
-    return locations;
-  }
-  for (const location of config.mosaics) {
-    if (typeof location === "string") {
-      locations.push(location);
+  | {
+      source: string;
+      defaultOf: DefaultOf;
+      inspection: MosaicInspection;
+      error: null;
     }
-  }
-  return locations;
-}
+  | { source: string; defaultOf: DefaultOf; inspection: null; error: string };
 
-async function inspectLocation(
+async function inspectCatalogMosaic(
   engine: ModEngine,
-  location: string,
+  catalogMosaic: CatalogMosaicEntry,
 ): Promise<MosaicEntry> {
+  const { source, defaultOf } = catalogMosaic;
   try {
     const inspection = await engine.request("mosaics.inspect", {
-      mosaic: location,
+      mosaic: source,
     });
-    const entry: MosaicEntry = { location, inspection, error: null };
+    const entry: MosaicEntry = { source, defaultOf, inspection, error: null };
     return entry;
   } catch (error) {
     const failedEntry: MosaicEntry = {
-      location,
+      source,
+      defaultOf,
       inspection: null,
       error: describeError(error),
     };
@@ -44,14 +41,14 @@ async function inspectLocation(
   }
 }
 
-/** Inspects each location, one after another, so the list keeps the config's order. */
+/** Inspects each mosaic of the catalog, one after another, so the list keeps the catalog's order. */
 export async function inspectMosaics(
   engine: ModEngine,
-  locations: string[],
+  catalog: CatalogListing,
 ): Promise<MosaicEntry[]> {
   const entries: MosaicEntry[] = [];
-  for (const location of locations) {
-    entries.push(await inspectLocation(engine, location));
+  for (const catalogMosaic of catalog.mosaics) {
+    entries.push(await inspectCatalogMosaic(engine, catalogMosaic));
   }
   return entries;
 }

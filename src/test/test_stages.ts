@@ -9,6 +9,7 @@ import { APP_BASE_URL } from "./sample_files.ts";
 import {
   APP_ORIGIN,
   SAMPLE_MOD_REFERENCE,
+  TEST_CATALOG,
   TEST_NPM_HOST,
 } from "./sample_mods.ts";
 import { fetchTestFile } from "./test_files.ts";
@@ -68,6 +69,8 @@ export function buildTestStage(
     fetch: fetchTestFile,
     colorScheme: "light",
     loadsTileLinkedMedia: true,
+    catalog: TEST_CATALOG,
+    catalogDefaultMosaics: false,
     theaterMode: false,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,

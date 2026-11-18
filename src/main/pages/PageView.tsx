@@ -11,6 +11,7 @@ import type { SectionSwitches } from "../sections/section_switches.ts";
 import type { PlayerSites } from "../settings/player_sites.ts";
 import type { SiteDecisions } from "../settings/site_decisions.ts";
 import { SettingsPage } from "../settings/SettingsPage.tsx";
+import type { CatalogSetting } from "../settings/catalog_setting.ts";
 import type { TileMediaSetting } from "../settings/tile_media_setting.ts";
 import type { AppTheme } from "../theme/app_theme.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
@@ -24,6 +25,7 @@ interface PageViewProps {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
+  catalogSetting: CatalogSetting;
   siteDecisions: SiteDecisions;
   playerSites: PlayerSites;
 }
@@ -51,6 +53,7 @@ export function PageView({
   sections,
   switches,
   tileMedia,
+  catalogSetting,
   siteDecisions,
   playerSites,
 }: PageViewProps): ReactElement | null {
@@ -75,6 +78,7 @@ export function PageView({
         sections={sections}
         switches={switches}
         tileMedia={tileMedia}
+        catalogSetting={catalogSetting}
         siteDecisions={siteDecisions}
         playerSites={playerSites}
       />

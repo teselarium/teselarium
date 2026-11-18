@@ -104,7 +104,7 @@ Tiles opens the [collection explorer](../tiles/explorer/README.md), Mods the [mo
 
 ### Rules
 
-The registry is checked before the stage is created. When it breaks a rule, the app does not start: it shows the errors, each naming its section, instead of the app. A broken registry is a mistake of whoever edited it, so it fails loudly.
+The registry is checked before the stage is created. When it breaks a rule, the app does not start: it shows the errors, each naming its section, instead of the app (`StartErrorScreen`, which also shows the [catalog's errors](#start-errors)). A broken registry is a mistake of whoever edited it, so it fails loudly.
 
 - An `id` matches `[a-z][a-z0-9_-]*` and is unique.
 - `run` is reserved for run links (`#/run?mod=...`).
@@ -131,6 +131,40 @@ A section whose target is a default mod that the instantiation switched off (`sw
 - **Remove a section**: delete its entry, and its `public/pages/<id>/` folder if it had one. Stored switches of a removed section are dropped on the next start. `home`, `settings` and `about` cannot be removed.
 - **Change a section**: edit its fields. Changing an `id` changes its addresses and its folder, and resets its stored switch.
 - **Make a coming-soon section available**: set `comingSoon` to `false` and give it its real target, as Mosaics was given `mosaic_explorer`.
+
+## The app catalog
+
+The app's catalog is the list of the mods, collections and mosaics the instantiation offers. The Mods, Tiles and Mosaics explorers list it, and any mod can read it with `catalog.list` (see the [engine module](../lib/core/engine/README.md#app-catalog)). It lives in `src/main/app_catalog.ts`, next to the default mod settings, as three ordered lists of references relative to the app's address:
+
+```ts
+export const APP_CATALOG: AppCatalog = {
+  mods: [
+    "./samples/mods/book_list",
+    "./samples/mods/flashcards",
+    "./samples/mods/country_map",
+  ],
+  collections: [
+    "./samples/tiles/literature_nobel_laureates/collection.yaml",
+    "./samples/tiles/literature_nobel_laureates_books/collection.yaml",
+  ],
+  mosaics: [
+    "./samples/mosaics/nobel_books_list.yaml",
+    "./samples/mosaics/nobel_laureates_map.yaml",
+  ],
+};
+```
+
+A mod entry is a mod reference: a default mod name such as `tile_viewer`, a mod folder, or a mod file. A collection entry is a collection file or a folder holding `collection.yaml`, and a mosaic entry a mosaic file or a folder holding `mosaic.yaml`. The order of each list is the order the explorers show. The vanilla catalog lists the samples, and no default mod, fixture or default mosaic: the "List the default mosaics of mods" switch in [Settings](settings/README.md) adds the default mosaics of the catalog's mods after its mosaics.
+
+When cloning the app, edit `APP_CATALOG` to offer other mods, collections and mosaics. The explorers' configs no longer hold lists: a `mods`, `collections` or `mosaics` key in them is ignored.
+
+### Start errors
+
+`main.tsx` checks the catalog with `resolveAppCatalog`, next to the registry, before the stage is created. When an entry is empty, cannot be resolved, or resolves to the same file as an earlier entry of its list (for example `./samples/mods/book_list` and `./samples/mods/book_list/mod_conf.yaml`), the app does not start: `StartErrorScreen` (`StartErrorScreen.tsx`) shows the registry's errors and the catalog's, each under its own title, and each catalog error names its list and the entry as written.
+
+### Switched-off mods
+
+A mod entry that names a default mod the instantiation switched off (`switchedOff` in `src/main/default_mods.ts`) is left out of the catalog, whatever reference names it, and does not stop the app.
 
 ## Stage dialogs
 
@@ -161,3 +195,5 @@ The frame is hidden by layout, not by `display: none` or a size of zero: it fill
 | `stage/` | The stage view: the stage bar, the frames, the hidden check frames, the action dialog, the player dialog, the API mismatch dialog and the site consent dialog; the remembered theater choice (`theater_setting.ts`) and the frames' fullscreen (`stage_fullscreen.ts`). |
 | `theme/` | The app's theme and the Theme control. |
 | `default_mods.ts` | The default mod settings: the default mods folder and the switched-off mods. |
+| `app_catalog.ts` | The app catalog: the mods, collections and mosaics the explorers list (see [The app catalog](#the-app-catalog)). |
+| `StartErrorScreen.tsx` | What the app shows instead of itself when the registry or the catalog breaks a rule. |

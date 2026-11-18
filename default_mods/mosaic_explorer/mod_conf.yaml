@@ -7,10 +7,7 @@ mod:
   test_path: "./test.js"
   config:
     viewer: "mosaic_viewer"
-    mosaics:
-      - "./samples/mosaics/nobel_books_list.yaml"
-      - "./samples/mosaics/nobel_laureates_map.yaml"
   permissions:
     open:
       - host: "*"
-        reason: "Lists the mosaics of its config and opens the one you pick"
+        reason: "Lists the app's mosaics and opens the one you pick"

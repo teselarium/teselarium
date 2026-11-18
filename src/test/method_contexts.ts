@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import type { Mock } from "vitest";
 import type { AppAction } from "../lib/core/engine/app_actions.ts";
+import type { CatalogListing } from "../lib/core/engine/catalog_listing.ts";
 import { ModMethodError } from "../lib/core/engine/engine_errors.ts";
 import { checkModBundle } from "../lib/core/engine/mod_bundle_check.ts";
 import { buildModCheckReport } from "../lib/core/engine/mod_check_report.ts";
@@ -78,6 +79,12 @@ export function readNoSiteDecisions(): SiteDecision[] {
   return decisions;
 }
 
+/** The `readCatalog` of handler and session tests: an empty catalog. A test that reads the catalog sets its own. */
+export function readEmptyCatalog(): Promise<CatalogListing> {
+  const listing: CatalogListing = { mods: [], collections: [], mosaics: [] };
+  return Promise.resolve(listing);
+}
+
 function acceptOpenLink(): OpenLinkOutcome {
   return "opened";
 }
@@ -153,6 +160,7 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
     },
     tileBodies: buildTileBodies([]),
     readSiteDecisions: readNoSiteDecisions,
+    readCatalog: readEmptyCatalog,
     onOpenLink: acceptOpenLink,
     onRequestAction: acceptAction,
     onCheckMod: failOnCheckMod,

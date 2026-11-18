@@ -1,7 +1,7 @@
 /**
  * Tests of the mosaic explorer, which `mods.check` runs after mounting it.
- * Each case mounts the explorer with fixture mosaics in its config's
- * `mosaics`, so the cases pass whatever samples the app ships
+ * Each case answers `catalog.list` with fixture mosaics before mounting the
+ * explorer, so the cases pass whatever samples and catalog the app ships
  * (default_mods/README.md). "Open" and "View" are answered with `null`, so
  * they open nothing.
  */
@@ -10,6 +10,7 @@ import type { ModTestRegistration } from "../../mod_api.d.ts";
 import {
   listsFailureAsAlert,
   listsMosaicsAsCards,
+  marksDefaultMosaic,
   opensSelectedMosaic,
   opensViewerForSelectedMosaic,
   showsRefusedOpen,
@@ -23,7 +24,8 @@ import {
 } from "./look_cases.ts";
 
 export default function registerExplorerTests(t: ModTestRegistration): void {
-  t.test("lists the mosaics of its config as cards", listsMosaicsAsCards);
+  t.test("lists the mosaics of the catalog as cards", listsMosaicsAsCards);
+  t.test("marks a mod's default mosaic", marksDefaultMosaic);
   t.test(
     "lists a mosaic that cannot be inspected as an alert",
     listsFailureAsAlert,

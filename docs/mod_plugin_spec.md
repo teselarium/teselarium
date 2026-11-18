@@ -516,7 +516,7 @@ Each case runs in a fresh hidden frame, with the content policy and permissions 
 
 ### Scripted answers
 
-A check shows no dialog. `answer(method, value)` queues the answer to the next request for `method`: `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean, or `mods.open` or `mosaics.open` with `null` (`mosaics.open` since mod API `0.1.14`). The request resolves with it, a `mods.open` or `mosaics.open` answered this way opens nothing, and a `players.open` answered this way requests nothing from the player's site. Requests without a queued answer get what the mount check gives: `false` for `links.open`, `files.save`, `ui.confirm` and `players.open`, and `-32002` for `mods.open`, `mosaics.open`, `mods.check` and `mosaics.check`. In a case, none of them is a finding. A wrong method or value throws at once, for example `the answer to ui.confirm must be a boolean`. The app still checks each request's params, so a `links.open` with a bad address fails as it would in the app, and leaves its answer queued.
+A check shows no dialog. `answer(method, value)` queues the answer to the next request for `method`: `links.open`, `files.save`, `ui.confirm` or `players.open` with a boolean, `mods.open` or `mosaics.open` with `null` (`mosaics.open` since mod API `0.1.14`), or `catalog.list` with a catalog (since mod API `0.1.15`, see below). The request resolves with it, a `mods.open` or `mosaics.open` answered this way opens nothing, and a `players.open` answered this way requests nothing from the player's site. Requests without a queued answer get what the mount check gives: `false` for `links.open`, `files.save`, `ui.confirm` and `players.open`, and `-32002` for `mods.open`, `mosaics.open`, `mods.check` and `mosaics.check`. In a case, none of them is a finding. A wrong method or value throws at once, for example `the answer to ui.confirm must be a boolean`. The app still checks each request's params, so a `links.open` with a bad address fails as it would in the app, and leaves its answer queued.
 
 ```js
 function hasNoBooks(context) {
@@ -528,6 +528,18 @@ async function deletesAfterConfirming(context) {
   context.answer("ui.confirm", true);
   context.root.querySelector("button.delete").click();
   await context.waitFor(hasNoBooks.bind(undefined, context));
+}
+```
+
+A catalog answer is a mapping whose optional `mods`, `collections` and `mosaics` are lists of entries with a non-empty string `source`. A mosaic entry may also have `defaultOf`: `null`, or `{ source, title }` with non-empty strings. A missing list is empty and a missing `defaultOf` is `null`, so `catalog.list` resolves with the catalog in its complete form, as the app answers it. Any other value throws, naming the first wrong key, for example `the answer to catalog.list must be a catalog: "mods[0]" must be a mapping with a non-empty "source"`. Sources are kept as given, so a case can list its own fixtures by their address in the default mods folder, and the mod's `*.inspect` requests resolve them against the app's address. A `catalog.list` without a queued answer, in a case or in the mount check, gets the app's catalog, as in the app. Script it before `mount` when the mod lists the catalog as it mounts, so the case never depends on what the app ships:
+
+```js
+async function listsTheFixtureMod(context) {
+  context.answer("catalog.list", {
+    mods: [{ source: "./default_mods/mod_explorer/fixtures/listed_mod" }],
+  });
+  await context.mount();
+  // catalog.list resolved with that mod, no collection and no mosaic.
 }
 ```
 

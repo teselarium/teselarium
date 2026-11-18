@@ -5,6 +5,19 @@ export type {
   PlayerAction,
   SaveFileAction,
 } from "./app_actions.ts";
+export { resolveAppCatalog } from "./app_catalog.ts";
+export type {
+  AppCatalog,
+  AppCatalogResolution,
+  ResolvedAppCatalog,
+} from "./app_catalog.ts";
+export { buildCatalogListing } from "./catalog_listing.ts";
+export type {
+  CatalogEntry,
+  CatalogListing,
+  CatalogMosaicEntry,
+  CatalogMosaicMod,
+} from "./catalog_listing.ts";
 export {
   findSwitchedOffMod,
   resolveDefaultModSettings,
@@ -86,8 +99,10 @@ export type {
 export { buildTileBodies, collectModTileLinks } from "./mod_tile_bodies.ts";
 export type { TileBodies } from "./mod_tile_bodies.ts";
 export {
+  CATALOG_CHANGED_METHOD,
   connectModSession,
   LAYOUT_CHANGED_METHOD,
+  pushCatalogChanged,
   pushLayoutChanged,
   pushThemeChanged,
   pushTilesChanged,

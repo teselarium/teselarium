@@ -233,8 +233,8 @@ export async function serveLinkedTiles(
  */
 export const TEST_MOD_API_RANGE = "^0.1.0";
 
-/** `0.1.14`: the app's mod API version, as mods read it in `context.api.version`. */
-export const APP_MOD_API_VERSION = "0.1.14";
+/** `0.1.15`: the app's mod API version, as mods read it in `context.api.version`. */
+export const APP_MOD_API_VERSION = "0.1.15";
 
 /** `^0.2.0`: an `api` range for a later mod API, which the app's version does not match. */
 export const OTHER_API_RANGE = "^0.2.0";

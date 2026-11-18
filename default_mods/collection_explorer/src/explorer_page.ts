@@ -12,6 +12,12 @@ const EXPLORER_STYLE = `
   code { overflow-wrap: anywhere; }
 `;
 
+/** Marks the list region busy while the collections load, in place of the list. */
+export function showCollectionsLoading(view: ExplorerView): void {
+  view.content.setAttribute("aria-busy", "true");
+  view.content.textContent = "Loading collections…";
+}
+
 /** The page while the collections load: the region is busy, and the status region waits, empty. */
 export function buildExplorerPage(view: ExplorerView, title: string): void {
   const style = document.createElement("style");
@@ -19,8 +25,7 @@ export function buildExplorerPage(view: ExplorerView, title: string): void {
   document.head.append(style);
   const heading = document.createElement("h1");
   heading.textContent = title;
-  view.content.setAttribute("aria-busy", "true");
-  view.content.textContent = "Loading collections…";
+  showCollectionsLoading(view);
   document.body.replaceChildren(heading, view.content, view.status);
 }
 

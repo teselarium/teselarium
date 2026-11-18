@@ -22,9 +22,11 @@ import {
 } from "../../test/sample_mods.ts";
 import { PLAYER_SITES_KEY, readPlayerSitesSnapshot } from "./player_sites.ts";
 import { SITE_DECISIONS_KEY } from "./site_decisions.ts";
+import { CATALOG_SETTING_KEY } from "./catalog_setting.ts";
 import { TILE_MEDIA_SETTING_KEY } from "./tile_media_setting.ts";
 
 const TILE_MEDIA_LABEL = "Load media linked by tiles";
+const CATALOG_LABEL = "List the default mosaics of mods";
 
 /** The version of the app's `package.json`, which the build gives to the app. */
 const PACKAGE_VERSION = (
@@ -44,6 +46,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       sections={fixture.sections}
       switches={fixture.switches}
       tileMedia={fixture.tileMedia}
+      catalogSetting={fixture.catalogSetting}
       theater={fixture.theater}
       siteDecisions={fixture.siteDecisions}
       playerSites={fixture.playerSites}
@@ -173,6 +176,9 @@ describe("SettingsPage", function describeSettingsPage(): void {
       expect(within(findRow(name)).queryByRole("switch")).toBeNull();
     }
     expect(sectionRows()).not.toHaveTextContent("Coming soon");
+    expect(
+      screen.getByRole("switch", { name: CATALOG_LABEL }),
+    ).not.toBeChecked();
     expect(
       screen.getByRole("switch", { name: TILE_MEDIA_LABEL }),
     ).toBeChecked();
@@ -490,12 +496,30 @@ describe("SettingsPage", function describeSettingsPage(): void {
     expect(fixture.stage.loadsTileLinkedMedia).toBe(true);
   });
 
+  it("says the catalog switch helps when writing a mod", async function describesCatalogSwitch(): Promise<void> {
+    renderApp(await startTestApp("#/settings"));
+
+    expect(screen.getByText(/helps when writing a mod/)).toBeInTheDocument();
+  });
+
+  it("switches the default mosaics of mods on", async function switchesCatalogOn(): Promise<void> {
+    const fixture = await startTestApp("#/settings");
+    renderApp(fixture);
+
+    fireEvent.click(screen.getByRole("switch", { name: CATALOG_LABEL }));
+
+    expect(screen.getByRole("switch", { name: CATALOG_LABEL })).toBeChecked();
+    expect(fixture.stage.catalogDefaultMosaics).toBe(true);
+    expect(fixture.storage.getItem(CATALOG_SETTING_KEY)).toBe("true");
+  });
+
   it("Vanilla versions", async function showsVersions(): Promise<void> {
     renderApp(await startTestApp("#/settings"));
 
     expect(readGroupHeadings()).toEqual([
       "Appearance",
       "Sidebar",
+      "Catalog",
       "Privacy",
       "Mod permissions",
       "Version",

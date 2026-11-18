@@ -1,13 +1,19 @@
 import type { ModLoadOptions, ModPermission } from "../../mod/index.ts";
-import { MOD_API_VERSION, resolveDefaultModSettings } from "../engine/index.ts";
+import {
+  buildCatalogListing,
+  MOD_API_VERSION,
+  resolveDefaultModSettings,
+} from "../engine/index.ts";
 import type {
   AppAction,
+  CatalogListing,
   DefaultModSettings,
   FrameLayout,
   ModCheckReport,
   ModCheckRequest,
   OpenLinkOptions,
   OpenLinkOutcome,
+  ResolvedAppCatalog,
   ResolvedDefaultModSettings,
   RunLink,
 } from "../engine/index.ts";
@@ -60,6 +66,7 @@ import {
   buildConsentLineKey,
   launchSandbox,
   pushSandboxLayout,
+  pushSandboxCatalog,
   pushSandboxTheme,
   clearSandboxNotifications,
   dismissSandboxMessage,
@@ -127,6 +134,10 @@ export interface StageOptions {
   colorScheme: ColorScheme;
   /** Whether "Load media linked by tiles" is on as the app starts. */
   loadsTileLinkedMedia: boolean;
+  /** The app's catalog, resolved and checked by `resolveAppCatalog` before the stage is created. */
+  catalog: ResolvedAppCatalog;
+  /** Whether "List the default mosaics of mods" is on as the app starts. */
+  catalogDefaultMosaics: boolean;
   /** Whether theater mode is on as the app starts. */
   theaterMode: boolean;
   /** The remembered site decisions, read before a mod from another origin starts, by checks and by `mods.inspect`. */
@@ -254,6 +265,12 @@ export interface Stage {
   theme: Theme;
   /** Whether mods launched from now on load the media their tiles link. Running mods keep their launch. */
   loadsTileLinkedMedia: boolean;
+  /** The app's catalog, which `catalog.list` answers. */
+  catalog: ResolvedAppCatalog;
+  /** Whether the catalog's mosaics also hold the default mosaics of its mods. */
+  catalogDefaultMosaics: boolean;
+  /** Counts the switch's changes, so a `catalog.changed` whose listing a newer change overtook is dropped. */
+  catalogGeneration: number;
   /** Whether theater mode is on. With `fullscreenSandboxId`, it decides each frame's layout (`readSandboxLayout`). */
   theaterMode: boolean;
   /** The sandbox whose frame is the app page's fullscreen element, or `null`. */
@@ -292,6 +309,15 @@ function readStageTheme(stage: Stage): Theme {
   return stage.theme;
 }
 
+/** The catalog as `catalog.list` answers it now, with the switch's current value. */
+function readStageCatalog(stage: Stage): Promise<CatalogListing> {
+  return buildCatalogListing(
+    stage.catalog,
+    stage.catalogDefaultMosaics,
+    stage.fetchOptions,
+  );
+}
+
 function readStageLayout(stage: Stage, sandboxId: string): FrameLayout {
   return readSandboxLayout(
     stage.theaterMode,
@@ -314,6 +340,7 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     readLayout: readStageLayout.bind(undefined, stage),
     loadsTileLinkedMedia: stage.loadsTileLinkedMedia,
     readSiteDecisions: stage.readSiteDecisions,
+    readCatalog: readStageCatalog.bind(undefined, stage),
     rememberSiteDecisions: stage.rememberSiteDecisions,
   };
   return services;
@@ -333,6 +360,7 @@ function buildCheckServices(stage: Stage): CheckServices {
     onChange: publishStage.bind(undefined, stage),
     loadsTileLinkedMedia: stage.loadsTileLinkedMedia,
     readSiteDecisions: stage.readSiteDecisions,
+    readCatalog: readStageCatalog.bind(undefined, stage),
   };
   return services;
 }
@@ -622,6 +650,9 @@ export function createStage(options: StageOptions): Stage {
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
     loadsTileLinkedMedia: options.loadsTileLinkedMedia,
+    catalog: options.catalog,
+    catalogDefaultMosaics: options.catalogDefaultMosaics,
+    catalogGeneration: 0,
     theaterMode: options.theaterMode,
     fullscreenSandboxId: null,
     readSiteDecisions: options.readSiteDecisions,
@@ -1211,6 +1242,38 @@ export function warnFullscreenRefused(
  */
 export function changeStageTileLinkedMedia(stage: Stage, isOn: boolean): void {
   stage.loadsTileLinkedMedia = isOn;
+}
+
+/** Pushes the listing to every running sandbox, unless a newer change of the switch started meanwhile. */
+function pushStageCatalog(
+  stage: Stage,
+  generation: number,
+  listing: CatalogListing,
+): void {
+  if (generation !== stage.catalogGeneration) {
+    return;
+  }
+  for (const runtime of stage.runtimes.values()) {
+    pushSandboxCatalog(runtime, listing);
+  }
+}
+
+/**
+ * Switches "List the default mosaics of mods". Every `catalog.list` from now
+ * on answers with the new value. The listing is built once and pushed as
+ * `catalog.changed` to every running mod, visible or hidden, with no frame
+ * reloaded. A listing that a newer change overtook is dropped, so two quick
+ * changes leave the mods on the second. Resolves once the push is done.
+ */
+export async function changeStageCatalogDefaultMosaics(
+  stage: Stage,
+  isOn: boolean,
+): Promise<void> {
+  stage.catalogDefaultMosaics = isOn;
+  stage.catalogGeneration += 1;
+  const generation = stage.catalogGeneration;
+  const listing = await readStageCatalog(stage);
+  pushStageCatalog(stage, generation, listing);
 }
 
 export function readStageSnapshot(stage: Stage): StageSnapshot {

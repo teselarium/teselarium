@@ -4,6 +4,7 @@ export {
   answerStageAction,
   attachCheckFrame,
   attachFrame,
+  changeStageCatalogDefaultMosaics,
   changeStageColorScheme,
   changeStageFullscreen,
   changeStageTheaterMode,

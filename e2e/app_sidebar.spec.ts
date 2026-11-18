@@ -15,6 +15,7 @@ import {
 import {
   EXPLORER_OFF_PREVIEW_URL,
   HOME_MOD_PREVIEW_URL,
+  TEST_CATALOG_PREVIEW_URL,
 } from "./app_servers.ts";
 import {
   buildProbeFiles,
@@ -137,7 +138,9 @@ test.describe("Vanilla sections", function describeVanilla(): void {
     await expect(sectionItem(page, "Mods")).toHaveCount(0);
     await openSection(page, "Settings");
     await expect(page.getByRole("switch", { name: "Guides" })).toBeVisible();
-    await expect(page.getByRole("switch", { name: "Mods" })).toHaveCount(0);
+    await expect(
+      page.getByRole("switch", { name: "Mods", exact: true }),
+    ).toHaveCount(0);
   });
 });
 
@@ -146,7 +149,7 @@ test.describe("Section navigation", function describeNavigation(): void {
     page,
   }): Promise<void> {
     await serveExplorerOfTilesMod(page);
-    await page.goto("/");
+    await page.goto(`${TEST_CATALOG_PREVIEW_URL}/`);
     await openModsSection(page);
     const explorer = await findModFrame(page, "Mods");
     await explorer.getByRole("button", { name: /Tiles/ }).click();
@@ -166,7 +169,7 @@ test.describe("Section navigation", function describeNavigation(): void {
     page,
   }): Promise<void> {
     await serveExplorerOfTilesMod(page);
-    await page.goto("/");
+    await page.goto(`${TEST_CATALOG_PREVIEW_URL}/`);
     await openModsSection(page);
     const explorer = await findModFrame(page, "Mods");
     await markFrame(explorer);
@@ -203,7 +206,7 @@ test.describe("Active section", function describeActiveSection(): void {
     page,
   }): Promise<void> {
     await serveExplorerOfTilesMod(page);
-    await page.goto("/");
+    await page.goto(`${TEST_CATALOG_PREVIEW_URL}/`);
     await openModsSection(page);
     const explorer = await findModFrame(page, "Mods");
     await explorer.getByRole("button", { name: /Tiles/ }).click();

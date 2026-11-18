@@ -21,7 +21,11 @@ import type { Tile } from "../../tile/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
-import { readNoSiteDecisions } from "../../../test/method_contexts.ts";
+import type { CatalogListing } from "./catalog_listing.ts";
+import {
+  readEmptyCatalog,
+  readNoSiteDecisions,
+} from "../../../test/method_contexts.ts";
 import { launchTestMod } from "../../../test/test_launches.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import type { ModContext, ModLaunch, RunLink } from "./mod_launch.ts";
@@ -34,6 +38,7 @@ import type {
 import { buildTileBodies } from "./mod_tile_bodies.ts";
 import {
   connectModSession,
+  pushCatalogChanged,
   pushLayoutChanged,
   pushThemeChanged,
   pushTilesChanged,
@@ -145,6 +150,7 @@ async function playSession(
     defaults: TEST_DEFAULTS,
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     readSiteDecisions: readNoSiteDecisions,
+    readCatalog: readEmptyCatalog,
     onIssue,
     onOpenLink,
     onRequestAction,
@@ -177,6 +183,7 @@ function buildPlainOptions(): ModSessionOptions {
     defaults: TEST_DEFAULTS,
     fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
     readSiteDecisions: readNoSiteDecisions,
+    readCatalog: readEmptyCatalog,
     onIssue: vi.fn<(issue: ModIssue) => void>(),
     onOpenLink:
       vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
@@ -270,6 +277,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       defaults: TEST_DEFAULTS,
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       readSiteDecisions: readNoSiteDecisions,
+      readCatalog: readEmptyCatalog,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink:
         vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
@@ -307,6 +315,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       defaults: TEST_DEFAULTS,
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       readSiteDecisions: readNoSiteDecisions,
+      readCatalog: readEmptyCatalog,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink:
         vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
@@ -334,6 +343,7 @@ describe("connectModSession", function describeConnectModSession(): void {
       defaults: TEST_DEFAULTS,
       fetchOptions: { baseUrl: APP_BASE_URL, fetch: fetchTestFile },
       readSiteDecisions: readNoSiteDecisions,
+      readCatalog: readEmptyCatalog,
       onIssue: vi.fn<(issue: ModIssue) => void>(),
       onOpenLink:
         vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
@@ -587,6 +597,23 @@ describe("connectModSession", function describeConnectModSession(): void {
 
     expect(played.received).toEqual([
       { jsonrpc: "2.0", method: "theme.changed", params: theme },
+    ]);
+  });
+
+  it("pushes catalog.changed with the listing", async function pushesCatalogChanged(): Promise<void> {
+    const played = await playSession();
+    const listing: CatalogListing = {
+      mods: [{ source: SAMPLE_MOD_SOURCE }],
+      collections: [],
+      mosaics: [],
+    };
+
+    pushCatalogChanged(played.session, listing);
+    await waitForReceived(played, 1);
+    await waitForMessages();
+
+    expect(played.received).toEqual([
+      { jsonrpc: "2.0", method: "catalog.changed", params: listing },
     ]);
   });
 
@@ -944,6 +971,11 @@ describe("stopModSession", function describeStopModSession(): void {
     sendRequest(played, 2, "storage.get", { key: "selected" });
     pushTilesChanged(played.session, [], [], buildTileBodies([]));
     pushThemeChanged(played.session, buildTheme("dark"));
+    pushCatalogChanged(played.session, {
+      mods: [],
+      collections: [],
+      mosaics: [],
+    });
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await waitForMessages();
     }

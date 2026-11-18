@@ -7,10 +7,6 @@ mod:
   test_path: "./test.js"
   config:
     viewer: "mod_viewer"
-    mods:
-      - "./samples/mods/book_list"
-      - "./samples/mods/flashcards"
-      - "./samples/mods/country_map"
   permissions:
     open:
       - host: "*"

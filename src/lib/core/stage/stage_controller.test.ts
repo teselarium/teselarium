@@ -22,15 +22,19 @@ import {
   PROBE_MOD_SOURCE,
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_COLLECTION_RUN_HASH,
+  SAMPLE_COLLECTION_SOURCE,
   SAMPLE_COVERS_PERMISSION,
+  SAMPLE_DEFAULT_MOSAIC_SOURCE,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
+  SAMPLE_MOSAIC_SOURCE,
   SAMPLE_RUN_HASH,
   serveLibraryMod,
   serveOtherApiMod,
   serveProbeMod,
   serveTestMod,
   serveUntypedMod,
+  TEST_CATALOG,
   TEST_NPM_HOST,
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
@@ -39,8 +43,10 @@ import {
   attachCheckingFrame,
   closeCheckPorts,
   finishMount,
+  sendRequest,
   startCheck,
   startCheckStage,
+  waitForReceived,
 } from "../../../test/check_stages.ts";
 import {
   MOD_HOME_ROUTING,
@@ -60,6 +66,7 @@ import {
   answerSiteConsent,
   answerStageAction,
   attachFrame,
+  changeStageCatalogDefaultMosaics,
   changeStageColorScheme,
   changeStageFullscreen,
   changeStageTheaterMode,
@@ -143,6 +150,8 @@ function buildStage(
     fetch: fetchTestFile,
     colorScheme,
     loadsTileLinkedMedia: true,
+    catalog: TEST_CATALOG,
+    catalogDefaultMosaics: false,
     theaterMode,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,
@@ -1713,6 +1722,137 @@ describe("changeStageTileLinkedMedia", function describeChangeTileLinkedMedia():
 
     expect(stage.runtimes.get("sandbox-1")?.launch?.tileLinks).not.toBeNull();
     expect(stage.runtimes.get("sandbox-2")?.launch?.tileLinks).toBeNull();
+  });
+});
+
+/** The listing of `TEST_CATALOG` with "List the default mosaics of mods" off. */
+const CATALOG_OFF_LISTING = {
+  mods: [{ source: SAMPLE_MOD_SOURCE }],
+  collections: [{ source: SAMPLE_COLLECTION_SOURCE }],
+  mosaics: [{ source: SAMPLE_MOSAIC_SOURCE, defaultOf: null }],
+};
+
+/** The listing of `TEST_CATALOG` with the switch on: the fixture mod's default mosaic follows. */
+const CATALOG_ON_LISTING = {
+  ...CATALOG_OFF_LISTING,
+  mosaics: [
+    { source: SAMPLE_MOSAIC_SOURCE, defaultOf: null },
+    {
+      source: SAMPLE_DEFAULT_MOSAIC_SOURCE,
+      defaultOf: { source: SAMPLE_MOD_SOURCE, title: "Book List" },
+    },
+  ],
+};
+
+/** A `catalog.changed` notification, as the mod receives it. */
+function buildCatalogChanged(listing: object): object {
+  const notification = {
+    jsonrpc: "2.0",
+    method: "catalog.changed",
+    params: listing,
+  };
+  return notification;
+}
+
+/** Waits until `received` holds `count` messages. */
+async function waitForCount(received: unknown[], count: number): Promise<void> {
+  for (let attempt = 0; attempt < 50 && received.length < count; attempt += 1) {
+    await waitForMessages();
+  }
+}
+
+describe("app catalog", function describeAppCatalog(): void {
+  it("answers a running sandbox's catalog.list with the stage's catalog", async function answersRunningSandbox(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    postRequest(attached.modPort, 1, "catalog.list", {});
+    await waitForCount(attached.received, 1);
+
+    expect(attached.received).toEqual([
+      { jsonrpc: "2.0", id: 1, result: CATALOG_OFF_LISTING },
+    ]);
+  });
+
+  it("answers a check's catalog.list with the stage's catalog", async function answersCheck(): Promise<void> {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const checkStage = await startCheckStage();
+      const reporting = startCheck(checkStage, {
+        source: SAMPLE_MOD_SOURCE,
+        collection: null,
+      });
+      const checkFrame = await attachCheckingFrame(checkStage);
+
+      sendRequest(checkFrame, 1, "catalog.list", {});
+      await waitForReceived(checkFrame, 1);
+      await finishMount(checkFrame);
+      const report = await reporting;
+
+      expect(checkFrame.received[0]).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        result: CATALOG_OFF_LISTING,
+      });
+      expect(report.findings).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      closeCheckPorts();
+    }
+  });
+
+  it("Switched on while a mod runs", async function pushesCatalogChanged(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    await changeStageCatalogDefaultMosaics(stage, true);
+    await waitForCount(attached.received, 1);
+    postRequest(attached.modPort, 1, "catalog.list", {});
+    await waitForCount(attached.received, 2);
+
+    expect(attached.received).toEqual([
+      buildCatalogChanged(CATALOG_ON_LISTING),
+      { jsonrpc: "2.0", id: 1, result: CATALOG_ON_LISTING },
+    ]);
+    expect(stage.runtimes.get("sandbox-1")?.session?.stopped).toBe(false);
+  });
+
+  it("Hidden mod", async function pushesToHiddenMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    const hidden = attachCollectingFrame(stage, "sandbox-1");
+    const visible = attachCollectingFrame(stage, "sandbox-2");
+
+    await changeStageCatalogDefaultMosaics(stage, true);
+    await waitForCount(hidden.received, 1);
+    await waitForCount(visible.received, 1);
+
+    expect(readVisible(stage).id).toBe("sandbox-2");
+    expect(hidden.received).toEqual([buildCatalogChanged(CATALOG_ON_LISTING)]);
+    expect(visible.received).toEqual([buildCatalogChanged(CATALOG_ON_LISTING)]);
+  });
+
+  it("ends on the second of two quick changes", async function dropsOvertakenListing(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const attached = attachCollectingFrame(stage, "sandbox-1");
+
+    const switchingOn = changeStageCatalogDefaultMosaics(stage, true);
+    const switchingOff = changeStageCatalogDefaultMosaics(stage, false);
+    await Promise.all([switchingOn, switchingOff]);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await waitForMessages();
+    }
+
+    expect(stage.catalogDefaultMosaics).toBe(false);
+    expect(attached.received).toEqual([
+      buildCatalogChanged(CATALOG_OFF_LISTING),
+    ]);
   });
 });
 

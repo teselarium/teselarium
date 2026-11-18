@@ -7,10 +7,7 @@ mod:
   test_path: "./test.js"
   config:
     viewer: "collection_viewer"
-    collections:
-      - "./samples/tiles/literature_nobel_laureates/collection.yaml"
-      - "./samples/tiles/literature_nobel_laureates_books/collection.yaml"
   permissions:
     open:
       - host: "*"
-        reason: "Lists the collections of its config and opens the one you pick"
+        reason: "Lists the app's collections and opens the one you pick"

@@ -5,6 +5,7 @@ import type { IssueLevel } from "../../tile/index.ts";
 import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import type { ModSlot, ModStorage } from "../storage/index.ts";
 import type { AppAction } from "./app_actions.ts";
+import type { CatalogListing } from "./catalog_listing.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
@@ -76,6 +77,8 @@ export interface ModMethodContext {
   tileBodies: TileBodies;
   /** The remembered site decisions, read when `mods.inspect` grants a mod's permissions. */
   readSiteDecisions: () => readonly SiteDecision[];
+  /** The app's catalog as `catalog.list` answers it, read anew for each request. */
+  readCatalog: () => Promise<CatalogListing>;
   /**
    * Asks the stage to open a link, in a new sandbox or, with `replace`, in
    * place of the requesting one. Gives what came of it.

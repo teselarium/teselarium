@@ -39,14 +39,14 @@ function buildCollectionCard(
 }
 
 /** A collection that cannot be inspected: `role="alert"` gives it the app's destructive alert look. */
-function buildFailureAlert(location: string, error: string): HTMLElement {
+function buildFailureAlert(source: string, error: string): HTMLElement {
   const failure = document.createElement("div");
   failure.setAttribute("role", "alert");
-  const locationCode = document.createElement("code");
-  locationCode.textContent = location;
+  const sourceCode = document.createElement("code");
+  sourceCode.textContent = source;
   const message = document.createElement("p");
   message.textContent = error;
-  failure.append(locationCode, message);
+  failure.append(sourceCode, message);
   return failure;
 }
 
@@ -57,7 +57,7 @@ export function buildCollectionItem(
 ): HTMLElement {
   const item = document.createElement("li");
   if (entry.inspection === null) {
-    item.append(buildFailureAlert(entry.location, entry.error));
+    item.append(buildFailureAlert(entry.source, entry.error));
     return item;
   }
   item.append(buildCollectionCard(view, entry.inspection));
