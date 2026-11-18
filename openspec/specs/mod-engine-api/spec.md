@@ -219,7 +219,7 @@ Relative mod references, collection references and mosaic references in `mods.in
 - **AND** the app's address is a run link with `mod=tile_viewer`, the tile's address as `tile` and the collection's address as `from`
 
 ### Requirement: Opened mods report their own failures
-Loading and running the opened mod SHALL NOT change the `mods.open` response: its load failures and issues SHALL belong to the new sandbox. A request whose `mod` is not a non-empty string, whose `collection` or `tile` is neither absent, `null` nor a non-empty string, that has both a `collection` and a `tile`, whose `params` is present but not a mapping of strings or holds `mod`, `collection`, `tile` or `mosaic`, or whose `replace` is present but not a boolean SHALL be answered with error code `-32602`.
+Loading and running the opened mod SHALL NOT change the `mods.open` response: its load failures and issues SHALL belong to the new sandbox. A request whose `mod` is not a non-empty string, whose `collection` or `tile` is neither absent, `null` nor a non-empty string, that has both a `collection` and a `tile`, whose `params` is present but not a mapping of strings or holds `mod`, `collection`, `tile`, `mosaic` or `sites`, or whose `replace` is present but not a boolean SHALL be answered with error code `-32602`.
 
 #### Scenario: Opened mod is missing
 - **WHEN** the visible mod explorer sends `mods.open` with `{ "mod": "./fixtures/mods/missing" }`
@@ -252,6 +252,10 @@ Loading and running the opened mod SHALL NOT change the `mods.open` response: it
 #### Scenario: Opened tile is missing
 - **WHEN** the visible collection viewer sends `mods.open` with a `tile` that answers HTTP 404
 - **THEN** the response's result is `null`, and the new sandbox shows an error that names the tile's address and `404`
+
+#### Scenario: Sites is a reserved parameter
+- **WHEN** a mod sends `mods.open` with `{ "mod": "tile_viewer", "params": { "sites": "./m.yaml" } }`
+- **THEN** the response has an error with code `-32602` whose message names `mods.open` and says that `params.sites` is reserved
 
 ### Requirement: Inspecting and opening need the open permission
 The engine SHALL answer `mods.inspect` and `mods.open` with error code `-32002`, without requesting any file, unless the requesting mod has a granted `open` permission whose host is `"*"` or the origin of the target mod file. The message SHALL name the origin and say to add it to `permissions.open` in `mod_conf.yaml`, or that the declared permission was not granted.
@@ -562,7 +566,7 @@ The engine SHALL answer `mosaics.inspect` and `mosaics.open` with error code `-3
 - **THEN** the response has an error with code `-32002` and nothing opens
 
 ### Requirement: Mosaic open params are checked
-A `mosaics.open` request whose `mosaic` is not a non-empty string, whose `params` is present but not a mapping of strings or holds `mod`, `collection`, `tile` or `mosaic`, or whose `replace` is present but not a boolean SHALL be answered with error code `-32602`, and nothing SHALL open.
+A `mosaics.open` request whose `mosaic` is not a non-empty string, whose `params` is present but not a mapping of strings or holds `mod`, `collection`, `tile`, `mosaic` or `sites`, or whose `replace` is present but not a boolean SHALL be answered with error code `-32602`, and nothing SHALL open.
 
 #### Scenario: Reserved parameter
 - **WHEN** a mod sends `mosaics.open` with `{ "mosaic": "./m.yaml", "params": { "mod": "x" } }`
@@ -571,6 +575,10 @@ A `mosaics.open` request whose `mosaic` is not a non-empty string, whose `params
 #### Scenario: Missing reference
 - **WHEN** a mod sends `mosaics.open` with `{ "params": {} }`
 - **THEN** the response has an error with code `-32602` whose message names `mosaics.open` and says that `mosaic` must be a non-empty string
+
+#### Scenario: Sites is a reserved parameter
+- **WHEN** a mod sends `mosaics.open` with `{ "mosaic": "./m.yaml", "params": { "sites": "./n.yaml" } }`
+- **THEN** the response has an error with code `-32602` whose message names `mosaics.open` and says that `params.sites` is reserved
 
 ### Requirement: Open a mosaic in place of the requester
 `mosaics.open` with `replace: true` SHALL open the mosaic as `mods.open` with `replace: true` opens a mod: in place of the requesting sandbox, which the stage then closes, and with no answer to the requester. The Home mod shown at `#/` SHALL NOT be replaced.
