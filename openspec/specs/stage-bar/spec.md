@@ -7,16 +7,16 @@ Shows the visible sandbox's mod and its messages in one row above the mod's fram
 ## Requirements
 
 ### Requirement: One-row stage bar
-While a sandbox is visible, the stage bar SHALL be one row above its frame. Its left side SHALL hold, in order, the mod's name, its version in a capsule, an information button, a Share button and, for a sandbox opened with a collection, the "Reload tiles" button. Its right side SHALL hold, in order, the errors, warnings and notifications buttons, a separator, the theater mode button, the fullscreen button when the sandbox has a running mod frame and, when the sandbox has a close button, a separator and the close button. No list of messages SHALL be shown under the bar.
+While a sandbox is visible, the stage bar SHALL be one row above its frame. Its left side SHALL hold the sandbox's title, as capsules for a combination sandbox (see "Combination capsules") or as a plain title otherwise, then the "More actions" button. Its right side SHALL hold, in order, the errors, warnings and notifications buttons, a separator, the theater mode button, the fullscreen button when the sandbox has a running mod frame and, when the sandbox has a close button, a separator and the close button. No list of messages SHALL be shown under the bar.
 
 #### Scenario: Sample mod with its collection
 - **WHEN** a mod opened from a run link runs with a collection
-- **THEN** the stage bar shows, from left to right, the mod's name, its version in a capsule, the information button, the Share button, the "Reload tiles" button, the errors, warnings and notifications buttons, the theater mode button, the fullscreen button and the close button
+- **THEN** the stage bar shows, from left to right, the mod capsule, the collection capsule, the mosaic capsule, the "More actions" button, the errors, warnings and notifications buttons, the theater mode button, the fullscreen button and the close button
 - **AND** the stage bar is a single row
 
 #### Scenario: No collection
-- **WHEN** a mod opened from a run link runs without a collection
-- **THEN** the stage bar has no "Reload tiles" button and its other items keep their order
+- **WHEN** the mod viewer, which the catalog does not list, runs from a run link without a collection
+- **THEN** the stage bar shows the mod's name and version as a plain title, then the "More actions" button, and its other items keep their order
 
 #### Scenario: Close button last
 - **WHEN** a mod opened from a run link runs
@@ -27,11 +27,11 @@ While a sandbox is visible, the stage bar SHALL be one row above its frame. Its 
 - **THEN** the fullscreen button is the stage bar's rightmost item, and no separator follows it
 
 ### Requirement: Name while loading or after a failure
-Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place of the name and version. When the sandbox failed before its mod file was loaded, it SHALL show "Mod not loaded". Once the mod file is loaded, it SHALL show the mod's name and version, even when the sandbox failed later.
+Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place of the mod's name and version, in the mod capsule of a combination sandbox. When the sandbox failed before its mod file was loaded, it SHALL show "Mod not loaded". Once the mod file is loaded, it SHALL show the mod's name and version, even when the sandbox failed later.
 
 #### Scenario: Missing mod file
 - **WHEN** a run link names a mod folder whose mod file answers HTTP 404
-- **THEN** the stage bar shows "Mod not loaded" and no version capsule
+- **THEN** the stage bar shows "Mod not loaded" and no version
 
 #### Scenario: Missing collection
 - **WHEN** a mod is opened with a collection that answers HTTP 404
@@ -166,15 +166,19 @@ In a message popover, each message that was unread when the popover opened, and 
 - **THEN** the producer labels of both items line up
 
 ### Requirement: Popovers and menus close on a click outside
-An open popover or menu of the stage bar SHALL close when the user clicks outside it, including inside the visible mod's frame. A click inside the mod's frame SHALL still reach the mod. When it closes because of a click in the mod's frame, the focus SHALL stay in the frame.
+An open popover, menu or list of the stage bar SHALL close when the user clicks outside it, including inside the visible mod's frame. A click inside the mod's frame SHALL still reach the mod. When it closes because of a click in the mod's frame, the focus SHALL stay in the frame.
 
 #### Scenario: Click in the mod's frame
 - **WHEN** the notifications popover is open over a running mod and the user clicks inside the mod's frame
 - **THEN** the popover closes and the mod receives the click
 
 #### Scenario: Share menu
-- **WHEN** the Share menu is open and the user clicks inside the mod's frame
+- **WHEN** the "More actions" menu, which now holds "Copy link", is open and the user clicks inside the mod's frame
 - **THEN** the menu closes and the mod receives the click
+
+#### Scenario: Mod list
+- **WHEN** the mod list is open and the user clicks inside the mod's frame
+- **THEN** the list closes and the mod receives the click
 
 #### Scenario: The mod keeps the keyboard
 - **WHEN** the notifications popover is open over a running mod and the user clicks inside the mod's frame
@@ -220,32 +224,6 @@ A sandbox SHALL keep at most 100 messages from its mod for each level. When a ne
 #### Scenario: Notifications drop no error or warning
 - **WHEN** a mod sends `ui.notify` once with `level` `error`, once with `level` `warning`, and then 105 times with `level` `info`
 - **THEN** the errors and warnings popovers still list the mod's error and warning, with no note about dropped messages
-
-### Requirement: Information popover
-The information button SHALL open a popover with the mod's source, the collection's location when the sandbox was opened with one, and the sandbox's run link, as text the user can select. The popover SHALL have no copy button: the Share menu copies the link.
-
-#### Scenario: Sample mod with its collection
-- **WHEN** a mod runs with a collection and the user presses the information button
-- **THEN** the popover shows the mod file's source, the collection's location and the run link, and no "Copy link" button
-
-#### Scenario: Mod that did not load
-- **WHEN** a run link names a mod folder that does not exist and the user presses the information button
-- **THEN** the popover shows the run link's mod reference resolved against the app's address, and the run link
-
-### Requirement: Share menu
-The Share button SHALL open a menu of the ways to share the visible sandbox, which for now has one item, "Copy link". "Copy link" SHALL copy the full address of the app with the sandbox's run link as its hash, close the menu, and show "Link copied" at the Share button for a moment, also announced to assistive technologies. When the clipboard refuses, it SHALL show "Cannot copy the link" instead.
-
-#### Scenario: Copy the link
-- **WHEN** the user opens the Share menu of the app at `https://example.org/` and chooses "Copy link"
-- **THEN** the clipboard holds `https://example.org/` followed by the sandbox's run link hash, the menu closes, and "Link copied" shows at the Share button
-
-#### Scenario: Copy refused
-- **WHEN** the user chooses "Copy link" and the clipboard refuses the text
-- **THEN** "Cannot copy the link" shows at the Share button
-
-#### Scenario: Keyboard
-- **WHEN** the user moves the focus to the Share button and presses Enter
-- **THEN** the menu opens with "Copy link" focused
 
 ### Requirement: Notification of reloaded tiles
 When "Reload tiles" loads the collection or the tile again, the sandbox SHALL get an `info` message from the app whose source is the collection's or the tile's location and whose text gives the number of tiles the mod received and the number of collection issues. A reload whose collection or tile cannot be loaded SHALL give its error and no notification.
@@ -329,32 +307,97 @@ The stage bar SHALL have an icon button whose accessible name and tooltip are "F
 - **WHEN** a mod whose `api` range does not match is opened and the API question is shown
 - **THEN** the stage bar has no button named "Fullscreen"
 
-### Requirement: Mosaic title in the stage bar
-For a sandbox opened from a mosaic, the stage bar's left side SHALL show the mosaic's title before the mod's name and version, with the mod's name in muted text, and keep the other items and their order. The bar SHALL stay one row.
-
-#### Scenario: Laureates on the map
-- **WHEN** the mosaic `Laureates on the map` opens the mod `Country Map` version `1.0.0`
-- **THEN** the stage bar shows, from the left, `Laureates on the map`, `Country Map` in muted text, `1.0.0` in a capsule, then the information button
-- **AND** the stage bar is a single row
-
-#### Scenario: Mod opened without a mosaic
-- **WHEN** a mod is opened from a run link with a `mod`
-- **THEN** the stage bar shows no mosaic title
-
 ### Requirement: Mosaic name while loading or after a failure
-For a run link with a `mosaic`, until the mosaic file is loaded the stage bar SHALL show "Loading mosaic…" in place of the titles and version, and when the sandbox failed before the mosaic file was loaded, "Mosaic not loaded". Once the mosaic file is loaded, the mosaic's title SHALL be shown, and the mod's name follows the rules for a mod.
+For a run link with a `mosaic`, until the mosaic file is loaded the stage bar SHALL show one capsule "Loading mosaic…" in place of the three capsules, and when the sandbox failed before the mosaic file was loaded, "Mosaic not loaded". Once the mosaic file is loaded, the mosaic capsule SHALL show the mosaic's title, and the mod and collection capsules follow their own rules.
 
 #### Scenario: Missing mosaic file
 - **WHEN** a run link names a mosaic file that answers HTTP 404
-- **THEN** the stage bar shows "Mosaic not loaded" and no version capsule
+- **THEN** the stage bar shows "Mosaic not loaded" and no version
 
 #### Scenario: Missing mod of a mosaic
 - **WHEN** a mosaic names a mod folder whose mod file answers HTTP 404
-- **THEN** the stage bar shows the mosaic's title and "Mod not loaded"
+- **THEN** the mosaic capsule shows the mosaic's title and the mod capsule shows "Mod not loaded"
 
-### Requirement: Information popover of a mosaic
-For a sandbox opened from a mosaic, the information popover SHALL also show the mosaic file's address, before the mod's source, as text the user can select.
+### Requirement: Combination sandboxes
+A combination sandbox SHALL be one opened from a mosaic, from a link with a collection or a tile, or from a link whose mod the catalog or recently used holds. Any other sandbox, such as an explorer or a viewer opened without a collection or tile, SHALL show its mod's name and version as a plain title, with no capsule and no list.
 
-#### Scenario: Mosaic with a collection
-- **WHEN** a mod opened from a mosaic with a collection runs and the user presses the information button
-- **THEN** the popover shows the mosaic file's address, the mod file's source, the collection's location and the run link
+#### Scenario: Catalog mod without a collection
+- **WHEN** the user chose "None" in the collection list of a Book List sandbox
+- **THEN** the new sandbox is a combination sandbox, and its collection capsule shows "None"
+
+#### Scenario: Mod viewer
+- **WHEN** the mod viewer runs with a `target` and no collection
+- **THEN** the stage bar shows the mod viewer's title and version plainly and has no capsule
+
+### Requirement: Combination capsules
+A combination sandbox's title SHALL be three capsules, in order: the mod capsule, a `+`, the collection capsule, an arrow, and the mosaic capsule. Each SHALL have an icon of its kind, its title and a chevron, and SHALL open its list (see `combination-pickers`). The `+` and the arrow SHALL be hidden from assistive technologies. Each capsule's accessible name SHALL be its kind and its full title, such as "Mod: Country Map 1.0.1".
+
+#### Scenario: Laureates on the map
+- **WHEN** the mosaic "Nobel laureates on the map" runs
+- **THEN** the capsules show `Country Map` with `1.0.1`, `Nobel Prize in Literature laureates` and `Nobel laureates on the map`
+- **AND** the collection capsule's accessible name is "Collection: Nobel Prize in Literature laureates"
+
+### Requirement: Capsule contents
+The mod capsule SHALL show the mod's title and version. The collection capsule SHALL show the collection's title once its file is loaded, "Loading collection…" before, "Collection not loaded" after a failure, the decoded file name of the tile for a tile link, or "None". The mosaic capsule SHALL show the mosaic's title, or, for a sandbox not opened from a mosaic, "Unsaved combination" with a dashed border.
+
+#### Scenario: Unsaved combination
+- **WHEN** a run link opens Book List with the laureates' collection
+- **THEN** the mosaic capsule says "Unsaved combination" and has a dashed border
+
+#### Scenario: Missing collection file
+- **WHEN** a run link names a collection that answers HTTP 404
+- **THEN** the collection capsule shows "Collection not loaded"
+
+### Requirement: Sites chip
+For a sandbox opened with `sites`, the stage bar SHALL show a chip after the mosaic capsule with a shield icon and the number of `show` lines of that mosaic, named "Sites from <mosaic title>". Pressing it SHALL open a popover that lists each line's host, reason and whether it was granted, and has a button "Stop using these sites" that opens the same combination without `sites`.
+
+#### Scenario: Kept covers
+- **WHEN** the user chose Flashcards in the mod list of "Books by Nobel laureates"
+- **THEN** a chip named "Sites from Books by Nobel laureates" shows `4`, and its popover lists `https://covers.openlibrary.org` as granted
+
+#### Scenario: Stop using them
+- **WHEN** the user presses "Stop using these sites"
+- **THEN** a sandbox runs Flashcards with the laureates' books from a run link with no `sites`, and the stage bar has no chip
+
+### Requirement: More actions menu
+The "More actions" button (`…`) SHALL open a menu that holds "Copy link" and, for a sandbox opened with a collection or a tile, "Reload tiles". "Copy link" SHALL copy the full address of the app with the sandbox's run link as its hash, close the menu, and show "Link copied" at the button for a moment, also announced to assistive technologies, or "Cannot copy the link" when the clipboard refuses.
+
+#### Scenario: Copy the link
+- **WHEN** the user opens the "More actions" menu of the app at `https://example.org/` and chooses "Copy link"
+- **THEN** the clipboard holds `https://example.org/` followed by the sandbox's run link hash, the menu closes, and "Link copied" shows at the button
+
+#### Scenario: Copy refused
+- **WHEN** the user chooses "Copy link" and the clipboard refuses the text
+- **THEN** "Cannot copy the link" shows at the button
+
+#### Scenario: No collection
+- **WHEN** the user opens the "More actions" menu of a sandbox without a collection or a tile
+- **THEN** the menu holds "Copy link" and no "Reload tiles"
+
+#### Scenario: Keyboard
+- **WHEN** the user moves the focus to the "More actions" button and presses Enter
+- **THEN** the menu opens with "Copy link" focused
+
+### Requirement: Long titles
+No capsule SHALL be wider than 16rem. A title that does not fit SHALL end with an ellipsis, and its capsule's tooltip SHALL give the full title. When the capsules do not fit, the collection capsule SHALL shrink first, then the mod capsule, then the mosaic capsule. For a sandbox not opened from a mosaic, the mosaic capsule SHALL shrink before the mod capsule.
+
+#### Scenario: Long collection title
+- **WHEN** the bar is too narrow for the three titles of "Nobel laureates on the map"
+- **THEN** the collection capsule's title is cut with an ellipsis first, and hovering it shows the full title
+
+### Requirement: The bar folds as it narrows
+The left side SHALL follow the stage bar's width:
+- at least 960px: everything shown;
+- 720px to 959px: no version in the mod capsule, which moves to the mod list's details;
+- 480px to 719px: the mod and collection capsules show only their icons;
+- under 480px: one capsule with the mosaic's title, or the mod's for an unsaved combination, whose menu has "Mosaic", "Mod" and "Collection" rows that open their lists.
+
+A change of width SHALL NOT move any item of the bar's right side.
+
+#### Scenario: Narrow bar
+- **WHEN** the stage bar of "Nobel laureates on the map" is 600px wide
+- **THEN** the mod and collection capsules show only their icons, with their full titles in their accessible names, and the mosaic capsule shows its title
+
+#### Scenario: Phone width
+- **WHEN** the stage bar is 400px wide
+- **THEN** the left side holds one capsule `Nobel laureates on the map`, and its menu's "Collection" row opens the collection list
