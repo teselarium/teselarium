@@ -426,38 +426,28 @@ export async function expectNoIssues(page: Page): Promise<void> {
   await expectMessageCount(page, "Warnings", 0);
 }
 
-/**
- * Opens the information popover, waits until it shows each of `texts`, and
- * closes it.
- */
-export async function expectModInfo(
-  page: Page,
-  ...texts: string[]
-): Promise<void> {
-  await stageBar(page).getByRole("button", { name: "Mod information" }).click();
-  const popover = page.locator("[data-slot=popover-content]");
-  for (const text of texts) {
-    await expect(popover).toContainText(text);
-  }
-  await closeMessages(page);
+/** The stage bar's "More actions" button. */
+export function moreActionsButton(page: Page): Locator {
+  return stageBar(page).getByRole("button", { name: "More actions" });
 }
 
-/** The stage bar's Share button. */
-export function shareButton(page: Page): Locator {
-  return stageBar(page).getByRole("button", { name: "Share" });
-}
-
-/** The Share menu, while it is open. */
-export function shareMenu(page: Page): Locator {
+/** The "More actions" menu, while it is open. */
+export function moreActionsMenu(page: Page): Locator {
   return page.getByRole("menu");
 }
 
-/** Opens the Share menu with a click and returns it. */
-export async function openShareMenu(page: Page): Promise<Locator> {
-  await shareButton(page).click();
-  const menu = shareMenu(page);
+/** Opens the "More actions" menu with a click and returns it. */
+export async function openMoreActions(page: Page): Promise<Locator> {
+  await moreActionsButton(page).click();
+  const menu = moreActionsMenu(page);
   await expect(menu).toBeVisible();
   return menu;
+}
+
+/** Presses "Reload tiles" in the "More actions" menu. */
+export async function reloadTiles(page: Page): Promise<void> {
+  const menu = await openMoreActions(page);
+  await menu.getByRole("menuitem", { name: "Reload tiles" }).click();
 }
 
 /** The items of an open popover marked unread, each with a dot whose accessible text is "Unread". */

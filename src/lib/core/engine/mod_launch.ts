@@ -263,6 +263,8 @@ export interface LaunchSites {
  */
 export interface ModTiles {
   tilesSource: string;
+  /** The collection's title, or `""` for a tile. */
+  title: string;
   tiles: Tile[];
   issues: TileIssue[];
 }
@@ -288,6 +290,7 @@ function resolveEveryTilePaths(tiles: Tile[]): Tile[] {
 function buildModTiles(collection: TileCollection, tiles: Tile[]): ModTiles {
   const modTiles: ModTiles = {
     tilesSource: collection.source,
+    title: collection.title,
     tiles: resolveEveryTilePaths(tiles),
     issues: collection.issues,
   };

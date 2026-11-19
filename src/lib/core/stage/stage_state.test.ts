@@ -598,3 +598,61 @@ describe("replaceStageEntry", function describeReplaceStageEntry(): void {
     );
   });
 });
+
+describe("replaceStageEntry with a new entry", function describeReplaceWithNewEntry(): void {
+  it("gives the new sandbox a new entry, the requester's opener and section", function addsEntry(): void {
+    const state = openInTurn(["a"]);
+
+    const change = replaceStageEntry(
+      state,
+      buildOpening("b"),
+      "sandbox-2",
+      "new-entry",
+    );
+
+    expect(change.opened).toMatchObject({
+      id: "sandbox-3",
+      openerId: "sandbox-1",
+      section: "home",
+    });
+    expect(change.state.position).toBe(2);
+    expect(change.state.entries[1].view).toEqual({
+      kind: "sandbox",
+      sandboxId: "sandbox-2",
+    });
+    expect(change.state.entries[2]).toEqual({
+      position: 2,
+      view: { kind: "sandbox", sandboxId: "sandbox-3" },
+      section: "home",
+    });
+  });
+
+  it("closes the requester, whose entry is restored by link when visited", function closesRequester(): void {
+    const state = openInTurn(["a"]);
+
+    const change = replaceStageEntry(
+      state,
+      buildOpening("b"),
+      "sandbox-2",
+      "new-entry",
+    );
+
+    expect(change.closedIds).toEqual(["sandbox-2"]);
+    expect(listSandboxIds(change.state)).toEqual(["sandbox-1", "sandbox-3"]);
+  });
+
+  it("drops the forward entries and the sandboxes only they reached", function dropsForward(): void {
+    const state = restoreSandbox(openInTurn(["a", "b"]), 1, "a");
+
+    const change = replaceStageEntry(
+      state,
+      buildOpening("c"),
+      "sandbox-2",
+      "new-entry",
+    );
+
+    expect(change.state.entries).toHaveLength(3);
+    expect(change.closedIds).toEqual(["sandbox-2", "sandbox-3"]);
+    expect(listSandboxIds(change.state)).toEqual(["sandbox-1", "sandbox-4"]);
+  });
+});

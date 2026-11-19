@@ -192,6 +192,10 @@ interface SpiedServices {
   >;
 }
 
+function ignoreLoadedFile(): void {
+  // These tests do not record recently used files.
+}
+
 function readLightTheme(): Theme {
   return buildTheme("light");
 }
@@ -240,6 +244,7 @@ function buildServices(
     readSiteDecisions: siteDecisions.read,
     readCatalog: readEmptyCatalog,
     rememberSiteDecisions: siteDecisions.remember,
+    onFilesLoaded: ignoreLoadedFile,
   };
   const spiedServices: SpiedServices = {
     services,

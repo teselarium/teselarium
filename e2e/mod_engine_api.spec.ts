@@ -7,11 +7,12 @@ import {
   findModFrame,
   OTHER_API_RANGE,
   postRequestToParent,
+  PROBE_MOD_CODE,
   readProbeCalls,
   readProbeContext,
   readWindowMessages,
   registerTwoTileHandlers,
-  PROBE_MOD_CODE,
+  reloadTiles,
   requestFromProbe,
   serveAppOriginMod,
   stageBar,
@@ -138,9 +139,7 @@ test.describe(
       const frame = await openTilesMod(page);
       await frame.evaluate(registerTwoTileHandlers);
 
-      await stageBar(page)
-        .getByRole("button", { name: "Reload tiles" })
-        .click();
+      await reloadTiles(page);
 
       await expect
         .poll(function readCallCount(): Promise<number> {

@@ -1,13 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { TEST_CATALOG_PREVIEW_URL } from "./app_servers.ts";
-import type {
-  Dialog,
-  Frame,
-  Locator,
-  Page,
-  Request,
-  Route,
-} from "@playwright/test";
+import type { Dialog, Frame, Page, Request, Route } from "@playwright/test";
 import {
   addFullscreenButton,
   answerSiteConsent,
@@ -40,6 +33,7 @@ import {
   readProbeContext,
   readStorageError,
   recordHost,
+  reloadTiles,
   requestFromProbe,
   routeCovers,
   routeImages,
@@ -723,10 +717,6 @@ async function showLinkedImage(page: Page, imageUrl: string): Promise<boolean> {
   return isLoaded;
 }
 
-function reloadTilesButton(page: Page): Locator {
-  return stageBar(page).getByRole("button", { name: "Reload tiles" });
-}
-
 test.describe(
   "Media linked by tiles",
   { tag: "@frames" },
@@ -984,7 +974,7 @@ test.describe(
       const frame = await openLinkedAppProbe(page);
       linkedTile.metadataLines = [`image: "${newUrl}"`];
 
-      await reloadTilesButton(page).click();
+      await reloadTiles(page);
 
       await expectMessages(
         page,

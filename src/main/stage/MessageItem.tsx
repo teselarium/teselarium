@@ -1,4 +1,4 @@
-import { Puzzle, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { ReactElement } from "react";
 import { Badge } from "@/vendor/shadcn/ui/badge.tsx";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
@@ -7,6 +7,7 @@ import type {
   MessageSnapshot,
 } from "../../lib/core/stage/index.ts";
 import type { MessageLevelView } from "./message_level_views.ts";
+import { MOD_ICON as ModIcon } from "../catalog_icons.ts";
 
 interface MessageItemProps {
   /** The view of the message's level, for the colors of the unread mark. */
@@ -32,7 +33,7 @@ function renderProducer(producer: MessageProducer): ReactElement {
   }
   return (
     <Badge variant="secondary" data-producer="mod">
-      <Puzzle aria-hidden="true" />
+      <ModIcon aria-hidden="true" />
       Mod
     </Badge>
   );

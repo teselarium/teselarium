@@ -204,6 +204,20 @@ function buildPlacingChange(
   return change;
 }
 
+/** The entries up to `position`: a new entry after it drops the forward ones. */
+function keepEntriesUpTo(
+  entries: StageEntry[],
+  position: number,
+): StageEntry[] {
+  const keptEntries: StageEntry[] = [];
+  for (const entry of entries) {
+    if (entry.position <= position) {
+      keptEntries.push(entry);
+    }
+  }
+  return keptEntries;
+}
+
 /**
  * Adds an entry at the next history position that shows `target`: a new
  * sandbox, an open sandbox or a page. Entries after the current position are
@@ -215,12 +229,7 @@ export function openStageEntry(
   target: EntryTarget,
   section: string | null,
 ): StageChange {
-  const keptEntries: StageEntry[] = [];
-  for (const entry of state.entries) {
-    if (entry.position <= state.position) {
-      keptEntries.push(entry);
-    }
-  }
+  const keptEntries = keepEntriesUpTo(state.entries, state.position);
   const position = state.position + 1;
   if (target.kind === "new-sandbox") {
     const sandbox = buildSandbox(state, target.opening, section);
@@ -388,17 +397,27 @@ export function closeStageSandbox(
 }
 
 /**
+ * Where a replacing sandbox's entry goes: the current entry (`mods.open` with
+ * `replace`), or a new entry after it (a stage bar combination).
+ */
+export type ReplacingStep = "current-entry" | "new-entry";
+
+/**
  * Replaces the visible sandbox, `requesterId`, with a new sandbox for
  * `opening`: the new sandbox gets the requester's opener and the current
- * entry's section, the current entry points to it at the same position, and
- * the requester is closed. No entry is added and forward entries are kept.
- * Other entries that pointed to the requester stay, and are restored when
- * visited. Throws when the requester is not the visible sandbox.
+ * entry's section, and the requester is closed. With `"current-entry"`, the
+ * current entry points to it at the same position, no entry is added and
+ * forward entries are kept. With `"new-entry"`, it gets a new entry at the
+ * next position, and forward entries are dropped with the sandboxes only
+ * they reached. Other entries that pointed to the requester stay, and are
+ * restored when visited. Throws when the requester is not the visible
+ * sandbox.
  */
 export function replaceStageEntry(
   state: StageState,
   opening: SandboxOpening,
   requesterId: string,
+  step: ReplacingStep = "current-entry",
 ): StageChange {
   const visibleEntry = readVisibleEntry(state);
   const requester = readVisibleSandbox(state);
@@ -412,22 +431,31 @@ export function replaceStageEntry(
     openerId: requester.openerId,
   };
   const sandbox = buildSandbox(state, replacingOpening, visibleEntry.section);
+  const isNewEntry = step === "new-entry";
+  const position = isNewEntry ? state.position + 1 : state.position;
   const entry: StageEntry = {
-    position: state.position,
+    position,
     view: buildSandboxView(sandbox),
     section: visibleEntry.section,
   };
   const remainingState = removeSandbox(state, requesterId);
-  const replacedState: StageState = {
-    sandboxes: [...remainingState.sandboxes, sandbox],
-    entries: placeEntry(remainingState.entries, entry),
-    position: state.position,
-    nextNumber: state.nextNumber + 1,
-  };
+  const entries = isNewEntry
+    ? keepEntriesUpTo(remainingState.entries, state.position)
+    : remainingState.entries;
+  const placedEntries = placeEntry(entries, entry);
+  const sandboxes = [...remainingState.sandboxes, sandbox];
+  const split = isNewEntry
+    ? keepReachedSandboxes(sandboxes, placedEntries)
+    : { kept: sandboxes, closedIds: [] };
   const change: StageChange = {
-    state: replacedState,
+    state: {
+      sandboxes: split.kept,
+      entries: placedEntries,
+      position,
+      nextNumber: state.nextNumber + 1,
+    },
     opened: sandbox,
-    closedIds: [requesterId],
+    closedIds: [requesterId, ...split.closedIds],
   };
   return change;
 }

@@ -22,6 +22,7 @@ import type {
   SiteDecision,
   SiteDecisionSubject,
 } from "../permissions/index.ts";
+import type { LoadedMosaic, MosaicAliases } from "../../mosaic/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme, Theme } from "../theme/index.ts";
@@ -83,6 +84,7 @@ import type {
   MessageProducer,
 } from "./stage_messages.ts";
 import type {
+  LoadedFileEntry,
   SandboxRuntime,
   SandboxServices,
   SandboxStatus,
@@ -110,6 +112,7 @@ import type {
   EntryTarget,
   EntryView,
   HomeFallback,
+  ReplacingStep,
   SandboxOpening,
   StageChange,
   StageSandbox,
@@ -145,6 +148,38 @@ export interface StageOptions {
   readSiteDecisions: () => readonly SiteDecision[];
   /** Keeps the decisions of a site consent answer whose Remember was checked. */
   rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
+  /**
+   * Told about each mod, collection and mosaic file a sandbox opened from a
+   * mosaic, a collection or a tile loaded, for recently used. Never for a
+   * tile or the mosaic a link names as `sites`. Nothing is told without it.
+   */
+  onFilesLoaded?: (entry: LoadedFileEntry) => void;
+}
+
+/**
+ * A sandbox's run link as resolved against the app's address. For a mosaic
+ * link, `mod` is `""` and `collection` `null` until the mosaic file is
+ * loaded, then the mosaic's. Frozen.
+ */
+export interface SandboxLink {
+  mod: string;
+  collection: string | null;
+  tile: string | null;
+  mosaic: string | null;
+  sites: string | null;
+  params: Readonly<Record<string, string>>;
+}
+
+/** One `show` line of a mosaic. Frozen. */
+export interface MosaicShowLine {
+  host: string;
+  reason: string;
+}
+
+/** One `show` line of the mosaic a link names as `sites`, and whether the running mod got it. Frozen. */
+export interface SitesLine extends MosaicShowLine {
+  /** `false` until the mod starts, and for a refused line. */
+  granted: boolean;
 }
 
 /** One line of the site consent dialog: a declared category and host, and the mod's reason. Frozen. */
@@ -178,7 +213,25 @@ export interface SandboxSnapshot {
   /** Known once the mod is loaded. */
   mod: { title: string; version: string; source: string } | null;
   /** Known once the mosaic file of a mosaic link is loaded, `null` otherwise. */
-  mosaic: { title: string; source: string } | null;
+  mosaic: {
+    title: string;
+    source: string;
+    aliases: Readonly<MosaicAliases>;
+    /** The `show` lines, in file order. */
+    show: readonly MosaicShowLine[];
+  } | null;
+  /** The run link as resolved (see `SandboxLink`). */
+  link: SandboxLink;
+  /** The collection's title once its file is loaded, `null` before, after a failure, or without a collection. */
+  collectionTitle: string | null;
+  /** The link's tile, resolved against the app's address, or `null` without one. */
+  tile: string | null;
+  /** The mosaic the link names as `sites`, once its file is loaded. `null` before, without one, or when it failed. */
+  sites: {
+    source: string;
+    title: string;
+    lines: readonly SitesLine[];
+  } | null;
   /** The link's mosaic reference, resolved against the app's address, or `null` for a mod link. */
   mosaicReference: string | null;
   /** The frame's `srcdoc`, only while the mod is running. */
@@ -285,6 +338,7 @@ export interface Stage {
   fullscreenSandboxId: string | null;
   readSiteDecisions: () => readonly SiteDecision[];
   rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
+  onFilesLoaded: (entry: LoadedFileEntry) => void;
   /** The actions the visible mod asked for, oldest first. */
   actions: StageActions;
   /** The running mod checks, apart from the sandboxes and the history. */
@@ -317,8 +371,12 @@ function readStageTheme(stage: Stage): Theme {
   return stage.theme;
 }
 
-/** The catalog as `catalog.list` answers it now, with the switch's current value. */
-function readStageCatalog(stage: Stage): Promise<CatalogListing> {
+/**
+ * The catalog as `catalog.list` answers it now, with the current value of
+ * "List the default mosaics of mods". The stage bar's lists read it too, so
+ * the page and the mods read one catalog.
+ */
+export function readStageCatalog(stage: Stage): Promise<CatalogListing> {
   return buildCatalogListing(
     stage.catalog,
     stage.catalogDefaultMosaics,
@@ -350,6 +408,7 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     readSiteDecisions: stage.readSiteDecisions,
     readCatalog: readStageCatalog.bind(undefined, stage),
     rememberSiteDecisions: stage.rememberSiteDecisions,
+    onFilesLoaded: stage.onFilesLoaded,
   };
   return services;
 }
@@ -395,8 +454,111 @@ function buildMosaicSummary(
   if (mosaic === null) {
     return null;
   }
-  const summary = { title: mosaic.title, source: mosaic.source };
+  const summary = {
+    title: mosaic.title,
+    source: mosaic.source,
+    aliases: freezeAliases(mosaic.aliases),
+    show: buildShowLines(mosaic),
+  };
   return Object.freeze(summary);
+}
+
+function freezeAliases(aliases: MosaicAliases): Readonly<MosaicAliases> {
+  const frozen: MosaicAliases = {};
+  for (const [field, names] of Object.entries(aliases)) {
+    frozen[field] = Object.freeze([...names]) as string[];
+  }
+  return Object.freeze(frozen);
+}
+
+function buildShowLines(mosaic: LoadedMosaic): readonly MosaicShowLine[] {
+  const lines: MosaicShowLine[] = [];
+  for (const permission of mosaic.permissions) {
+    if (permission.category === "show") {
+      const line: MosaicShowLine = {
+        host: permission.host,
+        reason: permission.reason,
+      };
+      lines.push(Object.freeze(line));
+    }
+  }
+  return Object.freeze(lines);
+}
+
+/** Whether the running mod got the `show` line of `host` from its `sites` mosaic. */
+function isSitesHostGranted(runtime: SandboxRuntime, host: string): boolean {
+  const grants = runtime.mosaicGrants;
+  if (grants === null || grants.role !== "sites") {
+    return false;
+  }
+  for (const permission of grants.grants.granted) {
+    if (permission.category === "show" && permission.host === host) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildSitesSummary(
+  runtime: SandboxRuntime | undefined,
+): SandboxSnapshot["sites"] {
+  const mosaic = runtime?.loadedSites ?? null;
+  if (runtime === undefined || mosaic === null) {
+    return null;
+  }
+  const lines: SitesLine[] = [];
+  for (const showLine of buildShowLines(mosaic)) {
+    const line: SitesLine = {
+      ...showLine,
+      granted: isSitesHostGranted(runtime, showLine.host),
+    };
+    lines.push(Object.freeze(line));
+  }
+  const summary = {
+    source: mosaic.source,
+    title: mosaic.title,
+    lines: Object.freeze(lines),
+  };
+  return Object.freeze(summary);
+}
+
+/** The link's collection: the resolved collection of a mod link, or the mosaic's once its file is loaded. */
+function readLinkCollection(
+  sandbox: StageSandbox,
+  runtime: SandboxRuntime,
+): string | null {
+  if (sandbox.link.collection !== null) {
+    return runtime.tilesLocation;
+  }
+  return runtime.loadedMosaic?.collection ?? null;
+}
+
+function buildSandboxLink(
+  sandbox: StageSandbox,
+  runtime: SandboxRuntime | undefined,
+): SandboxLink {
+  const params = Object.freeze({ ...sandbox.link.params });
+  if (runtime === undefined) {
+    const writtenLink: SandboxLink = {
+      mod: sandbox.link.mod,
+      collection: sandbox.link.collection,
+      tile: sandbox.link.tile ?? null,
+      mosaic: sandbox.link.mosaic ?? null,
+      sites: sandbox.link.sites ?? null,
+      params,
+    };
+    return Object.freeze(writtenLink);
+  }
+  const hasTile = (sandbox.link.tile ?? null) !== null;
+  const link: SandboxLink = {
+    mod: runtime.modReference,
+    collection: readLinkCollection(sandbox, runtime),
+    tile: hasTile ? runtime.tilesLocation : null,
+    mosaic: runtime.mosaicSource,
+    sites: runtime.sitesSource,
+    params,
+  };
+  return Object.freeze(link);
 }
 
 function buildMessageSnapshots(
@@ -503,6 +665,7 @@ function buildSandboxSnapshot(
   const status = runtime?.status ?? "stopped";
   const launch = runtime?.launch ?? null;
   const isRunning = status === "running" && launch !== null;
+  const link = buildSandboxLink(sandbox, runtime);
   const snapshot: SandboxSnapshot = {
     id: sandbox.id,
     hash: sandbox.hash,
@@ -511,6 +674,10 @@ function buildSandboxSnapshot(
     status,
     mod: buildModSummary(runtime),
     mosaic: buildMosaicSummary(runtime),
+    link,
+    collectionTitle: runtime?.collectionTitle ?? null,
+    tile: link.tile,
+    sites: buildSitesSummary(runtime),
     mosaicReference: runtime?.mosaicSource ?? sandbox.link.mosaic ?? null,
     sandboxDocument: isRunning ? launch.sandboxDocument : null,
     canReloadTiles: isRunning && launch.tilesSource !== null,
@@ -657,6 +824,10 @@ function applyStageChange(stage: Stage, change: StageChange): void {
   }
 }
 
+function ignoreLoadedFile(): void {
+  // No recently used store was given.
+}
+
 export function createStage(options: StageOptions): Stage {
   const stage: Stage = {
     state: createStageState(),
@@ -681,6 +852,7 @@ export function createStage(options: StageOptions): Stage {
     fullscreenSandboxId: null,
     readSiteDecisions: options.readSiteDecisions,
     rememberSiteDecisions: options.rememberSiteDecisions,
+    onFilesLoaded: options.onFilesLoaded ?? ignoreLoadedFile,
     actions: createStageActions(),
     checks: createStageChecks(),
     listeners: new Set(),
@@ -796,14 +968,15 @@ const PUSH_OPENING: OpenLinkOptions = Object.freeze({ replace: false });
 
 /**
  * Replaces the visible sandbox, the requester, with a new sandbox for
- * `link` in the current history entry, whose address becomes the link's.
- * Closing the requester stops its session before this returns, so its
- * request gets no answer, and drops its actions.
+ * `link`: in the current history entry, whose address becomes the link's,
+ * or in a new entry pushed after it. Closing the requester stops its session
+ * before this returns, so its request gets no answer, and drops its actions.
  */
 function replaceWithLink(
   stage: Stage,
   link: RunLink,
   requesterId: string,
+  step: ReplacingStep,
 ): void {
   const route = routeForLink(link);
   const opening: SandboxOpening = {
@@ -812,8 +985,11 @@ function replaceWithLink(
     openerId: null,
     isHomeMod: false,
   };
-  applyStageChange(stage, replaceStageEntry(stage.state, opening, requesterId));
-  writeCurrentEntry(stage, "replace");
+  applyStageChange(
+    stage,
+    replaceStageEntry(stage.state, opening, requesterId, step),
+  );
+  writeCurrentEntry(stage, step === "new-entry" ? "push" : "replace");
 }
 
 /**
@@ -837,7 +1013,7 @@ export function openStageLink(
     return "home-mod";
   }
   if (options.replace) {
-    replaceWithLink(stage, link, openerId);
+    replaceWithLink(stage, link, openerId, "current-entry");
   } else {
     const change = openStageEntry(
       stage.state,
@@ -847,6 +1023,32 @@ export function openStageLink(
     applyStageChange(stage, change);
     writeCurrentEntry(stage, "push");
   }
+  publishStage(stage);
+  return "opened";
+}
+
+/**
+ * Opens a combination chosen in the stage bar, in place of the visible
+ * sandbox `sandboxId`: a new sandbox takes its opener and section, gets a
+ * new history entry, and the previous sandbox is closed, so Back reopens it
+ * from its link. Forward entries are dropped. The Home mod at `#/` is not
+ * replaced: the link opens as a followed link, with the Home mod as opener.
+ * Gives `"not-visible"`, and opens nothing, when `sandboxId` is not the
+ * visible sandbox.
+ */
+export function openStageCombination(
+  stage: Stage,
+  sandboxId: string,
+  link: RunLink,
+): OpenLinkOutcome {
+  const visible = readVisibleSandbox(stage.state);
+  if (visible?.id !== sandboxId) {
+    return "not-visible";
+  }
+  if (visible.isHomeMod) {
+    return openStageLink(stage, link, sandboxId);
+  }
+  replaceWithLink(stage, link, sandboxId, "new-entry");
   publishStage(stage);
   return "opened";
 }

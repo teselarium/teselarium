@@ -32,6 +32,8 @@ import type {
   AppAction,
   CatalogListing,
   FrameLayout,
+  LaunchMosaicGrants,
+  LaunchSites,
   ModCheckReport,
   ModCheckRequest,
   ModLaunch,
@@ -112,6 +114,17 @@ export interface SandboxServices {
   readCatalog: () => Promise<CatalogListing>;
   /** Keeps the decisions of an answer whose Remember was checked. */
   rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
+  /** Told about each file a combination sandbox loaded (see `isRecordedLaunch`). */
+  onFilesLoaded: (entry: LoadedFileEntry) => void;
+}
+
+/** What a loaded file is: a mod file, a collection file or a mosaic file. */
+export type LoadedFileKind = "mod" | "collection" | "mosaic";
+
+/** A file a sandbox opened from a mosaic, a collection or a tile loaded, by its resolved source. */
+export interface LoadedFileEntry {
+  kind: LoadedFileKind;
+  source: string;
 }
 
 /**
@@ -144,6 +157,17 @@ export interface SandboxRuntime {
   mosaicSource: string | null;
   /** The mosaic once its mosaic file is loaded, kept when the sandbox fails later. */
   loadedMosaic: LoadedMosaic | null;
+  /**
+   * The link's `sites` reference resolved against the app's address, as
+   * written when it cannot be resolved, or `null` without one.
+   */
+  sitesSource: string | null;
+  /** The mosaic the link names as `sites` once its file is loaded, `null` before, without one, or when it failed. */
+  loadedSites: LoadedMosaic | null;
+  /** The grants of the mosaic whose `show` lines the launch got, set when the mod starts. */
+  mosaicGrants: LaunchMosaicGrants | null;
+  /** The collection's title once its file is loaded, `null` before, after a failure, or for a tile. */
+  collectionTitle: string | null;
   /** The loaded mod while the runtime asks, before its launch is built. */
   pending: ModLaunchInputs | null;
   /** The question of an `asking` runtime, `null` otherwise. */
@@ -356,15 +380,17 @@ function startPendingRuntime(
 ): void {
   const decisions = [...services.readSiteDecisions(), ...answers];
   const grants = grantModPermissions(inputs.mod, services.appOrigin, decisions);
+  const mosaicGrants = grantInputsMosaic(inputs, services.appOrigin, decisions);
   const launch = buildModLaunch(
     inputs.mod,
     inputs.link,
     inputs.modTiles,
     grants,
     services.loadsTileLinkedMedia,
-    grantInputsMosaic(inputs, services.appOrigin, decisions),
+    mosaicGrants,
     inputs.sitesIssues,
   );
+  runtime.mosaicGrants = mosaicGrants;
   runtime.pending = null;
   runtime.question = null;
   runtime.consentLines = [];
@@ -607,6 +633,79 @@ function resolveLinkMosaic(
   }
 }
 
+/** The link's `sites` reference resolved against the app's address, as written when it cannot be resolved, or `null`. */
+function resolveLinkSites(
+  sandbox: StageSandbox,
+  services: SandboxServices,
+): string | null {
+  const sites = sandbox.link.sites ?? null;
+  if (sites === null || sites === "") {
+    return null;
+  }
+  try {
+    return resolveMosaicReference(sites, services.fetchOptions.baseUrl);
+  } catch {
+    return sites;
+  }
+}
+
+/**
+ * Whether a sandbox's files are recorded as recently used: it was opened
+ * from a mosaic, or from a link with a collection or a tile.
+ */
+function isRecordedLaunch(sandbox: StageSandbox): boolean {
+  const link = sandbox.link;
+  return (
+    (link.mosaic ?? null) !== null ||
+    link.collection !== null ||
+    (link.tile ?? null) !== null
+  );
+}
+
+/** Tells the stage that a recorded sandbox loaded a file, unless it was stopped meanwhile. */
+function reportLoadedFile(
+  runtime: SandboxRuntime,
+  sandbox: StageSandbox,
+  services: SandboxServices,
+  entry: LoadedFileEntry,
+): void {
+  if (runtime.status === "stopped" || !isRecordedLaunch(sandbox)) {
+    return;
+  }
+  services.onFilesLoaded(entry);
+}
+
+/** Keeps the loaded `sites` mosaic on the runtime. A failed one stays `null`. */
+function keepRuntimeSites(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+  sites: LaunchSites,
+): void {
+  if (sites.mosaic === null || runtime.status === "stopped") {
+    return;
+  }
+  runtime.loadedSites = sites.mosaic;
+  services.onChange();
+}
+
+/** Keeps the title of a loaded collection on the runtime, and reports the collection file. */
+function keepRuntimeCollection(
+  runtime: SandboxRuntime,
+  sandbox: StageSandbox,
+  services: SandboxServices,
+  inputs: ModLaunchInputs,
+): void {
+  const modTiles = inputs.modTiles;
+  if (modTiles === null || inputs.link.collection === null) {
+    return;
+  }
+  runtime.collectionTitle = modTiles.title;
+  reportLoadedFile(runtime, sandbox, services, {
+    kind: "collection",
+    source: modTiles.tilesSource,
+  });
+}
+
 /** Keeps a loaded mosaic on the runtime: its mod and collection become the sandbox's. */
 function keepRuntimeMosaic(
   runtime: SandboxRuntime,
@@ -638,17 +737,30 @@ async function loadRuntimeInputs(
   };
   const mosaic = await loadLaunchMosaic(request, services.fetchOptions);
   keepRuntimeMosaic(runtime, services, mosaic);
+  if (mosaic !== null) {
+    reportLoadedFile(runtime, sandbox, services, {
+      kind: "mosaic",
+      source: mosaic.source,
+    });
+  }
   const sites = await loadLaunchSites(request, services.fetchOptions);
+  keepRuntimeSites(runtime, services, sites);
   const launchRequest = expandMosaicRequest(request, mosaic);
   const mod = await loadLaunchMod(launchRequest, services.fetchOptions);
   runtime.loadedMod = mod;
-  return loadLaunchTiles(
+  reportLoadedFile(runtime, sandbox, services, {
+    kind: "mod",
+    source: mod.source,
+  });
+  const inputs = await loadLaunchTiles(
     mod,
     launchRequest.link,
     services.fetchOptions,
     mosaic,
     sites,
   );
+  keepRuntimeCollection(runtime, sandbox, services, inputs);
+  return inputs;
 }
 
 /**
@@ -666,6 +778,10 @@ export function launchSandbox(
     loadedMod: null,
     mosaicSource: resolveLinkMosaic(sandbox, services),
     loadedMosaic: null,
+    sitesSource: resolveLinkSites(sandbox, services),
+    loadedSites: null,
+    mosaicGrants: null,
+    collectionTitle: null,
     pending: null,
     question: null,
     consentLines: [],

@@ -10,12 +10,16 @@ import type { FakeNavigation } from "../../../test/fake_history.ts";
 import { createMemorySiteDecisions } from "../../../test/memory_site_decisions.ts";
 import type { MemorySiteDecisions } from "../../../test/memory_site_decisions.ts";
 import { createMemoryStorage } from "../../../test/memory_storage.ts";
-import { APP_BASE_URL } from "../../../test/sample_files.ts";
+import { APP_BASE_URL, FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
+  ALIASED_MOSAIC_REFERENCE,
+  ALIASED_MOSAIC_SOURCE,
   APP_ORIGIN,
   buildProbeDecision,
   LEAFLET_SCRIPT_SOURCE,
   LIBRARY_MOD_SOURCE,
+  MISSING_MOD_REFERENCE,
+  NAMED_BOOKS_SOURCE,
   OTHER_API_MOD_SOURCE,
   OTHER_API_RANGE,
   PROBE_CONNECT_PERMISSION,
@@ -29,6 +33,7 @@ import {
   SAMPLE_MOD_SOURCE,
   SAMPLE_MOSAIC_SOURCE,
   SAMPLE_RUN_HASH,
+  serveAliasedMosaic,
   serveLibraryMod,
   serveOtherApiMod,
   serveProbeMod,
@@ -61,6 +66,7 @@ import type { AppAction } from "../engine/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme } from "../theme/index.ts";
 import type { MessageLevel } from "./stage_messages.ts";
+import type { LoadedFileEntry } from "./stage_sandboxes.ts";
 import type { StageRouting } from "./stage_routes.ts";
 import {
   answerApiMismatch,
@@ -79,8 +85,10 @@ import {
   followHistory,
   frameLoadedAgain,
   markMessagesRead,
+  openStageCombination,
   openStageLink,
   openStageSection,
+  readStageCatalog,
   readStageSnapshot,
   reloadTiles,
   requestStageAction,
@@ -139,6 +147,7 @@ function buildStage(
   routing: StageRouting = MOD_HOME_ROUTING,
   siteDecisions: MemorySiteDecisions = createMemorySiteDecisions(),
   theaterMode = false,
+  onFilesLoaded?: (entry: LoadedFileEntry) => void,
 ): Stage {
   const stage = createStage({
     history,
@@ -156,6 +165,7 @@ function buildStage(
     theaterMode,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,
+    onFilesLoaded,
   });
   return stage;
 }
@@ -1795,6 +1805,16 @@ async function waitForCount(received: unknown[], count: number): Promise<void> {
 }
 
 describe("app catalog", function describeAppCatalog(): void {
+  it("readStageCatalog follows the default-mosaics switch", async function readsCatalog(): Promise<void> {
+    const stage = buildStage(new FakeHistory(""));
+    const offListing = await readStageCatalog(stage);
+
+    await changeStageCatalogDefaultMosaics(stage, true);
+
+    expect(offListing).toEqual(CATALOG_OFF_LISTING);
+    expect(await readStageCatalog(stage)).toEqual(CATALOG_ON_LISTING);
+  });
+
   it("answers a running sandbox's catalog.list with the stage's catalog", async function answersRunningSandbox(): Promise<void> {
     const history = new FakeHistory("");
     const stage = buildStage(history);
@@ -2360,3 +2380,312 @@ function readTextsOf(sandbox: SandboxSnapshot): string[] {
   }
   return texts;
 }
+
+/** A foreign mosaic with one `show` line, for `sites` links. */
+const COVERS_SITES_SOURCE = "https://mosaics.example.net/covers/mosaic.yaml";
+
+function serveCoversSites(): void {
+  serveTestMosaic(COVERS_SITES_SOURCE, [
+    'title: "Covers"',
+    `mod: "${UNTYPED_MOD_SOURCE}"`,
+    "permissions:",
+    "  show:",
+    '    - host: "https://covers.openlibrary.org"',
+    '      reason: "Shows the book covers"',
+  ]);
+}
+
+/** Starts at the Home mod, then follows `hash`. */
+async function followFromHome(hash: string): Promise<Stage> {
+  const history = new FakeHistory("");
+  const stage = buildStage(history);
+  await follow(stage, history.readNavigation());
+  await follow(stage, history.followLink(hash));
+  return stage;
+}
+
+describe("sandbox snapshot", function describeSandboxSnapshot(): void {
+  it("gives a mosaic's link, collection title, aliases and show lines", async function readsMosaic(): Promise<void> {
+    serveAliasedMosaic();
+
+    const stage = await followFromHome(
+      `#/run?mosaic=${encodeURIComponent(ALIASED_MOSAIC_REFERENCE)}`,
+    );
+
+    expect(readVisible(stage)).toMatchObject({
+      link: {
+        mod: SAMPLE_MOD_SOURCE,
+        collection: NAMED_BOOKS_SOURCE,
+        tile: null,
+        mosaic: ALIASED_MOSAIC_SOURCE,
+        sites: null,
+        params: {},
+      },
+      collectionTitle: "Named books",
+      tile: null,
+      mosaic: {
+        title: "Named books on the shelf",
+        aliases: { title: ["name"], country: ["origin"] },
+        show: [],
+      },
+      sites: null,
+    });
+  });
+
+  it("gives a collection link's resolved sources, title and params", async function readsCollection(): Promise<void> {
+    const stage = await followFromHome(
+      `${SAMPLE_COLLECTION_RUN_HASH}&from=explorer`,
+    );
+
+    expect(readVisible(stage)).toMatchObject({
+      link: {
+        mod: SAMPLE_MOD_SOURCE,
+        collection: SAMPLE_COLLECTION_SOURCE,
+        tile: null,
+        mosaic: null,
+        sites: null,
+        params: { from: "explorer" },
+      },
+      collectionTitle: "Science fiction books",
+      tile: null,
+      mosaic: null,
+    });
+  });
+
+  it("gives a tile link's resolved tile and no collection title", async function readsTile(): Promise<void> {
+    const tileSource = `${FIXTURES_BASE_URL}tiles/books/kallocain.md`;
+
+    const stage = await followFromHome(
+      `${SAMPLE_RUN_HASH}&tile=${encodeURIComponent("./fixtures/tiles/books/kallocain.md")}`,
+    );
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "running",
+      link: { collection: null, tile: tileSource },
+      collectionTitle: null,
+      tile: tileSource,
+    });
+  });
+
+  it("gives the sites mosaic's lines, granted once the mod starts", async function readsSites(): Promise<void> {
+    serveCoversSites();
+    const stage = await followFromHome(
+      `${SAMPLE_COLLECTION_RUN_HASH}&sites=${encodeURIComponent(COVERS_SITES_SOURCE)}`,
+    );
+    const asking = readVisible(stage);
+
+    answerSiteConsent(stage, asking.id, {
+      allowed: ["mosaic show https://covers.openlibrary.org"],
+      remember: false,
+    });
+
+    const line = {
+      host: "https://covers.openlibrary.org",
+      reason: "Shows the book covers",
+    };
+    expect(asking).toMatchObject({
+      status: "asking",
+      link: { sites: COVERS_SITES_SOURCE, mosaic: null },
+      sites: {
+        source: COVERS_SITES_SOURCE,
+        title: "Covers",
+        lines: [{ ...line, granted: false }],
+      },
+    });
+    expect(readVisible(stage)).toMatchObject({
+      status: "running",
+      sites: { lines: [{ ...line, granted: true }] },
+    });
+  });
+
+  it("gives no sites when the sites mosaic failed", async function readsFailedSites(): Promise<void> {
+    const missingSource = `${FIXTURES_BASE_URL}mosaics/missing/mosaic.yaml`;
+
+    const stage = await followFromHome(
+      `${SAMPLE_COLLECTION_RUN_HASH}&sites=${encodeURIComponent("./fixtures/mosaics/missing")}`,
+    );
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "running",
+      link: { sites: missingSource },
+      sites: null,
+    });
+  });
+});
+
+/** Book List on the sample collection, from the swapped sandbox's list: a link with no section. */
+const SWAP_LINK = {
+  mod: SAMPLE_MOD_SOURCE,
+  collection: SAMPLE_COLLECTION_SOURCE,
+  tile: null,
+  sites: SAMPLE_MOSAIC_SOURCE,
+  params: {},
+};
+
+/** On the page stage: opens Mods, the viewer from the explorer, then swaps the viewer for `SWAP_LINK`. */
+async function swapViewerFromMods(history: FakeHistory): Promise<Stage> {
+  const stage = await openViewerFromMods(history);
+  openStageCombination(stage, "sandbox-2", SWAP_LINK);
+  await settleStage(stage);
+  return stage;
+}
+
+describe("openStageCombination", function describeOpenStageCombination(): void {
+  it("opens the link in a new sandbox and entry, in place of the visible one", async function opensCombination(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromMods(history);
+    const viewerRuntime = stage.runtimes.get("sandbox-2");
+
+    const outcome = openStageCombination(stage, "sandbox-2", SWAP_LINK);
+    await settleStage(stage);
+
+    expect(outcome).toBe("opened");
+    expect(viewerRuntime?.status).toBe("stopped");
+    expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-3"]);
+    expect(stage.state.sandboxes[1]).toMatchObject({
+      openerId: "sandbox-1",
+      section: "mods",
+    });
+    expect(history.entries).toHaveLength(4);
+    expect(history.entries[3].state).toEqual(stageState(3, "mods"));
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-3",
+      status: "running",
+      link: { sites: SAMPLE_MOSAIC_SOURCE },
+    });
+  });
+
+  it("Back to the previous combination", async function goesBack(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await swapViewerFromMods(history);
+
+    await follow(stage, history.goBack());
+
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-4",
+      hash: `${SAMPLE_COLLECTION_RUN_HASH}&from=explorer`,
+    });
+    expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-3", "sandbox-4"]);
+  });
+
+  it("Close after a swap", async function closesSwapped(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await swapViewerFromMods(history);
+
+    closeSandbox(stage, "sandbox-3");
+
+    expect(readVisible(stage).id).toBe("sandbox-1");
+    expect(readStageSnapshot(stage).activeSection).toBe("mods");
+  });
+
+  it("Section after a swap", async function remembersSwapped(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await swapViewerFromMods(history);
+    await openSection(stage, "home");
+
+    await openSection(stage, "mods");
+
+    expect(readVisible(stage).id).toBe("sandbox-3");
+    expect(readStageSnapshot(stage).activeSection).toBe("mods");
+  });
+
+  it("Swap from a home mod", async function opensFromHomeMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const homeRuntime = stage.runtimes.get("sandbox-1");
+
+    openStageCombination(stage, "sandbox-1", SWAP_LINK);
+    await settleStage(stage);
+    const swapped = readVisible(stage);
+    const swappedOpener = stage.state.sandboxes[1].openerId;
+    closeSandbox(stage, "sandbox-2");
+
+    expect(swapped.id).toBe("sandbox-2");
+    expect(swappedOpener).toBe("sandbox-1");
+    expect(history.entries).toHaveLength(2);
+    expect(readVisible(stage)).toMatchObject({
+      id: "sandbox-1",
+      canClose: false,
+    });
+    expect(homeRuntime?.status).toBe("running");
+  });
+
+  it("opens nothing for a sandbox that is not visible", async function refusesHidden(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromMods(history);
+
+    const outcome = openStageCombination(stage, "sandbox-1", SWAP_LINK);
+
+    expect(outcome).toBe("not-visible");
+    expect(listIds(stage)).toEqual(["sandbox-1", "sandbox-2"]);
+  });
+});
+
+/** Starts at the Home mod with a stage that keeps what it reports as loaded, then follows `hash`. */
+async function recordFromHome(hash: string): Promise<LoadedFileEntry[]> {
+  const recorded: LoadedFileEntry[] = [];
+  const history = new FakeHistory("");
+  const stage = buildStage(
+    history,
+    "light",
+    MOD_HOME_ROUTING,
+    createMemorySiteDecisions(),
+    false,
+    recorded.push.bind(recorded),
+  );
+  await follow(stage, history.readNavigation());
+  await follow(stage, history.followLink(hash));
+  return recorded;
+}
+
+describe("onFilesLoaded", function describeOnFilesLoaded(): void {
+  it("reports a mosaic link's mosaic, mod and collection", async function recordsMosaic(): Promise<void> {
+    serveAliasedMosaic();
+
+    const recorded = await recordFromHome(
+      `#/run?mosaic=${encodeURIComponent(ALIASED_MOSAIC_REFERENCE)}`,
+    );
+
+    expect(recorded).toEqual([
+      { kind: "mosaic", source: ALIASED_MOSAIC_SOURCE },
+      { kind: "mod", source: SAMPLE_MOD_SOURCE },
+      { kind: "collection", source: NAMED_BOOKS_SOURCE },
+    ]);
+  });
+
+  it("does not report the sites mosaic", async function skipsSites(): Promise<void> {
+    serveCoversSites();
+
+    const recorded = await recordFromHome(
+      `${SAMPLE_COLLECTION_RUN_HASH}&sites=${encodeURIComponent(COVERS_SITES_SOURCE)}`,
+    );
+
+    expect(recorded).toEqual([
+      { kind: "mod", source: SAMPLE_MOD_SOURCE },
+      { kind: "collection", source: SAMPLE_COLLECTION_SOURCE },
+    ]);
+  });
+
+  it("Explorer not recorded: a mod link without a collection or a tile", async function skipsModLink(): Promise<void> {
+    const recorded = await recordFromHome(SAMPLE_RUN_HASH);
+
+    expect(recorded).toEqual([]);
+  });
+
+  it("reports the mod of a tile link, and not the tile", async function skipsTile(): Promise<void> {
+    const recorded = await recordFromHome(
+      `${SAMPLE_RUN_HASH}&tile=${encodeURIComponent("./fixtures/tiles/books/kallocain.md")}`,
+    );
+
+    expect(recorded).toEqual([{ kind: "mod", source: SAMPLE_MOD_SOURCE }]);
+  });
+
+  it("Mod that fails to load", async function skipsFailedMod(): Promise<void> {
+    const recorded = await recordFromHome(
+      `#/run?mod=${encodeURIComponent(MISSING_MOD_REFERENCE)}&collection=${encodeURIComponent(SAMPLE_COLLECTION_REFERENCE)}`,
+    );
+
+    expect(recorded).toEqual([]);
+  });
+});

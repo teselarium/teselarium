@@ -22,6 +22,7 @@
     "@11ty/gray-matter": "^3.0.0",
     "ajv": "^8.20.0",
     "class-variance-authority": "^0.7.1",
+    "cmdk": "^1.1.1",
     "cn": "^0.5.0",
     "js-yaml": "^5.4.3",
     "lucide-react": "^1.61.0",

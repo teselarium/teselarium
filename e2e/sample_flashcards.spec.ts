@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Frame, Locator, Page, Route } from "@playwright/test";
-import { findModFrame, stageBar } from "./mod_routes.ts";
+import { findModFrame, reloadTiles } from "./mod_routes.ts";
 import {
   FLASHCARDS_CARDS_FOLDER_PATH,
   FLASHCARDS_COLLECTION_GLOB,
@@ -214,10 +214,6 @@ async function stepToThirdCard(frame: Frame): Promise<void> {
     await frame.getByRole("button", { name: "I knew it" }).press("Enter");
   }
   await expect(cardPosition(frame)).toHaveText("Card 3 of 8");
-}
-
-async function reloadTiles(page: Page): Promise<void> {
-  await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
 }
 
 /** Opens the mod again in a new document, so its frame starts from scratch. */

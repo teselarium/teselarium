@@ -18,6 +18,7 @@ import {
   markFrame,
   openChecker,
   readLoadedCovers,
+  reloadTiles,
   routeCovers,
   serveAppOriginMod,
   stageBar,
@@ -317,10 +318,6 @@ async function expectExpandedStates(
       states[index],
     );
   }
-}
-
-async function reloadTiles(page: Page): Promise<void> {
-  await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
 }
 
 test.describe(

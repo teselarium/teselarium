@@ -1,6 +1,16 @@
+import { createCombinationCatalog } from "../lib/core/combinations/index.ts";
+import type { CombinationCatalog } from "../lib/core/combinations/index.ts";
 import type { RunLink } from "../lib/core/engine/index.ts";
-import { createStage, followHistory } from "../lib/core/stage/index.ts";
-import type { Stage, StageRouting } from "../lib/core/stage/index.ts";
+import {
+  createStage,
+  followHistory,
+  readStageCatalog,
+} from "../lib/core/stage/index.ts";
+import type {
+  LoadedFileEntry,
+  Stage,
+  StageRouting,
+} from "../lib/core/stage/index.ts";
 import { FakeHistory } from "./fake_history.ts";
 import { createMemorySiteDecisions } from "./memory_site_decisions.ts";
 import type { MemorySiteDecisions } from "./memory_site_decisions.ts";
@@ -10,6 +20,7 @@ import {
   APP_ORIGIN,
   SAMPLE_MOD_REFERENCE,
   TEST_CATALOG,
+  TEST_DEFAULTS,
   TEST_NPM_HOST,
 } from "./sample_mods.ts";
 import { fetchTestFile } from "./test_files.ts";
@@ -57,6 +68,7 @@ export function buildTestStage(
   history: FakeHistory,
   routing: StageRouting = MOD_HOME_ROUTING,
   siteDecisions: StageSiteDecisions = createMemorySiteDecisions(),
+  onFilesLoaded?: (entry: LoadedFileEntry) => void,
 ): Stage {
   const stage = createStage({
     history,
@@ -74,8 +86,23 @@ export function buildTestStage(
     theaterMode: false,
     readSiteDecisions: siteDecisions.read,
     rememberSiteDecisions: siteDecisions.remember,
+    onFilesLoaded,
   });
   return stage;
+}
+
+/** The combination catalog of a test stage, as `main.tsx` builds it, serving what `fetchTestFile` serves. */
+export function buildTestCombinations(stage: Stage): CombinationCatalog {
+  const combinations = createCombinationCatalog({
+    fetchOptions: {
+      baseUrl: APP_BASE_URL,
+      fetch: fetchTestFile,
+      npmHost: TEST_NPM_HOST,
+      defaultModsFolder: TEST_DEFAULTS.folder,
+    },
+    readCatalog: readStageCatalog.bind(undefined, stage),
+  });
+  return combinations;
 }
 
 /** Waits until every sandbox launch of the stage settled. */

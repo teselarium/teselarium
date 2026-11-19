@@ -1,11 +1,13 @@
 import type { CSSProperties, ReactElement } from "react";
 import { TooltipProvider } from "@/vendor/shadcn/ui/tooltip.tsx";
+import type { CombinationCatalog } from "./lib/core/combinations/index.ts";
 import type { Stage } from "./lib/core/stage/index.ts";
 import { AppHeader } from "./main/AppHeader.tsx";
 import { PageView } from "./main/pages/PageView.tsx";
 import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import type { SectionSwitches } from "./main/sections/section_switches.ts";
 import type { PlayerSites } from "./main/settings/player_sites.ts";
+import type { RecentlyUsed } from "./main/settings/recently_used.ts";
 import type { SiteDecisions } from "./main/settings/site_decisions.ts";
 import type { CatalogSetting } from "./main/settings/catalog_setting.ts";
 import type { TileMediaSetting } from "./main/settings/tile_media_setting.ts";
@@ -26,6 +28,10 @@ import "./main/app.css";
 
 interface AppProps {
   stage: Stage;
+  /** The summaries and counts of the stage bar's lists. */
+  combinations: CombinationCatalog;
+  /** The mods, collections and mosaics tried in combination sandboxes. */
+  recentlyUsed: RecentlyUsed;
   appTheme: AppTheme;
   /** The available sections, in registry order. */
   sections: readonly SectionDefinition[];
@@ -56,6 +62,8 @@ function readSidebarColumn(snapshot: SidebarSnapshot): string {
  */
 function App({
   stage,
+  combinations,
+  recentlyUsed,
   appTheme,
   sections,
   switches,
@@ -93,12 +101,15 @@ function App({
               switches={switches}
               tileMedia={tileMedia}
               catalogSetting={catalogSetting}
+              recentlyUsed={recentlyUsed}
               siteDecisions={siteDecisions}
               playerSites={playerSites}
             />
           </div>
           <StageView
             stage={stage}
+            combinations={combinations}
+            recentlyUsed={recentlyUsed}
             playerSites={playerSites}
             theater={theater}
           />

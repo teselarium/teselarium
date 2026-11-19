@@ -62,7 +62,7 @@ mosaic:
 - **From a mod**: `mosaics.inspect` reads a mosaic file without opening it, and `mosaics.open` opens it as if the user had followed its link. Both need the requester's `open` permission for the mosaic file's origin (see [Inspecting and opening mosaics](../lib/core/engine/README.md#inspecting-and-opening-mosaics) in the engine module).
 - **What the mod gets**: `context.mosaic` (`source`, `title`, `description`), the merged `context.config`, and its tiles renamed by the aliases before they are validated against its tile type. "Reload tiles" renames the reloaded tiles the same way, without reading the mosaic file again (see [Launch](../lib/core/engine/README.md#launch) in the engine module).
 - **Its storage**: a mod opened from a mosaic has a storage slot for that mosaic file, apart from the slot it has with the same collection from a run link and from the slots of other mosaics, so a mod remembers its state per mosaic (see [Storage slots](../lib/core/engine/README.md#storage-slots) in the engine module).
-- **In the stage bar**: the mosaic's title before the mod's name, which is muted, and the mosaic file's address first in the information popover (see [The stage bar](../main/README.md#the-stage-bar)).
+- **In the stage bar**: the mosaic capsule shows the mosaic's title after the mod and collection capsules, and its list holds the other mosaics, those of the same pair first, with the mosaic file's address in its details. Choosing another mod in the mod list keeps the mosaic's `show` lines through `sites`, which the Sites chip shows (see [The stage bar](../main/README.md#the-stage-bar)).
 
 ## Trust
 

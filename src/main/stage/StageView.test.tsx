@@ -25,12 +25,17 @@ import {
   SAMPLE_COLLECTION_REFERENCE,
   SAMPLE_MOD_REFERENCE,
   SAMPLE_MOD_SOURCE,
+  SAMPLE_MOSAIC_REFERENCE,
   serveOtherApiMod,
+  serveTestMosaic,
+  serveUntypedMod,
+  UNTYPED_MOD_SOURCE,
 } from "../../test/sample_mods.ts";
 import { FIXTURES_BASE_URL } from "../../test/sample_files.ts";
 import { testTexts } from "../../test/test_files.ts";
 import { FakeHistory } from "../../test/fake_history.ts";
 import {
+  buildTestCombinations,
   buildTestStage,
   MOD_HOME_ROUTING,
   PAGE_HOME_ROUTING,
@@ -41,6 +46,7 @@ import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
 import { createMemoryStorage } from "../../test/memory_storage.ts";
 import type { MemoryStorage } from "../../test/memory_storage.ts";
 import { createPlayerSites } from "../settings/player_sites.ts";
+import { createRecentlyUsed } from "../settings/recently_used.ts";
 import type { PlayerSites } from "../settings/player_sites.ts";
 import { StageView } from "./StageView.tsx";
 import { createTheaterSetting, THEATER_MODE_KEY } from "./theater_setting.ts";
@@ -59,6 +65,8 @@ function renderStageView(
     <TooltipProvider>
       <StageView
         stage={stage}
+        combinations={buildTestCombinations(stage)}
+        recentlyUsed={createRecentlyUsed({ storage })}
         playerSites={createTestPlayerSites()}
         theater={createTheaterSetting({ storage, stage })}
       />
@@ -133,6 +141,13 @@ async function waitForCheck(stage: Stage): Promise<CheckSnapshot> {
     await act(waitForMessages);
   }
   throw new Error("Expected the stage to list a check");
+}
+
+/** Opens the "More actions" menu with the keyboard. */
+function openMoreActions(): void {
+  fireEvent.keyDown(screen.getByRole("button", { name: "More actions" }), {
+    key: "Enter",
+  });
 }
 
 function theaterButton(): HTMLElement {
@@ -401,7 +416,9 @@ describe("StageView", function describeStageView(): void {
     const stage = await startTestStage("");
     renderStageView(stage);
 
-    expect(screen.getByText("Book List")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Mod: Book List 1.0.0" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
   });
 
@@ -416,15 +433,19 @@ describe("StageView", function describeStageView(): void {
     const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
     renderStageView(stage);
 
-    expect(screen.queryByRole("button", { name: "Reload tiles" })).toBeNull();
+    openMoreActions();
+    expect(screen.queryByRole("menuitem", { name: "Reload tiles" })).toBeNull();
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
     const names: string[] = [];
     for (const button of within(stageBar).getAllByRole("button")) {
       names.push(button.getAttribute("aria-label") ?? "");
     }
     expect(names).toEqual([
-      "Mod information",
-      "Share",
+      "Mod: Book List 1.0.0",
+      "Collection: None",
+      "Mosaic: Unsaved combination",
+      "Combination: Book List",
+      "More actions",
       "Errors: 0, 0 unread",
       "Warnings: 0, 0 unread",
       "Notifications: 0, 0 unread",
@@ -440,8 +461,10 @@ describe("StageView", function describeStageView(): void {
     );
     renderStageView(stage);
 
+    openMoreActions();
+
     expect(
-      screen.getByRole("button", { name: "Reload tiles" }),
+      screen.getByRole("menuitem", { name: "Reload tiles" }),
     ).toBeInTheDocument();
   });
 
@@ -451,8 +474,9 @@ describe("StageView", function describeStageView(): void {
 
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
 
-    expect(within(stageBar).getByText("Book List")).toBeInTheDocument();
-    expect(within(stageBar).getByText("1.0.0")).toBeInTheDocument();
+    expect(
+      within(stageBar).getByRole("button", { name: "Mod: Book List 1.0.0" }),
+    ).toHaveTextContent("Book List1.0.0");
   });
 
   it("Missing mod file", async function showsLoadFailure(): Promise<void> {
@@ -481,8 +505,14 @@ describe("StageView", function describeStageView(): void {
     expect(screen.getByRole("alert")).toHaveTextContent("404");
     expect(container.querySelector("iframe")).toBeNull();
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
-    expect(within(stageBar).getByText("Book List")).toBeInTheDocument();
-    expect(within(stageBar).getByText("1.0.0")).toBeInTheDocument();
+    expect(
+      within(stageBar).getByRole("button", { name: "Mod: Book List 1.0.0" }),
+    ).toBeInTheDocument();
+    expect(
+      within(stageBar).getByRole("button", {
+        name: "Collection: Collection not loaded",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("Sample mod has no issues", async function showsNoIssues(): Promise<void> {
@@ -676,9 +706,11 @@ describe("StageView", function describeStageView(): void {
       names.push(button.getAttribute("aria-label") ?? "");
     }
     expect(names).toEqual([
-      "Mod information",
-      "Share",
-      "Reload tiles",
+      "Mod: Book List 1.0.0",
+      "Collection: Science fiction books",
+      "Mosaic: Unsaved combination",
+      "Combination: Book List",
+      "More actions",
       "Errors: 0, 0 unread",
       "Warnings: 0, 0 unread",
       "Notifications: 1, 1 unread",
@@ -686,17 +718,6 @@ describe("StageView", function describeStageView(): void {
       "Fullscreen",
       "Close",
     ]);
-    const title = within(stageBar).getByText("Book List");
-    expect(
-      title.compareDocumentPosition(within(stageBar).getByText("1.0.0")),
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(
-      within(stageBar)
-        .getByText("1.0.0")
-        .compareDocumentPosition(
-          within(stageBar).getByRole("button", { name: "Mod information" }),
-        ),
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(stageBar.querySelector("[data-slot=separator]")).not.toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
   });
@@ -710,9 +731,7 @@ describe("StageView", function describeStageView(): void {
     renderStageView(stage);
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
 
-    fireEvent.keyDown(screen.getByRole("button", { name: "Share" }), {
-      key: "Enter",
-    });
+    openMoreActions();
     await act(async function chooseCopy(): Promise<void> {
       fireEvent.click(screen.getByRole("menuitem", { name: "Copy link" }));
       await Promise.resolve();
@@ -749,7 +768,9 @@ describe("StageView", function describeStageView(): void {
     renderStageView(stage);
 
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
-    expect(within(stageBar).getByText("Loading mod…")).toBeInTheDocument();
+    expect(
+      within(stageBar).getByRole("button", { name: "Mod: Loading mod…" }),
+    ).toBeInTheDocument();
     expect(within(stageBar).queryByText("1.0.0")).toBeNull();
   });
 
@@ -872,12 +893,10 @@ describe("StageView", function describeStageView(): void {
     expect(document.activeElement).toBe(frame);
   });
 
-  it("closes the Share menu when the focus moves into a frame", async function closesShareOnFrameFocus(): Promise<void> {
+  it("Share menu: closes the More actions menu when the focus moves into a frame", async function closesMoreOnFrameFocus(): Promise<void> {
     const stage = await startTestStage("");
     renderStageView(stage);
-    fireEvent.keyDown(screen.getByRole("button", { name: "Share" }), {
-      key: "Enter",
-    });
+    openMoreActions();
     expect(screen.getByRole("menu")).toBeInTheDocument();
     const frame = appendFrame();
 
@@ -1114,3 +1133,297 @@ describe("CheckFrame", function describeCheckFrame(): void {
     expect(secondFrame?.getAttribute("data-check-id")).toBe("check-9");
   });
 });
+
+function readStageBar(): HTMLElement {
+  return screen.getByRole("region", { name: "Stage bar" });
+}
+
+function findCapsule(name: string): HTMLElement {
+  return within(readStageBar()).getByRole("button", { name });
+}
+
+const MOSAIC_HASH = `#/run?mosaic=${SAMPLE_MOSAIC_REFERENCE}`;
+
+describe("combination capsules", function describeCombinationCapsules(): void {
+  it("Combination capsules: the mosaic's mod, collection and title", async function showsMosaicCapsules(): Promise<void> {
+    const stage = await startTestStage(MOSAIC_HASH);
+    renderStageView(stage);
+
+    expect(findCapsule("Mod: Book List 1.0.0")).toHaveTextContent(
+      "Book List1.0.0",
+    );
+    expect(findCapsule("Collection: Science fiction books")).toHaveTextContent(
+      "Science fiction books",
+    );
+    expect(findCapsule("Mosaic: Books on the shelf")).toHaveTextContent(
+      "Books on the shelf",
+    );
+    expect(findCapsule("Combination: Books on the shelf")).toBeInTheDocument();
+    const separators = readStageBar().querySelectorAll("[aria-hidden=true]");
+    const texts: string[] = [];
+    for (const separator of separators) {
+      texts.push(separator.textContent ?? "");
+    }
+    expect(texts).toContain("+");
+    expect(texts).toContain("→");
+  });
+
+  it("Capsule icons: the sidebar's icons for mod, collection and mosaic", async function usesSidebarIcons(): Promise<void> {
+    const stage = await startTestStage(MOSAIC_HASH);
+    renderStageView(stage);
+
+    expect(
+      findCapsule("Mod: Book List 1.0.0").querySelector("svg.lucide-puzzle"),
+    ).not.toBeNull();
+    expect(
+      findCapsule("Collection: Science fiction books").querySelector(
+        "svg.lucide-layout-grid",
+      ),
+    ).not.toBeNull();
+    expect(
+      findCapsule("Mosaic: Books on the shelf").querySelector(
+        "svg.lucide-shapes",
+      ),
+    ).not.toBeNull();
+    expect(
+      findCapsule("Combination: Books on the shelf").querySelector(
+        "svg.lucide-shapes",
+      ),
+    ).not.toBeNull();
+  });
+
+  it("orders the capsules mod, +, collection, arrow, mosaic", async function ordersCapsules(): Promise<void> {
+    const stage = await startTestStage(MOSAIC_HASH);
+    renderStageView(stage);
+
+    const row = findCapsule("Mod: Book List 1.0.0").parentElement;
+    const texts: string[] = [];
+    for (const child of row?.children ?? []) {
+      texts.push(child.getAttribute("aria-label") ?? child.textContent ?? "");
+    }
+    expect(texts).toEqual([
+      "Mod: Book List 1.0.0",
+      "+",
+      "Collection: Science fiction books",
+      "→",
+      "Mosaic: Books on the shelf",
+    ]);
+  });
+
+  it("Unsaved combination: a dashed mosaic capsule", async function showsUnsaved(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    renderStageView(stage);
+
+    expect(findCapsule("Mosaic: Unsaved combination")).toHaveClass(
+      "border-dashed",
+    );
+    expect(findCapsule("Mosaic: Unsaved combination")).toHaveTextContent(
+      "Unsaved combination",
+    );
+  });
+
+  it("shows the decoded file name of a tile link's tile", async function showsTileName(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&tile=./fixtures/tiles/books/kallocain.md`,
+    );
+    renderStageView(stage);
+
+    expect(findCapsule("Collection: kallocain.md")).toBeInTheDocument();
+  });
+
+  it("Missing collection file", async function showsMissingCollection(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=./fixtures/tiles/missing.yaml`,
+    );
+    renderStageView(stage);
+
+    expect(
+      findCapsule("Collection: Collection not loaded"),
+    ).toBeInTheDocument();
+  });
+
+  it("Loading collection…", function showsLoadingCollection(): void {
+    const history = new FakeHistory(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    const stage = buildTestStage(history, MOD_HOME_ROUTING);
+    followHistory(stage, history.hash, history.state);
+
+    renderStageView(stage);
+
+    expect(findCapsule("Collection: Loading collection…")).toBeInTheDocument();
+  });
+
+  it("Mod viewer: a mod no list holds, without a collection, has a plain title", async function showsPlainTitle(): Promise<void> {
+    serveUntypedMod();
+    const stage = await startTestStage(
+      `#/run?mod=${encodeURIComponent(UNTYPED_MOD_SOURCE)}&target=x`,
+    );
+    renderStageView(stage);
+
+    const names: string[] = [];
+    for (const button of within(readStageBar()).getAllByRole("button")) {
+      names.push(button.getAttribute("aria-label") ?? "");
+    }
+    expect(names[0]).toBe("More actions");
+    expect(readStageBar().querySelector("[data-slot=badge]")).not.toBeNull();
+  });
+
+  it("Missing mod file of a combination: Mod not loaded in the mod capsule", async function showsMissingMod(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${MISSING_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    renderStageView(stage);
+
+    expect(findCapsule("Mod: Mod not loaded")).toBeInTheDocument();
+    expect(within(readStageBar()).queryByText("1.0.0")).toBeNull();
+  });
+});
+
+describe("mosaic name while loading or after a failure", function describeMosaicName(): void {
+  it("Loading mosaic…: one capsule in place of the three", function showsLoadingMosaic(): void {
+    const history = new FakeHistory(MOSAIC_HASH);
+    const stage = buildTestStage(history, MOD_HOME_ROUTING);
+    followHistory(stage, history.hash, history.state);
+
+    renderStageView(stage);
+
+    expect(
+      within(readStageBar()).getByText("Loading mosaic…"),
+    ).toBeInTheDocument();
+    expect(
+      within(readStageBar()).queryByRole("button", { name: /^Mod:/ }),
+    ).toBeNull();
+  });
+
+  it("Missing mosaic file", async function showsMissingMosaic(): Promise<void> {
+    const stage = await startTestStage(
+      "#/run?mosaic=./fixtures/mosaics/missing",
+    );
+    renderStageView(stage);
+
+    expect(
+      within(readStageBar()).getByText("Mosaic not loaded"),
+    ).toBeInTheDocument();
+    expect(readStageBar().querySelector("[data-slot=badge]")).toBeNull();
+  });
+
+  it("Missing mod of a mosaic", async function showsMissingModOfMosaic(): Promise<void> {
+    const mosaicSource = `${FIXTURES_BASE_URL}mosaics/lost/mosaic.yaml`;
+    serveTestMosaic(mosaicSource, [
+      'title: "Lost books"',
+      'mod: "../../mods/missing"',
+      'collection: "../../tiles/books_collection.yaml"',
+    ]);
+    const stage = await startTestStage("#/run?mosaic=./fixtures/mosaics/lost");
+    renderStageView(stage);
+
+    expect(findCapsule("Mosaic: Lost books")).toBeInTheDocument();
+    expect(findCapsule("Mod: Mod not loaded")).toBeInTheDocument();
+  });
+});
+
+describe("closing on a click outside", function describeClickOutside(): void {
+  it("Mod list: closes when the focus moves into a frame, which keeps it", async function closesModList(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    renderStageView(stage);
+    fireEvent.click(findCapsule("Mod: Book List 1.0.0"));
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    const frame = appendFrame();
+
+    await moveFocusToFrame(frame);
+
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(document.activeElement).toBe(frame);
+  });
+
+  it("opens one list at a time", async function opensOneList(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    renderStageView(stage);
+    fireEvent.click(findCapsule("Mod: Book List 1.0.0"));
+
+    fireEvent.click(findCapsule("Mosaic: Unsaved combination"));
+
+    expect(screen.getAllByRole("combobox")).toHaveLength(1);
+    expect(screen.getByRole("dialog")).toHaveTextContent("Run link");
+  });
+});
+
+/** A mosaic on the app's origin with the covers' `show` line, for `sites` links. */
+const COVERS_SITES_SOURCE = `${FIXTURES_BASE_URL}mosaics/covers/mosaic.yaml`;
+
+function serveCoversSites(): void {
+  serveTestMosaic(COVERS_SITES_SOURCE, [
+    'title: "Covers on the shelf"',
+    'mod: "../../mods/book_list"',
+    "permissions:",
+    "  show:",
+    '    - host: "https://covers.openlibrary.org"',
+    '      reason: "Shows the book covers"',
+  ]);
+}
+
+const SITES_HASH = `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}&sites=${encodeURIComponent(COVERS_SITES_SOURCE)}&sort=year`;
+
+describe("sites chip", function describeSitesChip(): void {
+  it("Kept covers: a chip with the number of lines, and their hosts", async function showsSites(): Promise<void> {
+    serveCoversSites();
+    const stage = await startTestStage(SITES_HASH);
+    renderStageView(stage);
+
+    const chip = findCapsule("Sites from Covers on the shelf");
+    fireEvent.click(chip);
+
+    expect(chip).toHaveTextContent("1");
+    const popover = screen.getByRole("dialog");
+    expect(popover).toHaveTextContent("https://covers.openlibrary.org");
+    expect(popover).toHaveTextContent("Shows the book covers");
+    expect(popover).toHaveTextContent("Granted");
+    expect(
+      chip.compareDocumentPosition(findCapsule("Mosaic: Unsaved combination")),
+    ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+  });
+
+  it("Stop using them: the same combination and params without sites, and no chip", async function dropsSites(): Promise<void> {
+    serveCoversSites();
+    const stage = await startTestStage(SITES_HASH);
+    renderStageView(stage);
+    fireEvent.click(findCapsule("Sites from Covers on the shelf"));
+
+    await act(async function clickStop(): Promise<void> {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Stop using these sites" }),
+      );
+      await settleStage(stage);
+    });
+
+    const visible = readStageSnapshot(stage).sandboxes.find(isVisibleSandbox);
+    expect(visible?.link).toMatchObject({
+      mod: SAMPLE_MOD_SOURCE,
+      sites: null,
+      params: { sort: "year" },
+    });
+    expect(
+      within(readStageBar()).queryByRole("button", { name: /^Sites from/ }),
+    ).toBeNull();
+  });
+
+  it("shows no chip without sites", async function hidesChip(): Promise<void> {
+    const stage = await startTestStage(MOSAIC_HASH);
+    renderStageView(stage);
+
+    expect(
+      within(readStageBar()).queryByRole("button", { name: /^Sites from/ }),
+    ).toBeNull();
+  });
+});
+
+function isVisibleSandbox(sandbox: { isVisible: boolean }): boolean {
+  return sandbox.isVisible;
+}

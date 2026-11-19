@@ -7,7 +7,12 @@ import {
   resolveDefaultModSettings,
 } from "./lib/core/engine/index.ts";
 import type { ResolvedAppCatalog } from "./lib/core/engine/index.ts";
-import { createStage, followHistory } from "./lib/core/stage/index.ts";
+import { createCombinationCatalog } from "./lib/core/combinations/index.ts";
+import {
+  createStage,
+  followHistory,
+  readStageCatalog,
+} from "./lib/core/stage/index.ts";
 import type { Stage } from "./lib/core/stage/index.ts";
 import { buildThemeTokenStyles } from "./lib/core/theme/index.ts";
 import { APP_CATALOG } from "./main/app_catalog.ts";
@@ -26,6 +31,10 @@ import {
   readStartCatalogDefaultMosaics,
 } from "./main/settings/catalog_setting.ts";
 import { createPlayerSites } from "./main/settings/player_sites.ts";
+import {
+  createRecentlyUsed,
+  recordRecentlyUsed,
+} from "./main/settings/recently_used.ts";
 import {
   createSiteDecisions,
   readSiteDecisionsSnapshot,
@@ -87,6 +96,8 @@ function startApp(
   // Before the stage, which reads and remembers the decisions through it.
   const siteDecisions = createSiteDecisions({ storage: window.localStorage });
   const playerSites = createPlayerSites({ storage: window.localStorage });
+  // Before the stage, which records the files of combination sandboxes in it.
+  const recentlyUsed = createRecentlyUsed({ storage: window.localStorage });
   const stage = createStage({
     history: window.history,
     defaults: DEFAULT_MODS,
@@ -102,6 +113,16 @@ function startApp(
     theaterMode: readStartTheaterMode(window.localStorage),
     readSiteDecisions: readSiteDecisionsSnapshot.bind(undefined, siteDecisions),
     rememberSiteDecisions: rememberSiteDecisions.bind(undefined, siteDecisions),
+    onFilesLoaded: recordRecentlyUsed.bind(undefined, recentlyUsed),
+  });
+  // The stage bar's lists measure what they show, cached for the page.
+  const combinations = createCombinationCatalog({
+    fetchOptions: {
+      baseUrl: document.baseURI,
+      npmHost: NPM_HOST,
+      defaultModsFolder: stage.defaults.folder,
+    },
+    readCatalog: readStageCatalog.bind(undefined, stage),
   });
   // Same lifetime as the stage: it tells the stage when the color scheme changes.
   const appTheme = createAppTheme({
@@ -147,6 +168,8 @@ function startApp(
   return (
     <App
       stage={stage}
+      combinations={combinations}
+      recentlyUsed={recentlyUsed}
       appTheme={appTheme}
       sections={sections}
       switches={switches}

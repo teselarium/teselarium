@@ -7,7 +7,6 @@ import {
   COVER_HOST,
   expectMessageCount,
   expectMessages,
-  expectModInfo,
   expectNoIssues,
   findModFrame,
   findSandboxFrame,
@@ -20,6 +19,7 @@ import {
   MEDIA_HOST,
   readMessages,
   readProbeContext,
+  reloadTiles,
   routeImages,
   serveAppOriginMod,
   serveForeignMod,
@@ -142,7 +142,9 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
     await followLink(page, `#/run?mod=${encodeURIComponent(source)}`);
 
     await expect(stageBar(page)).toContainText(TILES_TITLE);
-    await expectModInfo(page, source);
+    expect(new URL(page.url()).hash).toBe(
+      `#/run?mod=${encodeURIComponent(source)}`,
+    );
   });
 });
 
@@ -742,7 +744,7 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
     await frame.evaluate(recordChangedTiles);
     files["collection.yaml"] = buildNoteCollection(["./second.md"]);
 
-    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+    await reloadTiles(page);
 
     await expect
       .poll(frame.evaluate.bind(frame, readChangedTitles))
@@ -762,7 +764,7 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
     files[LABELS_COLLECTION_FILE] = buildLabelsCollection(["./second.md"]);
     const mosaicRequests = countMosaicRequests(seenUrls);
 
-    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+    await reloadTiles(page);
 
     await expect
       .poll(frame.evaluate.bind(frame, readChangedTitles))
@@ -780,7 +782,7 @@ test.describe("Reload the tiles", function describeReloadTiles(): void {
     await frame.evaluate(recordChangedTiles);
     files["first.md"] = buildNoteTile("Changed note");
 
-    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+    await reloadTiles(page);
 
     await expect
       .poll(frame.evaluate.bind(frame, readChangedTitles))

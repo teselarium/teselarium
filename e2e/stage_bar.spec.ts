@@ -11,14 +11,15 @@ import {
   messageButton,
   messageCapsule,
   messagePopover,
+  moreActionsButton,
+  moreActionsMenu,
   openMessages,
-  openShareMenu,
+  openMoreActions,
   readMessages,
+  reloadTiles,
   requestFromProbe,
   serveAppOriginMod,
   serveForeignMod,
-  shareButton,
-  shareMenu,
   showImage,
   siteConsentDialog,
   stageBar,
@@ -27,9 +28,11 @@ import {
 } from "./mod_routes.ts";
 import type { MessageLevelName, ProbeAnswer } from "./mod_routes.ts";
 import {
+  buildLabelsCollection,
   buildLabelsMosaicFiles,
   buildNoteCollection,
   buildTypedProbeFiles,
+  LABELS_COLLECTION_FILE,
   LABELS_MOSAIC_HASH,
   LABELS_MOSAIC_PATH,
   LABELS_MOSAIC_TITLE,
@@ -41,7 +44,11 @@ import {
   TILES_TITLE,
   TILES_VERSION,
 } from "./test_mods.ts";
-import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
+import type { ModFiles } from "./mod_routes.ts";
+import {
+  HOME_MOD_PREVIEW_URL,
+  TEST_CATALOG_PREVIEW_URL,
+} from "./app_servers.ts";
 
 /** The lines of a probe that shows images from `COVER_HOST`, so a foreign probe asks for consent. */
 const SHOW_COVERS_LINES = [
@@ -280,11 +287,10 @@ test.describe("One-row stage bar", function describeLayout(): void {
     const bar = stageBar(page);
 
     const items = [
-      bar.getByText("probe", { exact: true }),
-      bar.getByText("0.1.0", { exact: true }),
-      bar.getByRole("button", { name: "Mod information" }),
-      shareButton(page),
-      bar.getByRole("button", { name: "Reload tiles" }),
+      bar.getByRole("button", { name: "Mod: probe 0.1.0" }),
+      bar.getByRole("button", { name: "Collection: Probe notes" }),
+      bar.getByRole("button", { name: "Mosaic: Unsaved combination" }),
+      moreActionsButton(page),
       messageButton(page, "Errors"),
       messageButton(page, "Warnings"),
       messageButton(page, "Notifications"),
@@ -336,21 +342,21 @@ async function openLabelsMosaic(
   await page.goto(`/${LABELS_MOSAIC_HASH}`);
 }
 
-test.describe("Mosaic title in the stage bar", function describeMosaicTitle(): void {
-  test("Labelled items on the tiles mod", async function ordersMosaicItems({
+test.describe("Combination capsules", function describeCapsules(): void {
+  test("Labelled items on the tiles mod", async function showsCapsules({
     page,
   }): Promise<void> {
     await openLabelsMosaic(page);
     const bar = stageBar(page);
     await waitForProbe(await findModFrame(page, TILES_TITLE));
 
-    const mosaicTitle = bar.getByText(LABELS_MOSAIC_TITLE, { exact: true });
-    const modTitle = bar.getByText(TILES_TITLE, { exact: true });
     const items = [
-      mosaicTitle,
-      modTitle,
-      bar.getByText(TILES_VERSION, { exact: true }),
-      bar.getByRole("button", { name: "Mod information" }),
+      bar.getByRole("button", { name: `Mod: ${TILES_TITLE} ${TILES_VERSION}` }),
+      bar.getByText("+", { exact: true }),
+      bar.getByRole("button", { name: "Collection: Labelled tiles" }),
+      bar.getByText("→", { exact: true }),
+      bar.getByRole("button", { name: `Mosaic: ${LABELS_MOSAIC_TITLE}` }),
+      moreActionsButton(page),
     ];
     const boxes: Box[] = [];
     for (const item of items) {
@@ -361,13 +367,13 @@ test.describe("Mosaic title in the stage bar", function describeMosaicTitle(): v
         expect(box.x).toBeGreaterThan(boxes[index - 1].x);
       }
     }
-    await expect(modTitle).toHaveClass(/text-muted-foreground/);
-    await expect(mosaicTitle).not.toHaveClass(/text-muted-foreground/);
+    await expect(items[1]).toHaveAttribute("aria-hidden", "true");
+    await expect(items[3]).toHaveAttribute("aria-hidden", "true");
     const barBox = await readBox(bar);
-    expect(barBox.height).toBeLessThan(boxes[3].height * 2);
+    expect(barBox.height).toBeLessThan(boxes[0].height * 2);
   });
 
-  test("Mod opened without a mosaic", async function showsNoMosaicTitle({
+  test("Unsaved combination", async function showsUnsaved({
     page,
   }): Promise<void> {
     await serveTilesMod(page, buildLabelsMosaicFiles());
@@ -375,10 +381,12 @@ test.describe("Mosaic title in the stage bar", function describeMosaicTitle(): v
     await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
     await waitForProbe(await findModFrame(page, TILES_TITLE));
 
+    const mosaicCapsule = stageBar(page).getByRole("button", {
+      name: "Mosaic: Unsaved combination",
+    });
+    await expect(mosaicCapsule).toBeVisible();
+    await expect(mosaicCapsule).toHaveCSS("border-top-style", "dashed");
     await expect(stageBar(page)).not.toContainText(LABELS_MOSAIC_TITLE);
-    await expect(
-      stageBar(page).getByText(TILES_TITLE, { exact: true }),
-    ).not.toHaveClass(/text-muted-foreground/);
   });
 });
 
@@ -409,32 +417,21 @@ test.describe("Mosaic name while loading or after a failure", function describeM
   });
 });
 
-test.describe("Information popover of a mosaic", function describeMosaicInfo(): void {
-  test("Mosaic with a collection", async function listsMosaicFirst({
+test.describe("Details footer", function describeDetails(): void {
+  test("Mosaic details", async function listsMosaicDetails({
     page,
   }): Promise<void> {
     await openLabelsMosaic(page);
     await waitForProbe(await findModFrame(page, TILES_TITLE));
     const mosaicSource = new URL(LABELS_MOSAIC_PATH, page.url()).href;
-    const modSource = new URL("/test-mods/tiles/mod_conf.yaml", page.url())
-      .href;
-    const collectionSource = new URL(
-      "/test-mods/mosaics/labels/collection.yaml",
-      page.url(),
-    ).href;
 
     await stageBar(page)
-      .getByRole("button", { name: "Mod information" })
+      .getByRole("button", { name: `Mosaic: ${LABELS_MOSAIC_TITLE}` })
       .click();
 
-    const popover = page.locator("[data-slot=popover-content]");
-    const details = await popover.locator("dd").allTextContents();
-    expect(details).toEqual([
-      mosaicSource,
-      modSource,
-      collectionSource,
-      LABELS_MOSAIC_HASH,
-    ]);
+    const list = page.locator("[data-slot=popover-content]");
+    const details = await list.locator("dd").allTextContents();
+    expect(details).toEqual([mosaicSource, LABELS_MOSAIC_HASH]);
   });
 });
 
@@ -665,7 +662,7 @@ test.describe("Dismiss notifications", function describeDismiss(): void {
   });
 });
 
-test.describe("Share menu", function describeShare(): void {
+test.describe("More actions menu", function describeMoreActions(): void {
   test("Copy the link", async function copiesLink({
     page,
     context,
@@ -680,13 +677,13 @@ test.describe("Share menu", function describeShare(): void {
     const files = buildTypedProbeFiles();
     files["collection.yaml"] = buildNoteCollection([]);
     await openTypedProbe(page, files);
-    const menu = await openShareMenu(page);
+    const menu = await openMoreActions(page);
 
     await menu.getByRole("menuitem", { name: "Copy link" }).click();
 
-    await expect(shareMenu(page)).toHaveCount(0);
+    await expect(moreActionsMenu(page)).toHaveCount(0);
     await expect(page.getByRole("tooltip")).toContainText("Link copied");
-    await expect(shareButton(page)).toHaveAccessibleName("Share");
+    await expect(moreActionsButton(page)).toHaveAccessibleName("More actions");
     await expect(stageBar(page).locator("[aria-live=polite]")).toContainText(
       "Link copied",
     );
@@ -739,15 +736,34 @@ test.describe(
       await expect.poll(countFrameKeys.bind(undefined, frame)).toBe(1);
     });
 
-    test("Share menu", async function closesShareMenu({ page }): Promise<void> {
+    test("Share menu", async function closesMoreActions({
+      page,
+    }): Promise<void> {
       const frame = await openProbe(page);
       await frame.evaluate(CLICK_RECORDER);
-      await openShareMenu(page);
+      await openMoreActions(page);
 
       await clickInFrame(page, "probe");
 
-      await expect(shareMenu(page)).toHaveCount(0);
+      await expect(moreActionsMenu(page)).toHaveCount(0);
       await expect.poll(countFrameClicks.bind(undefined, frame)).toBe(1);
+    });
+
+    test("Mod list", async function closesModList({ page }): Promise<void> {
+      const files = buildTypedProbeFiles();
+      files["collection.yaml"] = buildNoteCollection([]);
+      const frame = await openTypedProbe(page, files);
+      await frame.evaluate(CLICK_RECORDER);
+      await stageBar(page)
+        .getByRole("button", { name: "Mod: probe 0.1.0" })
+        .click();
+      await expect(page.getByRole("combobox")).toBeFocused();
+
+      await clickInFrame(page, "probe");
+
+      await expect(page.getByRole("combobox")).toHaveCount(0);
+      await expect.poll(countFrameClicks.bind(undefined, frame)).toBe(1);
+      await expect.poll(readActiveTag.bind(undefined, page)).toBe("IFRAME");
     });
   },
 );
@@ -762,7 +778,7 @@ test.describe("The app's notifications", function describeAppNotifications(): vo
     await expectMessageCount(page, "Notifications", 1);
     files["collection.yaml"] = buildNoteCollection(["./second.md"]);
 
-    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+    await reloadTiles(page);
 
     await expectMessageCount(page, "Notifications", 2);
     const notifications = await readMessages(page, "Notifications");
@@ -770,7 +786,7 @@ test.describe("The app's notifications", function describeAppNotifications(): vo
     expect(notifications[0].text).toContain("2 tiles");
     expect(notifications[0].text).toContain("0 collection issues");
     delete files["collection.yaml"];
-    await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
+    await reloadTiles(page);
     await expectMessageCount(page, "Errors", 1);
     await expectMessages(
       page,
@@ -826,4 +842,317 @@ test.describe("Messages from the mod in the stage bar", function describeModMess
       await expect(messagePopover(page, "Notifications")).toHaveCount(0);
     },
   );
+});
+
+/*
+ * The swap flows and the width ladder run on the e2e build whose catalog
+ * lists the tiles mod and the labels mosaic. The typed probe and its notes
+ * are recently used, so the lists also offer them, marked "Recent".
+ */
+
+/** The typed probe's mod file and its notes collection, on the test catalog's origin. */
+const PROBE_SOURCE = `${TEST_CATALOG_PREVIEW_URL}/test-mods/probe/mod_conf.yaml`;
+const NOTES_SOURCE = `${TEST_CATALOG_PREVIEW_URL}/test-mods/collection.yaml`;
+const LABELS_MOSAIC_SOURCE = `${TEST_CATALOG_PREVIEW_URL}${LABELS_MOSAIC_PATH}`;
+
+/** Runs in the page before the app: the typed probe and its notes are recently used. */
+function storeRecentProbe(sources: { mod: string; collection: string }): void {
+  localStorage.setItem(
+    "opentesela.recently-used",
+    JSON.stringify({
+      mods: [sources.mod],
+      collections: [sources.collection],
+      mosaics: [],
+    }),
+  );
+}
+
+/** The labels mosaic, the tiles mod and the typed probe with its notes, with the mosaic's `show` line. */
+function buildSwapFiles(): ModFiles {
+  const files: ModFiles = {
+    ...buildLabelsMosaicFiles(),
+    ...buildTypedProbeFiles(),
+    "collection.yaml": buildNoteCollection([]),
+  };
+  files["mosaics/labels.yaml"] = [
+    files["mosaics/labels.yaml"],
+    "  permissions:",
+    "    show:",
+    `      - host: "${COVER_HOST}"`,
+    '        reason: "Shows the labels\' images"',
+  ].join("\n");
+  return files;
+}
+
+/** Opens the labels mosaic on the test catalog's app, with the probe recently used, and waits for the tiles mod. */
+async function openSwapMosaic(
+  page: Page,
+  files: ModFiles = buildSwapFiles(),
+): Promise<void> {
+  await page.addInitScript(storeRecentProbe, {
+    mod: PROBE_SOURCE,
+    collection: NOTES_SOURCE,
+  });
+  await serveTilesMod(page, files);
+  await page.goto(`${TEST_CATALOG_PREVIEW_URL}/${LABELS_MOSAIC_HASH}`);
+  await waitForProbe(await findModFrame(page, TILES_TITLE));
+}
+
+function capsule(page: Page, name: string): Locator {
+  return stageBar(page).getByRole("button", { name });
+}
+
+/** Opens the list of the capsule `name`, and chooses the entry that says `text`. */
+async function chooseInList(
+  page: Page,
+  name: string,
+  text: string,
+): Promise<void> {
+  await capsule(page, name).click();
+  const list = page.locator("[data-slot=popover-content]");
+  await list.getByRole("option").filter({ hasText: text }).click();
+  await expect(list).toHaveCount(0);
+}
+
+function readRunParams(page: Page): URLSearchParams {
+  const hash = new URL(page.url()).hash;
+  const params = new URLSearchParams(hash.slice(hash.indexOf("?") + 1));
+  return params;
+}
+
+/** Chooses the probe in the mosaic's mod list and waits for its frame. */
+async function swapToProbe(page: Page): Promise<void> {
+  await chooseInList(page, `Mod: ${TILES_TITLE} ${TILES_VERSION}`, "probe");
+  await waitForProbe(await findModFrame(page, "probe"));
+}
+
+test.describe("Swapping combinations", function describeSwaps(): void {
+  test("Book List on the laureates' map data", async function swapsMod({
+    page,
+  }): Promise<void> {
+    await openSwapMosaic(page);
+
+    await swapToProbe(page);
+
+    const params = readRunParams(page);
+    expect(params.get("mod")).toBe(PROBE_SOURCE);
+    expect(params.get("sites")).toBe(LABELS_MOSAIC_SOURCE);
+    expect(params.get("mosaic")).toBeNull();
+    await expect(capsule(page, "Collection: Labelled tiles")).toBeVisible();
+    await expect(capsule(page, "Mosaic: Unsaved combination")).toBeVisible();
+  });
+
+  test("Kept covers, then Stop using them", async function keepsSites({
+    page,
+  }): Promise<void> {
+    await openSwapMosaic(page);
+    await swapToProbe(page);
+
+    const chip = capsule(page, `Sites from ${LABELS_MOSAIC_TITLE}`);
+    await expect(chip).toHaveText("1");
+    await chip.click();
+    const popover = page.locator("[data-slot=popover-content]");
+    await expect(popover).toContainText(COVER_HOST);
+    await expect(popover).toContainText("Granted");
+    await popover
+      .getByRole("button", { name: "Stop using these sites" })
+      .click();
+    await waitForProbe(await findModFrame(page, "probe"));
+
+    expect(readRunParams(page).get("sites")).toBeNull();
+    expect(readRunParams(page).get("mod")).toBe(PROBE_SOURCE);
+    await expect(
+      stageBar(page).getByRole("button", { name: /^Sites from / }),
+    ).toHaveCount(0);
+  });
+
+  test("Back to the previous combination", async function goesBack({
+    page,
+  }): Promise<void> {
+    await openSwapMosaic(page);
+    await swapToProbe(page);
+
+    await page.goBack();
+
+    await expect(capsule(page, `Mosaic: ${LABELS_MOSAIC_TITLE}`)).toBeVisible();
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
+    expect(readRunParams(page).get("mosaic")).not.toBeNull();
+  });
+
+  test("Other collection for the same mod, then None", async function swapsCollection({
+    page,
+  }): Promise<void> {
+    await openSwapMosaic(page);
+    await swapToProbe(page);
+
+    await chooseInList(page, "Collection: Labelled tiles", "Probe notes");
+    await waitForProbe(await findModFrame(page, "probe"));
+
+    expect(readRunParams(page).get("sites")).toBeNull();
+    expect(readRunParams(page).get("collection")).toBe(NOTES_SOURCE);
+    await expect(capsule(page, "Collection: Probe notes")).toBeVisible();
+
+    await chooseInList(page, "Collection: Probe notes", "None");
+    await waitForProbe(await findModFrame(page, "probe"));
+
+    expect(readRunParams(page).get("collection")).toBeNull();
+    await expect(capsule(page, "Collection: None")).toBeVisible();
+  });
+
+  test("Other combination", async function swapsMosaic({
+    page,
+  }): Promise<void> {
+    await openSwapMosaic(page);
+    await swapToProbe(page);
+    await chooseInList(page, "Collection: Labelled tiles", "Probe notes");
+    await waitForProbe(await findModFrame(page, "probe"));
+
+    await chooseInList(
+      page,
+      "Mosaic: Unsaved combination",
+      LABELS_MOSAIC_TITLE,
+    );
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
+
+    await expect(
+      capsule(page, `Mod: ${TILES_TITLE} ${TILES_VERSION}`),
+    ).toBeVisible();
+    await expect(capsule(page, "Collection: Labelled tiles")).toBeVisible();
+    await expect(capsule(page, `Mosaic: ${LABELS_MOSAIC_TITLE}`)).toBeVisible();
+  });
+});
+
+/** Gives the stage bar `width` pixels, as a window of that size would. */
+async function setBarWidth(page: Page, width: number): Promise<void> {
+  await stageBar(page).evaluate(applyBarWidth, width);
+}
+
+function applyBarWidth(bar: HTMLElement, width: number): void {
+  bar.style.width = `${width}px`;
+  bar.style.alignSelf = "flex-start";
+}
+
+/** Whether an element's text is cut: wider than its box. */
+function isCut(element: HTMLElement): boolean {
+  return element.scrollWidth > element.clientWidth;
+}
+
+/** The title of a capsule: its first text, after the icon. */
+function capsuleTitle(page: Page, name: string): Locator {
+  return capsule(page, name).locator("span").first();
+}
+
+/** How far the close button's right edge is from the bar's. */
+async function readCloseOffset(page: Page): Promise<number> {
+  const barBox = await readBox(stageBar(page));
+  const closeBox = await readBox(closeButton(page));
+  return barBox.x + barBox.width - (closeBox.x + closeBox.width);
+}
+
+const MOD_CAPSULE = `Mod: ${TILES_TITLE} ${TILES_VERSION}`;
+const MOSAIC_CAPSULE = `Mosaic: ${LABELS_MOSAIC_TITLE}`;
+const COLLECTION_CAPSULE = "Collection: Labelled tiles";
+
+test.describe("The bar folds as it narrows", function describeLadder(): void {
+  test("Long collection title", async function cutsCollection({
+    page,
+  }): Promise<void> {
+    const longTitle =
+      "Labelled tiles of a collection whose title is much longer than a capsule";
+    const files = buildSwapFiles();
+    files[LABELS_COLLECTION_FILE] = buildLabelsCollection().replace(
+      "Labelled tiles",
+      longTitle,
+    );
+    await openSwapMosaic(page, files);
+    await setBarWidth(page, 1100);
+    const collectionName = `Collection: ${longTitle}`;
+
+    const collectionTitle = capsuleTitle(page, collectionName);
+    expect(await collectionTitle.evaluate(isCut)).toBe(true);
+    expect(await capsuleTitle(page, MOD_CAPSULE).evaluate(isCut)).toBe(false);
+    expect(await capsuleTitle(page, MOSAIC_CAPSULE).evaluate(isCut)).toBe(
+      false,
+    );
+    expect(
+      (await readBox(capsule(page, collectionName))).width,
+    ).toBeLessThanOrEqual(256);
+    await capsule(page, collectionName).hover();
+    await expect(page.getByRole("tooltip")).toContainText(longTitle);
+  });
+
+  test("Each step of the ladder", async function foldsBar({
+    page,
+  }): Promise<void> {
+    await openSwapMosaic(page);
+    const version = capsule(page, MOD_CAPSULE).getByText(TILES_VERSION);
+
+    await setBarWidth(page, 1100);
+    await expect(version).toBeVisible();
+    const wideOffset = await readCloseOffset(page);
+
+    await setBarWidth(page, 800);
+    await expect(version).toBeHidden();
+    await expect(capsuleTitle(page, MOD_CAPSULE)).toBeVisible();
+    expect(await readCloseOffset(page)).toBe(wideOffset);
+
+    await setBarWidth(page, 600);
+    await expect(capsuleTitle(page, MOD_CAPSULE)).toBeHidden();
+    await expect(capsuleTitle(page, COLLECTION_CAPSULE)).toBeHidden();
+    await expect(capsule(page, MOD_CAPSULE)).toBeVisible();
+    await expect(capsule(page, COLLECTION_CAPSULE)).toBeVisible();
+    await expect(capsuleTitle(page, MOSAIC_CAPSULE)).toBeVisible();
+    expect(await readCloseOffset(page)).toBe(wideOffset);
+
+    await setBarWidth(page, 400);
+    await expect(capsule(page, MOSAIC_CAPSULE)).toBeHidden();
+    const folded = capsule(page, `Combination: ${LABELS_MOSAIC_TITLE}`);
+    await expect(folded).toBeVisible();
+    expect(await readCloseOffset(page)).toBe(wideOffset);
+  });
+
+  test("Phone width", async function opensFoldedMenu({ page }): Promise<void> {
+    await openSwapMosaic(page);
+    await setBarWidth(page, 400);
+
+    await capsule(page, `Combination: ${LABELS_MOSAIC_TITLE}`).click();
+    await page.getByRole("menuitem", { name: "Collection" }).click();
+
+    const list = page.locator("[data-slot=popover-content]");
+    await expect(list.getByRole("option").first()).toHaveText("None");
+    await expect(page.getByRole("combobox")).toBeFocused();
+    await expectUnder(
+      list,
+      capsule(page, `Combination: ${LABELS_MOSAIC_TITLE}`),
+    );
+  });
+});
+
+/** Checks that `list` opens right under `trigger`, starting at its left edge. */
+async function expectUnder(list: Locator, trigger: Locator): Promise<void> {
+  await expect(list).toBeVisible();
+  // The list zooms in as it opens, so its box is read once it settled.
+  await list.evaluate(finishAnimations);
+  const listBox = await readBox(list);
+  const triggerBox = await readBox(trigger);
+  expect(Math.abs(listBox.x - triggerBox.x)).toBeLessThan(4);
+  expect(listBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height);
+  expect(listBox.y).toBeLessThan(triggerBox.y + triggerBox.height + 16);
+}
+
+test.describe("Each capsule opens a list", function describeListPlace(): void {
+  test("Each list opens under its capsule", async function opensUnder({
+    page,
+  }): Promise<void> {
+    await openSwapMosaic(page);
+    await setBarWidth(page, 1100);
+    const list = page.locator("[data-slot=popover-content]");
+
+    for (const name of [MOD_CAPSULE, COLLECTION_CAPSULE, MOSAIC_CAPSULE]) {
+      await capsule(page, name).click();
+      await expectUnder(list, capsule(page, name));
+      await page.keyboard.press("Escape");
+      await expect(list).toHaveCount(0);
+    }
+  });
 });

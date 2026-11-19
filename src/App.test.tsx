@@ -11,6 +11,8 @@ function renderApp(fixture: AppFixture): RenderResult {
   return render(
     <App
       stage={fixture.stage}
+      combinations={fixture.combinations}
+      recentlyUsed={fixture.recentlyUsed}
       appTheme={fixture.appTheme}
       sections={fixture.sections}
       switches={fixture.switches}

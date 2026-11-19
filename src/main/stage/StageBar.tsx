@@ -1,5 +1,5 @@
-import { Info, Maximize, RectangleHorizontal, RotateCw, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Maximize, RectangleHorizontal, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Badge } from "@/vendor/shadcn/ui/badge.tsx";
 import {
@@ -12,14 +12,19 @@ import {
   clearNotifications,
   closeSandbox,
   dismissMessage,
+  isCombinationSandbox,
   markMessagesRead,
-  reloadTiles,
 } from "../../lib/core/stage/index.ts";
-import type {
-  MessageLevel,
-  SandboxSnapshot,
-  Stage,
-} from "../../lib/core/stage/index.ts";
+import type { SandboxSnapshot, Stage } from "../../lib/core/stage/index.ts";
+import type { CombinationCatalog } from "../../lib/core/combinations/index.ts";
+import {
+  readRecentlyUsedSnapshot,
+  subscribeRecentlyUsed,
+} from "../settings/recently_used.ts";
+import type { RecentlyUsed } from "../settings/recently_used.ts";
+import { useStoreSnapshot } from "../use_store_snapshot.ts";
+import { readModCapsuleTitle } from "./capsule_titles.ts";
+import { CombinationTitle } from "./CombinationTitle.tsx";
 import { keepFocusInFrame, listenForFrameFocus } from "./frame_focus.ts";
 import { followAttention, startAttention } from "./message_attention.ts";
 import type { MessageAttention } from "./message_attention.ts";
@@ -30,16 +35,23 @@ import {
 import type { MessageLevelView } from "./message_level_views.ts";
 import { MessageButton } from "./MessageButton.tsx";
 import { MessagePopover } from "./MessagePopover.tsx";
-import { ModInfoPopover } from "./ModInfoPopover.tsx";
-import { ShareMenu } from "./ShareMenu.tsx";
+import { MoreActionsMenu } from "./MoreActionsMenu.tsx";
+import { SitesChip } from "./SitesChip.tsx";
+import { isMessageLevelPanel } from "./stage_bar_panels.ts";
+import type { StageBarPanel } from "./stage_bar_panels.ts";
 import { StageBarIconButton } from "./StageBarIconButton.tsx";
 import { changeTheaterMode } from "./theater_setting.ts";
+import { reloadSandboxTiles } from "./tile_reload.ts";
 import type { TheaterSetting } from "./theater_setting.ts";
 import { recordUnreadMarks } from "./unread_marks.ts";
 import type { UnreadMarks } from "./unread_marks.ts";
 
 interface StageBarProps {
   stage: Stage;
+  /** The summaries and counts of the stage bar's lists. */
+  combinations: CombinationCatalog;
+  /** The mods, collections and mosaics tried in combination sandboxes. */
+  recentlyUsed: RecentlyUsed;
   sandbox: SandboxSnapshot;
   /** Whether theater mode is on: the stage snapshot's `isTheaterMode`. */
   isTheaterMode: boolean;
@@ -48,9 +60,6 @@ interface StageBarProps {
   /** Shows the sandbox's frame fullscreen. Called during the click. */
   onFullscreen: (sandboxId: string) => void;
 }
-
-/** The stage bar's popovers and menus: one per message level, the information popover and the Share menu. */
-type StageBarPanel = MessageLevel | "mod-info" | "share";
 
 /** The open popover or menu, and the sandbox it was opened for, so it closes when another sandbox is shown. */
 interface OpenPanel {
@@ -63,10 +72,6 @@ interface OpenPanel {
 /** The popovers line up under the bar's right side, and stay within the viewport. */
 const POPOVER_CLASSES = "w-96 max-w-[calc(100vw-2rem)]";
 
-function isMessageLevelPanel(panel: StageBarPanel): panel is MessageLevel {
-  return panel !== "mod-info" && panel !== "share";
-}
-
 /**
  * Marks read the level of a popover that closes, for the messages that
  * arrived while it was open. Run by the effect of the open popover when it
@@ -78,95 +83,74 @@ function markClosedLevelRead(stage: Stage, openPanel: OpenPanel): void {
   }
 }
 
+/** The open panel after `panel` closed: `null` when it was the open one, the open one otherwise. */
+function closePanel(
+  panel: StageBarPanel,
+  current: OpenPanel | null,
+): OpenPanel | null {
+  return current?.panel === panel ? null : current;
+}
+
 /** The fullscreen button needs a frame: only a running mod has one. */
 function hasModFrame(sandbox: SandboxSnapshot): boolean {
   return sandbox.status === "running" && sandbox.sandboxDocument !== null;
 }
 
-function isSandboxLoading(sandbox: SandboxSnapshot): boolean {
-  return sandbox.status === "loading" || sandbox.status === "asking";
-}
-
 /**
- * The mod's name and version once its mod file is loaded, even when the
- * sandbox failed later, in muted text after a mosaic's title. Before that,
- * "Loading mod…", or "Mod not loaded" when it failed or stopped first.
+ * The plain title of a sandbox that is not a combination, such as an
+ * explorer or a viewer: the mod's name and version once its mod file is
+ * loaded, "Loading mod…" before, or "Mod not loaded" when it failed first.
  */
-function renderModName(
-  sandbox: SandboxSnapshot,
-  isAfterMosaic: boolean,
-): ReactElement {
-  if (sandbox.mod !== null) {
-    const title = isAfterMosaic ? (
-      <span className="truncate text-muted-foreground">
-        {sandbox.mod.title}
-      </span>
-    ) : (
-      <strong className="truncate font-semibold">{sandbox.mod.title}</strong>
-    );
+function renderPlainTitle(sandbox: SandboxSnapshot): ReactElement {
+  const modTitle = readModCapsuleTitle(sandbox);
+  if (modTitle.version === undefined) {
     return (
-      <>
-        {title}
-        <Badge variant="outline" className="tabular-nums">
-          {sandbox.mod.version}
-        </Badge>
-      </>
-    );
-  }
-  return (
-    <span className="truncate text-muted-foreground">
-      {isSandboxLoading(sandbox) ? "Loading mod…" : "Mod not loaded"}
-    </span>
-  );
-}
-
-/**
- * For a mosaic link, the mosaic's title before the mod's name once the
- * mosaic file is loaded. Before that, "Loading mosaic…", or "Mosaic not
- * loaded" when it failed or stopped first. For a mod link, the mod's name.
- */
-function renderSandboxName(sandbox: SandboxSnapshot): ReactElement {
-  if (sandbox.mosaicReference === null) {
-    return renderModName(sandbox, false);
-  }
-  if (sandbox.mosaic === null) {
-    return (
-      <span className="truncate text-muted-foreground">
-        {isSandboxLoading(sandbox) ? "Loading mosaic…" : "Mosaic not loaded"}
-      </span>
+      <span className="truncate text-muted-foreground">{modTitle.title}</span>
     );
   }
   return (
     <>
-      <strong className="truncate font-semibold">{sandbox.mosaic.title}</strong>
-      {renderModName(sandbox, true)}
+      <strong className="truncate font-semibold">{modTitle.title}</strong>
+      <Badge variant="outline" className="tabular-nums">
+        {modTitle.version}
+      </Badge>
     </>
   );
 }
 
 /**
- * The visible sandbox's bar, in one row above its frame. On the left: the
- * mosaic's title for a mosaic, the mod's name and version, the information
- * button, the Share button and "Reload tiles". On the right: the errors, warnings and notifications
- * buttons, a separator, the theater mode toggle, the fullscreen button while
- * the mod runs in its frame, then, when the sandbox has a close button, a
- * separator and the close button (×). Each button opens its
- * popover or menu, drawn by the app outside every mod frame, which closes on
- * a click outside it, in the mod's frame too. Opening a level marks it read,
- * marks its unread items while it is open, and closing it marks read what
- * arrived meanwhile. A level whose newest message arrives while it is
- * shown flashes, and a new error, like the Share menu's "Link copied", is
+ * The visible sandbox's bar, in one row above its frame, a container whose
+ * width folds its left side. On the left: for a combination sandbox, the
+ * capsules mod + collection -> mosaic, each opening its list, then the Sites
+ * chip for a sandbox with `sites`; for any other sandbox, the mod's name and
+ * version; then the "More actions" menu. On the right: the errors, warnings
+ * and notifications buttons, a separator, the theater mode toggle, the
+ * fullscreen button while the mod runs in its frame, then, when the sandbox
+ * has a close button, a separator and the close button (×). Each button
+ * opens its popover, menu or list, drawn by the app outside every mod frame,
+ * which closes on a click outside it, in the mod's frame too. Opening a
+ * level marks it read, marks its unread items while it is open, and closing
+ * it marks read what arrived meanwhile. A level whose newest message arrives
+ * while it is shown flashes, and a new error, like "Link copied", is
  * announced politely.
  */
 export function StageBar({
   stage,
+  combinations,
+  recentlyUsed,
   sandbox,
   isTheaterMode,
   theater,
   onFullscreen,
 }: StageBarProps): ReactElement {
   const [openPanel, setOpenPanel] = useState<OpenPanel | null>(null);
-  const [shareFeedback, setShareFeedback] = useState("");
+  const [copyFeedback, setCopyFeedback] = useState("");
+  const leftSideRef = useRef<HTMLDivElement>(null);
+  const recent = useStoreSnapshot(
+    recentlyUsed,
+    subscribeRecentlyUsed,
+    readRecentlyUsedSnapshot,
+  );
   // Another sandbox shown closes the open popover or menu, while rendering as for the attention.
   if (openPanel !== null && openPanel.sandboxId !== sandbox.id) {
     setOpenPanel(null);
@@ -198,9 +182,17 @@ export function StageBar({
     return openPanel?.sandboxId === sandbox.id && openPanel.panel === panel;
   }
 
+  const visiblePanel =
+    openPanel?.sandboxId === sandbox.id ? openPanel.panel : null;
+  const isCombination = isCombinationSandbox(sandbox.link, [
+    ...stage.catalog.mods,
+    ...recent.mods,
+  ]);
+
   function handlePanelOpenChange(panel: StageBarPanel, isOpen: boolean): void {
     if (!isOpen) {
-      setOpenPanel(null);
+      // Only that panel closes: the folded menu closes after its row opened a list.
+      setOpenPanel(closePanel.bind(undefined, panel));
       return;
     }
     if (!isMessageLevelPanel(panel)) {
@@ -214,8 +206,8 @@ export function StageBar({
     setOpenPanel({ sandboxId: sandbox.id, panel, unreadMarks });
   }
 
-  function handleReloadClick(): void {
-    void reloadTiles(stage, sandbox.id);
+  function handleReloadTiles(): void {
+    void reloadSandboxTiles(stage, combinations, sandbox);
   }
 
   function handleTheaterClick(): void {
@@ -281,39 +273,40 @@ export function StageBar({
 
   return (
     <section
-      className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1 text-card-foreground"
+      className="@container flex items-center gap-2 rounded-lg border bg-card px-3 py-1 text-card-foreground"
       aria-label="Stage bar"
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        {renderSandboxName(sandbox)}
-        <Popover
-          open={isPanelOpen("mod-info")}
-          onOpenChange={handlePanelOpenChange.bind(undefined, "mod-info")}
-        >
-          <PopoverTrigger asChild>
-            <StageBarIconButton label="Mod information">
-              <Info />
-            </StageBarIconButton>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            className={POPOVER_CLASSES}
-            onCloseAutoFocus={keepFocusInFrame}
-          >
-            <ModInfoPopover sandbox={sandbox} />
-          </PopoverContent>
-        </Popover>
-        <ShareMenu
+      <div ref={leftSideRef} className="flex min-w-0 flex-1 items-center gap-2">
+        {isCombination ? (
+          <CombinationTitle
+            stage={stage}
+            sandbox={sandbox}
+            combinations={combinations}
+            recentlyUsed={recentlyUsed}
+            openPanel={visiblePanel}
+            onPanelOpenChange={handlePanelOpenChange}
+            anchorRef={leftSideRef}
+          />
+        ) : (
+          renderPlainTitle(sandbox)
+        )}
+        {sandbox.sites === null ? null : (
+          <SitesChip
+            stage={stage}
+            sandbox={sandbox}
+            sites={sandbox.sites}
+            isOpen={isPanelOpen("sites")}
+            onOpenChange={handlePanelOpenChange.bind(undefined, "sites")}
+          />
+        )}
+        <MoreActionsMenu
           hash={sandbox.hash}
-          isOpen={isPanelOpen("share")}
-          onOpenChange={handlePanelOpenChange.bind(undefined, "share")}
-          onFeedbackChange={setShareFeedback}
+          canReloadTiles={sandbox.canReloadTiles}
+          onReloadTiles={handleReloadTiles}
+          isOpen={isPanelOpen("more")}
+          onOpenChange={handlePanelOpenChange.bind(undefined, "more")}
+          onFeedbackChange={setCopyFeedback}
         />
-        {sandbox.canReloadTiles ? (
-          <StageBarIconButton label="Reload tiles" onClick={handleReloadClick}>
-            <RotateCw />
-          </StageBarIconButton>
-        ) : null}
       </div>
       {/* The gap leaves room for a `99+` capsule, which sticks out of its button's corner. */}
       <div className="flex shrink-0 items-center gap-3">
@@ -352,7 +345,7 @@ export function StageBar({
       </div>
       <p className="sr-only" aria-live="polite">
         <span>{attention.announcement}</span>
-        <span>{shareFeedback}</span>
+        <span>{copyFeedback}</span>
       </p>
     </section>
   );

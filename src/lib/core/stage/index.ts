@@ -18,8 +18,10 @@ export {
   frameLoadedAgain,
   markMessagesRead,
   markStageActionPlaying,
+  openStageCombination,
   openStageLink,
   openStageSection,
+  readStageCatalog,
   readStageSnapshot,
   reloadTiles,
   subscribeStage,
@@ -29,7 +31,10 @@ export type {
   ActionSnapshot,
   CheckSnapshot,
   MessageSnapshot,
+  MosaicShowLine,
+  SandboxLink,
   SandboxSnapshot,
+  SitesLine,
   SiteConsentLine,
   Stage,
   StageOptions,
@@ -49,8 +54,22 @@ export type {
   MessageLevel,
   MessageProducer,
 } from "./stage_messages.ts";
+export {
+  buildCollectionChoice,
+  buildModChoice,
+  buildMosaicChoice,
+  buildSitesDrop,
+  isCombinationSandbox,
+  NO_COLLECTION,
+} from "./combination_links.ts";
+export type { CollectionChoice } from "./combination_links.ts";
 export type { StageHistory } from "./stage_history.ts";
 export type { FrameLayout } from "./stage_layout.ts";
 export { buildSectionHash } from "./stage_routes.ts";
 export type { SectionLink, StageHome, StageRouting } from "./stage_routes.ts";
-export type { SandboxStatus, SiteConsentAnswer } from "./stage_sandboxes.ts";
+export type {
+  LoadedFileEntry,
+  LoadedFileKind,
+  SandboxStatus,
+  SiteConsentAnswer,
+} from "./stage_sandboxes.ts";

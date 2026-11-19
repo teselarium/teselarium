@@ -9,6 +9,7 @@ import { SETTINGS_SECTION_ID } from "../sections/section_registry.ts";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import type { SectionSwitches } from "../sections/section_switches.ts";
 import type { PlayerSites } from "../settings/player_sites.ts";
+import type { RecentlyUsed } from "../settings/recently_used.ts";
 import type { SiteDecisions } from "../settings/site_decisions.ts";
 import { SettingsPage } from "../settings/SettingsPage.tsx";
 import type { CatalogSetting } from "../settings/catalog_setting.ts";
@@ -26,6 +27,7 @@ interface PageViewProps {
   switches: SectionSwitches;
   tileMedia: TileMediaSetting;
   catalogSetting: CatalogSetting;
+  recentlyUsed: RecentlyUsed;
   siteDecisions: SiteDecisions;
   playerSites: PlayerSites;
 }
@@ -54,6 +56,7 @@ export function PageView({
   switches,
   tileMedia,
   catalogSetting,
+  recentlyUsed,
   siteDecisions,
   playerSites,
 }: PageViewProps): ReactElement | null {
@@ -79,6 +82,7 @@ export function PageView({
         switches={switches}
         tileMedia={tileMedia}
         catalogSetting={catalogSetting}
+        recentlyUsed={recentlyUsed}
         siteDecisions={siteDecisions}
         playerSites={playerSites}
       />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import { Alert, AlertDescription } from "@/vendor/shadcn/ui/alert.tsx";
+import type { CombinationCatalog } from "../../lib/core/combinations/index.ts";
 import {
   answerApiMismatch,
   answerSiteConsent,
@@ -18,6 +19,7 @@ import type {
   StageSnapshot,
 } from "../../lib/core/stage/index.ts";
 import type { PlayerSites } from "../settings/player_sites.ts";
+import type { RecentlyUsed } from "../settings/recently_used.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { ActionDialog } from "./ActionDialog.tsx";
 import type { QuestionSnapshot } from "./ActionDialog.tsx";
@@ -38,6 +40,10 @@ import "./stage.css";
 
 interface StageViewProps {
   stage: Stage;
+  /** The summaries and counts of the stage bar's lists. */
+  combinations: CombinationCatalog;
+  /** The mods, collections and mosaics tried in combination sandboxes. */
+  recentlyUsed: RecentlyUsed;
   /** The sites the user always plays from, which the player dialog reads and remembers. */
   playerSites: PlayerSites;
   /** Theater mode, which the stage bar's button turns on and off. */
@@ -172,6 +178,8 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
  */
 export function StageView({
   stage,
+  combinations,
+  recentlyUsed,
   playerSites,
   theater,
 }: StageViewProps): ReactElement {
@@ -246,6 +254,8 @@ export function StageView({
       {visibleSandbox === null ? null : (
         <StageBar
           stage={stage}
+          combinations={combinations}
+          recentlyUsed={recentlyUsed}
           sandbox={visibleSandbox}
           isTheaterMode={snapshot.isTheaterMode}
           theater={theater}

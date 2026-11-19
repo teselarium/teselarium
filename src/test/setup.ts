@@ -36,3 +36,10 @@ function capturePointer(this: Element): void {
 // The sidebar's resize handle captures the pointer. Capture is checked in Playwright.
 Element.prototype.setPointerCapture ??= capturePointer;
 Element.prototype.releasePointerCapture ??= capturePointer;
+
+function scrollNowhere(): void {
+  // jsdom lays nothing out, so there is nothing to scroll.
+}
+
+// cmdk scrolls the selected entry of a list into view. Scrolling is checked in Playwright.
+Element.prototype.scrollIntoView ??= scrollNowhere;

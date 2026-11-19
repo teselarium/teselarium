@@ -4,17 +4,19 @@ import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { TooltipProvider } from "@/vendor/shadcn/ui/tooltip.tsx";
-import { ShareMenu } from "./ShareMenu.tsx";
+import { MoreActionsMenu } from "./MoreActionsMenu.tsx";
 
 const RUN_HASH =
   "#/run?mod=./mods/book_list&collection=./books/collection.yaml";
 
 let writeText: Mock<(text: string) => Promise<void>>;
+let onReloadTiles: Mock<() => void>;
 
 beforeEach(function stubClipboard(): void {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   writeText = vi.fn<(text: string) => Promise<void>>();
   writeText.mockResolvedValue(undefined);
+  onReloadTiles = vi.fn<() => void>();
   vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
 });
 
@@ -23,14 +25,22 @@ afterEach(function restore(): void {
   vi.unstubAllGlobals();
 });
 
-/** The Share menu as the stage bar holds it: its open state, and the feedback it reports. */
-function ShareMenuHarness(): ReactElement {
+interface HarnessProps {
+  canReloadTiles?: boolean;
+}
+
+/** The menu as the stage bar holds it: its open state, and the feedback it reports. */
+function MoreActionsHarness({
+  canReloadTiles = true,
+}: HarnessProps): ReactElement {
   const [isOpen, setIsOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   return (
     <TooltipProvider>
-      <ShareMenu
+      <MoreActionsMenu
         hash={RUN_HASH}
+        canReloadTiles={canReloadTiles}
+        onReloadTiles={onReloadTiles}
         isOpen={isOpen}
         onOpenChange={setIsOpen}
         onFeedbackChange={setFeedback}
@@ -40,12 +50,12 @@ function ShareMenuHarness(): ReactElement {
   );
 }
 
-function findShareButton(): HTMLElement {
-  return screen.getByRole("button", { name: "Share" });
+function findMoreButton(): HTMLElement {
+  return screen.getByRole("button", { name: "More actions" });
 }
 
 function openMenu(): void {
-  fireEvent.keyDown(findShareButton(), { key: "Enter" });
+  fireEvent.keyDown(findMoreButton(), { key: "Enter" });
 }
 
 async function chooseCopyLink(): Promise<void> {
@@ -61,26 +71,46 @@ function readTooltip(): string {
   return screen.getByRole("tooltip").textContent ?? "";
 }
 
-describe("ShareMenu", function describeShareMenu(): void {
-  it("has a Share button named and titled Share", function namesButton(): void {
-    render(<ShareMenuHarness />);
+describe("MoreActionsMenu", function describeMoreActionsMenu(): void {
+  it("has a button named and titled More actions", function namesButton(): void {
+    render(<MoreActionsHarness />);
 
-    expect(findShareButton()).toBeInTheDocument();
+    expect(findMoreButton()).toBeInTheDocument();
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
   it("Keyboard", function opensWithKeyboard(): void {
-    render(<ShareMenuHarness />);
+    render(<MoreActionsHarness />);
 
     openMenu();
 
     const item = screen.getByRole("menuitem", { name: "Copy link" });
-    expect(screen.getAllByRole("menuitem")).toEqual([item]);
+    expect(screen.getAllByRole("menuitem")[0]).toBe(item);
     expect(item).toHaveFocus();
   });
 
+  it("Reload tiles", function reloadsTiles(): void {
+    render(<MoreActionsHarness />);
+    openMenu();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reload tiles" }));
+
+    expect(onReloadTiles).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("No collection", function hidesReload(): void {
+    render(<MoreActionsHarness canReloadTiles={false} />);
+
+    openMenu();
+
+    expect(screen.getAllByRole("menuitem")).toEqual([
+      screen.getByRole("menuitem", { name: "Copy link" }),
+    ]);
+  });
+
   it("Copy the link", async function copiesLink(): Promise<void> {
-    render(<ShareMenuHarness />);
+    render(<MoreActionsHarness />);
 
     await chooseCopyLink();
 
@@ -90,12 +120,12 @@ describe("ShareMenu", function describeShareMenu(): void {
     );
     expect(screen.queryByRole("menu")).toBeNull();
     expect(readTooltip()).toBe("Link copied");
-    expect(findShareButton()).toHaveAccessibleName("Share");
+    expect(findMoreButton()).toHaveAccessibleName("More actions");
     expect(screen.getByTestId("feedback")).toHaveTextContent("Link copied");
   });
 
   it("says Link copied for 2 seconds", async function endsFeedback(): Promise<void> {
-    render(<ShareMenuHarness />);
+    render(<MoreActionsHarness />);
     await chooseCopyLink();
 
     await act(async function waitAlmost(): Promise<void> {
@@ -112,7 +142,7 @@ describe("ShareMenu", function describeShareMenu(): void {
 
   it("Copy refused", async function showsFailure(): Promise<void> {
     writeText.mockRejectedValue(new Error("Not allowed"));
-    render(<ShareMenuHarness />);
+    render(<MoreActionsHarness />);
 
     await chooseCopyLink();
 
@@ -124,7 +154,7 @@ describe("ShareMenu", function describeShareMenu(): void {
 
   it("says Cannot copy the link without a clipboard", async function showsMissingClipboard(): Promise<void> {
     vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
-    render(<ShareMenuHarness />);
+    render(<MoreActionsHarness />);
 
     await chooseCopyLink();
 

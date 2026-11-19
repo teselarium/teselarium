@@ -9,6 +9,7 @@ import {
   isFrameMarked,
   markFrame,
   openMessages,
+  reloadTiles,
   routeCovers,
   stageBar,
 } from "./mod_routes.ts";
@@ -271,10 +272,6 @@ async function openSiteCard(frame: Frame): Promise<Locator> {
   const card = frame.getByRole("dialog", { name: CARD_TITLE });
   await expect(card).toBeVisible();
   return card;
-}
-
-async function reloadTiles(page: Page): Promise<void> {
-  await stageBar(page).getByRole("button", { name: "Reload tiles" }).click();
 }
 
 /** Runs in the frame: each marker on the map, with its tip and the point the map projects for it. */

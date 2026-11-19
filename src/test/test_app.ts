@@ -6,6 +6,11 @@ import { createSectionSwitches } from "../main/sections/section_switches.ts";
 import type { SectionSwitches } from "../main/sections/section_switches.ts";
 import { VANILLA_SECTIONS } from "../main/sections/vanilla_sections.ts";
 import { createPlayerSites } from "../main/settings/player_sites.ts";
+import {
+  createRecentlyUsed,
+  recordRecentlyUsed,
+} from "../main/settings/recently_used.ts";
+import type { RecentlyUsed } from "../main/settings/recently_used.ts";
 import type { PlayerSites } from "../main/settings/player_sites.ts";
 import {
   createSiteDecisions,
@@ -28,12 +33,19 @@ import type { FakeColorSchemeQuery } from "./fake_color_scheme_queries.ts";
 import { FakeHistory } from "./fake_history.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import type { MemoryStorage } from "./memory_storage.ts";
-import { buildTestStage, settleStage } from "./test_stages.ts";
+import {
+  buildTestCombinations,
+  buildTestStage,
+  settleStage,
+} from "./test_stages.ts";
+import type { CombinationCatalog } from "../lib/core/combinations/index.ts";
 
 /** Everything `App` gets, built as `main.tsx` builds it, on fakes. The site decisions and player sites use `storage`. */
 export interface AppFixture {
   history: FakeHistory;
   stage: Stage;
+  combinations: CombinationCatalog;
+  recentlyUsed: RecentlyUsed;
   appTheme: AppTheme;
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
@@ -75,6 +87,7 @@ export async function startTestApp(
   const isNarrow = options.isNarrow ?? false;
   const history = new FakeHistory(hash);
   const siteDecisions = createSiteDecisions({ storage });
+  const recentlyUsed = createRecentlyUsed({ storage });
   const stage = buildTestStage(
     history,
     options.routing ?? buildStageRouting(sections),
@@ -82,11 +95,14 @@ export async function startTestApp(
       read: readSiteDecisionsSnapshot.bind(undefined, siteDecisions),
       remember: rememberSiteDecisions.bind(undefined, siteDecisions),
     },
+    recordRecentlyUsed.bind(undefined, recentlyUsed),
   );
   const narrowQuery = createFakeColorSchemeQuery(isNarrow);
   const fixture: AppFixture = {
     history,
     stage,
+    combinations: buildTestCombinations(stage),
+    recentlyUsed,
     appTheme: createAppTheme({
       storage,
       systemQuery: createFakeColorSchemeQuery(false),

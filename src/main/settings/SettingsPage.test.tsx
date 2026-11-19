@@ -9,7 +9,10 @@ import { COMING_SOON_SECTIONS } from "../../test/registries/coming_soon_sections
 import { startTestApp } from "../../test/test_app.ts";
 import type { AppFixture } from "../../test/test_app.ts";
 import { MOD_API_VERSION } from "../../lib/core/engine/index.ts";
-import { openStageSection } from "../../lib/core/stage/index.ts";
+import {
+  openStageSection,
+  readStageSnapshot,
+} from "../../lib/core/stage/index.ts";
 import { settleStage } from "../../test/test_stages.ts";
 import type { SiteDecision } from "../../lib/core/permissions/index.ts";
 import { createMemoryStorage } from "../../test/memory_storage.ts";
@@ -21,6 +24,7 @@ import {
   SAMPLE_COVERS_PERMISSION,
 } from "../../test/sample_mods.ts";
 import { PLAYER_SITES_KEY, readPlayerSitesSnapshot } from "./player_sites.ts";
+import { recordRecentlyUsed } from "./recently_used.ts";
 import { SITE_DECISIONS_KEY } from "./site_decisions.ts";
 import { CATALOG_SETTING_KEY } from "./catalog_setting.ts";
 import { TILE_MEDIA_SETTING_KEY } from "./tile_media_setting.ts";
@@ -42,6 +46,8 @@ function renderApp(fixture: AppFixture): RenderResult {
   return render(
     <App
       stage={fixture.stage}
+      combinations={fixture.combinations}
+      recentlyUsed={fixture.recentlyUsed}
       appTheme={fixture.appTheme}
       sections={fixture.sections}
       switches={fixture.switches}
@@ -53,6 +59,22 @@ function renderApp(fixture: AppFixture): RenderResult {
       layout={fixture.layout}
     />,
   );
+}
+
+/** Records two mods and one collection as recently used. */
+function recordTriedCombinations(fixture: AppFixture): void {
+  recordRecentlyUsed(fixture.recentlyUsed, {
+    kind: "mod",
+    source: "https://example.org/mods/atlas/mod_conf.yaml",
+  });
+  recordRecentlyUsed(fixture.recentlyUsed, {
+    kind: "mod",
+    source: "https://example.org/mods/globe/mod_conf.yaml",
+  });
+  recordRecentlyUsed(fixture.recentlyUsed, {
+    kind: "collection",
+    source: "https://example.org/tiles/laureates/collection.yaml",
+  });
 }
 
 function sidebarSections(): HTMLElement {
@@ -182,7 +204,36 @@ describe("SettingsPage", function describeSettingsPage(): void {
     expect(
       screen.getByRole("switch", { name: TILE_MEDIA_LABEL }),
     ).toBeChecked();
+    expect(screen.getByText("Nothing is recently used.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
     expect(screen.getByText("No remembered decisions.")).toBeInTheDocument();
+  });
+
+  it("Count after trying combinations", async function countsRecentlyUsed(): Promise<void> {
+    const fixture = await startTestApp("#/settings");
+    recordTriedCombinations(fixture);
+
+    renderApp(fixture);
+
+    expect(
+      screen.getByText(
+        "2 mods, 1 collection and 0 mosaics are recently used, kept only on this device.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+  });
+
+  it("Clear", async function clearsRecentlyUsed(): Promise<void> {
+    const fixture = await startTestApp("#/settings");
+    recordTriedCombinations(fixture);
+    renderApp(fixture);
+    const sandboxesBefore = readStageSnapshot(fixture.stage).sandboxes;
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(screen.getByText("Nothing is recently used.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+    expect(readStageSnapshot(fixture.stage).sandboxes).toBe(sandboxesBefore);
   });
 
   it("One remembered allow", async function listsRememberedAllow(): Promise<void> {

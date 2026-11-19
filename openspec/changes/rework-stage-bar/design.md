@@ -92,6 +92,10 @@ This change only builds links with `sites` (`buildModChoice`, `buildSitesDrop`) 
 
 Sorting happens once, when a list opens, from the counts known at that moment, and is kept in the component's state, so arriving counts never move rows. `StageBarPanel` grows to `"mod-list" | "collection-list" | "mosaic-list" | "more" | "sites"`, so the existing one-open-panel rule, the frame-focus close and the sandbox-change close cover the lists for free.
 
+Row marks are typed by kind, and each kind has one badge style, so a color keeps one meaning across the lists: "Current" is filled with the primary color (where you are), "Recent" uses the secondary fill (history), mosaic counts are `outline` (information), and "no match" is `outline` in muted text (not compatible, but not an error, so not destructive). Only a row's failure reason uses the destructive color. The text stays on every badge, so color is never the only cue. The tile-match count sits in a fixed-width, right-aligned column after the marks, so counts line up whatever marks a row has.
+
+The capsules use the sidebar's icons for the same concepts (mod `Puzzle`, collection `LayoutGrid`, mosaic `Shapes`), read from one mapping that the vanilla sections also use.
+
 ### Width ladder with container queries, both layouts rendered
 
 The bar's `<section>` becomes an `@container`. The full capsule row and the single folded capsule are both rendered. Container variants (`@max-[479px]:hidden`, `@min-[480px]:hidden`) show one of them. `display: none` removes the hidden one from the accessibility tree, so names never repeat. The version is hidden below 960px, and the mod and collection titles below 720px, with their accessible names unchanged.

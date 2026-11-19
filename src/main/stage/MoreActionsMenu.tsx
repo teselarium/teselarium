@@ -1,4 +1,4 @@
-import { Link, Share2 } from "lucide-react";
+import { Ellipsis, Link, RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import {
@@ -10,26 +10,29 @@ import {
 import { keepFocusInFrame } from "./frame_focus.ts";
 import { StageBarIconButton } from "./StageBarIconButton.tsx";
 
-interface ShareMenuProps {
+interface MoreActionsMenuProps {
   /** The sandbox's run link, such as `#/run?mod=…`. */
   hash: string;
+  /** Whether the menu holds "Reload tiles": the sandbox was opened with a collection or a tile. */
+  canReloadTiles: boolean;
+  onReloadTiles: () => void;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   /**
-   * Gets what the Share button says after a copy, then `""` once it stops
+   * Gets what the button says after a copy, then `""` once it stops
    * saying it. A stable function, such as a state setter: a new one reports
    * the feedback again and restarts its 2 seconds.
    */
   onFeedbackChange: (feedback: string) => void;
 }
 
-/** How the last "Copy link" went, while the Share button says so. */
+/** How the last "Copy link" went, while the button says so. */
 type CopyState = "idle" | "copied" | "failed";
 
-/** How long the Share button says how the copy went. */
+/** How long the button says how the copy went. */
 const COPY_FEEDBACK_MS = 2000;
 
-const SHARE_LABEL = "Share";
+const MORE_ACTIONS_LABEL = "More actions";
 
 const COPY_FEEDBACK: Readonly<Record<CopyState, string>> = Object.freeze({
   idle: "",
@@ -65,18 +68,21 @@ function scheduleFeedbackEnd(endFeedback: () => void): () => void {
 }
 
 /**
- * The Share button and its menu of the ways to share the sandbox. For now
- * the menu has "Copy link", which copies the app's full address with the run
- * link. The menu then closes, and the button's tooltip says "Link copied",
- * or "Cannot copy the link", for 2 seconds. The menu is not modal, so a
- * click in the mod's frame still reaches the mod.
+ * The "More actions" button (`…`) and its menu: "Copy link", which copies
+ * the app's full address with the run link, and, for a sandbox opened with a
+ * collection or a tile, "Reload tiles". After a copy the menu closes, and the
+ * button's tooltip says "Link copied", or "Cannot copy the link", for 2
+ * seconds. The menu is not modal, so a click in the mod's frame still
+ * reaches the mod.
  */
-export function ShareMenu({
+export function MoreActionsMenu({
   hash,
+  canReloadTiles,
+  onReloadTiles,
   isOpen,
   onOpenChange,
   onFeedbackChange,
-}: ShareMenuProps): ReactElement {
+}: MoreActionsMenuProps): ReactElement {
   const [copyState, setCopyState] = useState<CopyState>("idle");
 
   useEffect(
@@ -102,11 +108,13 @@ export function ShareMenu({
     <DropdownMenu open={isOpen} onOpenChange={onOpenChange} modal={false}>
       <DropdownMenuTrigger asChild>
         <StageBarIconButton
-          label={SHARE_LABEL}
-          tooltip={isShowingFeedback ? COPY_FEEDBACK[copyState] : SHARE_LABEL}
+          label={MORE_ACTIONS_LABEL}
+          tooltip={
+            isShowingFeedback ? COPY_FEEDBACK[copyState] : MORE_ACTIONS_LABEL
+          }
           isTooltipOpen={isShowingFeedback ? true : undefined}
         >
-          <Share2 />
+          <Ellipsis />
         </StageBarIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" onCloseAutoFocus={keepFocusInFrame}>
@@ -114,6 +122,12 @@ export function ShareMenu({
           <Link />
           Copy link
         </DropdownMenuItem>
+        {canReloadTiles ? (
+          <DropdownMenuItem onSelect={onReloadTiles}>
+            <RotateCw />
+            Reload tiles
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

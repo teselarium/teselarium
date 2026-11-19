@@ -1,12 +1,5 @@
-import {
-  BookOpen,
-  House,
-  Info,
-  LayoutGrid,
-  Puzzle,
-  Settings,
-  Shapes,
-} from "lucide-react";
+import { BookOpen, House, Info, Settings } from "lucide-react";
+import { COLLECTION_ICON, MOD_ICON, MOSAIC_ICON } from "../catalog_icons.ts";
 import type { SectionDefinition } from "./section_registry.ts";
 
 /**
@@ -28,7 +21,7 @@ export const VANILLA_SECTIONS: readonly SectionDefinition[] = [
   {
     id: "tiles",
     label: "Tiles",
-    icon: { lucide: LayoutGrid },
+    icon: { lucide: COLLECTION_ICON },
     target: {
       mod: { mod: "collection_explorer", collection: null, params: {} },
     },
@@ -39,7 +32,7 @@ export const VANILLA_SECTIONS: readonly SectionDefinition[] = [
   {
     id: "mods",
     label: "Mods",
-    icon: { lucide: Puzzle },
+    icon: { lucide: MOD_ICON },
     target: { mod: { mod: "mod_explorer", collection: null, params: {} } },
     group: "main",
     optional: true,
@@ -48,7 +41,7 @@ export const VANILLA_SECTIONS: readonly SectionDefinition[] = [
   {
     id: "mosaics",
     label: "Mosaics",
-    icon: { lucide: Shapes },
+    icon: { lucide: MOSAIC_ICON },
     target: { mod: { mod: "mosaic_explorer", collection: null, params: {} } },
     group: "main",
     optional: true,
