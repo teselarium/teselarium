@@ -6,6 +6,7 @@ import {
   findElement,
   findRequests,
   mountWithFixtureTile,
+  mountWithOpeningCollection,
   readFixtureTile,
   waitForOpen,
 } from "./case_helpers.ts";
@@ -123,6 +124,7 @@ export async function showsNoPlaceOutsideFrom(
   await context.mount({
     tiles: [tile],
     params: { from: FIXTURE_REFERENCES.tilesCollection },
+    collection: null,
   });
 
   context.expect(findRequests(context, "collections.inspect").length).toBe(1);
@@ -149,4 +151,55 @@ export async function warnsUnreadFrom(context: CaseContext): Promise<void> {
     .expect(findElement(context, "article h1").textContent)
     .toBe("Kallocain");
   context.expect(context.root.querySelector("nav")).toBe(null);
+}
+
+export async function showsPlaceInOpeningCollection(
+  context: CaseContext,
+): Promise<void> {
+  await mountWithOpeningCollection(context, "kallocain.md");
+
+  context.expect(findButton(context, "Viewer tiles")).toBeTruthy();
+  context.expect(readPosition(context)).toBe("1 of 3");
+  context.expect(findButton(context, "Previous").disabled).toBe(true);
+  context.expect(findButton(context, "Next").disabled).toBe(false);
+}
+
+/** The collections the viewer inspected, in order. */
+function listInspectedCollections(context: CaseContext): unknown[] {
+  const collections: unknown[] = [];
+  for (const request of findRequests(context, "collections.inspect")) {
+    collections.push(request.params.collection);
+  }
+  return collections;
+}
+
+export async function ignoresStaleFrom(context: CaseContext): Promise<void> {
+  await mountWithOpeningCollection(
+    context,
+    "kallocain.md",
+    FIXTURE_REFERENCES.staleCollection,
+  );
+
+  context.expect(findButton(context, "Viewer tiles")).toBeTruthy();
+  context.expect(readPosition(context)).toBe("1 of 3");
+  context
+    .expect(listInspectedCollections(context))
+    .toEqual([FIXTURE_REFERENCES.tilesCollection]);
+}
+
+export async function replacesWithNextOfOpeningCollection(
+  context: CaseContext,
+): Promise<void> {
+  await mountWithOpeningCollection(context, "kallocain.md");
+  context.answer("mods.open", null);
+
+  findButton(context, "Next").click();
+
+  const request = await waitForOpen(context);
+  context.expect(request.params).toEqual({
+    mod: "tile_viewer",
+    tile: readFixtureTile(context, "fahrenheit_451.md").source,
+    params: { from: FIXTURE_REFERENCES.tilesCollection },
+    replace: true,
+  });
 }

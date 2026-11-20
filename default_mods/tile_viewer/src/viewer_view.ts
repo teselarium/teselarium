@@ -3,18 +3,21 @@ import { describeError } from "./error_messages.ts";
 
 /**
  * What the viewer shows and opens with: the engine, the mods its config
- * names, its tile, its `from` collection, the tiles that collection lists
- * once it is inspected, and the region for errors of opening another view.
+ * names, its tile, its collection, the tiles that collection lists once it
+ * is inspected, and the region for errors of opening another view.
  */
 export interface ViewerView {
   engine: ModEngine;
   tileViewer: string;
   collectionViewer: string;
   tile: ModTile;
-  /** The `from` parameter, or `null` without one. */
-  from: string | null;
-  /** The tiles of `from`, empty until it is inspected or when it cannot be. */
-  fromTiles: string[];
+  /**
+   * The address of the viewer's collection: the one it was opened with, or
+   * else the `from` parameter, or `null` without either.
+   */
+  collection: string | null;
+  /** The tiles of `collection`, empty until it is inspected or when it cannot be. */
+  collectionTiles: string[];
   errors: HTMLElement;
 }
 

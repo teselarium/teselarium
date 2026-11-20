@@ -308,6 +308,53 @@ test.describe(
         message: "the mod is already mounted",
       });
     });
+
+    test("Check's collection", async function keepsCheckCollection({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTilesCaseFiles("tiles_context", TILES_CONTEXT_TEST_CODE),
+        "tiles_context",
+      );
+
+      expect(findCase(report, "keeps the check's collection")).toMatchObject({
+        status: "pass",
+        message: null,
+      });
+    });
+
+    test("No collection", async function mountsWithoutCollection({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTilesCaseFiles("tiles_context", TILES_CONTEXT_TEST_CODE),
+        "tiles_context",
+      );
+
+      expect(findCase(report, "mounts without a collection")).toMatchObject({
+        status: "pass",
+        message: null,
+      });
+    });
+
+    test("Invalid collection", async function rejectsInvalidCollection({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTilesCaseFiles("tiles_context", TILES_CONTEXT_TEST_CODE),
+        "tiles_context",
+      );
+
+      expect(findCase(report, "mounts with an invalid collection")).toEqual({
+        name: "mounts with an invalid collection",
+        status: "fail",
+        message:
+          'mount: "collection" must be a mapping with string "source", "title" and "description", or null',
+      });
+    });
   },
 );
 

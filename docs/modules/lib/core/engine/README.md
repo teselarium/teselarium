@@ -102,7 +102,8 @@ The second argument of `mount(engine, context)`. Plain data:
 |---|---|
 | `mod` | `source`, `title`, `version`, `description`. `name` was removed in mod API `0.1.14`. |
 | `mosaic` | `source`, `title`, `description` of the mosaic the mod was opened from (see the [mosaic module](../../mosaic/README.md)), or `null` for a mod opened from a mod link. It never holds the mosaic's `config`, `aliases` or `permissions`: the mod receives their effect in `config`, `tiles` and `permissions`. Added in mod API `0.1.13`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.16"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `collection` | `source`, `title`, `description` of the collection the mod's tiles were loaded from, or `null` for a mod opened with a tile or without a collection. A collection without a `description` gives `""`. A mod opened from a mosaic gets the mosaic's collection. It does not change when the tiles are reloaded, so `tiles.changed` does not carry it. Added in mod API `0.1.17`. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.17"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. For a mod opened from a mosaic, the mod's config merged with the mosaic's: mappings are merged key by key, and any other mosaic value, `null` included, replaces the mod's (see [Config merge](../../mosaic/README.md#config-merge)). `mods.inspect` still gives the mod's own config. |
 | `params` | The link's parameters other than `mod`, `collection`, `tile` and `mosaic`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection, or its one tile, that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -648,7 +649,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.16` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.17` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -661,7 +662,7 @@ A change that bumps the mod API also bumps the app's version, at least as much (
 
 Each bump also updates:
 
-- the surface guard, `mod_api_surface.test.ts`: it records, for each version, the API's surface by name (the method names, the event names, the mount context's keys and the keys of its `mod`, `mosaic` (from `0.1.13`, read from a mod opened from a mosaic, since it is `null` otherwise), `api`, `permissions` and `theme` mappings, the mod file keys and the permission categories). It fails when the surface built from the code differs from the entry of `MOD_API_VERSION`, or when a recorded version is above it. A bump adds an entry for the new version; older entries are never edited, so the record shows how the API grew. The guard sees names, not params or results, so a change to those needs the bump without the guard's help. The test API is part of the mod API, but the guard does not record it: the guard builds its surface from the engine's code and never runs the frame loader, so the e2e tests of `e2e/mod_tests.spec.ts` pin the test API's names instead;
+- the surface guard, `mod_api_surface.test.ts`: it records, for each version, the API's surface by name (the method names, the event names, the mount context's keys and the keys of its `mod`, `mosaic` (from `0.1.13`, read from a mod opened from a mosaic, since it is `null` otherwise), `collection` (from `0.1.17`, read from a mod opened with a collection, since it is `null` otherwise), `api`, `permissions` and `theme` mappings, the mod file keys and the permission categories). It fails when the surface built from the code differs from the entry of `MOD_API_VERSION`, or when a recorded version is above it. A bump adds an entry for the new version; older entries are never edited, so the record shows how the API grew. The guard sees names, not params or results, so a change to those needs the bump without the guard's help. The test API is part of the mod API, but the guard does not record it: the guard builds its surface from the engine's code and never runs the frame loader, so the e2e tests of `e2e/mod_tests.spec.ts` pin the test API's names instead;
 - the shipped mods' `api` ranges, and `TEST_MOD_API_RANGE` in `src/test/sample_mods.ts` and `e2e/mod_routes.ts`, on a breaking bump.
 
 Version notes:
@@ -678,6 +679,7 @@ Version notes:
 
 - `0.1.15` added the app's catalog: the method `catalog.list`, the event `catalog.changed`, and `answer("catalog.list", catalog)` in the test API. These are additions that no existing mod can break on, so it is a patch. The explorers' `mods`, `collections` and `mosaics` config keys were removed in the same change: that is the config of three default mods, not the mod API.
 - `0.1.16` added the run link field `sites`, a mosaic reference whose `show` lines a mod link's sandbox gets (see [Launch](#launch)). It also made `sites` a reserved link name: a link parameter named `sites` is no longer passed in `params`, and `mods.open` and `mosaics.open` refuse `params.sites` with `-32602`. That could break a mod that read or passed a `sites` parameter, which would call for a minor bump. No shipped, test or known mod does, and no mod exists outside this repository, so it was taken as a patch, as `tile` was in `0.1.12` and `mosaic` in `0.1.13`. The surface guard's `0.1.16` entry repeats `0.1.15`'s, since it records names and no name was added.
+- `0.1.17` added the mount context key `collection` (`source`, `title`, `description`, or `null`), the collection the mod's tiles were loaded from, and `options.collection` for `mount(options)` in the test API. These are additions that existing mods keep working with, so it is a patch.
 
 An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `openspec/config.yaml` asks.
 
@@ -766,7 +768,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.16"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.17"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.10` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.

@@ -28,6 +28,7 @@ import {
 } from "./lines_cases.ts";
 import {
   leavesOtherLinksToTheApp,
+  opensLinkedTileOfOpeningCollection,
   opensLinkedTileWithFrom,
   opensLinkedTileWithoutAnyFrom,
   opensMetadataTileLink,
@@ -37,11 +38,14 @@ import { drawsTheTileAsACard, keepsOwnStylesToLayout } from "./look_cases.ts";
 import {
   disablesNextOnLast,
   disablesPreviousOnFirst,
+  ignoresStaleFrom,
   opensTheCollection,
   replacesWithNext,
+  replacesWithNextOfOpeningCollection,
   replacesWithPrevious,
   showsNoPlaceOutsideFrom,
   showsPlaceInCollection,
+  showsPlaceInOpeningCollection,
   showsRefusedOpen,
   warnsUnreadFrom,
 } from "./place_cases.ts";
@@ -131,6 +135,15 @@ export default function registerViewerTests(t: ModTestRegistration): void {
   t.test("shows a refused open", showsRefusedOpen);
   t.test("shows no place for a tile not in from", showsNoPlaceOutsideFrom);
   t.test("warns about a from it cannot read", warnsUnreadFrom);
+  t.test(
+    "shows its place in the collection it was opened with",
+    showsPlaceInOpeningCollection,
+  );
+  t.test("ignores a stale from for its opening collection", ignoresStaleFrom);
+  t.test(
+    "replaces itself with the next tile of its opening collection",
+    replacesWithNextOfOpeningCollection,
+  );
   t.test("opens a linked tile of from with from", opensLinkedTileWithFrom);
   t.test(
     "opens a linked tile outside from without from",
@@ -139,6 +152,10 @@ export default function registerViewerTests(t: ModTestRegistration): void {
   t.test(
     "opens a linked tile without from when it has none",
     opensLinkedTileWithoutAnyFrom,
+  );
+  t.test(
+    "opens a linked tile of its opening collection with it as from",
+    opensLinkedTileOfOpeningCollection,
   );
   t.test("opens a tile linked by the metadata", opensMetadataTileLink);
   t.test("leaves the other links to the app", leavesOtherLinksToTheApp);

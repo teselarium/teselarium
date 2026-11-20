@@ -389,6 +389,17 @@ describe("Links with a tile", function describeTileLinks(): void {
     );
   });
 
+  it("gives no collection in the mount context of a tile", async function givesTileNullCollection(): Promise<void> {
+    serveUntypedMod();
+
+    const launch = await launchMod(
+      buildTileLink(UNTYPED_MOD_SOURCE, KALLOCAIN_TILE_SOURCE),
+    );
+
+    expect(launch.context.tiles).toHaveLength(1);
+    expect(launch.context.collection).toBeNull();
+  });
+
   it("Relative tile location", async function resolvesTileLocation(): Promise<void> {
     serveUntypedMod();
 
@@ -678,6 +689,11 @@ describe("Mosaic links", function describeMosaicLinks(): void {
       description: "The fixture books, without covers.",
     });
     expect(launch.context.mod.source).toBe(SAMPLE_MOD_SOURCE);
+    expect(launch.context.collection).toEqual({
+      source: SAMPLE_COLLECTION_SOURCE,
+      title: "Science fiction books",
+      description: "A sample book list for demonstration purposes.",
+    });
     expect(launch.context.params).toEqual({ from: "x" });
     expect(launch.context.tiles).toHaveLength(3);
   });
@@ -1122,6 +1138,37 @@ describe("buildModLaunch", function describeBuildModLaunch(): void {
     expect(launch.issues).toEqual([]);
   });
 
+  it("Mod opened with a collection", async function givesLaunchCollection(): Promise<void> {
+    const launch = await launchMod(SAMPLE_LINK);
+
+    expect(launch.context.collection).toEqual({
+      source: SAMPLE_COLLECTION_SOURCE,
+      title: "Science fiction books",
+      description: "A sample book list for demonstration purposes.",
+    });
+  });
+
+  it("Collection without a description", async function givesEmptyCollectionDescription(): Promise<void> {
+    serveFourBooks();
+
+    const launch = await launchMod({
+      ...SAMPLE_LINK,
+      collection: FOUR_BOOKS_SOURCE,
+    });
+
+    expect(launch.context.collection).toEqual({
+      source: FOUR_BOOKS_SOURCE,
+      title: "Four books",
+      description: "",
+    });
+  });
+
+  it("Mod opened without a collection", async function givesNullCollection(): Promise<void> {
+    const launch = await launchMod({ ...SAMPLE_LINK, collection: null });
+
+    expect(launch.context.collection).toBeNull();
+  });
+
   it("Link parameters", async function copiesParams(): Promise<void> {
     const params = { target: SAMPLE_MOD_SOURCE };
 
@@ -1370,6 +1417,7 @@ describe("Media linked by tiles", function describeTileLinkedMedia(): void {
     expect(onLaunch.context).toEqual(offLaunch.context);
     expect(Object.keys(onLaunch.context).sort()).toEqual([
       "api",
+      "collection",
       "config",
       "issues",
       "mod",

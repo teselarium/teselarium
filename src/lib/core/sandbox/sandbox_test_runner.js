@@ -131,6 +131,19 @@ function isStringMapping(value) {
   return true;
 }
 
+// A mount context's `collection`: `null`, or `{ source, title, description }` with strings.
+function isMountCollection(value) {
+  if (value === null) {
+    return true;
+  }
+  return (
+    isPlainMapping(value) &&
+    typeof value.source === "string" &&
+    typeof value.title === "string" &&
+    typeof value.description === "string"
+  );
+}
+
 function checkMountOptions(options) {
   if (options === undefined) {
     return;
@@ -147,9 +160,26 @@ function checkMountOptions(options) {
   if (options.params !== undefined && !isStringMapping(options.params)) {
     throw new Error('mount: "params" must be a mapping of strings');
   }
+  if (
+    options.collection !== undefined &&
+    !isMountCollection(options.collection)
+  ) {
+    throw new Error(
+      'mount: "collection" must be a mapping with string "source", "title" and "description", or null',
+    );
+  }
 }
 
-// A copy of the check's mount context, with the case's tiles, config keys and params.
+// The case's `collection`, `null` included, or else the check's.
+function readCaseCollection(context, mountOptions) {
+  if (mountOptions.collection === undefined) {
+    return context.collection;
+  }
+  return mountOptions.collection;
+}
+
+// A copy of the check's mount context, with the case's tiles, config keys,
+// params and collection.
 function buildCaseMountContext(context, options) {
   const mountOptions = options ?? {};
   const caseMountContext = {
@@ -157,6 +187,7 @@ function buildCaseMountContext(context, options) {
     tiles: mountOptions.tiles ?? context.tiles,
     config: { ...context.config, ...mountOptions.config },
     params: mountOptions.params ?? context.params,
+    collection: readCaseCollection(context, mountOptions),
   };
   return caseMountContext;
 }

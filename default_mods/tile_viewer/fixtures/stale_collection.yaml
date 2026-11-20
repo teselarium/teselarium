@@ -1,0 +1,6 @@
+# A collection the cases name as a stale `from`: it lists two of the viewer's fixture tiles in another order, so a place read from it differs from a place in tiles_collection.yaml.
+collection:
+  title: "Stale tiles"
+  tiles:
+    - path: "./tiles/reading_list.md"
+    - path: "./tiles/kallocain.md"

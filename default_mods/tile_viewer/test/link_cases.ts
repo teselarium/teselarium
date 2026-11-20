@@ -5,6 +5,7 @@ import {
   findMetadataValue,
   findRequests,
   mountWithFixtureTile,
+  mountWithOpeningCollection,
   readFixtureTile,
   waitForBodyLink,
   waitForOpen,
@@ -26,6 +27,23 @@ export async function opensLinkedTileWithFrom(
     params: { from: FIXTURE_REFERENCES.tilesCollection },
   });
   context.expect(findRequests(context, "links.open")).toEqual([]);
+}
+
+export async function opensLinkedTileOfOpeningCollection(
+  context: CaseContext,
+): Promise<void> {
+  await mountWithOpeningCollection(context, "kallocain.md");
+  const link = await waitForBodyLink(context, "/fahrenheit_451.md");
+  context.answer("mods.open", null);
+
+  link.click();
+
+  const request = await waitForOpen(context);
+  context.expect(request.params).toEqual({
+    mod: "tile_viewer",
+    tile: readFixtureTile(context, "fahrenheit_451.md").source,
+    params: { from: FIXTURE_REFERENCES.tilesCollection },
+  });
 }
 
 export async function opensOutsideTileWithoutFrom(
@@ -68,6 +86,7 @@ export async function opensMetadataTileLink(
   const nextTile = readFixtureTile(context, "fahrenheit_451.md").source;
   await context.mount({
     tiles: [buildCaseTile(context, "linking.md", { next: nextTile })],
+    collection: null,
   });
   context.answer("mods.open", null);
 

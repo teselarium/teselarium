@@ -94,6 +94,13 @@ export interface LaunchMosaic {
   description: string;
 }
 
+/** The collection a mod's tiles were loaded from, as its mount context gives it. */
+export interface LaunchCollection {
+  source: string;
+  title: string;
+  description: string;
+}
+
 /** What a mod receives as the second argument of `mount`. Plain data. */
 export interface ModContext {
   mod: {
@@ -104,6 +111,12 @@ export interface ModContext {
   };
   /** The mosaic the mod was opened from, `null` for a mod opened from a mod link. */
   mosaic: LaunchMosaic | null;
+  /**
+   * The collection the mod's tiles were loaded from, `null` for a mod opened
+   * with a tile or without a collection. A mod opened from a mosaic gets the
+   * mosaic's collection.
+   */
+  collection: LaunchCollection | null;
   /** The mod API the mod runs on. */
   api: {
     version: string;
@@ -265,6 +278,8 @@ export interface ModTiles {
   tilesSource: string;
   /** The collection's title, or `""` for a tile. */
   title: string;
+  /** The collection's description, or `""` for a tile. */
+  description: string;
   tiles: Tile[];
   issues: TileIssue[];
 }
@@ -291,6 +306,7 @@ function buildModTiles(collection: TileCollection, tiles: Tile[]): ModTiles {
   const modTiles: ModTiles = {
     tilesSource: collection.source,
     title: collection.title,
+    description: collection.description,
     tiles: resolveEveryTilePaths(tiles),
     issues: collection.issues,
   };
@@ -545,6 +561,22 @@ function buildLaunchMosaic(mosaic: LoadedMosaic | null): LaunchMosaic | null {
   return launchMosaic;
 }
 
+/** The collection of a collection link's tiles, or `null` for a tile or no tiles. */
+function buildLaunchCollection(
+  link: RunLink,
+  modTiles: ModTiles | null,
+): LaunchCollection | null {
+  if (modTiles === null || readLinkTilesKind(link) !== "collection") {
+    return null;
+  }
+  const launchCollection: LaunchCollection = {
+    source: modTiles.tilesSource,
+    title: modTiles.title,
+    description: modTiles.description,
+  };
+  return launchCollection;
+}
+
 /** The mod's config, merged with the mosaic's config (`mergeMosaicConfig`) for a mosaic. */
 function buildLaunchConfig(
   mod: LoadedMod,
@@ -571,6 +603,7 @@ function buildModContext(
       description: mod.description,
     },
     mosaic: buildLaunchMosaic(mosaic),
+    collection: buildLaunchCollection(link, modTiles),
     api: { version: MOD_API_VERSION },
     config: buildLaunchConfig(mod, mosaic),
     params: { ...link.params },

@@ -36,3 +36,4 @@ Out of scope: the stage bar's rule that choosing a collection keeps the link's p
 - Docs: the mount context table and a `0.1.17` version note in `docs/modules/lib/core/engine/README.md`, and `docs/mod_plugin_spec.md`.
 - E2E: the mount context checks in `e2e/mod_engine_api.spec.ts`, and a stage-bar collection switch with the tile viewer.
 - A changeset `.changeset/fix-tile-viewer-collection-switch.md` (patch).
+- Sample e2e checks: `e2e/sample_book_list.spec.ts` and `e2e/sample_country_map.spec.ts` measure the mod frame's width with a helper in `e2e/app_layout.ts` instead of assuming the shell's insets, which `refresh-app-shell` changed, and compare book sizes with a sub-pixel tolerance. Tests only; no behavior change.

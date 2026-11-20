@@ -3,6 +3,7 @@ import type { Frame, Page, Route } from "@playwright/test";
 import { HOME_MOD_PREVIEW_URL } from "./app_servers.ts";
 import {
   actionDialog,
+  APP_ORIGIN_MOD_PATH,
   buildProbeFiles,
   findModFrame,
   OTHER_API_RANGE,
@@ -33,12 +34,17 @@ import {
   openTilesMod,
   readTilesModSource,
   serveTilesMod,
+  TILES_COLLECTION_PATH,
   TILES_MOD_REFERENCE,
+  TILES_RUN_HASH,
   TILES_TITLE,
   TYPED_PROBE_COLLECTION_REFERENCE,
 } from "./test_mods.ts";
 
 const PROBE_LINK = "/#/run?mod=./test-mods/probe/";
+
+/** `./test-mods/tiles/items/first.md`: the first item of the tiles mod, as a run link names it. */
+const TILES_FIRST_ITEM_REFERENCE = `.${APP_ORIGIN_MOD_PATH}tiles/items/first.md`;
 const OPEN_ANY_SITE_LINES = [
   "  permissions:",
   "    open:",
@@ -418,6 +424,46 @@ test.describe(
   },
 );
 
+test.describe("Collection of the mount context", function describeContextCollection(): void {
+  test("Mod opened with a collection", async function givesContextCollection({
+    page,
+  }): Promise<void> {
+    const frame = await openTilesMod(page);
+
+    const context = await frame.evaluate(readProbeContext);
+
+    expect(context.collection).toEqual({
+      source: new URL(TILES_COLLECTION_PATH, page.url()).href,
+      title: "Three items",
+      description: "The collection of the tiles mod's default mosaic.",
+    });
+  });
+
+  test("Mount context of a tile", async function givesTileNullCollection({
+    page,
+  }): Promise<void> {
+    const frame = await openTilesMod(
+      page,
+      `${TILES_RUN_HASH}&tile=${TILES_FIRST_ITEM_REFERENCE}`,
+    );
+
+    const context = await frame.evaluate(readProbeContext);
+
+    expect(context.tiles).toHaveLength(1);
+    expect(context.collection).toBeNull();
+  });
+
+  test("Mod opened without a collection", async function givesNullCollection({
+    page,
+  }): Promise<void> {
+    const frame = await openTilesMod(page, TILES_RUN_HASH);
+
+    const context = await frame.evaluate(readProbeContext);
+
+    expect(context.collection).toBeNull();
+  });
+});
+
 test.describe("Mods opened from a mosaic", function describeMosaicLaunch(): void {
   test("Mosaic of the tiles mod", async function givesMosaicContext({
     page,
@@ -433,6 +479,14 @@ test.describe("Mods opened from a mosaic", function describeMosaicLaunch(): void
       source: new URL(LABELS_MOSAIC_PATH, page.url()).href,
       title: LABELS_MOSAIC_TITLE,
       description: "The tiles mod on labelled tiles.",
+    });
+    expect(context.collection).toEqual({
+      source: new URL(
+        `${APP_ORIGIN_MOD_PATH}${LABELS_COLLECTION_FILE}`,
+        page.url(),
+      ).href,
+      title: "Labelled tiles",
+      description: "",
     });
     expect(context.config).toEqual({
       show_images: false,

@@ -1,9 +1,11 @@
 /**
  * Default mod: shows the first tile it receives, with its heading, its
- * source, its metadata and its body. With a `from` parameter, the address of
- * a collection that lists the tile, it also shows the tile's place in it,
- * with Previous and Next, which replace the viewer with the neighbouring
- * tile. Links to tiles, in the metadata or the body, open in a new viewer.
+ * source, its metadata and its body. Its collection is the one it was opened
+ * with (`context.collection`), or else the `from` parameter, the address of
+ * a collection. When that collection lists the tile, it also shows the
+ * tile's place in it, with Previous and Next, which replace the viewer with
+ * the neighbouring tile. Links to tiles, in the metadata or the body, open in
+ * a new viewer.
  *
  * It is also an example of getting the app's look without classes: the
  * theme's base stylesheet styles semantic HTML like the app's components (an
@@ -40,6 +42,18 @@ function readFrom(params: Record<string, string>): string | null {
   return typeof from === "string" && from !== "" ? from : null;
 }
 
+/**
+ * The viewer's collection: the one it was opened with, or else `from`, or
+ * `null` without either. A `from` next to an opening collection is stale,
+ * such as one kept when another collection is chosen in the stage bar.
+ */
+function readViewerCollection(context: ModContext): string | null {
+  if (context.collection !== null) {
+    return context.collection.source;
+  }
+  return readFrom(context.params);
+}
+
 /** Entry point called by the frame loader with the engine API object and the mount context. */
 export default async function mount(
   engine: ModEngine,
@@ -64,8 +78,8 @@ export default async function mount(
       DEFAULT_COLLECTION_VIEWER,
     ),
     tile,
-    from: readFrom(context.params),
-    fromTiles: [],
+    collection: readViewerCollection(context),
+    collectionTiles: [],
     errors: buildErrorRegion(),
   };
   const card = renderTile(view);

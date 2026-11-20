@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import type { Frame, Locator, Page, Request, Route } from "@playwright/test";
-import { pressTheaterMode, waitForFrameLayout } from "./layout_probes.ts";
+import {
+  pressTheaterMode,
+  sizeModFrame,
+  waitForFrameLayout,
+} from "./layout_probes.ts";
 import {
   actionDialog,
   expectNoIssues,
@@ -111,9 +115,6 @@ const MADE_UP_HUNGARY: AddedTile = {
   title: "A Made-up Tile in Hungary",
   country: "Hungary",
 };
-
-/** How much narrower than the viewport the mod's frame is, with the app's sidebar collapsed. */
-const NARROW_FRAME_INSET = 80;
 
 /** 24rem at the frame's 16px root font size. */
 const PHONE_FRAME_WIDTH = 384;
@@ -1060,15 +1061,8 @@ test.describe("Sidebar", { tag: "@sample" }, function describeSidebar(): void {
   test("Phone width", async function stacksSidebarBelowMap({
     page,
   }): Promise<void> {
-    await page.setViewportSize({
-      width: PHONE_FRAME_WIDTH + NARROW_FRAME_INSET,
-      height: 800,
-    });
     const frame = await routeAndOpenSample(page);
-    const frameBox = await page
-      .locator(`iframe[title="${MOD_TITLE}"]`)
-      .boundingBox();
-    expect(frameBox?.width).toBe(PHONE_FRAME_WIDTH);
+    await sizeModFrame(page, MOD_TITLE, PHONE_FRAME_WIDTH);
 
     await selectWithKeyboard(frame, "France");
 

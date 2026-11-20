@@ -41,6 +41,7 @@ import {
   readBodyColors,
   readTokenAs,
 } from "./theme_probes.ts";
+import { sizeModFrame } from "./layout_probes.ts";
 
 const SAMPLE_TITLES = ["Fahrenheit 451", "Kallocain", "The Library of Babel"];
 
@@ -53,9 +54,13 @@ const KALLOCAIN_TILE_GLOB = `**${SAMPLE_BOOKS_FOLDER_PATH}/kallocain.md`;
 /** 4.5rem at the frame's 16px root font size: the narrowest a book may be. */
 const BOOK_MIN_WIDTH = 72;
 
-/** How much narrower than the viewport the mod's frame is, with the sidebar open (wide) and collapsed (narrow). */
-const WIDE_FRAME_INSET = 272;
-const NARROW_FRAME_INSET = 80;
+/**
+ * How many pixels two book sizes may differ by and still be the same size.
+ * Grid tracks are fractions of the frame's width, so equal books differ by
+ * float rounding in Chromium and Firefox (`150.3333282` and `150.3333435`)
+ * and by a 1/64px layout unit in WebKit (`150.328125` and `150.34375`).
+ */
+const BOOK_SIZE_TOLERANCE = 0.1;
 
 const DRAFT_RUN_HASH =
   "#/run?mod=./test-mods/drafts/&collection=./test-mods/drafts/tiles.yaml";
@@ -83,20 +88,6 @@ function buildDraftFiles(): ModFiles {
     "drafts/books/cover.svg": ICON_SVG,
   };
   return files;
-}
-
-/** Sets the viewport so that the mod's frame gets `frameWidth`. */
-async function sizeFrame(
-  page: Page,
-  frameWidth: number,
-  inset: number,
-): Promise<void> {
-  await page.setViewportSize({ width: frameWidth + inset, height: 800 });
-}
-
-async function expectFrameWidth(page: Page, frameWidth: number): Promise<void> {
-  const box = await page.locator('iframe[title="Book List"]').boundingBox();
-  expect(box?.width).toBe(frameWidth);
 }
 
 /** Opens the sample mod at `hash`, its default mosaic unless given, with every cover answered, and waits for its books. */
@@ -147,6 +138,16 @@ async function openKallocainCard(frame: Frame): Promise<Locator> {
 interface BookBox {
   width: number;
   height: number;
+}
+
+/** Expects `box` to be the size of `reference`, up to float rounding. */
+function expectSameBookSize(box: BookBox, reference: BookBox): void {
+  expect(Math.abs(box.width - reference.width)).toBeLessThanOrEqual(
+    BOOK_SIZE_TOLERANCE,
+  );
+  expect(Math.abs(box.height - reference.height)).toBeLessThanOrEqual(
+    BOOK_SIZE_TOLERANCE,
+  );
 }
 
 /** Runs in the sample's frame: the size of each book's button, in order. */
@@ -333,8 +334,7 @@ test.describe(
       await expect(frame.locator("li > p > strong")).toHaveText(SAMPLE_TITLES);
       const boxes = await frame.evaluate(readBookBoxes);
       for (const box of boxes) {
-        expect(box.width).toBe(boxes[0].width);
-        expect(box.height).toBe(boxes[0].height);
+        expectSameBookSize(box, boxes[0]);
         expect(Math.abs(box.height - 1.5 * box.width)).toBeLessThanOrEqual(1);
       }
     });
@@ -407,7 +407,7 @@ test.describe(
       await expect(draft.locator("span")).toHaveText("Untitled draft");
       await expect(draft.locator("img")).toHaveCount(0);
       const boxes = await frame.evaluate(readBookBoxes);
-      expect(boxes[1]).toEqual(boxes[0]);
+      expectSameBookSize(boxes[1], boxes[0]);
     });
   },
 );
@@ -419,9 +419,8 @@ test.describe(
     test("Default books per row", async function showsSixPerRow({
       page,
     }): Promise<void> {
-      await sizeFrame(page, 1200, WIDE_FRAME_INSET);
       const frame = await openSample(page);
-      await expectFrameWidth(page, 1200);
+      await sizeModFrame(page, "Book List", 1200);
 
       await expect(booksPerRow(frame)).toHaveValue("6");
       expect(await frame.evaluate(readColumnCount)).toBe(6);
@@ -481,9 +480,8 @@ test.describe(
     test("Ten per row in a narrow frame", async function fitsNarrowFrame({
       page,
     }): Promise<void> {
-      await sizeFrame(page, 400, NARROW_FRAME_INSET);
       const frame = await openSample(page);
-      await expectFrameWidth(page, 400);
+      await sizeModFrame(page, "Book List", 400);
 
       await booksPerRow(frame).selectOption("10");
 

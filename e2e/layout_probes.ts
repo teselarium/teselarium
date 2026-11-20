@@ -194,3 +194,60 @@ export function readFrameEdge(element: Element): {
   };
   return edge;
 }
+
+/** How many times `sizeModFrame` resizes the viewport before it gives up. */
+const FRAME_SIZING_ATTEMPTS = 4;
+
+/** Runs in the page: resolves after two animation frames, once a resize has been laid out. */
+function waitForLayout(): Promise<void> {
+  return new Promise<void>(function waitTwoFrames(resolve): void {
+    requestAnimationFrame(function waitSecondFrame(): void {
+      requestAnimationFrame(function resolveLaidOut(): void {
+        resolve();
+      });
+    });
+  });
+}
+
+/** The width of the mod frame titled `frameTitle`, in CSS pixels. */
+async function readFrameWidth(page: Page, frameTitle: string): Promise<number> {
+  const box = await page.locator(`iframe[title="${frameTitle}"]`).boundingBox();
+  if (box === null) {
+    throw new Error(`The mod frame "${frameTitle}" is not shown.`);
+  }
+  return box.width;
+}
+
+/**
+ * Resizes the viewport until the mod frame titled `frameTitle` is `width`
+ * pixels wide. The frame's inset is measured, never assumed, so the size
+ * holds whatever the shell's sidebar, padding and gaps are. It retries
+ * because the inset itself changes when a resize crosses a breakpoint, such
+ * as the one that collapses the sidebar. Keeps the viewport's height.
+ */
+export async function sizeModFrame(
+  page: Page,
+  frameTitle: string,
+  width: number,
+): Promise<void> {
+  const viewport = page.viewportSize() ?? { width: 1280, height: 800 };
+  let viewportWidth = viewport.width;
+  let frameWidth = await readFrameWidth(page, frameTitle);
+  for (let attempt = 0; attempt < FRAME_SIZING_ATTEMPTS; attempt++) {
+    if (frameWidth === width) {
+      return;
+    }
+    viewportWidth += width - frameWidth;
+    await page.setViewportSize({
+      width: viewportWidth,
+      height: viewport.height,
+    });
+    await page.evaluate(waitForLayout);
+    frameWidth = await readFrameWidth(page, frameTitle);
+  }
+  if (frameWidth !== width) {
+    throw new Error(
+      `The mod frame "${frameTitle}" is ${frameWidth}px wide, not ${width}px, after ${FRAME_SIZING_ATTEMPTS} resizes of the viewport (last ${viewportWidth}px).`,
+    );
+  }
+}

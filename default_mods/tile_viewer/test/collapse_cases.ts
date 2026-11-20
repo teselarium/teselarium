@@ -22,6 +22,7 @@ function mountWithMetadata(
 ): Promise<void> {
   const mounting = context.mount({
     tiles: [buildCaseTile(context, "metadata.md", metadata)],
+    collection: null,
   });
   return mounting;
 }

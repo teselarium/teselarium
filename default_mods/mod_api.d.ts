@@ -78,6 +78,13 @@ export interface ModContextMosaic {
   description: string;
 }
 
+/** The collection a mod's tiles were loaded from, as its mount context gives it. */
+export interface ModContextCollection {
+  source: string;
+  title: string;
+  description: string;
+}
+
 /** The second argument of `mount`. */
 export interface ModContext {
   mod: {
@@ -88,6 +95,12 @@ export interface ModContext {
   };
   /** The mosaic the mod was opened from, or `null` for a mod opened from a mod link. */
   mosaic: ModContextMosaic | null;
+  /**
+   * The collection the mod's tiles were loaded from, or `null` for a mod
+   * opened with a tile or without a collection. A mod opened from a mosaic
+   * gets the mosaic's collection.
+   */
+  collection: ModContextCollection | null;
   api: {
     version: string;
   };
@@ -315,6 +328,8 @@ export interface CaseMountOptions {
   tiles?: ModTile[];
   config?: ModYamlMapping;
   params?: Record<string, string>;
+  /** Replaces the context's `collection`, `null` included; without it, the check's is kept. */
+  collection?: ModContextCollection | null;
 }
 
 /** A request the mod sent during a case, with its result or error once it settled. */

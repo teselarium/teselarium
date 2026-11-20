@@ -28,7 +28,7 @@ function listTopLevelKeys(context: CaseContext): (string | null)[] {
 }
 
 export async function showsTheTile(context: CaseContext): Promise<void> {
-  await context.mount();
+  await context.mount({ collection: null });
 
   const tile = readFixtureTile(context, "kallocain.md");
   context
@@ -58,7 +58,7 @@ function listCardChildren(context: CaseContext): string[] {
 export async function putsTheBodyInTheCard(
   context: CaseContext,
 ): Promise<void> {
-  await context.mount();
+  await context.mount({ collection: null });
 
   context
     .expect(listCardChildren(context))
@@ -81,7 +81,7 @@ export async function laysValuesBesideTheirKeys(
     pages: 156,
     genres: ["Dystopian", "Political"],
   });
-  await context.mount({ tiles: [tile] });
+  await context.mount({ tiles: [tile], collection: null });
 
   const pages = findMetadataValue(context, "pages");
   const pagesKey = pages.previousElementSibling as Element;
@@ -174,7 +174,7 @@ export async function hidesFailedThumbnail(
   const tile = buildCaseTile(context, "broken_cover.md", {
     image: missingImage,
   });
-  await context.mount({ tiles: [tile] });
+  await context.mount({ tiles: [tile], collection: null });
 
   const link = findMetadataValue(context, "image").querySelector("a");
   const thumbnail = link?.querySelector("img");
@@ -206,6 +206,7 @@ export async function saysNoMetadata(context: CaseContext): Promise<void> {
 export async function rendersNoEmptyBody(context: CaseContext): Promise<void> {
   await context.mount({
     tiles: [buildCaseTile(context, "empty.md", { title: "Empty" })],
+    collection: null,
   });
 
   context.expect(context.root.querySelector("ot-tile-body")).toBe(null);
@@ -216,7 +217,7 @@ export async function rendersNoEmptyBody(context: CaseContext): Promise<void> {
 }
 
 export async function saysNoTile(context: CaseContext): Promise<void> {
-  await context.mount({ tiles: [] });
+  await context.mount({ tiles: [], collection: null });
 
   context
     .expect(findElement(context, '[role="status"]').textContent)

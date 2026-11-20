@@ -702,9 +702,13 @@ const TILE_VIEWER_CASES = [
   "shows a refused open",
   "shows no place for a tile not in from",
   "warns about a from it cannot read",
+  "shows its place in the collection it was opened with",
+  "ignores a stale from for its opening collection",
+  "replaces itself with the next tile of its opening collection",
   "opens a linked tile of from with from",
   "opens a linked tile outside from without from",
   "opens a linked tile without from when it has none",
+  "opens a linked tile of its opening collection with it as from",
   "opens a tile linked by the metadata",
   "leaves the other links to the app",
   "keeps its own styles to layout",
@@ -1345,6 +1349,38 @@ async function serveRoutedTiles(route: Route): Promise<void> {
   await route.fulfill({ status: 200, body });
 }
 
+/** The name of the collection the stage bar switch test serves in place of the laureates' books. */
+const ROUTED_BOOKS_NAME = "Routed books";
+
+/** Serves, at the laureates' books collection, a collection of the tile viewer's three fixture tiles, by address. */
+async function serveRoutedBooks(route: Route): Promise<void> {
+  const origin = new URL(route.request().url()).origin;
+  const body = [
+    "collection:",
+    `  title: "${ROUTED_BOOKS_NAME}"`,
+    "  tiles:",
+    `    - url: "${origin}${TILE_FIXTURES_PATH}tiles/reading_list.md"`,
+    `    - url: "${origin}${TILE_FIXTURES_PATH}tiles/kallocain.md"`,
+    `    - url: "${origin}${TILE_FIXTURES_PATH}tiles/fahrenheit_451.md"`,
+  ].join("\n");
+  await route.fulfill({ status: 200, body });
+}
+
+const LAUREATES_BOOKS_COLLECTION_GLOB =
+  "**/samples/tiles/literature_nobel_laureates_books/collection.yaml";
+
+/** Opens the stage bar's collection list, from its capsule named `name`, and chooses the entry that says `text`. */
+async function chooseStageCollection(
+  page: Page,
+  name: string,
+  text: string,
+): Promise<void> {
+  await stageBar(page).getByRole("button", { name }).click();
+  const list = page.locator("[data-slot=popover-content]");
+  await list.getByRole("option").filter({ hasText: text }).click();
+  await expect(list).toHaveCount(0);
+}
+
 test.describe(
   "Collection viewer opens tiles",
   { tag: "@frames" },
@@ -1381,6 +1417,58 @@ test.describe(
         ),
       );
       await expect(currentItem(page)).toHaveText("Tiles");
+    });
+
+    test("Another collection chosen in the stage bar", async function switchesCollection({
+      page,
+    }): Promise<void> {
+      await page.route(LAUREATES_COLLECTION_GLOB, serveRoutedTiles);
+      await page.route(LAUREATES_BOOKS_COLLECTION_GLOB, serveRoutedBooks);
+      await page.goto("/");
+      await openSection(page, "Tiles");
+      await collectionExplorerFrame(page)
+        .getByRole("button", { name: `View ${ROUTED_TILES_NAME}` })
+        .click();
+      await collectionViewerFrame(page)
+        .getByRole("button", { name: "fahrenheit_451.md" })
+        .click();
+      await expect(
+        tileViewerFrame(page).getByRole("navigation", { name: "Collection" }),
+      ).toContainText("2 of 2");
+
+      await chooseStageCollection(
+        page,
+        "Collection: fahrenheit_451.md",
+        ROUTED_BOOKS_NAME,
+      );
+
+      const viewer = tileViewerFrame(page);
+      await expect(viewer.getByRole("heading", { level: 1 })).toHaveText(
+        "reading_list.md",
+      );
+      const nav = viewer.getByRole("navigation", { name: "Collection" });
+      await expect(
+        nav.getByRole("button", { name: ROUTED_BOOKS_NAME }),
+      ).toBeVisible();
+      await expect(nav).toContainText("1 of 3");
+      await expect(
+        nav.getByRole("button", { name: "Previous" }),
+      ).toBeDisabled();
+      await expect(nav.getByRole("button", { name: "Next" })).toBeEnabled();
+    });
+
+    test("Opened from its default mosaic", async function showsDefaultMosaicPlace({
+      page,
+    }): Promise<void> {
+      await page.goto("/#/run?mosaic=./default_mods/tile_viewer/mosaic.yaml");
+
+      const nav = tileViewerFrame(page).getByRole("navigation", {
+        name: "Collection",
+      });
+      await expect(
+        nav.getByRole("button", { name: "Viewer tiles" }),
+      ).toBeVisible();
+      await expect(nav).toContainText("1 of 3");
     });
 
     test("Open the collection", async function opensCollectionFromBreadcrumb({

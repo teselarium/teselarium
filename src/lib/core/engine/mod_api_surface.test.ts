@@ -47,11 +47,13 @@ interface ModApiSurface {
   /**
    * The keys of the mount context's fixed mappings. `mosaic`, added in
    * `0.1.13`, is read from a mod opened from a mosaic, since it is `null`
-   * otherwise.
+   * otherwise. `collection`, added in `0.1.17`, is read from a mod opened
+   * with a collection, since it is `null` otherwise.
    */
   contextMappingKeys: {
     mod: string[];
     mosaic?: string[];
+    collection?: string[];
     api: string[];
     permissions: string[];
     theme: string[];
@@ -906,6 +908,69 @@ const SURFACE_BY_VERSION: Record<string, ModApiSurface> = {
     ],
     permissionCategories: ["code", "connect", "embed", "open", "show"],
   },
+  "0.1.17": {
+    methods: [
+      "catalog.list",
+      "collections.inspect",
+      "files.save",
+      "libs.load",
+      "links.open",
+      "mods.check",
+      "mods.inspect",
+      "mods.open",
+      "mosaics.check",
+      "mosaics.inspect",
+      "mosaics.open",
+      "players.open",
+      "storage.get",
+      "storage.set",
+      "tiles.renderBody",
+      "ui.confirm",
+      "ui.notify",
+    ],
+    events: [
+      "catalog.changed",
+      "layout.changed",
+      "theme.changed",
+      "tiles.changed",
+    ],
+    contextKeys: [
+      "api",
+      "collection",
+      "config",
+      "issues",
+      "layout",
+      "mod",
+      "mosaic",
+      "params",
+      "permissions",
+      "theme",
+      "tiles",
+    ],
+    contextMappingKeys: {
+      mod: ["description", "source", "title", "version"],
+      mosaic: ["description", "source", "title"],
+      collection: ["description", "source", "title"],
+      api: ["version"],
+      permissions: ["denied", "granted"],
+      theme: ["colorScheme", "tokens"],
+    },
+    modFileKeys: [
+      "api",
+      "config",
+      "default_mosaic",
+      "description",
+      "entrypoint",
+      "libraries",
+      "permissions",
+      "test_path",
+      "theme",
+      "title",
+      "type_path",
+      "version",
+    ],
+    permissionCategories: ["code", "connect", "embed", "open", "show"],
+  },
 };
 
 const BUMP_RULE = `The mod API surface does not match the entry of MOD_API_VERSION (${MOD_API_VERSION}). Bump MOD_API_VERSION in mod_api_version.ts as "Mod API version" in docs/modules/lib/core/engine/README.md says (while it is 0.x, a breaking change bumps the minor version, an addition or a fix the patch version), and add an entry for the new version to SURFACE_BY_VERSION`;
@@ -985,6 +1050,7 @@ async function buildCurrentSurface(): Promise<ModApiSurface> {
     contextMappingKeys: {
       mod: listSortedKeys(context.mod),
       mosaic: listSortedKeys(mosaicContext.mosaic),
+      collection: listSortedKeys(context.collection),
       api: listSortedKeys(context.api),
       permissions: listSortedKeys(context.permissions),
       theme: listSortedKeys(context.theme),

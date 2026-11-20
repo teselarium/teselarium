@@ -1,6 +1,7 @@
 import type {
   CaseContext,
   CaseRequest,
+  ModContextCollection,
   ModTile,
   ModYamlMapping,
 } from "../../mod_api.d.ts";
@@ -16,6 +17,15 @@ export const FIXTURE_REFERENCES = {
   /** A fixture path with no file, which `collections.inspect` answers with an error. */
   missingCollection:
     "./default_mods/tile_viewer/fixtures/missing_collection.yaml",
+  /** A collection that lists two of the fixture tiles in another order, named as a stale `from`. */
+  staleCollection: "./default_mods/tile_viewer/fixtures/stale_collection.yaml",
+};
+
+/** The tiles collection as the viewer gets it when it is opened with it, as `context.collection`. */
+export const FIXTURE_OPENING_COLLECTION: ModContextCollection = {
+  source: FIXTURE_REFERENCES.tilesCollection,
+  title: "Viewer tiles",
+  description: "A fixture collection that the tile viewer's tests show.",
 };
 
 /** The fixture tiles of the check's tiles, by file name, in the collection's order. */
@@ -58,7 +68,11 @@ export function buildCaseTile(
   return tile;
 }
 
-/** Mounts the viewer with one fixture tile, and the tiles collection as `from` unless `from` is `null`. */
+/**
+ * Mounts the viewer with one fixture tile, and the tiles collection as `from`
+ * unless `from` is `null`. It mounts without an opening collection, so the
+ * viewer's place comes from `from` alone.
+ */
 export function mountWithFixtureTile(
   context: CaseContext,
   fileName: string,
@@ -71,6 +85,29 @@ export function mountWithFixtureTile(
   const mounting = context.mount({
     tiles: [readFixtureTile(context, fileName)],
     params,
+    collection: null,
+  });
+  return mounting;
+}
+
+/**
+ * Mounts the viewer with one fixture tile, opened with the tiles collection
+ * as `context.collection`, and `from` as the `from` parameter unless it is
+ * `null`.
+ */
+export function mountWithOpeningCollection(
+  context: CaseContext,
+  fileName: string,
+  from: string | null = null,
+): Promise<void> {
+  const params: Record<string, string> = {};
+  if (from !== null) {
+    params.from = from;
+  }
+  const mounting = context.mount({
+    tiles: [readFixtureTile(context, fileName)],
+    params,
+    collection: FIXTURE_OPENING_COLLECTION,
   });
   return mounting;
 }

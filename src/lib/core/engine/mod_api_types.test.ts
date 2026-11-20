@@ -66,6 +66,15 @@ describe("default_mods/mod_api.d.ts", function describeModApiTypes(): void {
     >();
   });
 
+  it("declares a mount context collection the engine's fits", function checksContextCollection(): void {
+    expectTypeOf<ModContext["collection"]>().toExtend<
+      DeclaredModContext["collection"]
+    >();
+    expectTypeOf<DeclaredModContext["collection"]>().toExtend<
+      ModContext["collection"]
+    >();
+  });
+
   it("declares a mosaic inspection the engine's fits", function checksMosaicInspection(): void {
     expectTypeOf<MosaicInspection>().toExtend<DeclaredMosaicInspection>();
   });

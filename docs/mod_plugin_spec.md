@@ -8,7 +8,7 @@ Mods can communicates with the main app via the core engine API, like requesting
 
 A loaded mod doesn't have direct access to localStorage or indexedDB, it must use the core engine API for operations like requesting, writing or redirecting the user. Mods only have access to their own data and the common (shared) data from the main app via the core engine API. Data from each mod is stored in separated slots.
 
-A mosaic is a file that opens a mod with a collection, the way the data's author wants it shown: it names the mod and the collection, overrides values of the mod's config, renames the collection's field names to the names of the mod's tile type (`aliases`), and declares the `show` hosts the collection's media need. A mod needs no mosaic: it runs from a mod link with its own config. When it is opened from a mosaic, it reads the mosaic in `context.mosaic`, gets the merged config in `context.config` and the renamed tiles in `context.tiles`, and its sandbox gets the mosaic's granted `show` lines in `context.permissions` (see the [mosaic module](modules/lib/mosaic/README.md)).
+A mosaic is a file that opens a mod with a collection, the way the data's author wants it shown: it names the mod and the collection, overrides values of the mod's config, renames the collection's field names to the names of the mod's tile type (`aliases`), and declares the `show` hosts the collection's media need. A mod needs no mosaic: it runs from a mod link with its own config. When it is opened from a mosaic, it reads the mosaic in `context.mosaic` and the mosaic's collection in `context.collection`, gets the merged config in `context.config` and the renamed tiles in `context.tiles`, and its sandbox gets the mosaic's granted `show` lines in `context.permissions` (see the [mosaic module](modules/lib/mosaic/README.md)).
 
 As mods are created by the community and they need to follow principles of privacy and security.
 
@@ -224,6 +224,8 @@ await engine.request("mosaics.open", {
 ```
 
 `mosaics.inspect` answers the mosaic's `source`, `title`, `description`, the resolved `mod` and `collection`, its own `config` and `aliases`, and `permissions`, the `granted` and `denied` lists its `show` lines would get without asking; it requests nothing else and never asks the user. `mosaics.open` takes `params`, without `mod`, `collection`, `tile`, `mosaic` or `sites`, and `replace`, as `mods.open` does, and only the visible mod can open mosaics. The mosaic's load failures belong to the new sandbox.
+
+A mod reads the collection its tiles were loaded from in `context.collection` (`source`, `title`, `description`), next to `context.mosaic`. It is `null` for a mod opened with a tile or without a collection, and a mod opened from a mosaic gets the mosaic's collection.
 
 The mod opened from a mosaic tells it apart from a mod link with `context.mosaic`:
 
@@ -505,7 +507,7 @@ Each case runs in a fresh hidden frame, with the content policy and permissions 
 
 | Name | What it is |
 |---|---|
-| `mount(options?)` | Calls the mod's real `mount` with the engine API object and a mount context built as for a check, and resolves once it finished. `options.tiles` replaces the tiles, `options.config` replaces the config keys it names, and `options.params` is the context's `params`. When the mod's `mount` throws or rejects, `mount` rejects with that error. A second call rejects with `the mod is already mounted`. |
+| `mount(options?)` | Calls the mod's real `mount` with the engine API object and a mount context built as for a check, and resolves once it finished. `options.tiles` replaces the tiles, `options.config` replaces the config keys it names, `options.params` is the context's `params`, and `options.collection`, a `{ source, title, description }` mapping or `null`, replaces the context's `collection`. Without `options.collection`, the case keeps the check's `collection`: a check run with a collection or with the mod's default mosaic gives its cases that collection. Any other `collection` makes `mount` reject with `mount: "collection" must be a mapping with string "source", "title" and "description", or null`. When the mod's `mount` throws or rejects, `mount` rejects with that error. A second call rejects with `the mod is already mounted`. |
 | `root` | The frame's body, where the mod draws. |
 | `tiles` | The tiles the check gives: the collection's, or the default mosaic's collection's, of the mod's tile type, after the mosaic's aliases. |
 | `storage` | `get(key)` and `set(key, value)` on the case's slot, with the rules of `storage.get` and `storage.set`. Usable before `mount`, to seed what the mod reads. |

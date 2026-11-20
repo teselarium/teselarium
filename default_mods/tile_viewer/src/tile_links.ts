@@ -14,14 +14,14 @@ function findClickedTileLink(event: MouseEvent): HTMLAnchorElement | null {
   return link;
 }
 
-/** The params of a linked tile: `from` only when the inspected collection lists it. */
+/** The params of a linked tile: the viewer's collection as `from`, only when it lists the tile. */
 function buildLinkedTileParams(
   view: ViewerView,
   address: string,
 ): Record<string, string> {
   const params: Record<string, string> = {};
-  if (view.from !== null && view.fromTiles.includes(address)) {
-    params.from = view.from;
+  if (view.collection !== null && view.collectionTiles.includes(address)) {
+    params.from = view.collection;
   }
   return params;
 }
