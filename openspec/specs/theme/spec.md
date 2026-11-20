@@ -26,7 +26,7 @@ The system SHALL define a fixed set of theme tokens. Each token SHALL be a CSS c
 - **THEN** the result is a mapping from each token name to a string, and a structured clone of it deep-equals it
 
 ### Requirement: Theme choice
-The Settings page SHALL have a Theme control with the choices System, Light and Dark. The app header SHALL NOT have one. Changing the choice SHALL apply it to the app and to every running mod at once, visible or hidden, without reloading the page or any mod's frame.
+The Settings page and the sidebar SHALL each have a Theme control with the choices System, Light and Dark, showing the current choice. The sidebar's control SHALL be a button that, on each press, moves to the next choice in the order System, Light, Dark and back to System. Changing the choice in either control SHALL update the other and apply it to the app and to every running mod at once, visible or hidden, without reloading the page or any mod's frame.
 
 #### Scenario: Default choice
 - **WHEN** the app is opened for the first time at `#/settings`
@@ -37,9 +37,17 @@ The Settings page SHALL have a Theme control with the choices System, Light and 
 - **THEN** the app switches to the dark color scheme, and going back shows the mod's frame in the dark color scheme
 - **AND** the mod's frame was not reloaded
 
+#### Scenario: Choose from the sidebar
+- **WHEN** the operating system prefers light, a mod is visible, and the user presses the sidebar's theme control until the choice is Dark
+- **THEN** the app and the mod's frame switch to the dark color scheme without reloading the frame, and the Settings page's Theme control shows Dark
+
 #### Scenario: No Theme control in the header
 - **WHEN** the app is opened
-- **THEN** the header holds the hamburger button and the `OpenTesela` heading, and no Theme control
+- **THEN** the page has no header, and the only Theme controls are the sidebar's and, at `#/settings`, the Settings page's
+
+#### Scenario: Each press moves to the next choice
+- **WHEN** the choice is System and the user presses the sidebar's theme control three times
+- **THEN** the choice is Light, then Dark, then System again, and after each press the control's tooltip and accessible name say `Theme: <choice>`
 
 ### Requirement: Resolve the color scheme
 The system SHALL resolve the theme choice to a color scheme, `light` or `dark`. Light and Dark SHALL resolve to themselves. System SHALL resolve to the operating system's preference, and SHALL follow it when it changes while the app is open.
@@ -76,7 +84,7 @@ The system SHALL keep the theme choice in the app's storage, under a key that no
 - **THEN** the result is never the stored theme choice
 
 ### Requirement: The app follows the color scheme
-The app's own interface (the header, the sidebar, the Settings page, the stage bar, the issue list, the loading and load error messages and the action dialog) SHALL take its colors, fonts and spacing from the theme tokens of the current color scheme, so it matches the mods.
+The app's own interface (the sidebar, the Settings page, the stage bar, the issue list, the loading and load error messages and the action dialog) SHALL take its colors, fonts and spacing from the theme tokens of the current color scheme, so it matches the mods.
 
 #### Scenario: Dark app
 - **WHEN** the color scheme is `dark`
@@ -84,7 +92,7 @@ The app's own interface (the header, the sidebar, the Settings page, the stage b
 
 #### Scenario: Back to light
 - **WHEN** the color scheme changes from `dark` to `light`
-- **THEN** the page's background color becomes the light value of `--ot-background` without reloading the page
+- **THEN** the page's background color becomes the light value of `--ot-card` without reloading the page
 
 #### Scenario: Action dialog follows the color scheme
 - **WHEN** the color scheme is `dark` and a mod's action dialog is shown
@@ -104,3 +112,18 @@ In each color scheme, every text role SHALL have a contrast ratio of at least 4.
 #### Scenario: Foreground on its role
 - **WHEN** the tokens are resolved for the light and for the dark color scheme
 - **THEN** `--ot-card-foreground` on `--ot-card`, `--ot-popover-foreground` on `--ot-popover`, `--ot-primary-foreground` on `--ot-primary`, `--ot-secondary-foreground` on `--ot-secondary`, `--ot-accent-foreground` on `--ot-accent`, `--ot-highlight-foreground` on `--ot-highlight`, `--ot-destructive-foreground` on `--ot-destructive` and `--ot-muted-foreground` on `--ot-muted` each have a contrast ratio of at least 4.5
+
+### Requirement: App canvas and panels
+The app's canvas, behind its panels and pages, SHALL be `--ot-card` in the light color scheme and `--ot-background` in the dark one. The sidebar, the stage bar and the visible sandbox's frame SHALL be panels apart from each other and from the viewport's edges, each with an `--ot-border` border and a shadow. Pages SHALL be drawn on the canvas, not in a panel. No theme token SHALL change for this.
+
+#### Scenario: White canvas in light
+- **WHEN** the color scheme is `light` and a mod is visible
+- **THEN** the app page's background color is the light value of `--ot-card`, and the sidebar, the stage bar and the mod's frame each have a non-empty computed box shadow and do not touch each other
+
+#### Scenario: Canvas in dark
+- **WHEN** the color scheme is `dark`
+- **THEN** the app page's background color is the dark value of `--ot-background`
+
+#### Scenario: Mods keep their background
+- **WHEN** the color scheme is `light` and a mod that adds no styles runs
+- **THEN** its frame's `<body>` background color is the light value of `--ot-background`

@@ -151,7 +151,7 @@ For a sandbox opened with a collection or a tile, the stage bar SHALL have a "Re
 - **THEN** the mod receives the tile with the new `title` and the frame was not reloaded
 
 ### Requirement: The visible frame fills the stage area
-The visible sandbox's frame SHALL fill the stage area: the page's width left beside the sidebar, and the viewport height left under the app header and the stage bar, following the window's size and the sidebar's width. The frame's size SHALL NOT depend on the mod's content: content taller than the frame SHALL scroll inside the frame, not the page. The frame SHALL be at least 16rem tall; when less room is left, the page scrolls.
+The visible sandbox's frame SHALL fill the stage area: the page's width left beside the sidebar, or the whole width when the sidebar is hidden, and the viewport height left under the stage bar, following the window's size and the sidebar's width. The frame's size SHALL NOT depend on the mod's content: content taller than the frame SHALL scroll inside the frame, not the page. The frame SHALL be at least 16rem tall; when less room is left, the page scrolls.
 
 #### Scenario: Frame reaches the bottom of the viewport
 - **WHEN** a mod runs in a 1280×800 viewport
@@ -160,6 +160,10 @@ The visible sandbox's frame SHALL fill the stage area: the page's width left bes
 #### Scenario: Window resized
 - **WHEN** the viewport is resized from 1280×800 to 1024×600 while a mod runs
 - **THEN** the frame's bottom edge is within 24 pixels of the new viewport's bottom edge
+
+#### Scenario: Hidden sidebar widens the frame
+- **WHEN** a mod runs in a 1280×800 viewport with the sidebar collapsed, and the user hides the sidebar
+- **THEN** the frame is wider than before, its left edge is within 24 pixels of the viewport's left edge, and it was not reloaded
 
 #### Scenario: Tall content scrolls inside the frame
 - **WHEN** a mod whose content is 3000 pixels tall runs in a 1280×800 viewport
