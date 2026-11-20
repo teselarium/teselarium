@@ -37,6 +37,8 @@ Error messages must include context.
 
 When fixing complex bugs prefer a TDD approach: write the failing test first, then fix the code.
 
+Do not hardcode fixes, search instead for robust solutions that prevents the problem from reappearing.
+
 ## Tests
 
 - Test each behavior once, at the lowest level that can prove it. Go up a
