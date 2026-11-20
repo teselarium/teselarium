@@ -27,6 +27,7 @@ import { opensSelectedTile, showsRefusedOpen } from "./open_cases.ts";
 import {
   clearsFilter,
   filtersTiles,
+  givesTableRoles,
   labelsEncodedFileName,
   labelsFilterField,
   labelsSharedFileNames,
@@ -56,6 +57,7 @@ export default function registerViewerTests(t: ModTestRegistration): void {
   );
   t.test("shows the collection of its target", showsTargetCollection);
   t.test("shows each tile's address", showsTileAddresses);
+  t.test("gives its tile table explicit table roles", givesTableRoles);
   t.test("labels tiles that share a file name", labelsSharedFileNames);
   t.test("labels an encoded file name decoded", labelsEncodedFileName);
   t.test("shows the entry issues", showsEntryIssues);

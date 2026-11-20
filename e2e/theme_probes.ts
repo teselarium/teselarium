@@ -270,6 +270,87 @@ export function canFrameScroll(): boolean {
   return root.scrollHeight > root.clientHeight;
 }
 
+/** Runs in a frame: true when the frame's document can scroll sideways. */
+export function canFrameScrollSideways(): boolean {
+  const root = document.documentElement;
+  return root.scrollWidth > root.clientWidth;
+}
+
+/**
+ * Runs in a frame: for each word of the first element matching `selector`,
+ * how many lines it takes. A word split across two lines counts 2.
+ * Self-contained, since it runs in the frame.
+ */
+export function countWordLines(selector: string): number[] {
+  const element = document.querySelector(selector);
+  if (element === null || element.firstChild === null) {
+    throw new Error(`Expected text in an element matching "${selector}"`);
+  }
+  const text = element.firstChild;
+  const content = text.textContent ?? "";
+  const counts: number[] = [];
+  for (const match of content.matchAll(/\S+/g)) {
+    const range = document.createRange();
+    range.setStart(text, match.index);
+    range.setEnd(text, match.index + match[0].length);
+    const lineTops = new Set<number>();
+    for (const rect of range.getClientRects()) {
+      lineTops.add(Math.round(rect.top));
+    }
+    counts.push(lineTops.size);
+  }
+  return counts;
+}
+
+/** The separators of one table row, as the user sees them. */
+export interface RowSeparators {
+  /** Whether the row is in the table's `<thead>`. */
+  isHeader: boolean;
+  /** Whether a line runs under the row: its own bottom border, or its last cell's. */
+  hasLineUnder: boolean;
+  /** How many of its cells but the last have a bottom border: lines between its values when they are stacked. */
+  linesBetweenCells: number;
+}
+
+/**
+ * Runs in a frame: the separators of each row of the first table, from the
+ * computed bottom borders of the row and its cells. In a table with columns,
+ * the cells' borders side by side make the line under the row, so only the
+ * last cell counts for it. Self-contained, since it runs in the frame.
+ */
+export function readRowSeparators(): RowSeparators[] {
+  const table = document.querySelector("table");
+  if (table === null) {
+    throw new Error("Expected a table in the frame");
+  }
+  const rows: RowSeparators[] = [];
+  for (const row of table.querySelectorAll("tr")) {
+    const cells = [...row.querySelectorAll(":scope > th, :scope > td")];
+    const cellBorders: number[] = [];
+    for (const cell of cells) {
+      cellBorders.push(parseFloat(getComputedStyle(cell).borderBottomWidth));
+    }
+    const rowBorder = parseFloat(getComputedStyle(row).borderBottomWidth);
+    let linesBetweenCells = 0;
+    for (const border of cellBorders.slice(0, -1)) {
+      if (border > 0) {
+        linesBetweenCells++;
+      }
+    }
+    rows.push({
+      isHeader: row.parentElement?.tagName === "THEAD",
+      hasLineUnder: rowBorder > 0 || (cellBorders.at(-1) ?? 0) > 0,
+      linesBetweenCells,
+    });
+  }
+  return rows;
+}
+
+/** Runs in a frame: the computed `overflow-wrap` of `<body>`. */
+export function readBodyOverflowWrap(): string {
+  return getComputedStyle(document.body).overflowWrap;
+}
+
 /** The size of the visible sandbox's frame element in the page. */
 export async function readVisibleFrameBox(
   page: Page,

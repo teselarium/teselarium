@@ -4,7 +4,7 @@
 
 See proposal.md (Why) and the audit notes in `.audit/android-themes/findings.md` (C1, C2, C3+D1, E1). Current state:
 
-- **Base stylesheet** (`src/lib/core/theme/base_stylesheet.css`, layer `opentesela`): the `body` rule sets padding, colors and the content width, but no `overflow-wrap`. Only the player buttons set `overflow-wrap: anywhere`. The browser's default, `normal`, lets an unbreakable word overflow its line.
+- **Base stylesheet** (`src/lib/core/theme/base_stylesheet.css`, layer `opentesela`): the `body` rule sets padding, colors and the content width, but no `overflow-wrap`. Only the player buttons set `overflow-wrap: anywhere`. The browser's default, `normal`, lets an unbreakable word overflow its line. The row separators are each cell's `border-bottom` (`th, td`), so a row whose cells are stacked shows a line under each value.
 - **Default mods' tables**: the three viewers render plain `<table>`s, styled by the base stylesheet (`table { width: 100% }`, `th, td` padding). They are the collection viewer's tiles (`tile_list.ts`, two columns) and the mod and mosaic viewers' permissions (`metadata_card.ts`, `mosaic_card.ts`, four columns `Category`, `Host`, `Reason`, `Status`). Each viewer's `viewer_page.ts` adds `td { overflow-wrap: anywhere; }`. With `anywhere`, a cell's min-content width drops to one character. So on a narrow frame the table shrinks columns to slivers instead of overflowing, and file names and hosts break letter by letter. At 360px the permission table still ends up 27px wider than the frame: the badge and padding cannot shrink.
 - **Tile viewer's place** (`collection_place.ts`, styled in `tile_viewer/src/viewer_page.ts`): a `<nav aria-label="Collection">` holds the title button (ghost, does not wrap), the position `<span>` (`flex: 1`), Previous and Next. The span is the item that shrinks, so `7 of 17` wraps.
 - **Book list card** (`public/samples/mods/book_list/main.js`): `dialog > header` is a flex row of the small book (`flex: none; width: 6rem`) and a details `<div>` (`flex: 1; min-width: 0`), whose `<dl>` is a grid `auto minmax(0, 1fr)`. On a phone the `<div>` is about 110px wide, the `auto` label column takes about 100px, and the values get 9px. The country map's card already stacks its image above the title.
@@ -18,7 +18,7 @@ See proposal.md (Why) and the audit notes in `.audit/android-themes/findings.md`
 - The same breakpoint for every "narrow frame" rule in this change: 30rem.
 
 **Non-Goals:**
-- No generic table behavior in the base stylesheet: tables in tile bodies and in third-party mods are not changed.
+- No generic table layout in the base stylesheet: it does not make tables scroll or stack. Only where it draws the row separators changes (D6).
 - No shared code module between default mods. The permission table styles are duplicated in the mod viewer and the mosaic viewer, as `check_report.ts` already is ("Keep both copies alike").
 - No change to the app shell (stage bar, sidebar): that is `fix-app-shell-on-phones`.
 
@@ -52,7 +52,10 @@ In each viewer's style, inside `@media (max-width: 29.99rem)`:
 
 ### D3. Tile viewer: the title wraps, the position does not
 
-In the tile viewer's style, the collection title button gets `flex: 1 1 auto; min-width: 0; white-space: normal; text-align: start`. The position `<span>` gets `flex: none; white-space: nowrap` and loses its `flex: 1`. Today the span's `flex: 1` pushes Previous and Next to the end of the row. The title now does that, so the wide layout looks the same: title at the start, then the position and the two buttons.
+In the tile viewer's style, the collection title button gets `flex: 0 1 auto; min-width: 0; margin-inline-end: auto; justify-content: flex-start; white-space: normal; text-align: start`. The position `<span>` gets `flex: none; white-space: nowrap` and loses its `flex: 1`. Today the span's `flex: 1` pushes Previous and Next to the end of the row. The title's auto end margin now does that, so the wide layout looks the same: title at the start, then the position and the two buttons.
+
+- **Why a margin, not `flex-grow`:** a growing button would fill the free space, and its ghost hover highlight with it. With the margin, the button stays as wide as its text, and it can still shrink and wrap on a phone (`min-width: 0`).
+- **Why `justify-content`:** base buttons are `inline-flex` with centered content, so `text-align` alone leaves a wrapped title centered.
 
 - **Alternative:** putting the position on its own line on narrow frames. That costs a row on every phone, even when everything fits.
 
@@ -67,6 +70,17 @@ The `<dl>`'s `auto minmax(0, 1fr)` grid is unchanged: with the full width, the v
 
 - **Alternative:** moving the `<dl>` out of the header, under the cover and title. That needs a markup change and changes the wide layout too.
 
+### D6. Row separators on the rows, in the base stylesheet
+
+The `th, td` rule loses its `border-bottom`, and `tr` gets `border-bottom: 1px solid var(--ot-border)`.
+
+- **Why:** stacked rows (D2) showed a line under each value, so a tile or a permission did not read as one group. The cause is where the base stylesheet draws the separator, so the fix belongs there: it works for every mod that stacks a table, and the default mods' own CSS stays layout only.
+- **Wide tables are unchanged:** with `border-collapse: collapse`, a row's border is painted where its cells' borders were, the header row's included.
+- **Stacked rows:** a row laid out as a block or a grid draws its own border once, under the whole row.
+- **Alternatives:**
+  - Overrides in each viewer (`border-bottom-width: 0` on all cells but the last) need an exception to the "layout only" check, hard-code column positions and are duplicated between mods.
+  - Padding only groups the values, but the lines between them stay.
+
 ### D5. Tests at the level that can see layout
 
 Every behavior here depends on layout, which jsdom cannot compute, so each requirement gets one Playwright test at a phone viewport (`page.setViewportSize`), plus one wide check where the spec keeps the wide layout:
@@ -74,7 +88,10 @@ Every behavior here depends on layout, which jsdom cannot compute, so each requi
 - `e2e/default_mods.spec.ts`: the three tables, the roles, and the tile viewer's position.
 - `e2e/sample_book_list.spec.ts`, tagged `@sample`: the card on a phone and on a wide viewport.
 
-None of these depends on the browser engine beyond layout, so they don't need `@frames`. The roles scenario is the one that could differ by engine. It reads ARIA roles, which the explicit roles make engine-independent, so it stays in the default Chromium run.
+- The separators (D6): in `e2e/mod_theme.spec.ts`, a stacked row and a table with columns, tagged `@frames`, since how engines paint row borders in a collapsed table may differ. In `e2e/default_mods.spec.ts`, the stacked permission and tile rows have a line under the row and none between their values.
+- The tile viewer's title at 1280×800: as wide as its text, Next at the end of the line.
+
+Apart from the separators, none of these depends on the browser engine beyond layout, so they don't need `@frames`. The roles scenario is the one that could differ by engine. It reads ARIA roles, which the explicit roles make engine-independent, so it stays in the default Chromium run.
 
 ## Risks / Trade-offs
 
@@ -83,6 +100,8 @@ None of these depends on the browser engine beyond layout, so they don't need `@
 - [The 30rem breakpoint is arbitrary for frames between 480 and 600px] → Those widths keep the columns, as today. The audit found no problem at the tablet's 640px frame. If one shows up, the value lives in three style blocks and is easy to tune.
 - [Explicit roles duplicate native semantics] → Harmless where the browser keeps the semantics, and needed where it drops them. The builders set them in one place per table.
 - [Permission styles are duplicated in two default mods] → Same accepted pattern as `check_report.ts`, with a "keep both copies alike" comment on each.
+- [A mod's `td { border-bottom: none }` no longer hides the separators] → Rare. The theme README gives the new override, `tr { border-bottom: none; }`.
+- [Engines may paint row borders differently] → The `@frames` separator test runs in Chromium, Firefox and WebKit.
 
 ## Migration Plan
 

@@ -19,8 +19,19 @@ function describeCount(shown: number, total: number): string {
   return count;
 }
 
+/**
+ * The explicit role of each cell. Tables that stack their rows in a narrow
+ * frame change their parts' `display`, and some browsers then drop the
+ * implicit table semantics. Explicit roles keep them.
+ */
+const CELL_ROLES: Record<"td" | "th", string> = {
+  td: "cell",
+  th: "columnheader",
+};
+
 function buildCell(tagName: "td" | "th", content: string | Node): HTMLElement {
   const cell = document.createElement(tagName);
+  cell.setAttribute("role", CELL_ROLES[tagName]);
   cell.append(content);
   return cell;
 }
@@ -36,6 +47,7 @@ function buildTileRow(
   address: string,
 ): HTMLElement {
   const row = document.createElement("tr");
+  row.setAttribute("role", "row");
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.otVariant = "ghost";
@@ -82,17 +94,22 @@ function buildFilterField(tileList: TileList): HTMLElement {
 /**
  * The tiles as a plain `<table>` in an `<article>`: the theme draws the
  * article as a card, and gives the rows separators and a hover highlight.
+ * Its parts carry explicit table roles (see `CELL_ROLES`).
  */
 function buildTileCard(rows: HTMLElement[]): HTMLElement {
   const header = document.createElement("tr");
+  header.setAttribute("role", "row");
   for (const column of TILE_COLUMNS) {
     header.append(buildCell("th", column));
   }
   const head = document.createElement("thead");
+  head.setAttribute("role", "rowgroup");
   head.append(header);
   const body = document.createElement("tbody");
+  body.setAttribute("role", "rowgroup");
   body.append(...rows);
   const table = document.createElement("table");
+  table.setAttribute("role", "table");
   table.append(head, body);
   const card = document.createElement("article");
   card.append(table);

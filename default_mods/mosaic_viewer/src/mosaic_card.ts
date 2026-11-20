@@ -58,6 +58,7 @@ function buildPermissionRow(
   isGranted: boolean,
 ): HTMLElement {
   const row = document.createElement("tr");
+  row.setAttribute("role", "row");
   const status = isGranted
     ? buildBadge("granted", "success")
     : buildBadge("not granted", "outline");
@@ -90,13 +91,17 @@ function buildPermissionTable(permissions: ModGrants): HTMLElement {
     return none;
   }
   const header = document.createElement("tr");
+  header.setAttribute("role", "row");
   for (const label of PERMISSION_COLUMNS) {
     header.append(buildCell("th", label));
   }
   const table = document.createElement("table");
+  table.setAttribute("role", "table");
   const head = document.createElement("thead");
+  head.setAttribute("role", "rowgroup");
   head.append(header);
   const body = document.createElement("tbody");
+  body.setAttribute("role", "rowgroup");
   body.append(...rows);
   table.append(head, body);
   return table;

@@ -11,6 +11,7 @@ import {
   visibleSandbox,
   waitForProbe,
 } from "./mod_routes.ts";
+import { countLines, sizeModFrame } from "./layout_probes.ts";
 import {
   serveExplorerOfTilesMod,
   serveTilesMod,
@@ -22,13 +23,17 @@ import {
   addModHtml,
   addModStyle,
   buildThemeProbeFiles,
+  canFrameScrollSideways,
   chooseTheme,
+  countWordLines,
   DARK_COLORS,
   hasThemeEvents,
   LIGHT_COLORS,
   readAttributeAtMount,
   readBodyColors,
   readBodyMargin,
+  readBodyOverflowWrap,
+  readRowSeparators,
   readColorSchemeAttribute,
   readElementColors,
   readElementLook,
@@ -280,6 +285,111 @@ test.describe(
         { colorScheme: "dark", attribute: "dark" },
       ]);
       expect(await frame.evaluate(readColorSchemeAttribute)).toBe("dark");
+    });
+  },
+);
+
+/** The frame width of a phone in the audit that found long words overflowing. */
+const NARROW_FRAME_WIDTH = 338;
+
+const BARE_URL = "https://en.wikipedia.org/wiki/Bob_Dylan";
+
+test.describe("Long words wrap", function describeLongWords(): void {
+  test("Bare URL in a narrow frame", async function wrapsBareUrl({
+    page,
+  }): Promise<void> {
+    const frame = await openThemeProbe(page, "light");
+    await sizeModFrame(page, "probe", NARROW_FRAME_WIDTH);
+
+    await frame.evaluate(
+      addModHtml,
+      `<p id="link"><a href="${BARE_URL}">${BARE_URL}</a></p>`,
+    );
+
+    expect(await frame.locator("#link a").evaluate(countLines)).toBeGreaterThan(
+      1,
+    );
+    expect(await frame.evaluate(canFrameScrollSideways)).toBe(false);
+  });
+
+  test("Words that fit are not broken", async function keepsWords({
+    page,
+  }): Promise<void> {
+    const frame = await openThemeProbe(page, "light");
+    await sizeModFrame(page, "probe", NARROW_FRAME_WIDTH);
+
+    await frame.evaluate(
+      addModHtml,
+      '<p id="words">The Nobel Prize in Literature</p>',
+    );
+
+    for (const lines of await frame.evaluate(countWordLines, "#words")) {
+      expect(lines).toBe(1);
+    }
+  });
+
+  test("A mod's own style wins", async function appliesModWrapping({
+    page,
+  }): Promise<void> {
+    const frame = await openThemeProbe(page, "light");
+
+    await frame.evaluate(addModStyle, "body { overflow-wrap: normal; }");
+
+    expect(await frame.evaluate(readBodyOverflowWrap)).toBe("normal");
+  });
+
+  test("Opted-out mods are not changed", async function keepsDefaultWrapping({
+    page,
+  }): Promise<void> {
+    const frame = await openThemeProbe(page, "light", ['  theme: "none"']);
+
+    expect(await frame.evaluate(readBodyOverflowWrap)).toBe("normal");
+  });
+});
+
+/** A table of a header row and two rows of two cells. */
+const TWO_ROW_TABLE =
+  "<table><thead><tr><th>Name</th><th>Address</th></tr></thead>" +
+  "<tbody><tr><td>First</td><td>https://example.org/first.md</td></tr>" +
+  "<tr><td>Second</td><td>https://example.org/second.md</td></tr></tbody></table>";
+
+test.describe(
+  "Table rows have one separator each",
+  { tag: "@frames" },
+  function describeRowSeparators(): void {
+    test("Stacked row", async function separatesStackedRow({
+      page,
+    }): Promise<void> {
+      const frame = await openThemeProbe(page, "light");
+      await sizeModFrame(page, "probe", NARROW_FRAME_WIDTH);
+
+      await frame.evaluate(
+        addModStyle,
+        "table, tbody, tr, td { display: block; } thead { display: none; }",
+      );
+      await frame.evaluate(addModHtml, TWO_ROW_TABLE);
+
+      const [first, last] = (await frame.evaluate(readRowSeparators)).slice(1);
+      expect(first).toEqual({
+        isHeader: false,
+        hasLineUnder: true,
+        linesBetweenCells: 0,
+      });
+      expect(last.linesBetweenCells).toBe(0);
+    });
+
+    test("Table with columns", async function separatesRows({
+      page,
+    }): Promise<void> {
+      const frame = await openThemeProbe(page, "light");
+
+      await frame.evaluate(addModHtml, TWO_ROW_TABLE);
+
+      const lines: boolean[] = [];
+      for (const row of await frame.evaluate(readRowSeparators)) {
+        lines.push(row.hasLineUnder);
+      }
+      expect(lines).toEqual([true, true, false]);
     });
   },
 );

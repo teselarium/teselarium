@@ -146,3 +146,30 @@ export function listTexts(elements: Iterable<Element>): string[] {
   }
   return texts;
 }
+
+/** The role each part of a table must carry explicitly. */
+const TABLE_PART_ROLES: Record<string, string> = {
+  TABLE: "table",
+  THEAD: "rowgroup",
+  TBODY: "rowgroup",
+  TR: "row",
+  TH: "columnheader",
+  TD: "cell",
+};
+
+/**
+ * The parts of `table`, itself included, whose `role` attribute is not the
+ * explicit table role of their element, as `tag: role`. Empty when every
+ * part carries its role.
+ */
+export function listWrongTableRoles(table: Element): string[] {
+  const wrong: string[] = [];
+  const parts = [table, ...table.querySelectorAll("thead, tbody, tr, th, td")];
+  for (const part of parts) {
+    const role = part.getAttribute("role");
+    if (role !== TABLE_PART_ROLES[part.tagName]) {
+      wrong.push(`${part.tagName.toLowerCase()}: ${role}`);
+    }
+  }
+  return wrong;
+}

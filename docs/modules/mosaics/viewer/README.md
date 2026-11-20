@@ -28,7 +28,7 @@ The report is drawn by `src/check_report.ts`, a copy of the mod viewer's report 
 
 Its TypeScript source, in `default_mods/mosaic_viewer/src/`, gets the app's look from semantic HTML as the mod viewer does:
 
-- the mosaic is an `<article>`, drawn as a card, and the permissions a plain `<table>`;
+- the mosaic is an `<article>`, drawn as a card, and the permissions a plain `<table>` whose parts carry explicit table roles, laid out as the [mod viewer](../../mods/viewer/README.md)'s: below 30rem, each permission is a block, its category and status, then its host, then its reason, with the header row hidden visually. A copy of the mod viewer's rules: a change to one belongs in the other;
 - the mod's version, the API range's match, the permission statuses, the check status and the findings' levels are badges: `<span>`s with `data-ot-variant`;
 - the mod's and the collection's titles are buttons with `data-ot-variant="ghost"`, "Open mosaic" a `<button type="submit">`, drawn as the primary button, and "Check mosaic" a plain `<button>`, drawn as an outline button, so the page has one primary action;
 - errors and notices are `role="alert"` and `role="status"` elements.

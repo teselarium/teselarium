@@ -19,6 +19,17 @@ const VIEWER_STYLE = `
   section[aria-label="Tiles"] table { margin: 0; }
   td { overflow-wrap: anywhere; }
   td > button { white-space: normal; text-align: start; overflow-wrap: anywhere; }
+  /*
+   * A narrow frame, such as a phone's: each tile is a block, its label, then
+   * its address, each across the row. The header row is hidden visually but
+   * stays for screen readers, and the explicit table roles of tile_list.ts
+   * keep the table's semantics.
+   */
+  @media (max-width: 29.99rem) {
+    section[aria-label="Tiles"] :is(table, tbody, td) { display: block; }
+    section[aria-label="Tiles"] tr:not([hidden]) { display: block; }
+    section[aria-label="Tiles"] thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
 `;
 
 export function addViewerStyle(): void {

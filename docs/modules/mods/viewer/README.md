@@ -23,7 +23,7 @@ The [mosaic viewer](../../mosaics/viewer/README.md) shows a mosaic check's repor
 
 Its TypeScript source, in `default_mods/mod_viewer/src/`, is a short example of how a mod gets the app's look from semantic HTML, with no classes and no styling library:
 
-- the metadata is an `<article>`, drawn as a card, and the permissions a plain `<table>`;
+- the metadata is an `<article>`, drawn as a card, and the permissions a plain `<table>` whose parts carry explicit table roles (`table`, `rowgroup`, `row`, `columnheader`, `cell`). In a frame narrower than 30rem, such as a phone's, each permission is a block: its category with its status badge at the end, then its host, then its reason, without the header row. The header row is hidden visually, not removed, and the roles keep the table's semantics for assistive technology whatever its layout. The [mosaic viewer](../../mosaics/viewer/README.md) has a copy of these rules: a change to one belongs in the other;
 - the version, the API range's match, the permission statuses, the check status, the test cases' statuses and the findings' levels are badges: `<span>`s with `data-ot-variant` (`secondary`, `success`, `warning`, `destructive`, `outline`);
 - "Open default mosaic" is a `<button type="submit">`, drawn as the primary button, and "Run with this collection" a submit button with `data-ot-variant="outline"`, so the page has one primary action;
 - errors and notices are `role="alert"` and `role="status"` elements.

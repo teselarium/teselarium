@@ -251,3 +251,84 @@ export async function sizeModFrame(
     );
   }
 }
+
+/** Where an element sits in its document's viewport, in CSS pixels. */
+export interface ElementBox {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+  width: number;
+  height: number;
+}
+
+/** Runs on an element: where it sits in its document's viewport. */
+export function readElementBox(element: Element): ElementBox {
+  const rect = element.getBoundingClientRect();
+  const box: ElementBox = {
+    top: rect.top,
+    bottom: rect.bottom,
+    left: rect.left,
+    right: rect.right,
+    width: rect.width,
+    height: rect.height,
+  };
+  return box;
+}
+
+/**
+ * Runs on an element: how many lines its content takes, counted by the
+ * distinct tops of the boxes its text is laid out in. Self-contained, since
+ * it runs in a frame.
+ */
+export function countLines(element: Element): number {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const lineTops = new Set<number>();
+  for (const rect of range.getClientRects()) {
+    if (rect.width > 0) {
+      lineTops.add(Math.round(rect.top));
+    }
+  }
+  return lineTops.size;
+}
+
+/** Runs in a frame: the width of its document's viewport, without a scrollbar. */
+export function readDocumentWidth(): number {
+  return document.documentElement.clientWidth;
+}
+
+/**
+ * Runs on an element: true when its content is fully shown, neither cut by
+ * its own box nor past its document's viewport sideways.
+ */
+export function isFullyShown(element: Element): boolean {
+  const rect = element.getBoundingClientRect();
+  const fitsItself =
+    element.scrollWidth <= element.clientWidth &&
+    element.scrollHeight <= element.clientHeight;
+  const fitsDocument =
+    rect.left >= 0 && rect.right <= document.documentElement.clientWidth;
+  return fitsItself && fitsDocument;
+}
+
+/**
+ * Runs on an element: how much wider it is than its text plus its own
+ * horizontal padding and borders, in CSS pixels. About 0 for a box that is
+ * as wide as its text. Self-contained, since it runs in a frame.
+ */
+export function readExtraWidth(element: Element): number {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const style = getComputedStyle(element);
+  const frameWidth =
+    parseFloat(style.paddingLeft) +
+    parseFloat(style.paddingRight) +
+    parseFloat(style.borderLeftWidth) +
+    parseFloat(style.borderRightWidth);
+  const extra =
+    element.getBoundingClientRect().width -
+    range.getBoundingClientRect().width -
+    frameWidth;
+  return extra;
+}

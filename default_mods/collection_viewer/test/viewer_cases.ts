@@ -9,6 +9,7 @@ import {
   readInspection,
   readTileLabel,
   typeInFilter,
+  listWrongTableRoles,
 } from "./case_helpers.ts";
 
 /** The end of the shown collection's source, whatever the app's address. */
@@ -205,4 +206,11 @@ export async function showsTargetFormatError(
   context
     .expect(findElement(context, '[role="alert"]').textContent)
     .toContain('"tiles" must be a list');
+}
+
+export async function givesTableRoles(context: CaseContext): Promise<void> {
+  await mountWithTarget(context, FIXTURE_REFERENCES.shownCollection);
+
+  const table = findElement(context, 'section[aria-label="Tiles"] table');
+  context.expect(listWrongTableRoles(table)).toEqual([]);
 }

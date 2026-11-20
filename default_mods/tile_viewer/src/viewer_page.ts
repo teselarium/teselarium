@@ -9,7 +9,8 @@ import { buildTileCard } from "./tile_card.ts";
 // in the same card.
 const VIEWER_STYLE = `
   nav[aria-label="Collection"] { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); margin-bottom: var(--ot-space-4); }
-  nav[aria-label="Collection"] > span { flex: 1; }
+  nav[aria-label="Collection"] > button[data-ot-variant="ghost"] { flex: 0 1 auto; min-width: 0; margin-inline-end: auto; justify-content: flex-start; white-space: normal; text-align: start; }
+  nav[aria-label="Collection"] > span { flex: none; white-space: nowrap; }
   article > h1 { margin-top: 0; overflow-wrap: anywhere; }
   article > small { display: block; overflow-wrap: anywhere; }
   section[aria-label="Metadata"] > header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); margin-bottom: var(--ot-space-2); }

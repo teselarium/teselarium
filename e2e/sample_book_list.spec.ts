@@ -41,7 +41,7 @@ import {
   readBodyColors,
   readTokenAs,
 } from "./theme_probes.ts";
-import { sizeModFrame } from "./layout_probes.ts";
+import { countLines, readElementBox, sizeModFrame } from "./layout_probes.ts";
 
 const SAMPLE_TITLES = ["Fahrenheit 451", "Kallocain", "The Library of Babel"];
 
@@ -561,6 +561,78 @@ test.describe(
       await expect(
         card.getByRole("heading", { level: 2, name: "Kallocain" }),
       ).toBeVisible();
+    });
+  },
+);
+
+/** A phone in portrait. */
+const PHONE_VIEWPORT = { width: 412, height: 915 };
+
+/** A laptop screen. */
+const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
+
+/** Expects each of the card's values that are `texts` to be one line high. */
+async function expectValuesOnOneLine(
+  card: Locator,
+  texts: string[],
+): Promise<void> {
+  for (const text of texts) {
+    const value = card
+      .getByRole("definition")
+      .filter({ hasText: new RegExp(`^${text}$`) });
+    expect(await value.evaluate(countLines)).toBe(1);
+  }
+}
+
+function cardHeading(card: Locator): Locator {
+  return card.getByRole("heading", { level: 2, name: "Kallocain" });
+}
+
+test.describe(
+  "Card in a narrow frame",
+  { tag: "@sample" },
+  function describeNarrowCard(): void {
+    test("Kallocain's card on a phone", async function stacksCover({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize(PHONE_VIEWPORT);
+      const frame = await openSample(page);
+
+      const card = await openKallocainCard(frame);
+
+      const cover = await card.locator("figure").evaluate(readElementBox);
+      const heading = await cardHeading(card).evaluate(readElementBox);
+      expect(cover.bottom).toBeLessThanOrEqual(heading.top);
+      await expectValuesOnOneLine(card, ["1940", "Sweden", "Swedish"]);
+    });
+
+    test("Card without a cover on a phone", async function startsWithHeading({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize(PHONE_VIEWPORT);
+      await page.route(`**${SAMPLE_MOD_FILE_PATH}`, answerCoversOff);
+      const frame = await openSample(page);
+
+      const card = await openKallocainCard(frame);
+
+      const header = await card.locator("header").evaluate(readElementBox);
+      const heading = await cardHeading(card).evaluate(readElementBox);
+      expect(Math.abs(heading.top - header.top)).toBeLessThanOrEqual(1);
+      await expectValuesOnOneLine(card, ["Sweden"]);
+    });
+
+    test("Wide frame keeps the cover beside the title", async function keepsCoverBeside({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize(DESKTOP_VIEWPORT);
+      const frame = await openSample(page);
+
+      const card = await openKallocainCard(frame);
+
+      const cover = await card.locator("figure").evaluate(readElementBox);
+      const heading = await cardHeading(card).evaluate(readElementBox);
+      expect(cover.right).toBeLessThanOrEqual(heading.left);
+      expect(cover.top).toBeLessThan(heading.bottom);
     });
   },
 );

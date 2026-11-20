@@ -76,11 +76,19 @@ Unless the mod opts out, its frame gets the tokens and a base stylesheet before 
 - form fields (`input`, `select`, `textarea`): the `card` surface, `input` border, radius, padding, the page's font, a placeholder in `muted-foreground`;
 - focus rings: a solid 3px `ring` outline on buttons and fields, a 2px one with a small offset on anything else (links, `[tabindex]`);
 - pressed buttons (`button[aria-pressed="true"]`) and current items (`[aria-current]`): a 3px outline in `--ot-primary`;
-- lists, description lists, tables (full width, row separators, headers in `muted-foreground`, a `muted` row on hover);
+- lists, description lists, tables (full width, headers in `muted-foreground`, a `muted` row on hover, and a separator under the header row and under each row but the last). The separator is drawn on the row (`tr`), not on its cells, so a row a mod stacks in a narrow frame, as a block or a grid, keeps one line under the whole row instead of one under each value. A mod drops it with `tr { border-bottom: none; }`;
 - `img`, `video`, `canvas`, `svg`: never wider than their container;
 - `<dialog>` (`popover`, border, radius, shadow, padding) and its backdrop;
 - `[hidden]`: still hidden, whatever else the base stylesheet gives the element, but not against a mod's own rule that sets `display` (see [The layer](#the-layer-your-css-always-wins));
 - short color transitions, none when the user prefers reduced motion.
+
+**Long words.** The page's text wraps long words: a word that does not fit on a line, such as a bare URL, breaks at the line's end, so text alone never makes the frame scroll sideways. Words that fit are never split, and tables, flex items and grid tracks stay at least as wide as their longest word (`overflow-wrap: break-word`, not `anywhere`). Every element inherits it from `<body>`. A mod that wants the browser's default back overrides it like any other base style:
+
+```css
+body {
+  overflow-wrap: normal;
+}
+```
 
 It sets no layout beyond spacing and the body's width in the `contained` layout. Checkboxes, radio buttons and range inputs take the primary color through `accent-color`, and the browser's own controls and scrollbars follow the color scheme through `color-scheme`.
 

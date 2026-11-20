@@ -138,6 +138,15 @@ const BOOK_LIST_STYLE = `
   dialog dd { margin: 0; }
   dialog > header p:last-child { display: flex; flex-wrap: wrap; gap: var(--ot-space-1); margin: 0; }
 
+  /*
+   * A narrow frame, such as a phone's: the small book above the details,
+   * centered, so the labeled values get the card's whole width.
+   */
+  @media (max-width: 29.99rem) {
+    dialog > header { flex-direction: column; align-items: stretch; }
+    dialog > header > figure { align-self: center; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     li > button { transition: none; }
     li > button:hover,

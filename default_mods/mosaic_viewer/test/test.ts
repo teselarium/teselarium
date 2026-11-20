@@ -21,6 +21,7 @@ import {
   keepsOwnStylesToLayout,
 } from "./look_cases.ts";
 import {
+  givesTableRoles,
   saysEmptyTarget,
   saysNoCollection,
   saysNoTarget,
@@ -36,6 +37,7 @@ import {
 export default function registerViewerTests(t: ModTestRegistration): void {
   t.test("shows the mosaic of its target", showsTargetMosaic);
   t.test("shows permission statuses as badges", showsPermissionBadges);
+  t.test("gives its permission table explicit table roles", givesTableRoles);
   t.test("shows the mosaic's mod", showsTargetMod);
   t.test("shows the mosaic's collection", showsTargetCollection);
   t.test("says when the mosaic has no collection", saysNoCollection);

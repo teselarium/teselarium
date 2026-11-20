@@ -19,6 +19,7 @@ import {
   runsWithTypedCollection,
 } from "./run_cases.ts";
 import {
+  givesTableRoles,
   marksMatchingApiRange,
   marksOtherApiRange,
   saysEmptyTarget,
@@ -56,6 +57,7 @@ export default function registerViewerTests(t: ModTestRegistration): void {
     offersNoDefaultMosaicWithoutOne,
   );
   t.test("shows permission statuses as badges", showsPermissionBadges);
+  t.test("gives its permission table explicit table roles", givesTableRoles);
   t.test(
     "makes opening the default mosaic the primary action",
     drawsPrimaryAction,

@@ -36,11 +36,22 @@ export function buildButton(
   return button;
 }
 
+/**
+ * The explicit role of each cell. Tables that stack their rows in a narrow
+ * frame change their parts' `display`, and some browsers then drop the
+ * implicit table semantics. Explicit roles keep them.
+ */
+const CELL_ROLES: Record<"td" | "th", string> = {
+  td: "cell",
+  th: "columnheader",
+};
+
 export function buildCell(
   tagName: "td" | "th",
   content: string | Node,
 ): HTMLElement {
   const cell = document.createElement(tagName);
+  cell.setAttribute("role", CELL_ROLES[tagName]);
   cell.append(content);
   return cell;
 }

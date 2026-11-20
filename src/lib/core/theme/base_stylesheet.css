@@ -24,6 +24,14 @@
     padding: var(--ot-space-4);
     background-color: var(--ot-background);
     color: var(--ot-foreground);
+    /*
+     * A word that does not fit on a line, such as a bare URL, breaks at the
+     * line's end instead of making the document scroll sideways. `break-word`
+     * and not `anywhere`: `anywhere` also lowers min-content widths, which
+     * squeezes table columns and flex items into slivers. `break-word` keeps
+     * them at their longest word's width. Every element inherits it.
+     */
+    overflow-wrap: break-word;
   }
 
   /*
@@ -272,8 +280,18 @@
   th,
   td {
     padding: var(--ot-space-2);
-    border-bottom: 1px solid var(--ot-border);
     text-align: start;
+  }
+
+  /*
+   * The row separator is on the row, not on its cells. In a collapsed table
+   * it is painted where the cells' borders would be, and a row a mod stacks
+   * in a narrow frame (as a block or a grid) keeps one line under the whole
+   * row instead of one under each value. A mod drops it with
+   * `tr { border-bottom: none; }`.
+   */
+  tr {
+    border-bottom: 1px solid var(--ot-border);
   }
 
   th {
@@ -281,7 +299,8 @@
     font-weight: 500;
   }
 
-  tr:last-child > td {
+  /* No line after the last row, but still one under the header row. */
+  tr:last-child:not(thead > tr) {
     border-bottom: 0;
   }
 

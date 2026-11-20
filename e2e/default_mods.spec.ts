@@ -57,7 +57,21 @@ import {
   EXPLORER_OFF_PREVIEW_URL,
   TEST_CATALOG_PREVIEW_URL,
 } from "./app_servers.ts";
-import { listOwnLookDeclarations, readTokenAs } from "./theme_probes.ts";
+import {
+  canFrameScrollSideways,
+  listOwnLookDeclarations,
+  readRowSeparators,
+  readTokenAs,
+} from "./theme_probes.ts";
+import type { RowSeparators } from "./theme_probes.ts";
+import {
+  countLines,
+  isFullyShown,
+  readDocumentWidth,
+  readExtraWidth,
+  readElementBox,
+} from "./layout_probes.ts";
+import type { ElementBox } from "./layout_probes.ts";
 
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
@@ -577,6 +591,7 @@ const VIEWER_CASES = [
   "runs without tiles",
   "offers no default mosaic without one",
   "shows permission statuses as badges",
+  "gives its permission table explicit table roles",
   "makes opening the default mosaic the primary action",
   "keeps its own styles to layout",
 ];
@@ -602,6 +617,7 @@ const COLLECTION_VIEWER_CASES = [
   "keeps every tile for an empty filter",
   "shows the collection of its target",
   "shows each tile's address",
+  "gives its tile table explicit table roles",
   "labels tiles that share a file name",
   "labels an encoded file name decoded",
   "shows the entry issues",
@@ -641,6 +657,7 @@ const MOSAIC_EXPLORER_CASES = [
 const MOSAIC_VIEWER_CASES = [
   "shows the mosaic of its target",
   "shows permission statuses as badges",
+  "gives its permission table explicit table roles",
   "shows the mosaic's mod",
   "shows the mosaic's collection",
   "says when the mosaic has no collection",
@@ -2033,3 +2050,305 @@ test.describe(
     });
   },
 );
+
+/** A phone in portrait. */
+const PHONE_VIEWPORT = { width: 412, height: 915 };
+
+/** A small phone in portrait. */
+const SMALL_PHONE_VIEWPORT = { width: 360, height: 740 };
+
+/** A laptop screen. */
+const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
+
+/** The mosaic viewer's fixture mosaic that declares a permission, which every built app serves. */
+const SHOWN_MOSAIC_REFERENCE =
+  "./default_mods/mosaic_viewer/fixtures/shown_mosaic.yaml";
+
+/** The collection viewer's fixture collection with laureate-like file names, which every built app serves. */
+const SHOWN_COLLECTION_REFERENCE =
+  "./default_mods/collection_viewer/fixtures/shown_collection.yaml";
+
+/** The column headings of the permission tables. */
+const PERMISSION_COLUMNS = ["Category", "Host", "Reason", "Status"];
+
+/** The rows of a table that hold cells, without its header row. */
+function listValueRows(frame: FrameLocator, table: Locator): Locator {
+  return table.getByRole("row").filter({ has: frame.getByRole("cell") });
+}
+
+/** Expects every cell of `rows` inside the frame's width. */
+async function expectCellsInsideFrame(
+  rows: Locator,
+  frameWidth: number,
+): Promise<void> {
+  const cells = rows.getByRole("cell");
+  await expect(cells.first()).toBeVisible();
+  for (const cell of await cells.all()) {
+    const box = await cell.evaluate(readElementBox);
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(frameWidth);
+  }
+}
+
+/** Expects the boxes to sit side by side, in order, on one line. */
+function expectSideBySide(boxes: ElementBox[]): void {
+  for (let index = 1; index < boxes.length; index++) {
+    expect(boxes[index].top).toBeCloseTo(boxes[0].top, 0);
+    expect(boxes[index].left).toBeGreaterThanOrEqual(boxes[index - 1].right);
+  }
+}
+
+async function readCellBoxes(row: Locator): Promise<ElementBox[]> {
+  const boxes: ElementBox[] = [];
+  for (const cell of await row.getByRole("cell").all()) {
+    boxes.push(await cell.evaluate(readElementBox));
+  }
+  return boxes;
+}
+
+test.describe("Viewer tables stack in a narrow frame", function describeNarrowTables(): void {
+  test("Collection viewer on a phone", async function stacksTileRows({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(PHONE_VIEWPORT);
+    await page.goto(buildCollectionViewerLink(SHOWN_COLLECTION_REFERENCE));
+    const viewer = collectionViewerFrame(page);
+
+    const row = viewer
+      .getByRole("row")
+      .filter({ hasText: "2021__abdulrazak_gurnah.md" });
+    const label = row.getByRole("cell").nth(0);
+    const address = row.getByRole("cell").nth(1);
+    await expect(label).toBeVisible();
+
+    expect(await label.getByRole("button").evaluate(countLines)).toBe(1);
+    const labelBox = await label.evaluate(readElementBox);
+    const addressBox = await address.evaluate(readElementBox);
+    expect(addressBox.top).toBeGreaterThanOrEqual(labelBox.bottom - 1);
+    const frame = await findModFrame(page, "Collection Viewer");
+    expect(await frame.evaluate(canFrameScrollSideways)).toBe(false);
+  });
+
+  test("Mosaic viewer permissions on a small phone", async function stacksMosaicPermissions({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await openMosaicViewer(page, SHOWN_MOSAIC_REFERENCE);
+    const viewer = mosaicViewerFrame(page);
+    const frame = await findModFrame(page, "Mosaic Viewer");
+
+    const table = mosaicViewerSection(page, "Permissions").getByRole("table");
+
+    await expectCellsInsideFrame(
+      listValueRows(viewer, table),
+      await frame.evaluate(readDocumentWidth),
+    );
+    expect(await frame.evaluate(canFrameScrollSideways)).toBe(false);
+  });
+
+  test("Mod viewer permissions on a phone", async function stacksModPermissions({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await openViewerForTilesMod(page);
+    const frame = await findModFrame(page, "Mod Viewer");
+
+    const badge = coverPermissionRow(frame).getByText("granted", {
+      exact: true,
+    });
+
+    const box = await badge.evaluate(readElementBox);
+    expect(box.right).toBeLessThanOrEqual(
+      await frame.evaluate(readDocumentWidth),
+    );
+  });
+
+  test("Wide frame keeps the columns", async function keepsColumns({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await openMosaicViewer(page, SHOWN_MOSAIC_REFERENCE);
+    const viewer = mosaicViewerFrame(page);
+
+    const table = mosaicViewerSection(page, "Permissions").getByRole("table");
+
+    const headers = table.getByRole("columnheader");
+    await expect(headers).toHaveText(PERMISSION_COLUMNS);
+    const headerBoxes: ElementBox[] = [];
+    for (const header of await headers.all()) {
+      headerBoxes.push(await header.evaluate(readElementBox));
+    }
+    expectSideBySide(headerBoxes);
+    expectSideBySide(await readCellBoxes(listValueRows(viewer, table).first()));
+  });
+
+  test("Cells keep their column headings", async function keepsTableRoles({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await openMosaicViewer(page, SHOWN_MOSAIC_REFERENCE);
+    const viewer = mosaicViewerFrame(page);
+
+    const table = mosaicViewerSection(page, "Permissions").getByRole("table");
+
+    await expect(table).toHaveCount(1);
+    await expect(table.getByRole("columnheader")).toHaveText(
+      PERMISSION_COLUMNS,
+    );
+    const rows = listValueRows(viewer, table);
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first().getByRole("cell")).toHaveCount(4);
+  });
+});
+
+/** Where the separator test serves a mosaic of the tiles mod with two permissions. */
+const TWO_PERMISSIONS_MOSAIC_FILE = "mosaics/two_permissions.yaml";
+
+/** A mosaic of the tiles mod that declares two `show` permissions, so its table has a row that is not the last. */
+function buildTwoPermissionsMosaicFiles(): ModFiles {
+  const files: ModFiles = {
+    [TWO_PERMISSIONS_MOSAIC_FILE]: [
+      "mosaic:",
+      '  title: "Two permissions"',
+      '  mod: "../tiles/"',
+      '  collection: "../tiles/item_collection.yaml"',
+      "  permissions:",
+      "    show:",
+      '      - host: "https://upload.wikimedia.org"',
+      '        reason: "Shows the item images"',
+      '      - host: "https://covers.openlibrary.org"',
+      '        reason: "Shows the item covers"',
+    ].join("\n"),
+  };
+  return files;
+}
+
+/** Expects each row of the table body to have one line under it but the last, and none between its values. */
+function expectOneSeparatorPerRow(rows: RowSeparators[]): void {
+  const bodyRows: RowSeparators[] = [];
+  for (const row of rows) {
+    if (!row.isHeader) {
+      bodyRows.push(row);
+    }
+  }
+  expect(bodyRows.length).toBeGreaterThan(1);
+  for (const [index, row] of bodyRows.entries()) {
+    expect(row.linesBetweenCells).toBe(0);
+    expect(row.hasLineUnder).toBe(index < bodyRows.length - 1);
+  }
+}
+
+test.describe("Stacked rows keep one separator each", function describeStackedSeparators(): void {
+  test("Permission rows on a small phone", async function separatesPermissions({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await serveTilesMod(page, buildTwoPermissionsMosaicFiles());
+    await openMosaicViewer(
+      page,
+      `.${APP_ORIGIN_MOD_PATH}${TWO_PERMISSIONS_MOSAIC_FILE}`,
+    );
+    await expect(
+      mosaicViewerSection(page, "Permissions").getByRole("row"),
+    ).toHaveCount(3);
+    const frame = await findModFrame(page, "Mosaic Viewer");
+
+    expectOneSeparatorPerRow(await frame.evaluate(readRowSeparators));
+  });
+
+  test("Tile rows on a phone", async function separatesTiles({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(PHONE_VIEWPORT);
+    await page.goto(buildCollectionViewerLink(SHOWN_COLLECTION_REFERENCE));
+    await expect(
+      collectionViewerFrame(page).getByRole("row").first(),
+    ).toBeAttached();
+    const frame = await findModFrame(page, "Collection Viewer");
+
+    expectOneSeparatorPerRow(await frame.evaluate(readRowSeparators));
+  });
+});
+
+/** The title of the collection the place test serves: as long as the laureates' collection's. */
+const LONG_TITLE = "Nobel Prize in Literature laureates";
+
+/** Where the place test serves its collection, on the app's origin. */
+const LONG_TITLE_COLLECTION_PATH = `${APP_ORIGIN_MOD_PATH}long_title/collection.yaml`;
+
+/** How many tiles the place test's collection lists, and where in it the shown tile is. */
+const LONG_TITLE_TILE_COUNT = 17;
+const LONG_TITLE_TILE_POSITION = 7;
+
+/**
+ * Serves a collection titled `LONG_TITLE` of 17 tiles, by address, whose
+ * seventh is the tile viewer's fixture `tiles/kallocain.md`. The tile viewer
+ * only inspects it, so the other tiles are never requested.
+ */
+async function serveLongTitleCollection(route: Route): Promise<void> {
+  const origin = new URL(route.request().url()).origin;
+  const lines = ["collection:", `  title: "${LONG_TITLE}"`, "  tiles:"];
+  for (let position = 1; position <= LONG_TITLE_TILE_COUNT; position++) {
+    const address =
+      position === LONG_TITLE_TILE_POSITION
+        ? `${origin}${TILE_FIXTURES_PATH}tiles/kallocain.md`
+        : `${origin}${APP_ORIGIN_MOD_PATH}long_title/tile_${position}.md`;
+    lines.push(`    - url: "${address}"`);
+  }
+  await route.fulfill({ status: 200, body: lines.join("\n") });
+}
+
+test.describe("Tile viewer keeps its position on one line", function describePlaceOnPhones(): void {
+  test("Title on a wide frame", async function fitsTitleToText({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await openFixtureTile(page, "tiles/kallocain.md");
+    const place = tileViewerFrame(page).getByRole("navigation", {
+      name: "Collection",
+    });
+    await expect(place).toContainText("1 of 3");
+
+    const title = place.getByRole("button").first();
+    const next = place.getByRole("button", { name: "Next" });
+
+    expect(await title.evaluate(readExtraWidth)).toBeLessThanOrEqual(1);
+    const placeBox = await place.evaluate(readElementBox);
+    expect((await title.evaluate(readElementBox)).left).toBeCloseTo(
+      placeBox.left,
+      0,
+    );
+    expect((await next.evaluate(readElementBox)).right).toBeCloseTo(
+      placeBox.right,
+      0,
+    );
+  });
+
+  test("Position on a phone", async function keepsPositionOnOneLine({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(PHONE_VIEWPORT);
+    await page.route(
+      `**${LONG_TITLE_COLLECTION_PATH}`,
+      serveLongTitleCollection,
+    );
+    await page.goto("/");
+    const tile = readTileFixtureUrl(page, "tiles/kallocain.md");
+    const from = new URL(LONG_TITLE_COLLECTION_PATH, page.url()).href;
+    await followLink(page, buildTileViewerLink(tile, from));
+    const place = tileViewerFrame(page).getByRole("navigation", {
+      name: "Collection",
+    });
+
+    const position = place.getByText(
+      `${LONG_TITLE_TILE_POSITION} of ${LONG_TITLE_TILE_COUNT}`,
+      { exact: true },
+    );
+    await expect(position).toBeVisible();
+
+    expect(await position.evaluate(countLines)).toBe(1);
+    const title = place.getByRole("button", { name: LONG_TITLE });
+    await expect(title).toHaveText(LONG_TITLE);
+    expect(await title.evaluate(isFullyShown)).toBe(true);
+  });
+});

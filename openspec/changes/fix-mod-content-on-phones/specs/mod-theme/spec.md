@@ -20,3 +20,14 @@ In the frame of a mod that does not opt out of the theme styles, the base styles
 #### Scenario: Opted-out mods are not changed
 - **WHEN** a mod whose file sets `theme: "none"` is running
 - **THEN** the computed `overflow-wrap` of its `<body>` is the browser's default, `normal`
+
+### Requirement: Table rows have one separator each
+In the frame of a mod that does not opt out of the theme styles, the base stylesheet SHALL draw the line between table rows once per row, under the row, not under each cell. A row that a mod lays out as a block or a grid SHALL keep one line under the whole row. A table with columns SHALL show one line under its header row and under each row but the last.
+
+#### Scenario: Stacked row
+- **WHEN** a mod that sets only `display: block` on a table's parts shows a table of two rows of two cells in a frame 338px wide
+- **THEN** the first row has one line, under its second cell, and none between its two cells
+
+#### Scenario: Table with columns
+- **WHEN** a mod that adds no styles shows a table with a header row and two rows
+- **THEN** a line runs under the header row and under the first row, across the table's width, and none under the last row

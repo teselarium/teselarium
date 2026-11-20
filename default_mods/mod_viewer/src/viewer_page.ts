@@ -12,6 +12,24 @@ const VIEWER_STYLE = `
   td { overflow-wrap: anywhere; }
   form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); margin-top: var(--ot-space-4); }
   input[type="text"] { flex: 1; min-width: 16rem; }
+  /*
+   * A narrow frame, such as a phone's: each permission is a small grid, its
+   * category and, at the end, its status on the first line, then its host,
+   * then its reason. The header row is hidden visually but stays for screen
+   * readers, and the explicit table roles of metadata_card.ts keep the table's
+   * semantics. The mosaic viewer has a copy of these rules
+   * (mosaic_viewer/src/viewer_page.ts), since a default mod cannot
+   * import another mod's files. Keep both copies alike.
+   */
+  @media (max-width: 29.99rem) {
+    :is(table, tbody) { display: block; }
+    thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "category status" "host host" "reason reason"; }
+    tbody td:nth-child(1) { grid-area: category; }
+    tbody td:nth-child(2) { grid-area: host; }
+    tbody td:nth-child(3) { grid-area: reason; }
+    tbody td:nth-child(4) { grid-area: status; }
+  }
 `;
 
 export function addViewerStyle(): void {

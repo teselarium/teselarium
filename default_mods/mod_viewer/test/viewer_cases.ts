@@ -6,6 +6,7 @@ import {
   mountWithTarget,
   readBadge,
   readDefinition,
+  listWrongTableRoles,
 } from "./case_helpers.ts";
 
 /** The end of the listed mod's source, whatever the app's address. */
@@ -123,4 +124,11 @@ export async function showsTargetFormatError(
   context
     .expect(findElement(context, '[role="alert"]').textContent)
     .toContain('"theme" must be "default" or "none"');
+}
+
+export async function givesTableRoles(context: CaseContext): Promise<void> {
+  await mountWithTarget(context, FIXTURE_REFERENCES.listedMod);
+
+  const table = findElement(context, "table");
+  context.expect(listWrongTableRoles(table)).toEqual([]);
 }

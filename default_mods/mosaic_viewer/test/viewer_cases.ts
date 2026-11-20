@@ -9,6 +9,7 @@ import {
   mountWithTarget,
   readBadge,
   readDefinition,
+  listWrongTableRoles,
 } from "./case_helpers.ts";
 
 function listRequestMethods(context: CaseContext): string[] {
@@ -181,4 +182,11 @@ export async function showsTargetFormatError(
   context
     .expect(findElement(context, '[role="alert"]').textContent)
     .toContain('"title" must be a non-empty string');
+}
+
+export async function givesTableRoles(context: CaseContext): Promise<void> {
+  await mountWithTarget(context, FIXTURE_REFERENCES.shownMosaic);
+
+  const table = findElement(context, "table");
+  context.expect(listWrongTableRoles(table)).toEqual([]);
 }
