@@ -1,4 +1,4 @@
-export { applyMosaicAliases } from "./mosaic_aliases.ts";
+export { aliasCollectionTiles, applyMosaicAliases } from "./mosaic_aliases.ts";
 export type { MosaicAliases } from "./mosaic_aliases.ts";
 export { mergeMosaicConfig } from "./mosaic_config.ts";
 export { MosaicFormatError } from "./mosaic_errors.ts";

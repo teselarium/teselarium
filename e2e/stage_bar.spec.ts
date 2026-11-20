@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Frame, Locator, Page } from "@playwright/test";
+import type { Frame, Locator, Page, Request } from "@playwright/test";
 import {
   buildProbeFiles,
   COVER_HOST,
@@ -765,6 +765,26 @@ test.describe(
       await expect.poll(countFrameClicks.bind(undefined, frame)).toBe(1);
       await expect.poll(readActiveTag.bind(undefined, page)).toBe("IFRAME");
     });
+
+    test("Sort menu of the mod list", async function closesSortMenu({
+      page,
+    }): Promise<void> {
+      const files = buildTypedProbeFiles();
+      files["collection.yaml"] = buildNoteCollection([]);
+      const frame = await openTypedProbe(page, files);
+      await frame.evaluate(CLICK_RECORDER);
+      await stageBar(page)
+        .getByRole("button", { name: "Mod: probe 0.1.0" })
+        .click();
+      await page.getByRole("button", { name: "Sort" }).click();
+      await expect(page.getByRole("menu")).toBeVisible();
+
+      await clickInFrame(page, "probe");
+
+      await expect(page.getByRole("menu")).toHaveCount(0);
+      await expect(page.getByRole("combobox")).toHaveCount(0);
+      await expect.poll(countFrameClicks.bind(undefined, frame)).toBe(1);
+    });
   },
 );
 
@@ -847,7 +867,7 @@ test.describe("Messages from the mod in the stage bar", function describeModMess
 /*
  * The swap flows and the width ladder run on the e2e build whose catalog
  * lists the tiles mod and the labels mosaic. The typed probe and its notes
- * are recently used, so the lists also offer them, marked "Recent".
+ * are recently used, so the lists also offer them, marked with the ring.
  */
 
 /** The typed probe's mod file and its notes collection, on the test catalog's origin. */
@@ -863,6 +883,7 @@ function storeRecentProbe(sources: { mod: string; collection: string }): void {
       mods: [sources.mod],
       collections: [sources.collection],
       mosaics: [],
+      combinations: [],
     }),
   );
 }
@@ -1156,3 +1177,247 @@ test.describe("Each capsule opens a list", function describeListPlace(): void {
     }
   });
 });
+
+/** A Flashcards sandbox on the laureates, from a run link of the vanilla app's samples. */
+const FLASHCARDS_LAUREATES_LINK =
+  "/#/run?mod=./samples/mods/flashcards&collection=./samples/tiles/literature_nobel_laureates/collection.yaml";
+const BOOKS_MOSAIC_LINK =
+  "/#/run?mosaic=./samples/mosaics/nobel_books_list.yaml";
+const LAUREATES_TITLE = "Nobel Prize in Literature laureates";
+const MAP_MOSAIC_TITLE = "Nobel laureates on the map";
+
+function openList(page: Page): Locator {
+  return page.locator("[data-slot=popover-content]");
+}
+
+function listOption(page: Page, text: string): Locator {
+  return openList(page).getByRole("option").filter({ hasText: text });
+}
+
+/** The titles of the open list's rows, in order. */
+async function readOptionTitles(page: Page): Promise<string[]> {
+  return openList(page)
+    .locator("[cmdk-item] [data-column=title] > span:first-child")
+    .allTextContents();
+}
+
+async function openSampleSandbox(page: Page, link: string): Promise<void> {
+  await page.goto(link);
+  await expect(
+    stageBar(page).getByRole("button", { name: /^Collection: / }),
+  ).toBeVisible();
+}
+
+async function openModList(page: Page): Promise<void> {
+  await stageBar(page)
+    .getByRole("button", { name: /^Mod: / })
+    .click();
+  await expect(page.getByRole("combobox")).toBeFocused();
+}
+
+test.describe("Combination lists", function describeCombinationLists(): void {
+  test("Default order and columns", async function ordersEntries({
+    page,
+  }): Promise<void> {
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+
+    await openModList(page);
+
+    await expect
+      .poll(readOptionTitles.bind(undefined, page))
+      .toEqual(["Country Map", "Book List", "Flashcards"]);
+    const flashcards = listOption(page, "Flashcards");
+    await expect(
+      flashcards.getByRole("img", { name: "Current" }),
+    ).toBeVisible();
+    await expect(flashcards).toHaveAttribute("aria-current", "true");
+    await expect(flashcards).toHaveAttribute("aria-selected", "true");
+    const countryMap = listOption(page, "Country Map");
+    await expect(
+      countryMap.getByRole("img", { name: "1 mosaic" }),
+    ).toBeVisible();
+    await expect(countryMap.locator("[data-column=score]")).toHaveText("17/17");
+    const countryTitle = await readBox(
+      countryMap.locator("[data-column=title]"),
+    );
+    const flashcardsTitle = await readBox(
+      flashcards.locator("[data-column=title]"),
+    );
+    expect(countryTitle.x).toBe(flashcardsTitle.x);
+    const countryScore = await readBox(
+      countryMap.locator("[data-column=score]"),
+    );
+    const flashcardsScore = await readBox(
+      flashcards.locator("[data-column=score]"),
+    );
+    expect(countryScore.x + countryScore.width).toBe(
+      flashcardsScore.x + flashcardsScore.width,
+    );
+  });
+
+  test("Country Map's page: its mosaic with aliases, then Without a mosaic", async function opensCountryMapPage({
+    page,
+  }): Promise<void> {
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+    await openModList(page);
+
+    await listOption(page, "Country Map").click();
+
+    await expect(
+      openList(page).getByRole("option", { name: "Back to Country Map" }),
+    ).toBeVisible();
+    await expect(
+      listOption(page, MAP_MOSAIC_TITLE).locator("[data-column=score]"),
+    ).toHaveText("17/17");
+    await expect(
+      listOption(page, "Without a mosaic").locator("[data-column=score]"),
+    ).toHaveText("0/17");
+
+    await listOption(page, MAP_MOSAIC_TITLE).click();
+
+    await expect(
+      stageBar(page).getByRole("button", {
+        name: `Mosaic: ${MAP_MOSAIC_TITLE}`,
+      }),
+    ).toBeVisible();
+  });
+
+  test("Without a mosaic: Country Map with the laureates, and no mosaic", async function choosesWithoutMosaic({
+    page,
+  }): Promise<void> {
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+    await openModList(page);
+    await listOption(page, "Country Map").click();
+
+    await listOption(page, "Without a mosaic").click();
+
+    await expect(
+      stageBar(page).getByRole("button", { name: /^Mod: Country Map/ }),
+    ).toBeVisible();
+    const params = readRunParams(page);
+    expect(params.get("mosaic")).toBeNull();
+    expect(params.get("collection")).toContain("literature_nobel_laureates");
+  });
+
+  test("Search through mosaics: laureates on", async function searchesMosaics({
+    page,
+  }): Promise<void> {
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+    await openModList(page);
+
+    await page.keyboard.type("laureates on");
+
+    await expect
+      .poll(readOptionTitles.bind(undefined, page))
+      .toEqual(["Country Map"]);
+    const countryMap = listOption(page, "Country Map");
+    await expect(countryMap).toContainText(MAP_MOSAIC_TITLE);
+    await expect(
+      countryMap.getByRole("img", { name: "1 of 1 mosaics match" }),
+    ).toBeVisible();
+    await countryMap.click();
+    await expect(page.getByRole("combobox")).toHaveValue("laureates on");
+    await expect(listOption(page, "Without a mosaic")).toHaveCount(0);
+  });
+
+  test("Sort by Name: kept for the next sandbox, reset by a reload", async function keepsSort({
+    page,
+  }): Promise<void> {
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+    await openModList(page);
+    await page.getByRole("button", { name: "Sort" }).click();
+    await page.getByRole("menuitemradio", { name: "Name" }).click();
+    await expect
+      .poll(readOptionTitles.bind(undefined, page))
+      .toEqual(["Book List", "Country Map", "Flashcards"]);
+
+    await listOption(page, "Book List").click();
+    await expect(openList(page)).toHaveCount(0);
+    await expect(
+      stageBar(page).getByRole("button", { name: /^Mod: Book List/ }),
+    ).toBeVisible();
+    await openModList(page);
+    await expect
+      .poll(readOptionTitles.bind(undefined, page))
+      .toEqual(["Book List", "Country Map", "Flashcards"]);
+
+    await page.reload();
+    await openModList(page);
+    await expect
+      .poll(readOptionTitles.bind(undefined, page))
+      .toEqual(["Country Map", "Book List", "Flashcards"]);
+  });
+
+  test("Tried combination in the mosaic list after a reload", async function listsTriedCombination({
+    page,
+  }): Promise<void> {
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+    await expect.poll(readStoredCombinationCount.bind(undefined, page)).toBe(1);
+    await page.goto(BOOKS_MOSAIC_LINK);
+    await page.reload();
+    await expect(
+      stageBar(page).getByRole("button", {
+        name: "Mosaic: Books by Nobel laureates",
+      }),
+    ).toBeVisible();
+
+    await stageBar(page)
+      .getByRole("button", { name: "Mosaic: Books by Nobel laureates" })
+      .click();
+
+    const tried = listOption(page, `Flashcards + ${LAUREATES_TITLE}`);
+    await expect(tried).toContainText("Unsaved combination");
+    await expect(
+      tried.getByRole("img", { name: "Tried recently, not saved in the app" }),
+    ).toBeVisible();
+  });
+
+  test("Hovering the mod capsule requests the tile type files", async function measuresOnHover({
+    page,
+  }): Promise<void> {
+    const requested: string[] = [];
+    page.on("request", recordRequest.bind(undefined, requested));
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+    await expect(
+      stageBar(page).getByRole("button", { name: /^Mod: Flashcards/ }),
+    ).toBeVisible();
+    expect(hasCountryTypeFile(requested)).toBe(false);
+
+    await stageBar(page)
+      .getByRole("button", { name: /^Mod: / })
+      .hover();
+
+    await expect.poll(hasCountryTypeFile.bind(undefined, requested)).toBe(true);
+    await expect(openList(page)).toHaveCount(0);
+  });
+});
+
+function readCombinationCount(): number {
+  const stored: unknown = JSON.parse(
+    localStorage.getItem("opentesela.recently-used") ?? "{}",
+  );
+  const combinations = (stored as { combinations?: unknown[] }).combinations;
+  return combinations?.length ?? 0;
+}
+
+/** How many tried combinations the app stored as recently used. */
+function readStoredCombinationCount(page: Page): Promise<number> {
+  return page.evaluate(readCombinationCount);
+}
+
+function recordRequest(requested: string[], request: Request): void {
+  requested.push(request.url());
+}
+
+function isCountryTypeFile(url: string): boolean {
+  return url.endsWith("/samples/mods/country_map/country_tile_type.md");
+}
+
+function hasCountryTypeFile(requested: readonly string[]): boolean {
+  for (const url of requested) {
+    if (isCountryTypeFile(url)) {
+      return true;
+    }
+  }
+  return false;
+}

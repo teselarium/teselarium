@@ -122,10 +122,23 @@ export interface SandboxServices {
 export type LoadedFileKind = "mod" | "collection" | "mosaic";
 
 /** A file a sandbox opened from a mosaic, a collection or a tile loaded, by its resolved source. */
-export interface LoadedFileEntry {
+export interface LoadedFileSource {
   kind: LoadedFileKind;
   source: string;
 }
+
+/**
+ * The mod and collection of a sandbox opened with a collection and not from
+ * a mosaic, once both files loaded, by their resolved sources.
+ */
+export interface LoadedCombination {
+  kind: "combination";
+  mod: string;
+  collection: string;
+}
+
+/** What a combination sandbox reports as loaded: one file, or the pair of a tried combination. */
+export type LoadedFileEntry = LoadedFileSource | LoadedCombination;
 
 /**
  * `asking`: the mod is loaded and waits for the user's answer to its
@@ -688,7 +701,11 @@ function keepRuntimeSites(
   services.onChange();
 }
 
-/** Keeps the title of a loaded collection on the runtime, and reports the collection file. */
+/**
+ * Keeps the title of a loaded collection on the runtime, and reports the
+ * collection file, then, for a sandbox not opened from a mosaic, its mod and
+ * collection as a tried combination.
+ */
 function keepRuntimeCollection(
   runtime: SandboxRuntime,
   sandbox: StageSandbox,
@@ -703,6 +720,14 @@ function keepRuntimeCollection(
   reportLoadedFile(runtime, sandbox, services, {
     kind: "collection",
     source: modTiles.tilesSource,
+  });
+  if ((sandbox.link.mosaic ?? null) !== null || runtime.loadedMod === null) {
+    return;
+  }
+  reportLoadedFile(runtime, sandbox, services, {
+    kind: "combination",
+    mod: runtime.loadedMod.source,
+    collection: modTiles.tilesSource,
   });
 }
 

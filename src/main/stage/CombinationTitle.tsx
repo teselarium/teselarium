@@ -21,12 +21,18 @@ import {
   readModCapsuleTitle,
   readMosaicCapsuleTitle,
 } from "./capsule_titles.ts";
+import { readRecentlyUsedSnapshot } from "../settings/recently_used.ts";
+import { startCollectionListLoads } from "./collection_list.ts";
 import { CollectionList } from "./CollectionList.tsx";
 import { CombinationCapsule } from "./CombinationCapsule.tsx";
 import type { CapsuleListProps } from "./combination_list_inputs.ts";
 import { isFocusInFrame } from "./frame_focus.ts";
+import type { ListChoices } from "./list_choices.ts";
+import { startModListLoads } from "./mod_list.ts";
 import { ModList } from "./ModList.tsx";
+import { startMosaicListLoads } from "./mosaic_list.ts";
 import { MosaicList } from "./MosaicList.tsx";
+import type { ListLoads } from "./use_list_inputs.ts";
 import type { CapsulePanel, StageBarPanel } from "./stage_bar_panels.ts";
 
 interface CombinationTitleProps {
@@ -34,6 +40,7 @@ interface CombinationTitleProps {
   sandbox: SandboxSnapshot;
   combinations: CombinationCatalog;
   recentlyUsed: RecentlyUsed;
+  listChoices: ListChoices;
   /** The bar's open panel, or `null`. */
   openPanel: StageBarPanel | null;
   onPanelOpenChange: (panel: CapsulePanel, isOpen: boolean) => void;
@@ -55,6 +62,19 @@ function renderPendingMosaic(sandbox: SandboxSnapshot): ReactElement {
   );
 }
 
+/** Starts a list's loads ahead of its opening, those not requested yet. */
+function startListLoads(props: CombinationTitleProps, loads: ListLoads): void {
+  const recent = readRecentlyUsedSnapshot(props.recentlyUsed);
+  void loads(props.combinations, props.stage, props.sandbox, recent);
+}
+
+/** The folded capsule's menu holds the three lists: opening it measures for each. */
+function startEveryListLoads(props: CombinationTitleProps): void {
+  startListLoads(props, startModListLoads);
+  startListLoads(props, startCollectionListLoads);
+  startListLoads(props, startMosaicListLoads);
+}
+
 function buildListProps(
   props: CombinationTitleProps,
   panel: CapsulePanel,
@@ -65,6 +85,7 @@ function buildListProps(
     sandbox: props.sandbox,
     combinations: props.combinations,
     recentlyUsed: props.recentlyUsed,
+    listChoices: props.listChoices,
     isOpen: props.openPanel === panel,
     onOpenChange: props.onPanelOpenChange.bind(undefined, panel),
     anchorRef: props.anchorRef,
@@ -86,6 +107,7 @@ function renderCapsuleRow(props: CombinationTitleProps): ReactElement {
       version={modTitle.version}
       shrink={isUnsaved ? 1 : 2}
       hidesTitleWhenNarrow
+      onIntent={startListLoads.bind(undefined, props, startModListLoads)}
     />
   );
   const collectionCapsule = (
@@ -95,6 +117,7 @@ function renderCapsuleRow(props: CombinationTitleProps): ReactElement {
       title={readCollectionCapsuleTitle(sandbox)}
       shrink={3}
       hidesTitleWhenNarrow
+      onIntent={startListLoads.bind(undefined, props, startCollectionListLoads)}
     />
   );
   const mosaicCapsule = (
@@ -104,6 +127,7 @@ function renderCapsuleRow(props: CombinationTitleProps): ReactElement {
       title={readMosaicCapsuleTitle(sandbox)}
       shrink={isUnsaved ? 2 : 1}
       isDashed={isUnsaved}
+      onIntent={startListLoads.bind(undefined, props, startMosaicListLoads)}
     />
   );
   return (
@@ -139,6 +163,9 @@ function FoldedCapsule(props: CombinationTitleProps): ReactElement {
   const chosenListRef = useRef<CapsulePanel | null>(null);
 
   function handleOpenChange(isOpen: boolean): void {
+    if (isOpen) {
+      startEveryListLoads(props);
+    }
     props.onPanelOpenChange("folded", isOpen);
   }
 

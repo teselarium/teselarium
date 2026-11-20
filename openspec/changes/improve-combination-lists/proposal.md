@@ -27,8 +27,8 @@ The stage bar's lists from `rework-stage-bar` work, but trying combinations with
     - mod and collection lists: Mosaics first (default), Name, Match ratio, Matching tiles;
     - mosaic list: This pair first (default), Name, Match ratio, Matching tiles.
   - Filter:
-    - mod and collection lists: Compatible only, Has mosaics, Tried recently;
-    - mosaic list: This pair only, Same mod, Same collection, Compatible only, Tried recently.
+    - mod and collection lists: Compatible only, Has mosaics, Unsaved;
+    - mosaic list: This pair only, Same mod, Same collection, Compatible only, Unsaved.
 
   Each list keeps its own choices until the page is reloaded.
 - **Rows that settle:** rows re-sort as summaries and scores arrive, until the user moves the pointer in the list or presses an arrow key. Opening the list, going back from a page, changing the search text and choosing a sort sort the rows again.

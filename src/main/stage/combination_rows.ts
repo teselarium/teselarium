@@ -1,120 +1,77 @@
+import { buildMosaicCountKey } from "../../lib/core/combinations/index.ts";
 import type {
+  CombinationSnapshot,
+  EntryScore,
   Loadable,
   MosaicSummary,
-  TileCount,
 } from "../../lib/core/combinations/index.ts";
+import type { RunLink } from "../../lib/core/engine/index.ts";
+import { buildMosaicChoice } from "../../lib/core/stage/index.ts";
+import type {
+  LoadedFileSource,
+  SandboxLink,
+} from "../../lib/core/stage/index.ts";
+import { orderEntries } from "./list_order.ts";
+
+/** The mark column: the current entry's filled dot, or the ring of an entry tried recently and not saved in the app. */
+export type RowMark = "current" | "tried";
 
 /**
- * What a mark says about an entry. Each kind has one badge style in the
- * lists, so a color keeps one meaning: where you are (`current`), history
- * (`recent`), information (`mosaics`) and not compatible (`noMatch`).
+ * The mosaic badge of a mod or collection entry: how many mosaics it has
+ * with the other capsule's value, and, while a search finds it only through
+ * them, how many of those match.
  */
-export type CombinationMarkKind = "current" | "recent" | "mosaics" | "noMatch";
-
-/** A badge after an entry's title. */
-export interface CombinationMark {
-  kind: CombinationMarkKind;
-  text: string;
+export interface MosaicBadge {
+  count: number;
+  matching: number | null;
 }
 
-/** The entry open in this sandbox. */
-export const CURRENT_MARK: CombinationMark = Object.freeze({
-  kind: "current",
-  text: "Current",
-});
+/** How a mosaic list entry relates to the sandbox's mod and collection, for its group and filters. */
+export interface MosaicPairFacts {
+  isCurrentPair: boolean;
+  hasCurrentMod: boolean;
+  /** The current collection, or none when "None" is current. */
+  hasCurrentCollection: boolean;
+}
 
-/** A recently used entry that the catalog does not list. */
-export const RECENT_MARK: CombinationMark = Object.freeze({
-  kind: "recent",
-  text: "Recent",
-});
+/** The mosaics a search found an entry through: the first one's title, and how many more. */
+export interface FoundMosaics {
+  title: string;
+  moreCount: number;
+}
 
-/** An entry with tiles to compare and none matching. */
-export const NO_MATCH_MARK: CombinationMark = Object.freeze({
-  kind: "noMatch",
-  text: "no match",
-});
-
-/** Where an entry goes when a list opens: what fits first, then partly, then not at all. */
-export type CountRank = "compatible" | "partial" | "incompatible";
+/** One row of a list: an entry, a pinned row or a page's option. Frozen by convention. */
+export interface CombinationRow {
+  /** Unique in the list: a resolved source, or a fixed id such as `none`. */
+  id: string;
+  title: string;
+  /** Short items shown under the title, such as a mosaic's aliases. */
+  details: readonly string[];
+  /** Set by the search for an entry found only through its mosaics. */
+  foundMosaics: FoundMosaics | null;
+  mark: RowMark | null;
+  /** The badge column: a count for a mod or collection entry with mosaics, the icon alone for a mosaic. */
+  mosaics: MosaicBadge | "icon" | null;
+  /** The score column, or `null` for an entry with no score. An entry with a page shows its best option's score (`matchEntries`). */
+  score: EntryScore;
+  /** A page's options, its mosaics then "Without a mosaic", for an entry with mosaics. Choosing the entry opens its page. */
+  options: readonly CombinationRow[] | null;
+  /** What the search reads: the title, or `<mod> + <collection>` for an unsaved combination. */
+  searchText: string;
+  /** For a mosaic list entry, how it relates to the current pair. */
+  pair: MosaicPairFacts | null;
+  isSelectable: boolean;
+  /** Why the entry's file cannot be loaded, or `null`. Such an entry goes last and is not selectable. */
+  failure: string | null;
+  onChoose: () => void;
+  /** Drops a recently used entry that cannot be loaded, or `null`. */
+  onRemove: (() => void) | null;
+}
 
 /** One entry of a list: a catalog source, or a recently used one the catalog does not list. */
 export interface ListedSource {
   source: string;
   isRecent: boolean;
-}
-
-/** The count's tiles, when it is known and has tiles to compare. */
-function readMatching(
-  count: Loadable<TileCount> | null | undefined,
-): { matching: number; total: number } | null {
-  if (count === null || count === undefined || count.state !== "loaded") {
-    return null;
-  }
-  if (count.value === "any" || count.value.total === 0) {
-    return null;
-  }
-  return count.value;
-}
-
-/**
- * The group an entry is sorted into: every tile matches, `any`, or no count
- * known yet, first; some matching tiles next; none last.
- */
-export function rankTileCount(
-  count: Loadable<TileCount> | null | undefined,
-): CountRank {
-  const known = readMatching(count);
-  if (known === null || known.matching === known.total) {
-    return "compatible";
-  }
-  return known.matching === 0 ? "incompatible" : "partial";
-}
-
-/** Whether a known count has tiles and none of them matches. */
-export function hasNoMatch(
-  count: Loadable<TileCount> | null | undefined,
-): boolean {
-  return readMatching(count)?.matching === 0;
-}
-
-/** `<matching>/<total>` or `any`, or `null` while the count is not known. */
-export function describeTileCount(
-  count: Loadable<TileCount> | null | undefined,
-): string | null {
-  if (count === null || count === undefined || count.state !== "loaded") {
-    return null;
-  }
-  if (count.value === "any") {
-    return "any";
-  }
-  const text = `${count.value.matching}/${count.value.total}`;
-  return text;
-}
-
-const RANK_ORDER: readonly CountRank[] = [
-  "compatible",
-  "partial",
-  "incompatible",
-];
-
-/**
- * The ids of entries sorted into their rank groups, each keeping the list
- * order. `ranks` gives each id's rank at the moment the list opened.
- */
-export function sortByRank(
-  ids: readonly string[],
-  ranks: ReadonlyMap<string, CountRank>,
-): string[] {
-  const sorted: string[] = [];
-  for (const rank of RANK_ORDER) {
-    for (const id of ids) {
-      if ((ranks.get(id) ?? "compatible") === rank) {
-        sorted.push(id);
-      }
-    }
-  }
-  return sorted;
 }
 
 /**
@@ -154,31 +111,19 @@ export function readSources(listed: readonly ListedSource[]): string[] {
   return sources;
 }
 
-/** How many of `mosaics` pair `mod` with `collection` (`null` for none), compared by resolved sources. */
-export function countPairMosaics(
+/** The mosaics of `mosaics` that pair `mod` with `collection` (`null` for none), compared by resolved sources. */
+export function listPairMosaics(
   mosaics: readonly MosaicSummary[],
   mod: string,
   collection: string | null,
-): number {
-  let count = 0;
+): MosaicSummary[] {
+  const paired: MosaicSummary[] = [];
   for (const mosaic of mosaics) {
     if (mosaic.mod === mod && mosaic.collection === collection) {
-      count += 1;
+      paired.push(mosaic);
     }
   }
-  return count;
-}
-
-/** The `mosaics` mark, `1 mosaic` or `<n> mosaics`, or `null` for none. */
-export function buildMosaicCountMark(count: number): CombinationMark | null {
-  if (count === 0) {
-    return null;
-  }
-  const mark: CombinationMark = {
-    kind: "mosaics",
-    text: count === 1 ? "1 mosaic" : `${count} mosaics`,
-  };
-  return mark;
+  return paired;
 }
 
 /** A mosaic's aliases as `<field> <- <names>` items, in file order. */
@@ -216,4 +161,185 @@ export function readLoadedValues<Value>(
     }
   }
   return values;
+}
+
+/** What a row does when chosen or removed, so the row builders stay pure. */
+export interface RowActions {
+  /** Closes the list, then opens `link`, or nothing for `null`, the current entry. */
+  choose: (link: RunLink | null) => void;
+  /** Drops a recently used entry that cannot be loaded. */
+  remove: (entry: LoadedFileSource) => void;
+}
+
+/** A list's rows: pinned at the top, the entries to sort and filter, and those that cannot be loaded. */
+export interface ListRows {
+  pinnedRows: readonly CombinationRow[];
+  entries: readonly CombinationRow[];
+  failedRows: readonly CombinationRow[];
+}
+
+/** The current mark wins over the ring. */
+export function readRowMark(
+  isCurrent: boolean,
+  isTried: boolean,
+): RowMark | null {
+  if (isCurrent) {
+    return "current";
+  }
+  return isTried ? "tried" : null;
+}
+
+const LOADING_SCORE: EntryScore = Object.freeze({ state: "loading" });
+
+/** The count under `key`, loading until it is measured. */
+export function readCountScore(
+  snapshot: CombinationSnapshot,
+  key: string,
+): EntryScore {
+  return snapshot.counts[key] ?? LOADING_SCORE;
+}
+
+/** A mosaic's score with its aliases, or `null` for a mosaic without a collection. */
+export function readMosaicScore(
+  snapshot: CombinationSnapshot,
+  mosaic: MosaicSummary,
+): EntryScore {
+  if (mosaic.collection === null) {
+    return null;
+  }
+  return readCountScore(snapshot, buildMosaicCountKey(mosaic.source));
+}
+
+/** A mosaic's aliases as items, or "No aliases". */
+export function describeMosaicAliases(mosaic: MosaicSummary): string[] {
+  const aliases = describeAliases(mosaic.aliases);
+  if (aliases.length === 0) {
+    const none = ["No aliases"];
+    return none;
+  }
+  return aliases;
+}
+
+/** What a page's options need from the list. */
+export interface PageInputs {
+  link: SandboxLink;
+  snapshot: CombinationSnapshot;
+  /** The recently used mosaics that the catalog does not list. */
+  triedMosaics: ReadonlySet<string>;
+  actions: RowActions;
+}
+
+/** A page's mosaic option: chosen as in the mosaic list. */
+function buildMosaicOption(
+  inputs: PageInputs,
+  mosaic: MosaicSummary,
+): CombinationRow {
+  const option: CombinationRow = {
+    id: mosaic.source,
+    title: mosaic.title,
+    details: describeMosaicAliases(mosaic),
+    foundMosaics: null,
+    mark: readRowMark(
+      mosaic.source === inputs.link.mosaic,
+      inputs.triedMosaics.has(mosaic.source),
+    ),
+    mosaics: "icon",
+    score: readMosaicScore(inputs.snapshot, mosaic),
+    options: null,
+    searchText: mosaic.title,
+    pair: null,
+    isSelectable: true,
+    failure: null,
+    onChoose: inputs.actions.choose.bind(
+      undefined,
+      buildMosaicChoice(inputs.link, mosaic.source),
+    ),
+    onRemove: null,
+  };
+  return option;
+}
+
+/** The suffix of a "Without a mosaic" option's id, after its entry's id. */
+export const WITHOUT_MOSAIC_SUFFIX = "#without-mosaic";
+
+/** What an entry with mosaics is, for its page. */
+export interface PageEntry {
+  id: string;
+  title: string;
+  isCurrent: boolean;
+  /** The entry's score without aliases. */
+  score: EntryScore;
+  /** Choosing the entry: what "Without a mosaic" opens. */
+  onChoose: () => void;
+}
+
+/** "Without a mosaic": the entry itself, found by its title. */
+function buildWithoutMosaicOption(
+  inputs: PageInputs,
+  entry: PageEntry,
+): CombinationRow {
+  const isCurrent = entry.isCurrent && inputs.link.mosaic === null;
+  const option: CombinationRow = {
+    id: `${entry.id}${WITHOUT_MOSAIC_SUFFIX}`,
+    title: "Without a mosaic",
+    details: [],
+    foundMosaics: null,
+    mark: readRowMark(isCurrent, false),
+    mosaics: null,
+    score: entry.score,
+    options: null,
+    searchText: entry.title,
+    pair: null,
+    isSelectable: true,
+    failure: null,
+    onChoose: entry.onChoose,
+    onRemove: null,
+  };
+  return option;
+}
+
+/**
+ * The options of an entry's page: its mosaics, sorted by "Match ratio", then
+ * "Without a mosaic", left out when the entry is current and the sandbox is
+ * opened from a mosaic. `null` for an entry without mosaics, which is chosen
+ * directly.
+ */
+export function buildPageOptions(
+  inputs: PageInputs,
+  entry: PageEntry,
+  mosaics: readonly MosaicSummary[],
+): CombinationRow[] | null {
+  if (mosaics.length === 0) {
+    return null;
+  }
+  const mosaicOptions: CombinationRow[] = [];
+  for (const mosaic of mosaics) {
+    mosaicOptions.push(buildMosaicOption(inputs, mosaic));
+  }
+  const options = [...orderEntries(mosaicOptions, "ratio", "")[0].entries];
+  const isFromMosaic = inputs.link.mosaic !== null;
+  if (!(entry.isCurrent && isFromMosaic)) {
+    options.push(buildWithoutMosaicOption(inputs, entry));
+  }
+  return options;
+}
+
+/** The badge of an entry with `count` mosaics, or `null` without any. */
+export function buildMosaicBadge(count: number): MosaicBadge | null {
+  if (count === 0) {
+    return null;
+  }
+  const badge: MosaicBadge = { count, matching: null };
+  return badge;
+}
+
+/** The recently used sources of `listed`, those the catalog does not list. */
+export function listTriedSources(listed: readonly ListedSource[]): Set<string> {
+  const tried = new Set<string>();
+  for (const entry of listed) {
+    if (entry.isRecent) {
+      tried.add(entry.source);
+    }
+  }
+  return tried;
 }

@@ -3,6 +3,7 @@ import {
   buildCollectionChoice,
   buildModChoice,
   buildMosaicChoice,
+  buildPairChoice,
   buildSitesDrop,
   isCombinationSandbox,
   NO_COLLECTION,
@@ -152,6 +153,21 @@ describe("buildMosaicChoice", function describeBuildMosaicChoice(): void {
 
   it("gives null for the current mosaic", function ignoresCurrent(): void {
     expect(buildMosaicChoice(MOSAIC_LINK, MAP_MOSAIC)).toBeNull();
+  });
+});
+
+describe("buildPairChoice", function describeBuildPairChoice(): void {
+  it("Back to a tried pair: its mod with its collection, with no mosaic, sites or params", function opensPair(): void {
+    const choice = buildPairChoice(BOOK_MOD, BOOKS);
+
+    expect(choice).toEqual({
+      mod: BOOK_MOD,
+      collection: BOOKS,
+      tile: null,
+      params: {},
+    });
+    expect(choice).not.toHaveProperty("mosaic");
+    expect(choice).not.toHaveProperty("sites");
   });
 });
 

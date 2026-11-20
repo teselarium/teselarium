@@ -20,6 +20,7 @@ import type {
 } from "../../lib/core/stage/index.ts";
 import type { PlayerSites } from "../settings/player_sites.ts";
 import type { RecentlyUsed } from "../settings/recently_used.ts";
+import type { ListChoices } from "./list_choices.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { ActionDialog } from "./ActionDialog.tsx";
 import type { QuestionSnapshot } from "./ActionDialog.tsx";
@@ -42,6 +43,8 @@ interface StageViewProps {
   stage: Stage;
   /** The summaries and counts of the stage bar's lists. */
   combinations: CombinationCatalog;
+  /** The sort and filter choices of the stage bar's lists. */
+  listChoices: ListChoices;
   /** The mods, collections and mosaics tried in combination sandboxes. */
   recentlyUsed: RecentlyUsed;
   /** The sites the user always plays from, which the player dialog reads and remembers. */
@@ -179,6 +182,7 @@ function findVisibleSandbox(snapshot: StageSnapshot): SandboxSnapshot | null {
 export function StageView({
   stage,
   combinations,
+  listChoices,
   recentlyUsed,
   playerSites,
   theater,
@@ -255,6 +259,7 @@ export function StageView({
         <StageBar
           stage={stage}
           combinations={combinations}
+          listChoices={listChoices}
           recentlyUsed={recentlyUsed}
           sandbox={visibleSandbox}
           isTheaterMode={snapshot.isTheaterMode}

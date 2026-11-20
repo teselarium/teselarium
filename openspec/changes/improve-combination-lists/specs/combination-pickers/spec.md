@@ -66,7 +66,7 @@ Each list SHALL have a sort button after its search field, behind a divider, nam
 - **THEN** they are ordered by title A-Z
 
 ### Requirement: Filter choices
-Each list SHALL have a filter button after its sort button, named "Filter", whose menu offers choices that can be checked together, and the list SHALL show only the entries that meet every checked choice. The mod and collection lists SHALL offer "Compatible only", "Has mosaics" and "Tried recently". The mosaic list SHALL offer "This pair only", "Same mod", "Same collection", "Compatible only" and "Tried recently". While a choice is checked, the filter button SHALL be shown pressed.
+Each list SHALL have a filter button after its sort button, named "Filter", whose menu offers choices that can be checked together, and the list SHALL show only the entries that meet every checked choice. The mod and collection lists SHALL offer "Compatible only", "Has mosaics" and "Unsaved". The mosaic list SHALL offer "This pair only", "Same mod", "Same collection", "Compatible only" and "Unsaved". While a choice is checked, the filter button SHALL be shown pressed.
 
 #### Scenario: Compatible only
 - **WHEN** a Flashcards sandbox runs with the laureates' collection, Flashcards scores `0/17`, and the user checks "Compatible only" in the mod list's filter menu
@@ -77,7 +77,7 @@ Each list SHALL have a filter button after its sort button, named "Filter", whos
 - **THEN** the list holds "Nobel laureates on the map" and "UNESCO World Heritage Sites Example", and no other mosaic
 
 ### Requirement: What the filters keep
-"Compatible only" SHALL keep the entries whose score has a matching tile, those with no score known yet and those with no score. "Has mosaics" SHALL keep the entries with mosaics. "Tried recently" SHALL keep the entries marked with the ring. "This pair only" SHALL keep the current pair's mosaics. "Same mod" and "Same collection" SHALL keep the mosaics that name the current mod, or the current collection or none when "None" is current. Rows pinned at the top SHALL be kept by every filter.
+"Compatible only" SHALL keep the entries whose score has a matching tile, those with no score known yet and those with no score. "Has mosaics" SHALL keep the entries with mosaics. "Unsaved" SHALL keep the entries marked with the ring. "This pair only" SHALL keep the current pair's mosaics. "Same mod" and "Same collection" SHALL keep the mosaics that name the current mod, or the current collection or none when "None" is current. Rows pinned at the top SHALL be kept by every filter.
 
 #### Scenario: Counting rows are kept
 - **WHEN** "Compatible only" is checked and an entry's score is still counting
@@ -115,6 +115,25 @@ A list SHALL be sorted again with what is known, and settle again, when it opens
 #### Scenario: Back from a page
 - **WHEN** the pointer stopped the mod list, scores arrived since, and the user opens Country Map's page and goes back
 - **THEN** the main list is sorted with those scores, and Country Map is highlighted and in view
+
+### Requirement: Opening highlights the current entry
+When a list opens, its highlighted row SHALL be the current entry, scrolled into view. When the current entry cannot be chosen, as the tile of a tile link, the next row that can be chosen SHALL be highlighted. When the list shows no current entry, as when a filter hides it, the first row SHALL be highlighted. Typing in the search field SHALL highlight the first row that matches.
+
+#### Scenario: Current mod highlighted
+- **WHEN** a sandbox runs Flashcards with the laureates' collection and the user opens the mod list
+- **THEN** Flashcards is highlighted, although Country Map and Book List come first
+
+#### Scenario: Tile link
+- **WHEN** the tile viewer runs with the tile `2016__bob_dylan.md` and the user opens the collection list
+- **THEN** "None" is highlighted
+
+#### Scenario: Current entry filtered out
+- **WHEN** "Unsaved" is checked in the mod list's filter menu and the current mod is in the catalog, and the user opens the mod list again
+- **THEN** the first row is highlighted
+
+#### Scenario: Typing
+- **WHEN** the mod list is open with Flashcards highlighted and the user types `map`
+- **THEN** Country Map, the first row that matches, is highlighted
 
 ### Requirement: Rows with mosaics open a page
 In the mod and collection lists, choosing an entry with mosaics, with a click or Enter, SHALL open its page in place of the main list instead of opening a combination. The page SHALL start with a "Back" row named after the entry, then its options (see "Page options"). "Back", and Backspace in an empty search field, SHALL return to the main list. An entry without mosaics SHALL be chosen directly.
@@ -201,7 +220,11 @@ A mosaic's score SHALL count the tiles of its collection that match its mod's ti
 - **THEN** "Nobel laureates on the map" shows `17/17`
 
 ### Requirement: Measured ahead
-When a combination sandbox is shown, the app SHALL load the files that give the lists' titles and mosaics, but no tile. When the pointer rests on a capsule or the keyboard focuses it, and when its list opens, the app SHALL start measuring the scores that list shows. The stage bar's measures SHALL make at most 6 requests at a time, all lists together.
+When a combination sandbox is shown and its mod file is loaded, the app SHALL load the files that give the lists' titles and mosaics, but no tile. When the pointer rests on a capsule or the keyboard focuses it, and when its list opens, the app SHALL start measuring the scores that list shows. The stage bar's measures SHALL make at most 6 requests at a time, all lists together.
+
+#### Scenario: Refused link
+- **WHEN** the app is opened at a run link with both a `collection` and a `tile`
+- **THEN** no file of the lists is requested, since the mod file is not loaded and the link requests no file (see `mod-stage`)
 
 #### Scenario: Hovering the mod capsule
 - **WHEN** a sandbox runs Country Map with the laureates' collection and the pointer rests on the mod capsule

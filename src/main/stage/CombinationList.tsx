@@ -1,12 +1,17 @@
-import { useMemo, useRef, useState } from "react";
-import type { ComponentProps, ReactElement, RefObject } from "react";
-import { Badge } from "@/vendor/shadcn/ui/badge.tsx";
+import { ChevronLeft } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+  Dispatch,
+  KeyboardEvent,
+  ReactElement,
+  RefObject,
+  SetStateAction,
+} from "react";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
 import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from "@/vendor/shadcn/ui/command.tsx";
@@ -16,47 +21,48 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/vendor/shadcn/ui/popover.tsx";
-import type { Loadable, TileCount } from "../../lib/core/combinations/index.ts";
 import {
-  describeTileCount,
-  hasNoMatch,
-  NO_MATCH_MARK,
-  rankTileCount,
-  sortByRank,
-} from "./combination_rows.ts";
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/vendor/shadcn/ui/tooltip.tsx";
+import type { EntryScore } from "../../lib/core/combinations/index.ts";
+import { MOSAIC_ICON as MosaicIcon } from "../catalog_icons.ts";
+import { LoadingSpinner } from "../LoadingSpinner.tsx";
+import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import type {
-  CombinationMark,
-  CombinationMarkKind,
-  CountRank,
+  CombinationRow,
+  ListRows,
+  MosaicBadge,
+  RowMark,
 } from "./combination_rows.ts";
+import { CombinationListToolbar } from "./CombinationListToolbar.tsx";
 import { keepFocusInFrame } from "./frame_focus.ts";
-
-/** One entry of a list. */
-export interface CombinationRow {
-  /** Unique in the list: a resolved source, or a fixed id such as `none`. */
-  id: string;
-  title: string;
-  /** Short items shown under the title, such as a mosaic's aliases. */
-  details: readonly string[];
-  /** The tile-match count to show, or `null` for none. */
-  count: Loadable<TileCount> | null;
-  /** Badges after the title, such as "Current", "Recent" or "1 mosaic". "no match" is added from the count. */
-  marks: readonly CombinationMark[];
-  isSelectable: boolean;
-  /** Why the entry's file cannot be loaded, or `null`. Such an entry goes last and is not selectable. */
-  failure: string | null;
-  onChoose: () => void;
-  /** Drops a recently used entry that cannot be loaded, or `null`. */
-  onRemove: (() => void) | null;
-}
-
-/** A group of entries under an optional heading. */
-export interface CombinationSection {
-  heading: string | null;
-  rows: readonly CombinationRow[];
-  /** Said when the group has no entry. Without it, an empty group is not shown. */
-  emptyText?: string;
-}
+import {
+  readListChoicesSnapshot,
+  subscribeListChoices,
+} from "./list_choices.ts";
+import type { ListChoices, ListKind } from "./list_choices.ts";
+import {
+  findOpeningHighlight,
+  keepFilteredEntries,
+  orderEntries,
+  placePinnedRows,
+} from "./list_order.ts";
+import type { EntryGroup } from "./list_order.ts";
+import {
+  matchEntries,
+  matchPageOptions,
+  showPinnedRows,
+} from "./list_search.ts";
+import type { MatchedEntry } from "./list_search.ts";
+import {
+  arrangeSettledGroups,
+  isSameOrder,
+  readSettledGroups,
+  SETTLE_INTERVAL_MS,
+} from "./list_settling.ts";
+import type { SettledGroup } from "./list_settling.ts";
 
 /** One line of the details footer. */
 export interface ListDetail {
@@ -71,6 +77,7 @@ export interface ExplorerLink {
 }
 
 interface CombinationListProps {
+  kind: ListKind;
   /** The list's accessible name, such as "Mod list". */
   label: string;
   isOpen: boolean;
@@ -82,16 +89,13 @@ interface CombinationListProps {
    * bar under 480px: the bar's left side, which starts with the folded capsule.
    */
   anchorRef: RefObject<HTMLElement | null>;
-  /** Entries listed first, never sorted, such as "None" and the tile. */
-  leadRows: readonly CombinationRow[];
-  sections: readonly CombinationSection[];
-  /** Whether the entries are sorted by their counts when the list opens. */
-  sortsByCount: boolean;
+  rows: ListRows;
+  /** The heading of the current pair's group, sorted by "This pair first". */
+  pairHeading: string;
+  listChoices: ListChoices;
   details: readonly ListDetail[];
   explorer: ExplorerLink | null;
 }
-
-const NOT_COMPATIBLE_HEADING = "Not compatible";
 
 /**
  * Where a list opens: under its capsule, or, while the capsule is hidden
@@ -125,181 +129,163 @@ class CapsuleAnchor {
   }
 }
 
-/** Keeps the entries whose title holds the typed text, ignoring letter case. */
-function filterByTitle(
-  _value: string,
-  search: string,
-  keywords?: string[],
-): number {
-  const title = (keywords ?? []).join(" ").toLowerCase();
-  return title.includes(search.toLowerCase()) ? 1 : 0;
+/** What the list shows: the main list, or an entry's page, and the search of each. */
+interface ListView {
+  pageId: string | null;
+  mainSearch: string;
+  pageSearch: string;
 }
 
-function listRows(sections: readonly CombinationSection[]): CombinationRow[] {
-  const rows: CombinationRow[] = [];
-  for (const section of sections) {
-    rows.push(...section.rows);
-  }
-  return rows;
-}
-
-/** Each entry's rank by the counts known now, recorded when the list opens. */
-function recordRanks(
-  sections: readonly CombinationSection[],
-): Map<string, CountRank> {
-  const ranks = new Map<string, CountRank>();
-  for (const row of listRows(sections)) {
-    ranks.set(row.id, rankTileCount(row.count));
-  }
-  return ranks;
-}
-
-function isLoadable(row: CombinationRow): boolean {
-  return row.failure === null;
-}
-
-function isFailed(row: CombinationRow): boolean {
-  return row.failure !== null;
-}
-
-function keepRows(
-  rows: readonly CombinationRow[],
-  isKept: (row: CombinationRow) => boolean,
-): CombinationRow[] {
-  const kept: CombinationRow[] = [];
-  for (const row of rows) {
-    if (isKept(row)) {
-      kept.push(row);
-    }
-  }
-  return kept;
-}
-
-/** The rows of `ids`, in that order. */
-function pickRows(
-  rows: readonly CombinationRow[],
-  ids: readonly string[],
-): CombinationRow[] {
-  const picked: CombinationRow[] = [];
-  for (const id of ids) {
-    for (const row of rows) {
-      if (row.id === id) {
-        picked.push(row);
-      }
-    }
-  }
-  return picked;
-}
-
-function listIds(rows: readonly CombinationRow[]): string[] {
-  const ids: string[] = [];
-  for (const row of rows) {
-    ids.push(row.id);
-  }
-  return ids;
-}
+const MAIN_VIEW: ListView = Object.freeze({
+  pageId: null,
+  mainSearch: "",
+  pageSearch: "",
+});
 
 /**
- * The sorted sections: what fits and what partly fits, then "Not
- * compatible", by the ranks recorded when the list opened. An entry that
- * arrived since goes first, as an entry with no count known yet.
+ * The main list's order. `layout` is `null` until the next render sorts
+ * with what is known. While `isFrozen`, rows stay in place.
  */
-function buildSortedSections(
-  sections: readonly CombinationSection[],
-  ranks: ReadonlyMap<string, CountRank>,
-): CombinationSection[] {
-  const rows = keepRows(listRows(sections), isLoadable);
-  const sortedIds = sortByRank(listIds(rows), ranks);
-  const fittingIds: string[] = [];
-  const incompatibleIds: string[] = [];
-  for (const id of sortedIds) {
-    if (ranks.get(id) === "incompatible") {
-      incompatibleIds.push(id);
-    } else {
-      fittingIds.push(id);
-    }
-  }
-  const sorted: CombinationSection[] = [
-    { heading: null, rows: pickRows(rows, fittingIds) },
-    { heading: NOT_COMPATIBLE_HEADING, rows: pickRows(rows, incompatibleIds) },
-  ];
-  return sorted;
+interface SettleState {
+  layout: readonly SettledGroup[] | null;
+  isFrozen: boolean;
 }
 
-function keepLoadableSections(
-  sections: readonly CombinationSection[],
-): CombinationSection[] {
-  const kept: CombinationSection[] = [];
-  for (const section of sections) {
-    kept.push({ ...section, rows: keepRows(section.rows, isLoadable) });
-  }
-  return kept;
-}
+const SORT_AGAIN: SettleState = Object.freeze({
+  layout: null,
+  isFrozen: false,
+});
 
-type BadgeVariant = ComponentProps<typeof Badge>["variant"];
+/** The id of a page's "Back" row. */
+const BACK_ID = "back";
 
-interface MarkStyle {
-  variant: BadgeVariant;
-  className: string;
-}
+const MARK_TEXTS: Readonly<Record<RowMark, string>> = Object.freeze({
+  current: "Current",
+  tried: "Tried recently, not saved in the app",
+});
 
-/** One badge style per mark kind, so a color keeps one meaning across the lists. */
-const MARK_STYLES: Readonly<Record<CombinationMarkKind, MarkStyle>> = {
-  current: { variant: "default", className: "" },
-  recent: { variant: "secondary", className: "" },
-  mosaics: { variant: "outline", className: "" },
-  noMatch: { variant: "outline", className: "text-muted-foreground" },
-};
+const MARK_CLASSES: Readonly<Record<RowMark, string>> = Object.freeze({
+  current: "bg-primary",
+  tried: "border border-primary",
+});
 
-/** The count column's classes: one width for every row, so counts line up. */
-const COUNT_COLUMN_CLASSES = "w-12 shrink-0 text-right text-xs tabular-nums";
+/** Each column keeps one width in every row, so the columns line up. */
+const MARK_COLUMN_CLASSES = "flex w-3 shrink-0 justify-center";
+const BADGE_COLUMN_CLASSES =
+  "flex w-9 shrink-0 items-center justify-end gap-0.5 text-xs tabular-nums";
+const SCORE_COLUMN_CLASSES =
+  "flex w-12 shrink-0 justify-end text-xs tabular-nums";
 
-/** The tile-match count, an empty column for a row without one in a list with counts, or nothing. */
-function renderCount(
-  row: CombinationRow,
-  hasCountColumn: boolean,
-): ReactElement | null {
-  if (row.count === null) {
-    return hasCountColumn ? (
-      <span aria-hidden="true" className={COUNT_COLUMN_CLASSES} />
-    ) : null;
-  }
-  const text = describeTileCount(row.count);
-  if (text === null) {
-    return (
-      <span
-        className={`${COUNT_COLUMN_CLASSES} text-muted-foreground`}
-        aria-label="Counting"
-      >
-        …
-      </span>
-    );
-  }
-  return <span className={COUNT_COLUMN_CLASSES}>{text}</span>;
-}
+const UNTYPED_TOOLTIP = "Accepts any tile: this mod has no tile type";
 
-function renderMark(mark: CombinationMark): ReactElement {
-  const style = MARK_STYLES[mark.kind];
+function renderWithTooltip(
+  trigger: ReactElement,
+  tooltip: string,
+): ReactElement {
   return (
-    <Badge
-      key={mark.kind}
-      variant={style.variant}
-      className={`shrink-0 ${style.className}`}
-    >
-      {mark.text}
-    </Badge>
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }
 
-function renderMarks(row: CombinationRow): ReactElement[] {
-  const marks: ReactElement[] = [];
-  for (const mark of row.marks) {
-    marks.push(renderMark(mark));
+/** The mark column: the dot or the ring, named, or an empty column. */
+function renderMark(mark: RowMark | null): ReactElement {
+  if (mark === null) {
+    return <span aria-hidden="true" className={MARK_COLUMN_CLASSES} />;
   }
-  if (hasNoMatch(row.count)) {
-    marks.push(renderMark(NO_MATCH_MARK));
+  const text = MARK_TEXTS[mark];
+  return (
+    <span className={MARK_COLUMN_CLASSES} data-column="mark">
+      {renderWithTooltip(
+        <span
+          role="img"
+          aria-label={text}
+          data-mark={mark}
+          className={`size-2 rounded-full ${MARK_CLASSES[mark]}`}
+        />,
+        text,
+      )}
+    </span>
+  );
+}
+
+function describeMosaicBadge(badge: MosaicBadge): string {
+  if (badge.matching !== null) {
+    const matching = `${badge.matching} of ${badge.count} mosaics match`;
+    return matching;
   }
-  return marks;
+  const count = badge.count === 1 ? "1 mosaic" : `${badge.count} mosaics`;
+  return count;
+}
+
+/** The badge column: the mosaic icon with a number, the icon alone, or an empty column. */
+function renderBadge(mosaics: CombinationRow["mosaics"]): ReactElement {
+  if (mosaics === null) {
+    return <span aria-hidden="true" className={BADGE_COLUMN_CLASSES} />;
+  }
+  const name = mosaics === "icon" ? "Mosaic" : describeMosaicBadge(mosaics);
+  const number =
+    mosaics === "icon" ? null : (
+      <span>{mosaics.matching ?? mosaics.count}</span>
+    );
+  return renderWithTooltip(
+    <span
+      role="img"
+      aria-label={name}
+      data-column="badge"
+      className={BADGE_COLUMN_CLASSES}
+    >
+      <MosaicIcon aria-hidden="true" className="size-3.5" />
+      {number}
+    </span>,
+    name,
+  );
+}
+
+/** The score column: `matching/total`, muted without a matching tile, the spinner while counting, or an empty column. */
+function renderScore(score: EntryScore): ReactElement {
+  if (score === null) {
+    return <span aria-hidden="true" className={SCORE_COLUMN_CLASSES} />;
+  }
+  if (score.state === "loading") {
+    return (
+      <span className={SCORE_COLUMN_CLASSES} data-column="score">
+        <LoadingSpinner
+          label="Counting"
+          className="size-3.5 text-muted-foreground"
+        />
+      </span>
+    );
+  }
+  if (score.state === "failed") {
+    return renderWithTooltip(
+      <span
+        data-column="score"
+        aria-label={`No score: ${score.reason}`}
+        className={`${SCORE_COLUMN_CLASSES} text-muted-foreground`}
+      >
+        –
+      </span>,
+      score.reason,
+    );
+  }
+  const count = score.value;
+  const classes =
+    count.matching === 0
+      ? `${SCORE_COLUMN_CLASSES} text-muted-foreground`
+      : SCORE_COLUMN_CLASSES;
+  const text = (
+    <span
+      data-column="score"
+      data-muted={count.matching === 0}
+      className={classes}
+    >
+      {`${count.matching}/${count.total}`}
+    </span>
+  );
+  return count.isUntyped ? renderWithTooltip(text, UNTYPED_TOOLTIP) : text;
 }
 
 function renderDetailItem(item: string): ReactElement {
@@ -310,70 +296,57 @@ function renderDetailItem(item: string): ReactElement {
   );
 }
 
+/** For an entry found through its mosaics: the first one's title with the icon, and "+<k> more". */
+function renderFoundMosaics(row: CombinationRow): ReactElement | null {
+  const found = row.foundMosaics;
+  if (found === null) {
+    return null;
+  }
+  return (
+    <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+      <MosaicIcon aria-hidden="true" className="size-3" />
+      <span className="truncate">{found.title}</span>
+      {found.moreCount === 0 ? null : (
+        <span className="shrink-0">{`+${found.moreCount} more`}</span>
+      )}
+    </span>
+  );
+}
+
 function renderRowText(row: CombinationRow): ReactElement {
   const items: ReactElement[] = [];
   for (const item of row.details) {
     items.push(renderDetailItem(item));
   }
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
+    <div className="flex min-w-0 flex-1 flex-col" data-column="title">
       <span className="truncate">{row.title}</span>
       {items.length === 0 ? null : (
         <span className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
           {items}
         </span>
       )}
+      {renderFoundMosaics(row)}
     </div>
   );
 }
 
-function renderRow(
-  row: CombinationRow,
-  isMuted: boolean,
-  hasCountColumn: boolean,
-): ReactElement {
+/** The four columns of a row: mark, title, mosaic badge and score. */
+function renderRow(row: CombinationRow, onSelect: () => void): ReactElement {
   return (
     <CommandItem
       key={row.id}
       value={row.id}
-      keywords={[row.title]}
       disabled={!row.isSelectable}
-      onSelect={row.onChoose}
-      className={isMuted ? "text-muted-foreground" : undefined}
+      onSelect={onSelect}
+      aria-current={row.mark === "current" ? "true" : undefined}
+      data-row-id={row.id}
     >
+      {renderMark(row.mark)}
       {renderRowText(row)}
-      {renderMarks(row)}
-      {renderCount(row, hasCountColumn)}
+      {renderBadge(row.mosaics)}
+      {renderScore(row.score)}
     </CommandItem>
-  );
-}
-
-function renderSection(
-  section: CombinationSection,
-  index: number,
-  hasCountColumn: boolean,
-): ReactElement | null {
-  if (section.rows.length === 0 && section.emptyText === undefined) {
-    return null;
-  }
-  const isMuted = section.heading === NOT_COMPATIBLE_HEADING;
-  const rows: ReactElement[] = [];
-  for (const row of section.rows) {
-    rows.push(renderRow(row, isMuted, hasCountColumn));
-  }
-  return (
-    <CommandGroup
-      key={section.heading ?? `section-${index}`}
-      heading={section.heading ?? undefined}
-    >
-      {rows.length === 0 ? (
-        <p className="px-2 py-1.5 text-sm text-muted-foreground">
-          {section.emptyText}
-        </p>
-      ) : (
-        rows
-      )}
-    </CommandGroup>
   );
 }
 
@@ -452,42 +425,124 @@ function renderFooter(
   );
 }
 
-/** Whether any entry has a count, so every row keeps the count column. */
-function hasCounts(sections: readonly CombinationSection[]): boolean {
-  for (const row of listRows(sections)) {
-    if (row.count !== null) {
-      return true;
+function findEntry(
+  entries: readonly CombinationRow[],
+  id: string | null,
+): CombinationRow | null {
+  for (const entry of entries) {
+    if (entry.id === id) {
+      return entry;
     }
   }
-  return false;
+  return null;
+}
+
+/** The rows of `groups`, in the order shown. */
+function listGroupRows(groups: readonly EntryGroup[]): CombinationRow[] {
+  const rows: CombinationRow[] = [];
+  for (const group of groups) {
+    rows.push(...group.entries);
+  }
+  return rows;
+}
+
+function listMatchedRows(matched: readonly MatchedEntry[]): CombinationRow[] {
+  const rows: CombinationRow[] = [];
+  for (const entry of matched) {
+    rows.push(entry.entry);
+  }
+  return rows;
+}
+
+function readPageSearch(matched: readonly MatchedEntry[], id: string): string {
+  for (const entry of matched) {
+    if (entry.entry.id === id) {
+      return entry.pageSearch;
+    }
+  }
+  return "";
+}
+
+/** The settled order, sorted with what is known now. */
+function settleNow(
+  setSettle: Dispatch<SetStateAction<SettleState>>,
+  layout: readonly SettledGroup[],
+): void {
+  setSettle({ layout, isFrozen: false });
+}
+
+function freezeSettle(current: SettleState): SettleState {
+  return current.isFrozen ? current : { ...current, isFrozen: true };
+}
+
+/** Shows the row the list highlights after Back, once. */
+function scrollRowIntoView(
+  listRef: RefObject<HTMLDivElement | null>,
+  targetRef: RefObject<string | null>,
+): void {
+  const id = targetRef.current;
+  if (id === null) {
+    return;
+  }
+  targetRef.current = null;
+  for (const item of listRef.current?.querySelectorAll("[data-row-id]") ?? []) {
+    if (item.getAttribute("data-row-id") === id) {
+      item.scrollIntoView({ block: "nearest" });
+    }
+  }
+}
+
+/** How long until the rows may be sorted again: at most every `SETTLE_INTERVAL_MS`. */
+function readSettleDelay(sortedAtRef: RefObject<number>): number {
+  const delay = Math.max(
+    0,
+    sortedAtRef.current + SETTLE_INTERVAL_MS - Date.now(),
+  );
+  return delay;
+}
+
+/** Keeps when the rows were last sorted, for the throttle. */
+function recordSortTime(sortedAtRef: RefObject<number>): void {
+  sortedAtRef.current = Date.now();
 }
 
 /**
  * A capsule's list: a shadcn Popover, drawn by the app outside every mod
- * frame and opened under its capsule (`CapsuleAnchor`), holding a searchable
- * Command with its search field focused. Typing keeps the entries whose
- * title holds the text, arrow keys move, Enter chooses, and Escape closes it
- * and gives the focus back to the capsule. With `sortsByCount`, the entries
- * are sorted once, when the list opens, from the counts known then, so a
- * count that arrives never moves its entry: what fits first, and the
- * entries with no matching tile under "Not compatible", muted and marked
- * `no match`. Entries that cannot be loaded come last with their reason.
- * The footer holds the details, as text the user can select, and the
- * explorer link.
+ * frame and opened under its capsule (`CapsuleAnchor`), holding a Command
+ * with its toolbar (search field focused, sort and filter) and the rows in
+ * four columns: mark, title, mosaic badge and score.
+ *
+ * The list does its own filtering (`matchEntries`) and ordering
+ * (`orderEntries`, `keepFilteredEntries`), with the rows pinned at the top
+ * outside both and hidden while searching. cmdk keeps the input, the
+ * highlighted row, arrow keys and Enter.
+ *
+ * Rows settle: they are sorted again as titles and scores arrive, at most
+ * every 300ms, until the pointer moves in the list or an arrow key is
+ * pressed; then they stay in place. Opening, Back, a search change and a
+ * sort choice sort them again at once.
+ *
+ * An entry with mosaics opens its page in place of the main list: "Back",
+ * named after it, then its options. "Back" and Backspace in an empty search
+ * field return, with the main search and the entry highlighted. Entries that
+ * cannot be loaded come last with their reason. The footer holds the
+ * details, as text the user can select, and the explorer link.
  */
 export function CombinationList({
+  kind,
   label,
   isOpen,
   onOpenChange,
   children,
   anchorRef,
-  leadRows,
-  sections,
-  sortsByCount,
+  rows,
+  pairHeading,
+  listChoices,
   details,
   explorer,
 }: CombinationListProps): ReactElement {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   // A new anchor each time the list opens: Radix only takes a virtual anchor
   // that differs from the last one it saw. Under StrictMode's double mount it
   // meanwhile records the capsule's first button, which React then replaces,
@@ -502,32 +557,187 @@ export function CombinationList({
     },
     [anchorRef, isOpen],
   );
-  const [openRanks, setOpenRanks] = useState<Map<string, CountRank> | null>(
-    null,
+  const choice = useStoreSnapshot(
+    listChoices,
+    subscribeListChoices,
+    readListChoicesSnapshot,
+  )[kind];
+  const [view, setView] = useState<ListView>(MAIN_VIEW);
+  const [highlighted, setHighlighted] = useState("");
+  // The parent to show after Back, and when the rows were last sorted: read after rendering.
+  const scrollTargetRef = useRef<string | null>(null);
+  // The parent highlighted by Back. Removing the page's highlighted row may
+  // make cmdk propose the first row in the same commit; that proposal is
+  // dropped, and the guard is cleared once the commit is done.
+  const pendingHighlightRef = useRef<string | null>(null);
+  const sortedAtRef = useRef(0);
+  const [settle, setSettle] = useState<SettleState>(SORT_AGAIN);
+  const [wasOpen, setWasOpen] = useState(false);
+  // Whether the opening still has to highlight the current entry, once its rows are sorted.
+  const [isHighlightingCurrent, setIsHighlightingCurrent] = useState(false);
+  // Opening starts on the main list, sorted with what is known, while rendering as React adjusts state to new props.
+  if (isOpen && !wasOpen) {
+    setWasOpen(true);
+    setView(MAIN_VIEW);
+    setIsHighlightingCurrent(true);
+    setSettle(SORT_AGAIN);
+  }
+  if (!isOpen && wasOpen) {
+    setWasOpen(false);
+  }
+
+  const matched = matchEntries(rows.entries, view.mainSearch);
+  const freshGroups = orderEntries(
+    keepFilteredEntries(listMatchedRows(matched), choice.filters),
+    choice.sort,
+    pairHeading,
   );
-  // Records the ranks while rendering the opening, React's way of adjusting state to new props.
-  if (isOpen && sortsByCount && openRanks === null) {
-    setOpenRanks(recordRanks(sections));
+  const freshLayout = readSettledGroups(freshGroups);
+  if (settle.layout === null && isOpen) {
+    settleNow(setSettle, freshLayout);
   }
-  if (!isOpen && openRanks !== null) {
-    setOpenRanks(null);
+  const layout = settle.layout ?? freshLayout;
+  const isSettled = isSameOrder(layout, freshLayout);
+  const page = findEntry(rows.entries, view.pageId);
+  const mainGroups: EntryGroup[] = placePinnedRows(
+    arrangeSettledGroups(freshGroups, layout),
+    showPinnedRows(rows.pinnedRows, view.mainSearch),
+  );
+  // The opening's rows are sorted: highlight the current entry before the list is shown, so cmdk mounts on it and scrolls it into view.
+  if (isOpen && isHighlightingCurrent && settle.layout !== null) {
+    setIsHighlightingCurrent(false);
+    setHighlighted(findOpeningHighlight(listGroupRows(mainGroups)));
   }
-  const shownSections =
-    sortsByCount && openRanks !== null
-      ? buildSortedSections(sections, openRanks)
-      : keepLoadableSections(sections);
-  const renderedSections: ReactElement[] = [];
-  const allSections: CombinationSection[] = [
-    { heading: null, rows: leadRows },
-    ...shownSections,
-  ];
-  const hasCountColumn = hasCounts(allSections);
-  for (const [index, section] of allSections.entries()) {
-    const rendered = renderSection(section, index, hasCountColumn);
-    if (rendered !== null) {
-      renderedSections.push(rendered);
+
+  const settledLayout = settle.layout;
+  useEffect(
+    function keepSortTime(): void {
+      if (settledLayout !== null) {
+        recordSortTime(sortedAtRef);
+      }
+    },
+    [settledLayout],
+  );
+  useEffect(
+    function sortAgainWhileSettling(): (() => void) | undefined {
+      if (!isOpen || settle.isFrozen || settle.layout === null || isSettled) {
+        return undefined;
+      }
+      const delay = readSettleDelay(sortedAtRef);
+      const timer = setTimeout(
+        settleNow.bind(undefined, setSettle, freshLayout),
+        delay,
+      );
+      return clearTimeout.bind(undefined, timer);
+    },
+    [isOpen, settle, isSettled, freshLayout],
+  );
+
+  useEffect(
+    function showHighlightedParent(): void {
+      pendingHighlightRef.current = null;
+      scrollRowIntoView(listRef, scrollTargetRef);
+    },
+    [view.pageId],
+  );
+
+  function sortAgain(): void {
+    setSettle(SORT_AGAIN);
+  }
+
+  function freeze(): void {
+    setSettle(freezeSettle);
+  }
+
+  function handleSearchChange(search: string): void {
+    if (page !== null) {
+      setView({ ...view, pageSearch: search });
+      return;
+    }
+    setView({ ...view, mainSearch: search });
+    sortAgain();
+  }
+
+  function openPage(entry: CombinationRow): void {
+    const pageSearch = readPageSearch(matched, entry.id);
+    setView({ ...view, pageId: entry.id, pageSearch });
+    const firstOption = matchPageOptions(entry, pageSearch)[0];
+    setHighlighted(firstOption?.id ?? BACK_ID);
+  }
+
+  function goBack(): void {
+    const parentId = view.pageId ?? "";
+    setView({ ...view, pageId: null, pageSearch: "" });
+    setHighlighted(parentId);
+    pendingHighlightRef.current = parentId;
+    scrollTargetRef.current = parentId;
+    sortAgain();
+  }
+
+  function handleHighlightChange(value: string): void {
+    const pending = pendingHighlightRef.current;
+    pendingHighlightRef.current = null;
+    setHighlighted(pending ?? value);
+  }
+
+  function chooseEntry(entry: CombinationRow): void {
+    if (entry.options === null) {
+      entry.onChoose();
+      return;
+    }
+    openPage(entry);
+  }
+
+  function handleKeyDown(event: KeyboardEvent): void {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      freeze();
+    }
+    if (event.key === "Backspace" && page !== null && view.pageSearch === "") {
+      event.preventDefault();
+      goBack();
     }
   }
+
+  function renderMainGroups(): ReactElement[] {
+    const rendered: ReactElement[] = [];
+    for (const [index, group] of mainGroups.entries()) {
+      const items: ReactElement[] = [];
+      for (const entry of group.entries) {
+        items.push(renderRow(entry, chooseEntry.bind(undefined, entry)));
+      }
+      rendered.push(
+        <CommandGroup
+          key={group.heading ?? `group-${index}`}
+          heading={group.heading ?? undefined}
+        >
+          {items}
+        </CommandGroup>,
+      );
+    }
+    return rendered;
+  }
+
+  function renderPage(entry: CombinationRow): ReactElement {
+    const items: ReactElement[] = [];
+    for (const option of matchPageOptions(entry, view.pageSearch)) {
+      items.push(renderRow(option, option.onChoose));
+    }
+    return (
+      <CommandGroup>
+        <CommandItem
+          value={BACK_ID}
+          onSelect={goBack}
+          aria-label={`Back to ${entry.title}`}
+        >
+          <ChevronLeft aria-hidden="true" />
+          <span>Back</span>
+          <span className="truncate text-muted-foreground">{entry.title}</span>
+        </CommandItem>
+        {items}
+      </CommandGroup>
+    );
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={capsuleAnchorRef} />
@@ -539,13 +749,25 @@ export function CombinationList({
         className="w-96 max-w-[calc(100vw-2rem)] p-0"
         onCloseAutoFocus={keepFocusInFrame}
       >
-        <Command label={label} filter={filterByTitle}>
-          <CommandInput placeholder="Search…" />
-          <CommandList>
+        <Command
+          label={label}
+          shouldFilter={false}
+          value={highlighted}
+          onValueChange={handleHighlightChange}
+          onKeyDown={handleKeyDown}
+        >
+          <CombinationListToolbar
+            kind={kind}
+            listChoices={listChoices}
+            search={page === null ? view.mainSearch : view.pageSearch}
+            onSearchChange={handleSearchChange}
+            onSortChoose={sortAgain}
+          />
+          <CommandList ref={listRef} onPointerMove={freeze}>
             <CommandEmpty>Nothing found.</CommandEmpty>
-            {renderedSections}
+            {page === null ? renderMainGroups() : renderPage(page)}
           </CommandList>
-          {renderFailedRows(keepRows(listRows(sections), isFailed))}
+          {page === null ? renderFailedRows(rows.failedRows) : null}
         </Command>
         {renderFooter(details, explorer)}
       </PopoverContent>

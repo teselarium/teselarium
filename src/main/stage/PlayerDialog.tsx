@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
-import { LoaderCircle } from "lucide-react";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
 import { Checkbox } from "@/vendor/shadcn/ui/checkbox.tsx";
 import { Label } from "@/vendor/shadcn/ui/label.tsx";
 import type { ActionMod, PlayerAction } from "../../lib/core/stage/index.ts";
+import { LoadingSpinner } from "../LoadingSpinner.tsx";
 import {
   readPlayerSitesSnapshot,
   rememberPlayerSite,
@@ -70,10 +70,7 @@ function PlayerLoading({ host }: PlayerLoadingProps): ReactElement {
       role="status"
       className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-md bg-muted p-4 text-center text-sm text-muted-foreground"
     >
-      <LoaderCircle
-        aria-hidden="true"
-        className="size-6 motion-safe:animate-spin"
-      />
+      <LoadingSpinner className="size-6" />
       <span className="[overflow-wrap:anywhere]">
         Loading the player from {host}…
       </span>

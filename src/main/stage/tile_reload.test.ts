@@ -41,7 +41,7 @@ describe("reloadSandboxTiles", function describeReloadSandboxTiles(): void {
 
     expect(countBefore).toEqual({
       state: "loaded",
-      value: { matching: 3, total: 3 },
+      value: { matching: 3, total: 3, isUntyped: false },
     });
     expect(readCombinationSnapshot(combinations).counts[key]).toBeUndefined();
   });

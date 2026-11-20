@@ -19,6 +19,7 @@ const COLLECTION_A = `${BASE}a/collection.yaml`;
 const COLLECTION_B = `${BASE}b/collection.yaml`;
 const MOD = `${BASE}mods/atlas/mod_conf.yaml`;
 const MOSAIC = `${BASE}mosaics/atlas.yaml`;
+const OTHER_MOD = `${BASE}mods/globe/mod_conf.yaml`;
 
 function buildModSource(number: number): string {
   const source = `${BASE}mods/mod_${number}/mod_conf.yaml`;
@@ -79,7 +80,68 @@ describe("recordRecentlyUsed", function describeRecordRecentlyUsed(): void {
       mods: [MOD],
       collections: [],
       mosaics: [MOSAIC],
+      combinations: [],
     });
+  });
+
+  it("Combination tried again: moves a combination already kept to the front", function movesCombinationToFront(): void {
+    const store = createRecentlyUsed({ storage: createMemoryStorage() });
+
+    recordRecentlyUsed(store, {
+      kind: "combination",
+      mod: MOD,
+      collection: COLLECTION_A,
+    });
+    recordRecentlyUsed(store, {
+      kind: "combination",
+      mod: OTHER_MOD,
+      collection: COLLECTION_A,
+    });
+    recordRecentlyUsed(store, {
+      kind: "combination",
+      mod: MOD,
+      collection: COLLECTION_A,
+    });
+
+    expect(readRecentlyUsedSnapshot(store).combinations).toEqual([
+      { mod: MOD, collection: COLLECTION_A },
+      { mod: OTHER_MOD, collection: COLLECTION_A },
+    ]);
+  });
+
+  it("keeps 10 combinations, dropping the oldest", function dropsOldestCombination(): void {
+    const store = createRecentlyUsed({ storage: createMemoryStorage() });
+
+    for (let number = 1; number <= 11; number += 1) {
+      recordRecentlyUsed(store, {
+        kind: "combination",
+        mod: buildModSource(number),
+        collection: COLLECTION_A,
+      });
+    }
+
+    const combinations = readRecentlyUsedSnapshot(store).combinations;
+    expect(combinations).toHaveLength(10);
+    expect(combinations[0]).toEqual({
+      mod: buildModSource(11),
+      collection: COLLECTION_A,
+    });
+    expect(combinations).not.toContainEqual({
+      mod: buildModSource(1),
+      collection: COLLECTION_A,
+    });
+  });
+
+  it("does not record a combination without two web addresses", function skipsInvalidCombination(): void {
+    const store = createRecentlyUsed({ storage: createMemoryStorage() });
+
+    recordRecentlyUsed(store, {
+      kind: "combination",
+      mod: "file:///mods/atlas/mod_conf.yaml",
+      collection: COLLECTION_A,
+    });
+
+    expect(readRecentlyUsedSnapshot(store).combinations).toEqual([]);
   });
 
   it("keeps working when the storage cannot be written", function keepsInMemory(): void {
@@ -117,6 +179,59 @@ describe("createRecentlyUsed", function describeCreateRecentlyUsed(): void {
     expect(readRecentlyUsedSnapshot(reloaded).mods).toEqual([MOD]);
   });
 
+  it("Combinations kept after a reload", function readsStoredCombinations(): void {
+    const storage = createMemoryStorage();
+    recordRecentlyUsed(createRecentlyUsed({ storage }), {
+      kind: "combination",
+      mod: MOD,
+      collection: COLLECTION_A,
+    });
+
+    const reloaded = createRecentlyUsed({ storage });
+
+    expect(readRecentlyUsedSnapshot(reloaded).combinations).toEqual([
+      { mod: MOD, collection: COLLECTION_A },
+    ]);
+  });
+
+  it("Stored before combinations were recorded: restored, with no combination", function readsOldValue(): void {
+    const storage = buildStoredStorage({
+      mods: [MOD],
+      collections: [COLLECTION_A],
+      mosaics: [MOSAIC],
+    });
+
+    const store = createRecentlyUsed({ storage });
+
+    expect(readRecentlyUsedSnapshot(store)).toEqual({
+      mods: [MOD],
+      collections: [COLLECTION_A],
+      mosaics: [MOSAIC],
+      combinations: [],
+    });
+  });
+
+  it("drops stored combinations without a valid mod and collection source", function dropsInvalidCombinations(): void {
+    const storage = buildStoredStorage({
+      combinations: [
+        { mod: MOD, collection: COLLECTION_A },
+        { mod: MOD },
+        { mod: "./relative/mod_conf.yaml", collection: COLLECTION_B },
+        "not a combination",
+        null,
+        { mod: MOD, collection: COLLECTION_A },
+        { mod: OTHER_MOD, collection: COLLECTION_B },
+      ],
+    });
+
+    const store = createRecentlyUsed({ storage });
+
+    expect(readRecentlyUsedSnapshot(store).combinations).toEqual([
+      { mod: MOD, collection: COLLECTION_A },
+      { mod: OTHER_MOD, collection: COLLECTION_B },
+    ]);
+  });
+
   it("drops stored entries that are not valid sources", function dropsInvalid(): void {
     const storage = buildStoredStorage({
       mods: [MOD, "./relative/mod_conf.yaml", 3, null, MOD],
@@ -130,6 +245,7 @@ describe("createRecentlyUsed", function describeCreateRecentlyUsed(): void {
       mods: [MOD],
       collections: [],
       mosaics: [MOSAIC],
+      combinations: [],
     });
   });
 
@@ -140,6 +256,7 @@ describe("createRecentlyUsed", function describeCreateRecentlyUsed(): void {
       mods: [],
       collections: [],
       mosaics: [],
+      combinations: [],
     });
   });
 
@@ -162,21 +279,32 @@ describe("removeRecentlyUsed", function describeRemoveRecentlyUsed(): void {
 });
 
 describe("clearRecentlyUsed", function describeClearRecentlyUsed(): void {
-  it("drops every entry, from the storage too, and records again afterwards", function clears(): void {
+  it("drops every entry of the four kinds, from the storage too, and records again afterwards", function clears(): void {
     const storage = createMemoryStorage();
     const store = createRecentlyUsed({ storage });
     recordRecentlyUsed(store, { kind: "mod", source: MOD });
     recordRecentlyUsed(store, { kind: "collection", source: COLLECTION_A });
+    recordRecentlyUsed(store, {
+      kind: "combination",
+      mod: MOD,
+      collection: COLLECTION_A,
+    });
 
     clearRecentlyUsed(store);
     const cleared = readStored(storage);
     recordRecentlyUsed(store, { kind: "mosaic", source: MOSAIC });
 
-    expect(cleared).toEqual({ mods: [], collections: [], mosaics: [] });
+    expect(cleared).toEqual({
+      mods: [],
+      collections: [],
+      mosaics: [],
+      combinations: [],
+    });
     expect(readRecentlyUsedSnapshot(store)).toEqual({
       mods: [],
       collections: [],
       mosaics: [MOSAIC],
+      combinations: [],
     });
   });
 });

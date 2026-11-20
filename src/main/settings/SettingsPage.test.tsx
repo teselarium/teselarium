@@ -47,6 +47,7 @@ function renderApp(fixture: AppFixture): RenderResult {
     <App
       stage={fixture.stage}
       combinations={fixture.combinations}
+      listChoices={fixture.listChoices}
       recentlyUsed={fixture.recentlyUsed}
       appTheme={fixture.appTheme}
       sections={fixture.sections}
@@ -61,7 +62,7 @@ function renderApp(fixture: AppFixture): RenderResult {
   );
 }
 
-/** Records two mods and one collection as recently used. */
+/** Records two mods, one collection and one combination as recently used. */
 function recordTriedCombinations(fixture: AppFixture): void {
   recordRecentlyUsed(fixture.recentlyUsed, {
     kind: "mod",
@@ -74,6 +75,11 @@ function recordTriedCombinations(fixture: AppFixture): void {
   recordRecentlyUsed(fixture.recentlyUsed, {
     kind: "collection",
     source: "https://example.org/tiles/laureates/collection.yaml",
+  });
+  recordRecentlyUsed(fixture.recentlyUsed, {
+    kind: "combination",
+    mod: "https://example.org/mods/atlas/mod_conf.yaml",
+    collection: "https://example.org/tiles/laureates/collection.yaml",
   });
 }
 
@@ -217,7 +223,7 @@ describe("SettingsPage", function describeSettingsPage(): void {
 
     expect(
       screen.getByText(
-        "2 mods, 1 collection and 0 mosaics are recently used, kept only on this device.",
+        "2 mods, 1 collection, 0 mosaics and 1 combination are recently used, kept only on this device.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();

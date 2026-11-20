@@ -6,7 +6,7 @@ import type {
   ModFile,
   ModLoadOptions,
 } from "../../mod/index.ts";
-import { loadMosaicFile } from "../../mosaic/index.ts";
+import { aliasCollectionTiles, loadMosaicFile } from "../../mosaic/index.ts";
 import type { LoadedMosaic, MosaicAliases } from "../../mosaic/index.ts";
 import { buildTileValidator, loadTileCollection } from "../../tile/index.ts";
 import type { TileIssue, TileValidator } from "../../tile/index.ts";
@@ -22,7 +22,6 @@ import {
 } from "./mod_api_version.ts";
 import type { ModCheckFinding } from "./mod_check_report.ts";
 import {
-  aliasCollectionTiles,
   expandMosaicRequest,
   readMosaicAliases,
   selectModTiles,

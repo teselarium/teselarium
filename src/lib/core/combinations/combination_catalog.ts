@@ -9,7 +9,13 @@ import {
   loadTileCollection,
   readTileCollectionIndex,
 } from "../../tile/index.ts";
-import type { Tile, TileCollection, TileValidator } from "../../tile/index.ts";
+import type {
+  Tile,
+  TileCollection,
+  TileCollectionIndex,
+  TileValidator,
+} from "../../tile/index.ts";
+import { limitFetch } from "./fetch_limit.ts";
 import { measureTileCount } from "./tile_counts.ts";
 import type { CountLoads, CountTarget, TileCount } from "./tile_counts.ts";
 
@@ -32,6 +38,8 @@ export interface ModSummary {
 export interface CollectionSummary {
   source: string;
   title: string;
+  /** The tile entries of the collection file, a repeated tile once. */
+  tileCount: number;
 }
 
 /** What the mosaic list shows of a mosaic file. Frozen. */
@@ -63,7 +71,7 @@ export interface CombinationSnapshot {
   mods: Readonly<Record<string, Loadable<ModSummary>>>;
   collections: Readonly<Record<string, Loadable<CollectionSummary>>>;
   mosaics: Readonly<Record<string, Loadable<MosaicSummary>>>;
-  /** By `buildCountKey(modSource, targetSource)`. */
+  /** By `buildCountKey(modSource, targetSource)`, and a mosaic's by `buildMosaicCountKey(mosaicSource)`. */
   counts: Readonly<Record<string, Loadable<TileCount>>>;
 }
 
@@ -75,9 +83,12 @@ export interface CombinationCatalog {
   fetchOptions: CombinationLoadOptions;
   readCatalog: () => Promise<CatalogListing>;
   modFiles: Map<string, Promise<ModFile>>;
+  collectionIndexes: Map<string, Promise<TileCollectionIndex>>;
   collectionLoads: Map<string, Promise<TileCollection>>;
   tileLoads: Map<string, Promise<Tile>>;
   validators: Map<string, Promise<TileValidator>>;
+  /** Each summary's load, by `buildSummaryKey(table, source)`, so a later request waits for it too. */
+  summaryLoads: Map<string, Promise<void>>;
   listeners: Set<() => void>;
   snapshot: CombinationSnapshot;
 }
@@ -92,22 +103,53 @@ const EMPTY_SNAPSHOT: CombinationSnapshot = Object.freeze({
   counts: Object.freeze({}),
 });
 
-/** The key of a count in `CombinationSnapshot.counts`. */
+/** The key of a count in `CombinationSnapshot.counts`, without aliases. */
 export function buildCountKey(modSource: string, targetSource: string): string {
   const key = `${modSource} ${targetSource}`;
   return key;
 }
 
+/**
+ * The key of a mosaic's count, with its aliases, in
+ * `CombinationSnapshot.counts`. It holds no space, so it never collides with
+ * a pair's key.
+ */
+export function buildMosaicCountKey(mosaicSource: string): string {
+  const key = `mosaic:${mosaicSource}`;
+  return key;
+}
+
+/** Over HTTP/1.1, browsers open at most 6 connections per host. */
+const MAX_PARALLEL_REQUESTS = 6;
+
+/** The global `fetch` as it is when a request starts, so a later stub is used. */
+function fetchGlobal(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  return globalThis.fetch(input, init);
+}
+
+/**
+ * Every request of the catalog goes through one `fetch`, `fetchOptions.fetch`
+ * or the global one, with at most 6 requests pending, all loads together.
+ */
 export function createCombinationCatalog(
   options: CombinationCatalogOptions,
 ): CombinationCatalog {
+  const limitedFetch = limitFetch(
+    options.fetchOptions.fetch ?? fetchGlobal,
+    MAX_PARALLEL_REQUESTS,
+  );
   const catalog: CombinationCatalog = {
-    fetchOptions: options.fetchOptions,
+    fetchOptions: { ...options.fetchOptions, fetch: limitedFetch },
     readCatalog: options.readCatalog,
     modFiles: new Map(),
+    collectionIndexes: new Map(),
     collectionLoads: new Map(),
     tileLoads: new Map(),
     validators: new Map(),
+    summaryLoads: new Map(),
     listeners: new Set(),
     snapshot: EMPTY_SNAPSHOT,
   };
@@ -187,6 +229,18 @@ function readCollection(
   );
 }
 
+function readCollectionIndex(
+  catalog: CombinationCatalog,
+  source: string,
+): Promise<TileCollectionIndex> {
+  return readCachedLoad(
+    catalog.collectionIndexes,
+    readTileCollectionIndex,
+    catalog.fetchOptions,
+    source,
+  );
+}
+
 function readTile(catalog: CombinationCatalog, source: string): Promise<Tile> {
   return readCachedLoad(
     catalog.tileLoads,
@@ -213,6 +267,7 @@ function buildCountLoads(catalog: CombinationCatalog): CountLoads {
   const loads: CountLoads = {
     loadModFile: readModFile.bind(undefined, catalog),
     loadCollection: readCollection.bind(undefined, catalog),
+    loadCollectionIndex: readCollectionIndex.bind(undefined, catalog),
     loadTile: readTile.bind(undefined, catalog),
     loadValidator: readValidator.bind(undefined, catalog),
   };
@@ -262,10 +317,11 @@ async function loadCollectionSummary(
   source: string,
 ): Promise<void> {
   try {
-    const index = await readTileCollectionIndex(source, catalog.fetchOptions);
+    const index = await readCollectionIndex(catalog, source);
     const summary: CollectionSummary = {
       source: index.source,
       title: index.title,
+      tileCount: index.tiles.length,
     };
     setEntry(catalog, "collections", source, buildLoaded(summary));
   } catch (error) {
@@ -292,19 +348,38 @@ async function loadMosaicSummary(
   }
 }
 
-/** Starts loading the summary of each source of `table` not requested yet. */
+type SummaryTable = "mods" | "collections" | "mosaics";
+
+function buildSummaryKey(table: SummaryTable, source: string): string {
+  const key = `${table} ${source}`;
+  return key;
+}
+
+/**
+ * The load of the summary of each source of `table`: the one already
+ * started, or a new one for a source not requested yet.
+ */
 function requestTable(
   catalog: CombinationCatalog,
-  table: "mods" | "collections" | "mosaics",
+  table: SummaryTable,
   sources: readonly string[],
   load: (catalog: CombinationCatalog, source: string) => Promise<void>,
 ): Promise<void>[] {
   const loads: Promise<void>[] = [];
   for (const source of sources) {
-    if (catalog.snapshot[table][source] === undefined) {
-      setEntry(catalog, table, source, LOADING);
-      loads.push(load(catalog, source));
+    const key = buildSummaryKey(table, source);
+    const started = catalog.summaryLoads.get(key);
+    if (
+      started !== undefined &&
+      catalog.snapshot[table][source] !== undefined
+    ) {
+      loads.push(started);
+      continue;
     }
+    setEntry(catalog, table, source, LOADING);
+    const loading = load(catalog, source);
+    catalog.summaryLoads.set(key, loading);
+    loads.push(loading);
   }
   return loads;
 }
@@ -318,7 +393,8 @@ export interface SummaryRequest {
 
 /**
  * Starts loading the summaries `request` names that were never requested:
- * mod files, collection indexes and mosaic files. Resolves once they settled.
+ * mod files, collection indexes and mosaic files. Resolves once every
+ * summary it names settled, those another request started too.
  */
 export async function requestSummaries(
   catalog: CombinationCatalog,
@@ -350,17 +426,28 @@ export async function refreshCatalog(
   publishCatalog(catalog, { ...catalog.snapshot, listing });
 }
 
+/** One count to measure, and its key in `CombinationSnapshot.counts`. */
+interface CountMeasure {
+  key: string;
+  modSource: string;
+  target: CountTarget;
+  aliases: Readonly<MosaicAliases>;
+}
+
+/** No aliases: a pair's count, not a mosaic's. */
+const NO_ALIASES: Readonly<MosaicAliases> = Object.freeze({});
+
 async function measureCount(
   catalog: CombinationCatalog,
-  modSource: string,
-  target: CountTarget,
+  measure: CountMeasure,
 ): Promise<void> {
-  const key = buildCountKey(modSource, target.source);
+  const key = measure.key;
   try {
     const count = await measureTileCount(
-      modSource,
-      target,
+      measure.modSource,
+      measure.target,
       buildCountLoads(catalog),
+      measure.aliases,
     );
     if (catalog.snapshot.counts[key] !== undefined) {
       setEntry(catalog, "counts", key, buildLoaded(count));
@@ -375,34 +462,105 @@ async function measureCount(
 /**
  * Starts measuring the count of each mod on `target` that is not known or
  * being measured, once per pair for the page. Resolves once they settled.
- * Tiles load with the collection loader's parallel limit, once per
- * collection, and each tile type file once.
+ * Tiles load once per collection, and each tile type file once, within the
+ * catalog's limit on pending requests.
  */
 export async function requestCounts(
   catalog: CombinationCatalog,
   modSources: readonly string[],
   target: CountTarget,
 ): Promise<void> {
-  const measures: Promise<void>[] = [];
+  const measures: CountMeasure[] = [];
   for (const modSource of modSources) {
-    const key = buildCountKey(modSource, target.source);
-    if (catalog.snapshot.counts[key] === undefined) {
-      setEntry(catalog, "counts", key, LOADING);
-      measures.push(measureCount(catalog, modSource, target));
-    }
+    measures.push({
+      key: buildCountKey(modSource, target.source),
+      modSource,
+      target,
+      aliases: NO_ALIASES,
+    });
   }
-  await Promise.all(measures);
+  await startMeasures(catalog, measures);
 }
 
-/** The entries of `entries` whose key does not end with ` <source>`. */
+/** Starts each measure whose count is not known or being measured. Resolves once they settled. */
+async function startMeasures(
+  catalog: CombinationCatalog,
+  measures: readonly CountMeasure[],
+): Promise<void> {
+  const started: Promise<void>[] = [];
+  for (const measure of measures) {
+    if (catalog.snapshot.counts[measure.key] === undefined) {
+      setEntry(catalog, "counts", measure.key, LOADING);
+      started.push(measureCount(catalog, measure));
+    }
+  }
+  await Promise.all(started);
+}
+
+/** The measure of a loaded mosaic's count, or `null` for a mosaic not loaded or without a collection. */
+function buildMosaicMeasure(
+  catalog: CombinationCatalog,
+  mosaicSource: string,
+): CountMeasure | null {
+  const entry = catalog.snapshot.mosaics[mosaicSource];
+  if (entry?.state !== "loaded" || entry.value.collection === null) {
+    return null;
+  }
+  const measure: CountMeasure = {
+    key: buildMosaicCountKey(mosaicSource),
+    modSource: entry.value.mod,
+    target: { kind: "collection", source: entry.value.collection },
+    aliases: entry.value.aliases,
+  };
+  return measure;
+}
+
+/**
+ * Starts measuring the count of each mosaic with its aliases, as its launch
+ * renames its tiles, under `buildMosaicCountKey`. The mod, collection and
+ * aliases are read from the mosaic's loaded summary, so a mosaic whose
+ * summary is not loaded, or that has no collection, is left out. The
+ * collection's tiles and the type file come from the same caches as the
+ * pairs' counts. Resolves once they settled.
+ */
+export async function requestMosaicCounts(
+  catalog: CombinationCatalog,
+  mosaicSources: readonly string[],
+): Promise<void> {
+  const measures: CountMeasure[] = [];
+  for (const mosaicSource of mosaicSources) {
+    const measure = buildMosaicMeasure(catalog, mosaicSource);
+    if (measure !== null) {
+      measures.push(measure);
+    }
+  }
+  await startMeasures(catalog, measures);
+}
+
+/** The keys of the counts of the loaded mosaics on the collection `source`. */
+function listMosaicCountKeys(
+  mosaics: CombinationSnapshot["mosaics"],
+  source: string,
+): Set<string> {
+  const keys = new Set<string>();
+  for (const [mosaicSource, entry] of Object.entries(mosaics)) {
+    if (entry.state === "loaded" && entry.value.collection === source) {
+      keys.add(buildMosaicCountKey(mosaicSource));
+    }
+  }
+  return keys;
+}
+
+/** The counts of `snapshot` that are not on the target `source`, its mosaics' left out too. */
 function leaveOutTarget(
-  entries: Readonly<Record<string, Loadable<TileCount>>>,
+  snapshot: CombinationSnapshot,
   source: string,
 ): Record<string, Loadable<TileCount>> {
   const kept: Record<string, Loadable<TileCount>> = {};
   const suffix = ` ${source}`;
-  for (const [key, entry] of Object.entries(entries)) {
-    if (!key.endsWith(suffix)) {
+  const mosaicKeys = listMosaicCountKeys(snapshot.mosaics, source);
+  for (const [key, entry] of Object.entries(snapshot.counts)) {
+    if (!key.endsWith(suffix) && !mosaicKeys.has(key)) {
       kept[key] = entry;
     }
   }
@@ -411,13 +569,15 @@ function leaveOutTarget(
 
 /**
  * Forgets a collection's or a tile's loaded tiles, its summary and its
- * counts, as when the stage reloads its tiles, so the next list measures
+ * counts, those of its mosaics too, as when the stage reloads its tiles, so the next list measures
  * them again.
  */
 export function dropCollection(
   catalog: CombinationCatalog,
   source: string,
 ): void {
+  catalog.collectionIndexes.delete(source);
+  catalog.summaryLoads.delete(buildSummaryKey("collections", source));
   catalog.collectionLoads.delete(source);
   catalog.tileLoads.delete(source);
   const collections = { ...catalog.snapshot.collections };
@@ -425,7 +585,7 @@ export function dropCollection(
   publishCatalog(catalog, {
     ...catalog.snapshot,
     collections: Object.freeze(collections),
-    counts: Object.freeze(leaveOutTarget(catalog.snapshot.counts, source)),
+    counts: Object.freeze(leaveOutTarget(catalog.snapshot, source)),
   });
 }
 

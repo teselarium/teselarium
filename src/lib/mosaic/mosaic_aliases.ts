@@ -1,5 +1,6 @@
 import { isYamlMapping } from "../files/index.ts";
 import type { Metadata, YamlValue } from "../files/index.ts";
+import type { Tile, TileCollection } from "../tile/index.ts";
 import { MosaicFormatError } from "./mosaic_errors.ts";
 
 /**
@@ -134,4 +135,27 @@ export function applyMosaicAliases(
     aliasedMetadata[aliasedKey] = value;
   }
   return aliasedMetadata;
+}
+
+/**
+ * The collection with each tile's metadata renamed by a mosaic's aliases
+ * (`applyMosaicAliases`). The tiles' `source`, `body` and `types` are kept.
+ * Changes neither input.
+ */
+export function aliasCollectionTiles(
+  collection: TileCollection,
+  aliases: MosaicAliases,
+): TileCollection {
+  const aliasedTiles: Tile[] = [];
+  for (const tile of collection.tiles) {
+    aliasedTiles.push({
+      ...tile,
+      metadata: applyMosaicAliases(tile.metadata, aliases),
+    });
+  }
+  const aliasedCollection: TileCollection = {
+    ...collection,
+    tiles: aliasedTiles,
+  };
+  return aliasedCollection;
 }

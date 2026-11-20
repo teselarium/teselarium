@@ -2,7 +2,7 @@ import type { FileFetchOptions, YamlMapping } from "../../files/index.ts";
 import { loadMod, resolveModReference } from "../../mod/index.ts";
 import type { LoadedMod, ModIssue, ModLoadOptions } from "../../mod/index.ts";
 import {
-  applyMosaicAliases,
+  aliasCollectionTiles,
   loadMosaicFile,
   mergeMosaicConfig,
   resolveMosaicReference,
@@ -319,28 +319,6 @@ export function selectModTiles(
     tileValidator.typeName,
   );
   return buildModTiles(validatedCollection, typedTiles);
-}
-
-/**
- * The collection with each tile's metadata renamed by a mosaic's aliases
- * (`applyMosaicAliases`). The tiles' `source`, `body` and `types` are kept.
- */
-export function aliasCollectionTiles(
-  collection: TileCollection,
-  aliases: MosaicAliases,
-): TileCollection {
-  const aliasedTiles: Tile[] = [];
-  for (const tile of collection.tiles) {
-    aliasedTiles.push({
-      ...tile,
-      metadata: applyMosaicAliases(tile.metadata, aliases),
-    });
-  }
-  const aliasedCollection: TileCollection = {
-    ...collection,
-    tiles: aliasedTiles,
-  };
-  return aliasedCollection;
 }
 
 /**

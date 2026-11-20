@@ -8,11 +8,13 @@ import {
 import type { CatalogListing } from "../engine/index.ts";
 import {
   buildCountKey,
+  buildMosaicCountKey,
   createCombinationCatalog,
   dropCollection,
   readCombinationSnapshot,
   refreshCatalog,
   requestCounts,
+  requestMosaicCounts,
   requestSummaries,
   subscribeCombinations,
 } from "./combination_catalog.ts";
@@ -155,11 +157,11 @@ describe("requestCounts", function describeRequestCounts(): void {
 
     expect(readCount(catalog, BOOK_MOD, PEOPLE)).toEqual({
       state: "loaded",
-      value: { matching: 0, total: 2 },
+      value: { matching: 0, total: 2, isUntyped: false },
     });
   });
 
-  it("Mod without a tile type: any, with no tile requested", async function countsAny(): Promise<void> {
+  it("Mod without a tile type: every tile matches, with no tile requested", async function countsUntyped(): Promise<void> {
     const { catalog, requested } = buildCatalog();
 
     await requestCounts(catalog, [UNTYPED_MOD], {
@@ -169,7 +171,25 @@ describe("requestCounts", function describeRequestCounts(): void {
 
     expect(readCount(catalog, UNTYPED_MOD, PEOPLE)).toEqual({
       state: "loaded",
-      value: "any",
+      value: { matching: 2, total: 2, isUntyped: true },
+    });
+    expect(requested).toEqual([UNTYPED_MOD, PEOPLE]);
+    for (const tile of PERSON_TILES) {
+      expect(requested).not.toContain(tile);
+    }
+  });
+
+  it("scores a mod without a tile type on a tile as 1/1, with no file but the mod's", async function countsUntypedTile(): Promise<void> {
+    const { catalog, requested } = buildCatalog();
+
+    await requestCounts(catalog, [UNTYPED_MOD], {
+      kind: "tile",
+      source: BOOK_TILE,
+    });
+
+    expect(readCount(catalog, UNTYPED_MOD, BOOK_TILE)).toEqual({
+      state: "loaded",
+      value: { matching: 1, total: 1, isUntyped: true },
     });
     expect(requested).toEqual([UNTYPED_MOD]);
   });
@@ -188,11 +208,11 @@ describe("requestCounts", function describeRequestCounts(): void {
 
     expect(readCount(catalog, BOOK_MOD, BOOK_TILE)).toEqual({
       state: "loaded",
-      value: { matching: 1, total: 1 },
+      value: { matching: 1, total: 1, isUntyped: false },
     });
     expect(readCount(catalog, BOOK_MOD, PERSON_TILES[0])).toEqual({
       state: "loaded",
-      value: { matching: 0, total: 1 },
+      value: { matching: 0, total: 1, isUntyped: false },
     });
   });
 
@@ -249,7 +269,81 @@ describe("requestCounts", function describeRequestCounts(): void {
   });
 });
 
+function readMosaicCount(
+  catalog: CombinationCatalog,
+  mosaic: string,
+): Loadable<TileCount> | undefined {
+  return readCombinationSnapshot(catalog).counts[buildMosaicCountKey(mosaic)];
+}
+
+describe("requestMosaicCounts", function describeRequestMosaicCounts(): void {
+  it("Laureates on the map: the mosaic's aliases make every person a book, the pair's count stays without them", async function countsWithAliases(): Promise<void> {
+    const { catalog } = buildCatalog();
+    await requestSummaries(catalog, { mosaics: [MOSAIC] });
+
+    await requestMosaicCounts(catalog, [MOSAIC]);
+    await requestCounts(catalog, [BOOK_MOD], {
+      kind: "collection",
+      source: PEOPLE,
+    });
+
+    expect(readMosaicCount(catalog, MOSAIC)).toEqual({
+      state: "loaded",
+      value: { matching: 2, total: 2, isUntyped: false },
+    });
+    expect(readCount(catalog, BOOK_MOD, PEOPLE)).toEqual({
+      state: "loaded",
+      value: { matching: 0, total: 2, isUntyped: false },
+    });
+  });
+
+  it("loads the collection's tiles and the type file once for the mosaic and the pair", async function sharesLoads(): Promise<void> {
+    const { catalog, requested } = buildCatalog();
+    await requestSummaries(catalog, { mosaics: [MOSAIC] });
+    requested.length = 0;
+
+    await Promise.all([
+      requestMosaicCounts(catalog, [MOSAIC]),
+      requestCounts(catalog, [BOOK_MOD], {
+        kind: "collection",
+        source: PEOPLE,
+      }),
+    ]);
+
+    expect([...requested].sort()).toEqual(
+      [BOOK_MOD, BOOK_TYPE, PEOPLE, ...PERSON_TILES].sort(),
+    );
+  });
+
+  it("leaves out a mosaic whose summary is not loaded", async function skipsUnloaded(): Promise<void> {
+    const { catalog, requested } = buildCatalog();
+
+    await requestMosaicCounts(catalog, [MOSAIC]);
+
+    expect(readMosaicCount(catalog, MOSAIC)).toBeUndefined();
+    expect(requested).toEqual([]);
+  });
+});
+
 describe("dropCollection", function describeDropCollection(): void {
+  it("Reload: drops the counts of the collection's mosaics too", async function dropsMosaicCounts(): Promise<void> {
+    const { catalog } = buildCatalog();
+    await requestSummaries(catalog, { mosaics: [MOSAIC] });
+    await requestMosaicCounts(catalog, [MOSAIC]);
+    await requestCounts(catalog, [BOOK_MOD], {
+      kind: "collection",
+      source: PEOPLE,
+    });
+
+    dropCollection(catalog, PEOPLE);
+
+    expect(readMosaicCount(catalog, MOSAIC)).toBeUndefined();
+    expect(readCount(catalog, BOOK_MOD, PEOPLE)).toBeUndefined();
+    expect(readCombinationSnapshot(catalog).mosaics[MOSAIC]?.state).toBe(
+      "loaded",
+    );
+  });
+
   it("drops the collection's counts and tiles, so the next request measures again", async function dropsCounts(): Promise<void> {
     const { catalog, requested } = buildCatalog();
     const target = { kind: "collection", source: PEOPLE } as const;
@@ -290,7 +384,7 @@ describe("requestSummaries", function describeRequestSummaries(): void {
     });
     expect(snapshot.collections[PEOPLE]).toEqual({
       state: "loaded",
-      value: { source: PEOPLE, title: "People" },
+      value: { source: PEOPLE, title: "People", tileCount: 2 },
     });
     expect(snapshot.mosaics[MOSAIC]).toEqual({
       state: "loaded",
@@ -304,6 +398,20 @@ describe("requestSummaries", function describeRequestSummaries(): void {
     });
     expect(requested).toHaveLength(firstCount);
     expect(requested).not.toContain(BOOK_ENTRYPOINT);
+  });
+});
+
+describe("requestSummaries while another request loads them", function describeSharedSummaries(): void {
+  it("resolves once the summaries another request started are loaded", async function waitsForStarted(): Promise<void> {
+    const { catalog } = buildCatalog();
+    const first = requestSummaries(catalog, { mosaics: [MOSAIC] });
+
+    await requestSummaries(catalog, { mosaics: [MOSAIC] });
+
+    expect(readCombinationSnapshot(catalog).mosaics[MOSAIC]?.state).toBe(
+      "loaded",
+    );
+    await first;
   });
 });
 

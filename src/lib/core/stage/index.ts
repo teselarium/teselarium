@@ -58,6 +58,7 @@ export {
   buildCollectionChoice,
   buildModChoice,
   buildMosaicChoice,
+  buildPairChoice,
   buildSitesDrop,
   isCombinationSandbox,
   NO_COLLECTION,
@@ -68,8 +69,10 @@ export type { FrameLayout } from "./stage_layout.ts";
 export { buildSectionHash } from "./stage_routes.ts";
 export type { SectionLink, StageHome, StageRouting } from "./stage_routes.ts";
 export type {
+  LoadedCombination,
   LoadedFileEntry,
   LoadedFileKind,
+  LoadedFileSource,
   SandboxStatus,
   SiteConsentAnswer,
 } from "./stage_sandboxes.ts";

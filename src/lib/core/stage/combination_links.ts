@@ -85,6 +85,20 @@ export function buildMosaicChoice(
   return mosaicLink;
 }
 
+/**
+ * The run link that choosing a tried combination in the mosaic list opens:
+ * its mod with its collection, with no `mosaic`, no `sites` and no params.
+ */
+export function buildPairChoice(mod: string, collection: string): RunLink {
+  const pairLink: RunLink = {
+    mod,
+    collection,
+    tile: null,
+    params: {},
+  };
+  return pairLink;
+}
+
 /** The run link "Stop using these sites" opens: the same combination, params kept, without `sites`. */
 export function buildSitesDrop(link: SandboxLink): RunLink {
   const droppedLink: RunLink = {

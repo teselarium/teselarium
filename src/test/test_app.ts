@@ -39,12 +39,15 @@ import {
   settleStage,
 } from "./test_stages.ts";
 import type { CombinationCatalog } from "../lib/core/combinations/index.ts";
+import { createListChoices } from "../main/stage/list_choices.ts";
+import type { ListChoices } from "../main/stage/list_choices.ts";
 
 /** Everything `App` gets, built as `main.tsx` builds it, on fakes. The site decisions and player sites use `storage`. */
 export interface AppFixture {
   history: FakeHistory;
   stage: Stage;
   combinations: CombinationCatalog;
+  listChoices: ListChoices;
   recentlyUsed: RecentlyUsed;
   appTheme: AppTheme;
   sections: readonly SectionDefinition[];
@@ -102,6 +105,7 @@ export async function startTestApp(
     history,
     stage,
     combinations: buildTestCombinations(stage),
+    listChoices: createListChoices(),
     recentlyUsed,
     appTheme: createAppTheme({
       storage,

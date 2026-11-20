@@ -26,6 +26,11 @@ type CombinationCapsuleProps = Omit<
   hidesTitleWhenNarrow?: boolean;
   /** The dashed border of an unsaved combination. */
   isDashed?: boolean;
+  /**
+   * Called when the tooltip opens: after the pointer rests on the capsule,
+   * or when the keyboard focuses it. The capsule's list starts its loads.
+   */
+  onIntent?: () => void;
 };
 
 const SHRINK_CLASSES: Readonly<Record<CapsuleShrink, string>> = Object.freeze({
@@ -63,7 +68,8 @@ function buildCapsuleName(
  * most 16rem wide, its title ends with an ellipsis when it does not fit, and
  * its tooltip and accessible name give the kind and the full title. The
  * other props, and the ones a `PopoverTrigger` or `DropdownMenuTrigger`
- * passes with `asChild`, go to the button.
+ * passes with `asChild`, go to the button. Its tooltip opening tells
+ * `onIntent`, so its list measures ahead.
  */
 export function CombinationCapsule({
   kind,
@@ -73,12 +79,20 @@ export function CombinationCapsule({
   shrink,
   hidesTitleWhenNarrow = false,
   isDashed = false,
+  onIntent,
   className,
   ...buttonProps
 }: CombinationCapsuleProps): ReactElement {
   const name = buildCapsuleName(kind, title, version);
+
+  function handleTooltipOpenChange(isOpen: boolean): void {
+    if (isOpen) {
+      onIntent?.();
+    }
+  }
+
   return (
-    <Tooltip>
+    <Tooltip onOpenChange={handleTooltipOpenChange}>
       <TooltipTrigger asChild>
         <Button
           type="button"

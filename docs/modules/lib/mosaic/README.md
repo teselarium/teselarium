@@ -93,7 +93,7 @@ The loaded lines keep the file order, as `{ category: "show", host, reason }`. T
 
 ## Module Details
 
-Implemented in `src/lib/mosaic/`. Other modules import only from the public entry point `src/lib/mosaic/index.ts`. It reuses the [files module](../files/README.md) for fetching and YAML, `resolveModReference` and `isShowHost` of the [mod module](../mod/README.md), and `resolveCollectionReference` of the [tile module](../tile/README.md).
+Implemented in `src/lib/mosaic/`. Other modules import only from the public entry point `src/lib/mosaic/index.ts`. It reuses the [files module](../files/README.md) for fetching and YAML, `resolveModReference` and `isShowHost` of the [mod module](../mod/README.md), and `resolveCollectionReference` and the `TileCollection` type of the [tile module](../tile/README.md).
 
 ### Mosaic loader
 
@@ -109,8 +109,9 @@ Loaded mosaics are plain data, and two loads of the same mosaic never share obje
 
 - `mergeMosaicConfig(modConfig, mosaicConfig)`: the [config merge](#config-merge). Returns a new mapping that shares no objects with its inputs, and changes neither.
 - `applyMosaicAliases(metadata, aliases)`: the [alias renaming](#aliases) of one tile's metadata. Returns new metadata and changes neither input.
+- `aliasCollectionTiles(collection, aliases)`: the collection with each tile's metadata renamed by `applyMosaicAliases`. The tiles' `source`, `body` and `types`, and the collection's other fields, are kept. Returns a new collection and changes neither input.
 
-Both are pure. The engine calls them when it builds a mosaic's launch.
+All three are pure. The engine calls them when it builds a mosaic's launch, and the [combinations module](../core/combinations/README.md) calls `aliasCollectionTiles` to score a mosaic as its launch would.
 
 Example:
 

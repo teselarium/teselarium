@@ -14,8 +14,13 @@ import type {
 import type { RunLink } from "../../lib/core/engine/index.ts";
 import type { ReactElement, RefObject } from "react";
 import type { CombinationCatalog } from "../../lib/core/combinations/index.ts";
-import type { RecentlyUsed } from "../settings/recently_used.ts";
+import type {
+  RecentlyUsed,
+  RecentlyUsedSnapshot,
+} from "../settings/recently_used.ts";
+import type { RowActions } from "./combination_rows.ts";
 import type { ExplorerLink } from "./CombinationList.tsx";
+import type { ListChoices } from "./list_choices.ts";
 
 /** What each capsule's list gets. */
 export interface CapsuleListProps {
@@ -23,12 +28,28 @@ export interface CapsuleListProps {
   sandbox: SandboxSnapshot;
   combinations: CombinationCatalog;
   recentlyUsed: RecentlyUsed;
+  listChoices: ListChoices;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   /** The capsule that opens the list. */
   children: ReactElement;
   /** What the list opens under (see `CombinationList`). */
   anchorRef: RefObject<HTMLElement | null>;
+}
+
+/** What the row builders read of a sandbox. */
+export type ListSandbox = Pick<
+  SandboxSnapshot,
+  "link" | "mod" | "collectionTitle" | "mosaic"
+>;
+
+/** What a list's row builder reads: the catalog, the sandbox, both stores' snapshots and the rows' actions. */
+export interface ListInputs {
+  catalog: CatalogSources;
+  sandbox: ListSandbox;
+  snapshot: CombinationSnapshot;
+  recent: RecentlyUsedSnapshot;
+  actions: RowActions;
 }
 
 /** The catalog's sources of each kind, in catalog order. */

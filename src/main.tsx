@@ -54,6 +54,7 @@ import {
   NARROW_VIEWPORT_QUERY,
 } from "./main/sidebar/sidebar_layout.ts";
 import type { SidebarLayoutStore } from "./main/sidebar/sidebar_layout.ts";
+import { createListChoices } from "./main/stage/list_choices.ts";
 import { StartErrorScreen } from "./main/StartErrorScreen.tsx";
 import {
   createAppTheme,
@@ -124,6 +125,8 @@ function startApp(
     },
     readCatalog: readStageCatalog.bind(undefined, stage),
   });
+  // The lists' sort and filter choices, kept in memory until the page is reloaded.
+  const listChoices = createListChoices();
   // Same lifetime as the stage: it tells the stage when the color scheme changes.
   const appTheme = createAppTheme({
     storage: window.localStorage,
@@ -169,6 +172,7 @@ function startApp(
     <App
       stage={stage}
       combinations={combinations}
+      listChoices={listChoices}
       recentlyUsed={recentlyUsed}
       appTheme={appTheme}
       sections={sections}

@@ -17,12 +17,13 @@ function describeCount(count: number, one: string, many: string): string {
   return text;
 }
 
-/** "2 mods, 1 collection and 0 mosaics are recently used", or `null` when nothing is. */
+/** "2 mods, 1 collection, 0 mosaics and 1 combination are recently used", or `null` when nothing is. */
 function describeRecentlyUsed(snapshot: RecentlyUsedSnapshot): string | null {
   const total =
     snapshot.mods.length +
     snapshot.collections.length +
-    snapshot.mosaics.length;
+    snapshot.mosaics.length +
+    snapshot.combinations.length;
   if (total === 0) {
     return null;
   }
@@ -33,13 +34,18 @@ function describeRecentlyUsed(snapshot: RecentlyUsedSnapshot): string | null {
     "collections",
   );
   const mosaics = describeCount(snapshot.mosaics.length, "mosaic", "mosaics");
+  const combinations = describeCount(
+    snapshot.combinations.length,
+    "combination",
+    "combinations",
+  );
   const verb = total === 1 ? "is" : "are";
-  const text = `${mods}, ${collections} and ${mosaics} ${verb} recently used, kept only on this device.`;
+  const text = `${mods}, ${collections}, ${mosaics} and ${combinations} ${verb} recently used, kept only on this device.`;
   return text;
 }
 
 /**
- * How many mods, collections and mosaics are recently used, and, while any
+ * How many mods, collections, mosaics and combinations are recently used, and, while any
  * is kept, a "Clear" button that clears them at once, without reloading any
  * frame.
  */

@@ -2622,6 +2622,9 @@ describe("openStageCombination", function describeOpenStageCombination(): void {
   });
 });
 
+/** A collection file that does not exist, so it answers `404 Not Found`. */
+const MISSING_COLLECTION_REFERENCE = "./fixtures/tiles/missing/collection.yaml";
+
 /** Starts at the Home mod with a stage that keeps what it reports as loaded, then follows `hash`. */
 async function recordFromHome(hash: string): Promise<LoadedFileEntry[]> {
   const recorded: LoadedFileEntry[] = [];
@@ -2664,7 +2667,34 @@ describe("onFilesLoaded", function describeOnFilesLoaded(): void {
     expect(recorded).toEqual([
       { kind: "mod", source: SAMPLE_MOD_SOURCE },
       { kind: "collection", source: SAMPLE_COLLECTION_SOURCE },
+      {
+        kind: "combination",
+        mod: SAMPLE_MOD_SOURCE,
+        collection: SAMPLE_COLLECTION_SOURCE,
+      },
     ]);
+  });
+
+  it("Tried pair: a collection link reports one combination, after its mod and collection", async function recordsCombination(): Promise<void> {
+    const recorded = await recordFromHome(SAMPLE_COLLECTION_RUN_HASH);
+
+    expect(recorded).toEqual([
+      { kind: "mod", source: SAMPLE_MOD_SOURCE },
+      { kind: "collection", source: SAMPLE_COLLECTION_SOURCE },
+      {
+        kind: "combination",
+        mod: SAMPLE_MOD_SOURCE,
+        collection: SAMPLE_COLLECTION_SOURCE,
+      },
+    ]);
+  });
+
+  it("Collection that fails to load: no combination is reported", async function skipsFailedCollection(): Promise<void> {
+    const recorded = await recordFromHome(
+      `${SAMPLE_RUN_HASH}&collection=${encodeURIComponent(MISSING_COLLECTION_REFERENCE)}`,
+    );
+
+    expect(recorded).toEqual([{ kind: "mod", source: SAMPLE_MOD_SOURCE }]);
   });
 
   it("Explorer not recorded: a mod link without a collection or a tile", async function skipsModLink(): Promise<void> {

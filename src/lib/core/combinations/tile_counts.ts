@@ -1,12 +1,24 @@
 import type { ModFile } from "../../mod/index.ts";
+import { aliasCollectionTiles } from "../../mosaic/index.ts";
+import type { MosaicAliases } from "../../mosaic/index.ts";
 import { validateTileCollection } from "../../tile/index.ts";
-import type { Tile, TileCollection, TileValidator } from "../../tile/index.ts";
+import type {
+  Tile,
+  TileCollection,
+  TileCollectionIndex,
+  TileValidator,
+} from "../../tile/index.ts";
 
 /**
- * How many tiles of a collection or a tile have a mod's tile type, without
- * any mosaic's aliases, or `"any"` for a mod without a tile type.
+ * How many tiles of a collection or a tile have a mod's tile type, after a
+ * mosaic's aliases when it is a mosaic's count. A mod without a tile type
+ * matches every tile, and is marked `isUntyped`.
  */
-export type TileCount = { matching: number; total: number } | "any";
+export interface TileCount {
+  matching: number;
+  total: number;
+  isUntyped: boolean;
+}
 
 /** What a count is measured on: a collection, or one tile. */
 export interface CountTarget {
@@ -19,6 +31,8 @@ export interface CountTarget {
 export interface CountLoads {
   loadModFile: (source: string) => Promise<ModFile>;
   loadCollection: (source: string) => Promise<TileCollection>;
+  /** The collection file alone, with no tile requested. */
+  loadCollectionIndex: (source: string) => Promise<TileCollectionIndex>;
   loadTile: (source: string) => Promise<Tile>;
   loadValidator: (typeSource: string) => Promise<TileValidator>;
 }
@@ -58,27 +72,52 @@ export function countMatchingTiles(
       matching += 1;
     }
   }
-  const count: TileCount = { matching, total: collection.tiles.length };
+  const count: TileCount = {
+    matching,
+    total: collection.tiles.length,
+    isUntyped: false,
+  };
   return count;
 }
 
+/** Every tile of the target matches a mod without a tile type: counted from the collection file, never its tiles. */
+async function measureUntypedCount(
+  target: CountTarget,
+  loads: CountLoads,
+): Promise<TileCount> {
+  let total = 1;
+  if (target.kind === "collection") {
+    const index = await loads.loadCollectionIndex(target.source);
+    total = index.tiles.length;
+  }
+  const count: TileCount = { matching: total, total, isUntyped: true };
+  return count;
+}
+
+/** No aliases: the count of a mod or collection entry, not of a mosaic. */
+const NO_ALIASES: MosaicAliases = {};
+
 /**
  * Measures one count: the mod file, then the target's tiles and the mod's
- * tile type file, never the entrypoint, a library or a mosaic file. Every
- * load error propagates.
+ * tile type file, never the entrypoint, a library or a mosaic file. The
+ * tiles are renamed by `aliases` before they are validated, as a mosaic's
+ * launch does. A mod without a tile type is counted from the collection
+ * file alone. Every load error propagates.
  */
 export async function measureTileCount(
   modSource: string,
   target: CountTarget,
   loads: CountLoads,
+  aliases: Readonly<MosaicAliases> = NO_ALIASES,
 ): Promise<TileCount> {
   const modFile = await loads.loadModFile(modSource);
   if (modFile.typeSource === null) {
-    return "any";
+    return measureUntypedCount(target, loads);
   }
   const [collection, validator] = await Promise.all([
     loadTargetTiles(target, loads),
     loads.loadValidator(modFile.typeSource),
   ]);
-  return countMatchingTiles(collection, validator);
+  const aliasedCollection = aliasCollectionTiles(collection, aliases);
+  return countMatchingTiles(aliasedCollection, validator);
 }

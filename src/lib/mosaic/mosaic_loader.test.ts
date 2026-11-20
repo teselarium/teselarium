@@ -595,6 +595,7 @@ describe("mosaic module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(mosaicModule).sort()).toEqual([
       "MosaicFormatError",
+      "aliasCollectionTiles",
       "applyMosaicAliases",
       "loadMosaicFile",
       "mergeMosaicConfig",

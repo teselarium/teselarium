@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Metadata } from "../files/index.ts";
-import { applyMosaicAliases } from "./index.ts";
+import type { TileCollection } from "../tile/index.ts";
+import { aliasCollectionTiles, applyMosaicAliases } from "./index.ts";
 
 describe("applyMosaicAliases", function describeApplyMosaicAliases(): void {
   it("Laureates become country tiles", function renamesLaureateFields(): void {
@@ -59,5 +60,50 @@ describe("applyMosaicAliases", function describeApplyMosaicAliases(): void {
 
     expect(metadata).toEqual({ name: "Bob Dylan", tags: ["music"] });
     expect(aliasedMetadata).not.toBe(metadata);
+  });
+});
+
+const TILE_SOURCE = "https://example.test/laureates/2016__bob_dylan.md";
+
+function buildLaureatesCollection(): TileCollection {
+  const collection: TileCollection = {
+    source: "https://example.test/laureates/collection.yaml",
+    title: "Laureates",
+    description: "",
+    tiles: [
+      {
+        source: TILE_SOURCE,
+        metadata: { name: "Bob Dylan", birth_country: "United States" },
+        body: "Songwriter.",
+        types: ["laureate"],
+      },
+    ],
+    issues: [],
+  };
+  return collection;
+}
+
+describe("aliasCollectionTiles", function describeAliasCollectionTiles(): void {
+  it("renames each tile's metadata and keeps the rest", function renamesTiles(): void {
+    const collection = buildLaureatesCollection();
+
+    const aliasedCollection = aliasCollectionTiles(collection, {
+      title: ["name"],
+      country: ["birth_country"],
+    });
+
+    expect(aliasedCollection.tiles).toEqual([
+      {
+        source: TILE_SOURCE,
+        metadata: { title: "Bob Dylan", country: "United States" },
+        body: "Songwriter.",
+        types: ["laureate"],
+      },
+    ]);
+    expect(aliasedCollection.title).toBe("Laureates");
+    expect(collection.tiles[0].metadata).toEqual({
+      name: "Bob Dylan",
+      birth_country: "United States",
+    });
   });
 });

@@ -8,6 +8,7 @@ import type { SectionDefinition } from "./main/sections/section_registry.ts";
 import type { SectionSwitches } from "./main/sections/section_switches.ts";
 import type { PlayerSites } from "./main/settings/player_sites.ts";
 import type { RecentlyUsed } from "./main/settings/recently_used.ts";
+import type { ListChoices } from "./main/stage/list_choices.ts";
 import type { SiteDecisions } from "./main/settings/site_decisions.ts";
 import type { CatalogSetting } from "./main/settings/catalog_setting.ts";
 import type { TileMediaSetting } from "./main/settings/tile_media_setting.ts";
@@ -30,6 +31,8 @@ interface AppProps {
   stage: Stage;
   /** The summaries and counts of the stage bar's lists. */
   combinations: CombinationCatalog;
+  /** The sort and filter choices of the stage bar's lists. */
+  listChoices: ListChoices;
   /** The mods, collections and mosaics tried in combination sandboxes. */
   recentlyUsed: RecentlyUsed;
   appTheme: AppTheme;
@@ -63,6 +66,7 @@ function readSidebarColumn(snapshot: SidebarSnapshot): string {
 function App({
   stage,
   combinations,
+  listChoices,
   recentlyUsed,
   appTheme,
   sections,
@@ -109,6 +113,7 @@ function App({
           <StageView
             stage={stage}
             combinations={combinations}
+            listChoices={listChoices}
             recentlyUsed={recentlyUsed}
             playerSites={playerSites}
             theater={theater}

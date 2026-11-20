@@ -48,6 +48,7 @@ import type { MemoryStorage } from "../../test/memory_storage.ts";
 import { createPlayerSites } from "../settings/player_sites.ts";
 import { createRecentlyUsed } from "../settings/recently_used.ts";
 import type { PlayerSites } from "../settings/player_sites.ts";
+import { createListChoices } from "./list_choices.ts";
 import { StageView } from "./StageView.tsx";
 import { createTheaterSetting, THEATER_MODE_KEY } from "./theater_setting.ts";
 
@@ -66,6 +67,7 @@ function renderStageView(
       <StageView
         stage={stage}
         combinations={buildTestCombinations(stage)}
+        listChoices={createListChoices()}
         recentlyUsed={createRecentlyUsed({ storage })}
         playerSites={createTestPlayerSites()}
         theater={createTheaterSetting({ storage, stage })}

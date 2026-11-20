@@ -22,6 +22,8 @@ import {
   subscribeRecentlyUsed,
 } from "../settings/recently_used.ts";
 import type { RecentlyUsed } from "../settings/recently_used.ts";
+import type { ListChoices } from "./list_choices.ts";
+import { requestListSummaries } from "./list_summaries.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { readModCapsuleTitle } from "./capsule_titles.ts";
 import { CombinationTitle } from "./CombinationTitle.tsx";
@@ -50,6 +52,8 @@ interface StageBarProps {
   stage: Stage;
   /** The summaries and counts of the stage bar's lists. */
   combinations: CombinationCatalog;
+  /** The sort and filter choices of the stage bar's lists. */
+  listChoices: ListChoices;
   /** The mods, collections and mosaics tried in combination sandboxes. */
   recentlyUsed: RecentlyUsed;
   sandbox: SandboxSnapshot;
@@ -137,6 +141,7 @@ function renderPlainTitle(sandbox: SandboxSnapshot): ReactElement {
 export function StageBar({
   stage,
   combinations,
+  listChoices,
   recentlyUsed,
   sandbox,
   isTheaterMode,
@@ -188,6 +193,17 @@ export function StageBar({
     ...stage.catalog.mods,
     ...recent.mods,
   ]);
+
+  // Once the mod file is loaded: a refused link or a failed mosaic requests no other file.
+  const hasModFile = sandbox.mod !== null;
+  useEffect(
+    function loadListSummaries(): void {
+      if (isCombination && hasModFile) {
+        void requestListSummaries(combinations, stage, sandbox, recent);
+      }
+    },
+    [isCombination, hasModFile, combinations, stage, sandbox, recent],
+  );
 
   function handlePanelOpenChange(panel: StageBarPanel, isOpen: boolean): void {
     if (!isOpen) {
@@ -282,6 +298,7 @@ export function StageBar({
             stage={stage}
             sandbox={sandbox}
             combinations={combinations}
+            listChoices={listChoices}
             recentlyUsed={recentlyUsed}
             openPanel={visiblePanel}
             onPanelOpenChange={handlePanelOpenChange}
