@@ -8,7 +8,7 @@ import type { AppFixture } from "../../test/test_app.ts";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import { VANILLA_SECTIONS } from "../sections/vanilla_sections.ts";
 import { COMING_SOON_SECTIONS } from "../../test/registries/coming_soon_sections.ts";
-import { HamburgerButton } from "./HamburgerButton.tsx";
+import { chooseTheme } from "../theme/app_theme.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import {
   collapseSidebar,
@@ -20,12 +20,12 @@ import {
 function renderSidebar(fixture: AppFixture): RenderResult {
   return render(
     <TooltipProvider>
-      <HamburgerButton layout={fixture.layout} />
       <Sidebar
         stage={fixture.stage}
         sections={fixture.sections}
         switches={fixture.switches}
         layout={fixture.layout}
+        appTheme={fixture.appTheme}
       />
     </TooltipProvider>,
   );
@@ -45,6 +45,38 @@ function readItemNames(list: HTMLElement): string[] {
 
 function findItem(name: string | RegExp): HTMLElement {
   return within(sectionsNav()).getByRole("link", { name });
+}
+
+/** The icon of an item: the content of its icon cell. */
+function findItemIcon(item: HTMLElement): Element | null {
+  return item.firstElementChild?.firstElementChild ?? null;
+}
+
+function sidebarAside(): HTMLElement {
+  return screen.getByRole("complementary", { name: "Sidebar" });
+}
+
+function headingRow(): HTMLElement {
+  const row = sidebarAside().querySelector<HTMLElement>(
+    "[data-sidebar-heading-row]",
+  );
+  if (row === null) {
+    throw new Error("Expected the sidebar's heading row");
+  }
+  return row;
+}
+
+function themeButton(): HTMLElement {
+  return within(sidebarAside()).getByRole("button", { name: /^Theme: / });
+}
+
+/** Every list item of the sidebar, in order: the sections', then the theme control's. */
+function readRowTexts(): string[] {
+  const texts: string[] = [];
+  for (const item of within(sidebarAside()).getAllByRole("listitem")) {
+    texts.push(item.textContent ?? "");
+  }
+  return texts;
 }
 
 function readCurrentItems(): string[] {
@@ -86,7 +118,7 @@ describe("Sidebar", function describeSidebar(): void {
     renderSidebar(await startTestApp(""));
 
     for (const item of within(sectionsNav()).getAllByRole("link")) {
-      const icon = item.firstElementChild;
+      const icon = findItemIcon(item);
       expect(icon?.tagName.toLowerCase()).toBe("svg");
       expect(icon).toHaveAttribute("aria-hidden", "true");
     }
@@ -97,7 +129,7 @@ describe("Sidebar", function describeSidebar(): void {
     const sections = withIcon({ image: "./icons/guides.png", tint: false });
     renderSidebar(await startTestApp("", { sections }));
 
-    const icon = findItem("Guides").firstElementChild;
+    const icon = findItemIcon(findItem("Guides"));
 
     expect(icon?.tagName).toBe("IMG");
     expect(icon).toHaveAttribute("src", "./icons/guides.png");
@@ -108,7 +140,7 @@ describe("Sidebar", function describeSidebar(): void {
     const sections = withIcon({ image: "./icons/guides.svg" });
     renderSidebar(await startTestApp("", { sections }));
 
-    const icon = findItem("Guides").firstElementChild as HTMLElement;
+    const icon = findItemIcon(findItem("Guides")) as HTMLElement;
 
     expect(icon.tagName).toBe("SPAN");
     expect(icon.style.backgroundColor).toBe("currentcolor");
@@ -180,7 +212,8 @@ describe("Sidebar", function describeSidebar(): void {
     renderSidebar(fixture);
     const hamburger = screen.getByRole("button", { name: "Hide sidebar" });
     expect(hamburger).toHaveAttribute("aria-expanded", "true");
-    expect(hamburger).toHaveAttribute("aria-controls", "app-sidebar");
+    expect(hamburger).toHaveAttribute("aria-controls", "app-sidebar-nav");
+    expect(sectionsNav()).toHaveAttribute("id", "app-sidebar-nav");
 
     fireEvent.click(hamburger);
 
@@ -188,6 +221,125 @@ describe("Sidebar", function describeSidebar(): void {
     expect(hamburger).toHaveAttribute("aria-expanded", "false");
     expect(hamburger).toHaveAccessibleName("Show sidebar");
     expect(screen.queryByRole("navigation", { name: "Sections" })).toBeNull();
+  });
+
+  it("No app header", async function startsWithHeadingRow(): Promise<void> {
+    renderSidebar(await startTestApp(""));
+
+    const row = headingRow();
+    const [button, heading] = Array.from(row.querySelectorAll("button, h1"));
+
+    expect(sidebarAside().firstElementChild).toBe(row);
+    expect(button).toHaveAccessibleName("Hide sidebar");
+    expect(heading).toBe(
+      screen.getByRole("heading", { level: 1, name: "OpenTesela" }),
+    );
+    expect(heading).not.toHaveClass("sr-only");
+  });
+
+  it("Heading in the rail", async function hidesHeadingText(): Promise<void> {
+    const fixture = await startTestApp("");
+    collapseSidebar(fixture.layout);
+    renderSidebar(fixture);
+
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: "OpenTesela",
+    });
+
+    expect(heading).toHaveClass("sr-only");
+    expect(headingRow()).toContainElement(heading);
+  });
+
+  it("shrinks the hidden sidebar to the hamburger chip", async function rendersChip(): Promise<void> {
+    const fixture = await startTestApp("");
+    pressHamburger(fixture.layout);
+    renderSidebar(fixture);
+
+    const aside = sidebarAside();
+
+    expect(aside).toBeVisible();
+    expect(within(aside).getAllByRole("button")).toHaveLength(1);
+    expect(within(aside).getByRole("button")).toHaveAccessibleName(
+      "Show sidebar",
+    );
+    expect(within(aside).queryAllByRole("link")).toHaveLength(0);
+    expect(within(aside).queryAllByRole("separator")).toHaveLength(0);
+    expect(
+      within(aside).getByRole("heading", { level: 1, name: "OpenTesela" }),
+    ).toHaveClass("sr-only");
+  });
+});
+
+describe("theme control", function describeThemeControl(): void {
+  it("Below About", async function followsAbout(): Promise<void> {
+    renderSidebar(await startTestApp(""));
+
+    const rows = readRowTexts();
+
+    expect(rows.slice(-2)).toEqual(["About", "Theme"]);
+    expect(themeButton()).toHaveAccessibleName("Theme: System");
+    expect(within(sectionsNav()).queryByRole("button")).toBeNull();
+  });
+
+  it("Tooltip in the rail", async function namesChoiceInRail(): Promise<void> {
+    const fixture = await startTestApp("");
+    collapseSidebar(fixture.layout);
+    chooseTheme(fixture.appTheme, "dark");
+    renderSidebar(fixture);
+
+    act(function focusThemeControl(): void {
+      themeButton().focus();
+    });
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Theme: Dark");
+    expect(themeButton()).not.toHaveTextContent("Theme");
+  });
+
+  it("Tooltip when expanded", async function namesChoiceExpanded(): Promise<void> {
+    const fixture = await startTestApp("");
+    chooseTheme(fixture.appTheme, "light");
+    renderSidebar(fixture);
+
+    act(function focusThemeControl(): void {
+      themeButton().focus();
+    });
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Theme: Light",
+    );
+    expect(themeButton()).toHaveTextContent("Theme");
+  });
+
+  it("Each press moves to the next choice", async function cyclesChoices(): Promise<void> {
+    const fixture = await startTestApp("");
+    renderSidebar(fixture);
+    const names: string[] = [];
+    const announcements: string[] = [];
+
+    for (let press = 0; press < 3; press++) {
+      fireEvent.click(themeButton());
+      names.push(themeButton().getAttribute("aria-label") ?? "");
+      announcements.push(
+        sidebarAside().querySelector("[aria-live]")?.textContent ?? "",
+      );
+    }
+
+    const expected = ["Theme: Light", "Theme: Dark", "Theme: System"];
+    expect(names).toEqual(expected);
+    expect(announcements).toEqual(expected);
+    expect(fixture.appTheme.snapshot.choice).toBe("system");
+  });
+
+  it("is never the current item", async function isNeverCurrent(): Promise<void> {
+    const fixture = await startTestApp("#/settings");
+    renderSidebar(fixture);
+
+    fireEvent.click(themeButton());
+
+    expect(fixture.appTheme.snapshot.choice).toBe("light");
+    expect(themeButton()).not.toHaveAttribute("aria-current");
+    expect(readCurrentItems()).toEqual(["Settings"]);
   });
 });
 

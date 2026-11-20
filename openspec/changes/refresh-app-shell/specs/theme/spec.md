@@ -18,7 +18,7 @@ The app's canvas, behind its panels and pages, SHALL be `--ot-card` in the light
 ## MODIFIED Requirements
 
 ### Requirement: Theme choice
-The Settings page and the sidebar SHALL each have a Theme control with the choices System, Light and Dark, showing the current choice. The sidebar's control SHALL be a button that opens a menu of the three choices. Changing the choice in either control SHALL update the other and apply it to the app and to every running mod at once, visible or hidden, without reloading the page or any mod's frame.
+The Settings page and the sidebar SHALL each have a Theme control with the choices System, Light and Dark, showing the current choice. The sidebar's control SHALL be a button that, on each press, moves to the next choice in the order System, Light, Dark and back to System. Changing the choice in either control SHALL update the other and apply it to the app and to every running mod at once, visible or hidden, without reloading the page or any mod's frame.
 
 #### Scenario: Default choice
 - **WHEN** the app is opened for the first time at `#/settings`
@@ -30,16 +30,16 @@ The Settings page and the sidebar SHALL each have a Theme control with the choic
 - **AND** the mod's frame was not reloaded
 
 #### Scenario: Choose from the sidebar
-- **WHEN** the operating system prefers light, a mod is visible, and the user presses the sidebar's theme control and chooses Dark in its menu
+- **WHEN** the operating system prefers light, a mod is visible, and the user presses the sidebar's theme control until the choice is Dark
 - **THEN** the app and the mod's frame switch to the dark color scheme without reloading the frame, and the Settings page's Theme control shows Dark
 
 #### Scenario: No Theme control in the header
 - **WHEN** the app is opened
 - **THEN** the page has no header, and the only Theme controls are the sidebar's and, at `#/settings`, the Settings page's
 
-#### Scenario: Sidebar menu shows the choice
-- **WHEN** the choice is Light and the user opens the sidebar's theme control
-- **THEN** its menu lists System, Light and Dark, and Light is marked as chosen
+#### Scenario: Each press moves to the next choice
+- **WHEN** the choice is System and the user presses the sidebar's theme control three times
+- **THEN** the choice is Light, then Dark, then System again, and after each press the control's tooltip and accessible name say `Theme: <choice>`
 
 ### Requirement: The app follows the color scheme
 The app's own interface (the sidebar, the Settings page, the stage bar, the issue list, the loading and load error messages and the action dialog) SHALL take its colors, fonts and spacing from the theme tokens of the current color scheme, so it matches the mods.

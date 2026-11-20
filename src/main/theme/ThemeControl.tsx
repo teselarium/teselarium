@@ -4,36 +4,17 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/vendor/shadcn/ui/native-select.tsx";
-import type { ThemeChoice } from "../../lib/core/theme/index.ts";
 import {
   chooseTheme,
   readAppThemeSnapshot,
   subscribeAppTheme,
 } from "./app_theme.ts";
 import type { AppTheme, AppThemeSnapshot } from "./app_theme.ts";
+import { findThemeChoice, THEME_OPTIONS } from "./theme_options.ts";
+import type { ThemeOption } from "./theme_options.ts";
 
 interface ThemeControlProps {
   appTheme: AppTheme;
-}
-
-interface ThemeOption {
-  choice: ThemeChoice;
-  label: string;
-}
-
-const THEME_OPTIONS: readonly ThemeOption[] = [
-  { choice: "system", label: "System" },
-  { choice: "light", label: "Light" },
-  { choice: "dark", label: "Dark" },
-];
-
-function findThemeChoice(value: string): ThemeChoice | null {
-  for (const option of THEME_OPTIONS) {
-    if (option.choice === value) {
-      return option.choice;
-    }
-  }
-  return null;
 }
 
 function renderThemeOption(option: ThemeOption): ReactElement {

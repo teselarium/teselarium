@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import {
   currentItem,
   hamburgerButton,
@@ -11,6 +11,7 @@ import {
   sectionItem,
   sectionsNav,
   sidebar,
+  sidebarThemeButton,
 } from "./app_layout.ts";
 import {
   EXPLORER_OFF_PREVIEW_URL,
@@ -33,7 +34,15 @@ import { DARK_COLORS, LIGHT_COLORS } from "./theme_probes.ts";
 
 const SIDEBAR_LAYOUT_KEY = "opentesela.sidebar";
 
-/** The bottom of the frame may sit this far from the viewport's edge: the stage's padding and border. */
+/** An element's box, as Playwright measures it. */
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The frame may sit this far from the viewport's edge: the shell's gap and the frame's border. */
 const EDGE_TOLERANCE = 24;
 
 async function readFrameBox(
@@ -73,12 +82,70 @@ async function dragHandleToWidth(page: Page, width: number): Promise<void> {
   await dragHandleBy(page, width - currentWidth);
 }
 
+async function readBox(locator: Locator): Promise<Box> {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error("Expected the element to have a box");
+  }
+  return box;
+}
+
+/** The sidebar's toggle, whichever state it is in: Collapse or Expand. */
+function sidebarToggle(page: Page): Locator {
+  return sidebar(page).getByRole("button", {
+    name: /^(Collapse|Expand) sidebar$/,
+  });
+}
+
+/** The left edges of every button and icon that must keep its place across the sidebar's states. */
+async function readAxisLefts(page: Page): Promise<number[]> {
+  const lefts = [
+    (await readBox(hamburgerButton(page))).x,
+    (await readBox(sectionItem(page, "Mods").locator("svg"))).x,
+    (await readBox(sidebarThemeButton(page))).x,
+    (await readBox(sidebarToggle(page))).x,
+  ];
+  return lefts;
+}
+
 function readBackgroundColor(element: Element): string {
   return getComputedStyle(element).backgroundColor;
 }
 
 function readTextColor(element: Element): string {
   return getComputedStyle(element).color;
+}
+
+/**
+ * Runs on a mosaic icon's first shape: the lightness of its fill, from 0 to
+ * 255, read back from a canvas, whatever color syntax the fill computes to.
+ */
+function readShapeLightness(icon: Element): number {
+  const shape = icon.querySelector(".mosaic-shape-1");
+  if (shape === null) {
+    throw new Error("Cannot read the mosaic icon's shape: it has none.");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("Cannot read the mosaic icon's shape: no 2D canvas.");
+  }
+  context.fillStyle = getComputedStyle(shape).fill;
+  context.fillRect(0, 0, 1, 1);
+  const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
+  const lightness = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return lightness;
+}
+
+function mosaicsIcon(page: Page): Locator {
+  return sectionItem(page, "Mosaics").locator("svg");
+}
+
+/** Runs on a lucide icon: the color its lines are drawn in. */
+function readStrokeColor(element: Element): string {
+  return getComputedStyle(element).stroke;
 }
 
 test.describe("Vanilla sections", function describeVanilla(): void {
@@ -127,6 +194,80 @@ test.describe("Vanilla sections", function describeVanilla(): void {
         return icon.evaluate(readBackgroundColor);
       })
       .toBe(DARK_COLORS.foreground.computed);
+  });
+
+  test("Footer follows the main group", async function placesFooter({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: 1200 });
+
+    await page.goto("/");
+
+    const guides = await readBox(sectionItem(page, "Guides"));
+    const divider = await readBox(
+      sectionsNav(page).locator('[data-slot="separator"]'),
+    );
+    const settings = await readBox(sectionItem(page, "Settings"));
+    expect(divider.y).toBeGreaterThan(guides.y + guides.height);
+    expect(settings.y).toBeGreaterThan(divider.y);
+    expect(settings.y - (guides.y + guides.height)).toBeLessThan(
+      2 * guides.height,
+    );
+  });
+
+  test("Icons follow the text color", async function tintsCatalogIcon({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/");
+    const item = sectionItem(page, "Mods");
+    const lightColor = await item.evaluate(readTextColor);
+    expect(await item.locator("svg").evaluate(readStrokeColor)).toBe(
+      lightColor,
+    );
+
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    await expect
+      .poll(function readItemColor(): Promise<string> {
+        return item.evaluate(readTextColor);
+      })
+      .not.toBe(lightColor);
+    expect(await item.locator("svg").evaluate(readStrokeColor)).toBe(
+      await item.evaluate(readTextColor),
+    );
+  });
+
+  test("Mosaic icon follows the color scheme", async function colorsMosaicIcon({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/");
+    const lightLightness = await mosaicsIcon(page).evaluate(readShapeLightness);
+
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    // The dark scheme's colors are pastels: lighter than the light scheme's.
+    await expect
+      .poll(function readDarkLightness(): Promise<number> {
+        return mosaicsIcon(page).evaluate(readShapeLightness);
+      })
+      .toBeGreaterThan(lightLightness + 40);
+  });
+
+  test("Mosaic icon on the current item", async function darkensOnAccent({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/");
+    const notCurrent = await mosaicsIcon(page).evaluate(readShapeLightness);
+
+    await openSection(page, "Mosaics");
+
+    await expect(currentItem(page)).toHaveText("Mosaics");
+    expect(await mosaicsIcon(page).evaluate(readShapeLightness)).toBeLessThan(
+      notCurrent - 40,
+    );
   });
 
   test("Explorer switched off", async function hidesMods({
@@ -236,8 +377,10 @@ test.describe("Sidebar states", function describeStates(): void {
     await expect(sectionsNav(page)).toBeHidden();
     await expect(hamburgerButton(page)).toBeVisible();
     await expect(hamburgerButton(page)).toHaveAccessibleName("Show sidebar");
-    // The main area takes the whole width, and the mod keeps running.
+    // The main area takes the whole width, beside the chip, and the mod keeps running.
     const hiddenBox = await readFrameBox(page, "probe");
+    const chipBox = await readBox(hamburgerButton(page));
+    expect(hiddenBox.x).toBeLessThan(chipBox.x + chipBox.width);
     expect(hiddenBox.x).toBeLessThanOrEqual(EDGE_TOLERANCE);
     expect(1280 - hiddenBox.right).toBeLessThanOrEqual(EDGE_TOLERANCE);
     expect(await isFrameMarked(frame)).toBe(true);
@@ -265,6 +408,39 @@ test.describe("Sidebar states", function describeStates(): void {
       })
       .toBeGreaterThan(before.width);
     expect(await isFrameMarked(frame)).toBe(true);
+  });
+
+  test("Collapse does not move the icons", async function keepsIconAxis({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    const expandedLefts = await readAxisLefts(page);
+
+    await sidebarToggle(page).click();
+
+    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
+    const collapsedLefts = await readAxisLefts(page);
+    for (const [index, left] of collapsedLefts.entries()) {
+      expect(Math.abs(left - expandedLefts[index])).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test("Hiding does not move the hamburger", async function keepsHamburger({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    const before = await readBox(hamburgerButton(page));
+
+    await hamburgerButton(page).click();
+
+    await expect(sidebar(page)).toHaveAttribute("data-state", "hidden");
+    const after = await readBox(hamburgerButton(page));
+    expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
   });
 
   test("Tooltip on hover", async function showsTooltip({
@@ -479,6 +655,31 @@ test.describe("Narrow viewports", function describeNarrow(): void {
       "Guides",
     );
     expect((await readFrameBox(page, "probe")).width).toBe(before.width);
+  });
+
+  test("Open sidebar keeps the first row", async function keepsFirstRow({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+    const railHamburger = await readBox(hamburgerButton(page));
+
+    await sidebar(page).getByRole("button", { name: "Expand sidebar" }).click();
+
+    const drawer = page.getByRole("dialog");
+    await expect(drawer.getByText("OpenTesela", { exact: true })).toBeVisible();
+    const drawerHamburger = drawer.getByRole("button", {
+      name: "Hide sidebar",
+    });
+    await expect(drawerHamburger).toBeVisible();
+    // The drawer slides in: its box is read once it settled.
+    await expect
+      .poll(async function readDrawerOffset(): Promise<number> {
+        const box = await readBox(drawerHamburger);
+        return Math.abs(box.x - railHamburger.x);
+      })
+      .toBeLessThanOrEqual(1);
+    const box = await readBox(drawerHamburger);
+    expect(Math.abs(box.y - railHamburger.y)).toBeLessThanOrEqual(1);
   });
 });
 

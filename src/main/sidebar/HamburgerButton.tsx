@@ -8,15 +8,17 @@ import {
   subscribeSidebar,
 } from "./sidebar_layout.ts";
 import type { SidebarLayoutStore } from "./sidebar_layout.ts";
-import { SIDEBAR_ID } from "./Sidebar.tsx";
 
 interface HamburgerButtonProps {
   layout: SidebarLayoutStore;
+  /** The id of the navigation it shows and hides. */
+  navigationId: string;
 }
 
-/** Always visible at the header's left: hides the sidebar, and shows it again as it was. */
+/** Always visible at the sidebar's top left: hides the sidebar, and shows it again as it was. */
 export function HamburgerButton({
   layout,
+  navigationId,
 }: HamburgerButtonProps): ReactElement {
   const snapshot = useStoreSnapshot(
     layout,
@@ -34,7 +36,7 @@ export function HamburgerButton({
       type="button"
       variant="ghost"
       size="icon-sm"
-      aria-controls={SIDEBAR_ID}
+      aria-controls={navigationId}
       aria-expanded={isShown}
       aria-label={isShown ? "Hide sidebar" : "Show sidebar"}
       onClick={handleClick}

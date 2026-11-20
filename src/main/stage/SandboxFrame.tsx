@@ -52,8 +52,8 @@ export function SandboxFrame({
     <iframe
       className={
         isShown
-          ? "sandbox-frame rounded-lg border"
-          : "sandbox-frame sandbox-frame-loading rounded-lg border"
+          ? "sandbox-frame rounded-lg border shadow-panel"
+          : "sandbox-frame sandbox-frame-loading rounded-lg border shadow-panel"
       }
       title={sandbox.mod?.title ?? sandbox.id}
       sandbox="allow-scripts"

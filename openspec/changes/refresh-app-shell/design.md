@@ -10,7 +10,7 @@ See proposal.md for the motivation. Current state the approach depends on:
 - The `footer` group is pushed down with `mt-auto`.
 - The stage view has `px-4 pt-2 pb-4` padding. The stage bar is already a `bg-card` bordered, rounded row (`py-1`, `icon-sm` buttons), and the frame is `rounded-lg border`.
 - Pages render in a shadow root whose `.page-body` paints `--ot-background` on a centered reading-width column (`MarkdownPage.tsx`).
-- `ThemeControl` (Settings) is a `NativeSelect` over the `AppTheme` store (`chooseTheme`, `subscribeAppTheme`, `readAppThemeSnapshot`). shadcn's `dropdown-menu` is already vendored.
+- `ThemeControl` (Settings) is a `NativeSelect` over the `AppTheme` store (`chooseTheme`, `subscribeAppTheme`, `readAppThemeSnapshot`).
 - Section icons are `LucideIcon`s. The catalog icons are shared through `catalog_icons.ts` by the vanilla sections, `CombinationTitle`, `CombinationList` and `MessageItem`.
 - The docs' conventions require colors, fonts, radius and spacing from the `--ot-*` tokens. Shadows are not in that list. `app.css` maps Tailwind's `--shadow-lg` to `--ot-shadow`.
 
@@ -52,9 +52,11 @@ The `Sheet` content drops `pt-10` and renders the same first row (hamburger + he
 
 ### Canvas and panels
 
-`app.css` adds an app-only alias `--app-canvas`: `var(--ot-card)` by default and `var(--ot-background)` under the `dark` variant's selector. `body` paints `--app-canvas` instead of `--background`. The sidebar, the hamburger chip, the stage bar and the sandbox frame get `rounded-lg border` and Tailwind's `shadow-sm`. The sidebar keeps `bg-sidebar` (`--ot-card`). `--ot-shadow` stays for popovers and menus.
+`app.css` adds an app-only alias `--app-canvas`: `var(--ot-card)` by default and `var(--ot-background)` under the `dark` variant's selector. `body` paints `--app-canvas` instead of `--background`. The sidebar, the hamburger chip, the stage bar and the sandbox frame get `rounded-lg border` and `shadow-panel`, an app-only Tailwind theme shadow in `app.css`: `2px 2px 0 rgb(0 0 0 / 0.06)`, offset down and right without blur. The sidebar keeps `bg-sidebar` (`--ot-card`). `--ot-shadow` stays for popovers and menus.
 
-*Alternative:* a new shadow token. Rejected: it would change the token list, which mods see (theme and mod-theme specs, mod API). The conventions don't require shadows to come from tokens, and `shadow-sm` is soft enough for white on white with the border carrying the edge. In dark mode the panels' lighter surface shows the depth, and the shadow is nearly invisible.
+*Alternative:* a new shadow token. Rejected: it would change the token list, which mods see (theme and mod-theme specs, mod API). The conventions don't require shadows to come from tokens, and a faint offset is enough for white on white with the border carrying the edge. In dark mode the panels' lighter surface shows the depth, and the shadow is nearly invisible.
+
+*Alternative:* Tailwind's `shadow-sm`, on the frame or on a wrapper around it. Rejected after measuring: a blurred shadow next to a running mod's frame made the default mods' checks about 10% slower in WebKit (17.0s → 18.9s for "Cases without the samples", 18.7s with the shadow on a wrapper), enough to time that e2e test out in the full run. Without blur, the time is the same as with no shadow.
 
 ### Pages on the canvas
 
@@ -64,9 +66,9 @@ The `Sheet` content drops `pt-10` and renders the same first row (hamburger + he
 
 ### Theme control in the sidebar
 
-A new `SidebarThemeControl` in `src/main/sidebar/` renders a ghost button in the icon cell (`Monitor`, `Sun` or `Moon` for the current *choice*, not the resolved scheme), labelled `Theme` when expanded and named `Theme: <choice>`. It opens shadcn's `DropdownMenu` with a `DropdownMenuRadioGroup` of System, Light and Dark, and calls `chooseTheme`. The choices' ids and labels move from `ThemeControl.tsx` into a shared `theme_options.ts` in `src/main/theme/`, used by both controls. `Sidebar` gets the `AppTheme` as a new prop from `App`. The button sits in its own list after the footer list, so it is not part of the sections' links.
+A new `SidebarThemeControl` in `src/main/sidebar/` renders a ghost button in the icon cell (`SunMoon`, `Sun` or `Moon` for the current *choice*, not the resolved scheme), labelled `Theme` when expanded and named `Theme: <choice>`. Each press calls `chooseTheme` with the next choice in `THEME_OPTIONS`' order (System, Light, Dark, then System again), from a pure `readNextThemeChoice` in `theme_options.ts`. A tooltip says `Theme: <choice>` in every state, since the `Theme` label alone does not say which mode is on, and a visually hidden polite live region announces the new choice, because screen readers do not always announce a focused button's new name. The choices' ids and labels move from `ThemeControl.tsx` into a shared `theme_options.ts` in `src/main/theme/`, used by both controls. `Sidebar` gets the `AppTheme` as a new prop from `App`. The button sits in its own list after the footer list, so it is not part of the sections' links.
 
-*Alternative:* a button that cycles the three choices. Rejected in exploration: the next state is not visible, and a menu matches the Settings control's model.
+*Alternative:* a button that opens a menu of the three choices (shadcn's `DropdownMenu` with a radio group), like the Settings control's model. Replaced after the first implementation: the common switch, between light and dark, takes one press instead of two, and the tooltip names the current mode. The cost is that the next choice is not shown before the press.
 
 ### Custom catalog icons with `createLucideIcon`
 
@@ -90,6 +92,12 @@ A new `SidebarThemeControl` in `src/main/sidebar/` renders a ghost button in the
 
 The mosaic's shapes sit on a grid and touch each other, which distinguishes it from `Shapes`' loose pieces at 20px. The drawings are a starting point; the task checks them at the rail's size next to `Shapes`.
 
+Final drawings, after checking them at 20px:
+
+- `MOD_ICON`: lucide's `square-arrow-right-enter` turned towards the bottom right, on `square-dashed`'s square (3..21): the dashed square's top-left corner is open, and the arrow enters through it (`M3 3l11 11`, head `M14 8v6H8`).
+- `MOSAIC_ICON`: a tile, `rx 2`, half a unit larger than the mod's square on each side (2.5..21.5), outlined in `currentColor` at 25% and filled with it at 10%, so it reads as a framed tile that weighs about as much as the outlined icons around it, holding a triangle, a circle, a square and a triangle on a 2×2 grid, filled without stroke (0.75 larger than outlined ones, to keep their visible size). The shapes are filled through classes from `app.css`: `--mosaic-shape-1` to `--mosaic-shape-4` are `hsl(from var(--ot-primary | --ot-secondary | --ot-destructive | --ot-warning) h calc(s * 1.2) l)`, the theme's colors 20% more saturated, so they follow the color scheme through the tokens: deep colors in light, pastels in dark. In dark, on the accent background (`[aria-current="page"]` in the sidebar, `[data-selected="true"]` in the stage bar's lists, `[data-highlighted]` in its menus), the pastels lose their contrast, so there each shape keeps its hue and gets darker: `oklch(from var(...) calc(l * 0.62) calc(c * 1.2) h)`, about the lightness of the light scheme's colors, with `color-mix()` towards `--ot-accent-foreground` as the fallback. Mixing towards that near-black alone dulled the colors (the red turned maroon), so it is only the fallback. No literal colors. It stays a `LucideIcon`; the shapes' fills come from the app's stylesheet, so they show the theme colors only in the app, which is the only place the icon is used. Chosen over outlined shapes, a solid tile and fixed colors after comparing them in the sidebar and the stage bar in both schemes: the faint tile keeps the shapes in front, and the saturated colors stay readable on white, on the dark sidebar and on the accent.
+- *Risk:* relative color syntax (`hsl(from ...)`) needs Chrome 119, Firefox 128 or Safari 18. Each variable falls back to the plain token color, so an older browser shows the unsaturated colors.
+
 *Alternative:* the closest existing lucide icons. Rejected in exploration.
 
 ## Risks / Trade-offs
@@ -107,4 +115,4 @@ None. The stored sidebar layout and theme choice keep their keys and values. Ins
 
 ## Open Questions
 
-- The final icon paths, checked at 20px in the rail and in the stage bar's capsules. This doesn't change any spec: the specs describe the shapes, not the paths.
+- ~~The final icon paths~~: settled, see "Custom catalog icons with `createLucideIcon`". The specs describe the shapes, not the paths.

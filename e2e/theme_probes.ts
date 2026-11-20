@@ -84,8 +84,9 @@ export function buildThemeProbeFiles(
   return files;
 }
 
+/** The Settings page's Theme control: a select. The sidebar's is a button. */
 export function themeControl(page: Page): Locator {
-  return page.getByLabel("Theme");
+  return page.getByRole("combobox", { name: "Theme" });
 }
 
 /**

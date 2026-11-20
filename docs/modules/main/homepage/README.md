@@ -26,10 +26,10 @@ The vanilla app ships an index page for Home, Guides and About: a level 1 headin
 
 ## Pages look like mods
 
-A page is rendered in an isolated shadow root that holds the theme tokens and the mods' base stylesheet (`THEME_FRAME_STYLES`, see the [theme module](../../lib/core/theme/README.md)), plus a few rules that give the page's body what a frame's `<body>` gets: padding, background, text color and font.
+A page is rendered in an isolated shadow root that holds the theme tokens and the mods' base stylesheet (`THEME_FRAME_STYLES`, see the [theme module](../../lib/core/theme/README.md)), plus a few rules that give the page's body what a frame's `<body>` gets: padding, text color and font. Not the background: a page is drawn on the app's canvas (see [Canvas and panels](../README.md#canvas-and-panels)), so in light it is white where a mod's frame is cream.
 
 - Plain HTML gets the app's look without classes, exactly as in a mod: a heading in a page and in a mod have the same size, weight and color.
-- The app's own styles (Tailwind, shadcn/ui) do not apply inside a page, and a page's styles do not apply to the header or the sidebar.
+- The app's own styles (Tailwind, shadcn/ui) do not apply inside a page, and a page's styles do not apply to the sidebar.
 - A page follows the color scheme at once, without a reload.
 - A page's content is at most `--ot-reading-width` wide and centered, so lines of text stay short enough to read on wide screens. In a narrower page area it fills the area. Pages have no theater mode.
 

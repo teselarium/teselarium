@@ -17,6 +17,7 @@ import {
   subscribeSectionSwitches,
 } from "../sections/section_switches.ts";
 import type { SectionSwitches } from "../sections/section_switches.ts";
+import type { AppTheme } from "../theme/app_theme.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import {
   collapseSidebar,
@@ -25,12 +26,24 @@ import {
   subscribeSidebar,
 } from "./sidebar_layout.ts";
 import type { SidebarLayoutStore } from "./sidebar_layout.ts";
+import { SidebarHeadingRow } from "./SidebarHeadingRow.tsx";
+import { SidebarIconCell } from "./SidebarIconCell.tsx";
 import { SidebarItem } from "./SidebarItem.tsx";
 import { SidebarResizeHandle } from "./SidebarResizeHandle.tsx";
+import { SidebarThemeControl } from "./SidebarThemeControl.tsx";
+import { readHeadingClass } from "./sidebar_rows.ts";
 import { useSidebarShortcut } from "./use_sidebar_shortcut.ts";
 
-/** The id the hamburger button's `aria-controls` points to. */
+/** The sidebar's `<aside>`. */
 export const SIDEBAR_ID = "app-sidebar";
+
+/** The id the hamburger button's `aria-controls` points to: the rail's navigation. */
+export const SIDEBAR_NAV_ID = "app-sidebar-nav";
+
+const APP_NAME = "OpenTesela";
+
+/** The list classes: no padding of their own, so every row starts at the rail's icon axis. */
+const LIST_CLASS = "flex flex-col gap-1";
 
 interface SidebarProps {
   stage: Stage;
@@ -38,6 +51,8 @@ interface SidebarProps {
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
   layout: SidebarLayoutStore;
+  /** The theme the sidebar's Theme control chooses. */
+  appTheme: AppTheme;
 }
 
 interface SectionListProps {
@@ -46,6 +61,8 @@ interface SectionListProps {
   currentSection: string | null;
   isExpanded: boolean;
   onActivate: (sectionId: string) => void;
+  /** The rail's navigation has the id the hamburger button points to; the drawer's has none. */
+  navigationId?: string;
 }
 
 function renderItems(
@@ -75,19 +92,129 @@ function renderItems(
   return items;
 }
 
-/** The `main` items at the top, then the `footer` items at the bottom. */
+/** The `main` items, then a divider and the `footer` items right after them. */
 function SectionList(props: SectionListProps): ReactElement {
-  const listClass = props.isExpanded
-    ? "flex flex-col gap-1 px-2"
-    : "flex flex-col gap-1 px-1.5";
   return (
-    <nav aria-label="Sections" className="flex min-h-0 flex-1 flex-col py-2">
-      <ul className={listClass}>{renderItems(props, "main")}</ul>
-      <div className="mt-auto">
-        <Separator className="my-2" />
-        <ul className={listClass}>{renderItems(props, "footer")}</ul>
-      </div>
+    <nav
+      id={props.navigationId}
+      aria-label="Sections"
+      className="flex min-h-0 shrink-0 flex-col pt-2"
+    >
+      <ul className={LIST_CLASS}>{renderItems(props, "main")}</ul>
+      <Separator className="my-2" />
+      <ul className={LIST_CLASS}>{renderItems(props, "footer")}</ul>
     </nav>
+  );
+}
+
+interface ThemeListProps {
+  appTheme: AppTheme;
+  isExpanded: boolean;
+}
+
+/** The Theme control, in its own list after the `footer` items: it is not a section. */
+function ThemeList({ appTheme, isExpanded }: ThemeListProps): ReactElement {
+  return (
+    <ul className={`${LIST_CLASS} pt-1 pb-2`}>
+      <SidebarThemeControl appTheme={appTheme} isExpanded={isExpanded} />
+    </ul>
+  );
+}
+
+interface SidebarToggleProps {
+  layout: SidebarLayoutStore;
+  isExpanded: boolean;
+  /** On a narrow viewport, Expand opens the drawer. */
+  isDrawerOpen: boolean;
+}
+
+/** At the sidebar's bottom, in the icon cell: Collapse when expanded, Expand in the rail. */
+function SidebarToggle({
+  layout,
+  isExpanded,
+  isDrawerOpen,
+}: SidebarToggleProps): ReactElement {
+  function handleCollapseClick(): void {
+    collapseSidebar(layout);
+  }
+
+  function handleExpandClick(): void {
+    expandSidebar(layout);
+  }
+
+  const button = isExpanded ? (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Collapse sidebar"
+      onClick={handleCollapseClick}
+    >
+      <PanelLeftClose />
+    </Button>
+  ) : (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Expand sidebar"
+      aria-expanded={isDrawerOpen}
+      onClick={handleExpandClick}
+    >
+      <PanelLeftOpen />
+    </Button>
+  );
+  return (
+    <div className="mt-auto flex py-2">
+      <SidebarIconCell>{button}</SidebarIconCell>
+    </div>
+  );
+}
+
+interface SidebarDrawerProps {
+  layout: SidebarLayoutStore;
+  appTheme: AppTheme;
+  listProps: SectionListProps;
+  isOpen: boolean;
+}
+
+/**
+ * The expanded sidebar of a narrow viewport, over the content. Its content
+ * has the rail's geometry (app.css), so its first row is where the rail's is.
+ */
+function SidebarDrawer({
+  layout,
+  appTheme,
+  listProps,
+  isOpen,
+}: SidebarDrawerProps): ReactElement {
+  function handleOpenChange(isOpenNow: boolean): void {
+    if (!isOpenNow) {
+      collapseSidebar(layout);
+    }
+  }
+
+  const heading = (
+    <SheetTitle className={readHeadingClass(true)}>{APP_NAME}</SheetTitle>
+  );
+  return (
+    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
+      <SheetContent
+        side="left"
+        className="sidebar-drawer w-64 gap-0 bg-sidebar p-0 text-sidebar-foreground"
+        aria-describedby={undefined}
+      >
+        <div className="m-(--shell-gap) flex min-h-0 flex-1 flex-col border border-transparent px-(--sidebar-inset)">
+          <SidebarHeadingRow
+            layout={layout}
+            navigationId={SIDEBAR_NAV_ID}
+            heading={heading}
+          />
+          <SectionList {...listProps} isExpanded={true} />
+          <ThemeList appTheme={appTheme} isExpanded={true} />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -119,15 +246,19 @@ function findCurrentSection(
 }
 
 /**
- * The left sidebar: one item per shown section, expanded with labels,
- * collapsed to an icon rail, or hidden. On a narrow viewport it stays a rail,
- * and expanding it opens the same items in a drawer over the content.
+ * The left sidebar: the hamburger button and the app's name, then one item
+ * per shown section and the Theme control, expanded with labels or collapsed
+ * to an icon rail. Hidden, it shrinks to the chip of its hamburger button,
+ * and renders nothing else. On a narrow viewport it stays a rail, and
+ * expanding it opens the same rows in a drawer over the content. Every row
+ * starts with the same icon cell, so no button moves between the states.
  */
 export function Sidebar({
   stage,
   sections,
   switches,
   layout,
+  appTheme,
 }: SidebarProps): ReactElement {
   const layoutSnapshot = useStoreSnapshot(
     layout,
@@ -153,20 +284,6 @@ export function Sidebar({
     }
   }
 
-  function handleCollapseClick(): void {
-    collapseSidebar(layout);
-  }
-
-  function handleExpandClick(): void {
-    expandSidebar(layout);
-  }
-
-  function handleDrawerOpenChange(isOpen: boolean): void {
-    if (!isOpen) {
-      collapseSidebar(layout);
-    }
-  }
-
   const shownSections = filterShownSections(sections, switchesSnapshot);
   const listProps: SectionListProps = {
     stage,
@@ -180,63 +297,46 @@ export function Sidebar({
   };
   const isDrawerOpen =
     layoutSnapshot.isNarrow && layoutSnapshot.state === "expanded";
+  const isHidden = layoutSnapshot.state === "hidden";
   return (
     <aside
       id={SIDEBAR_ID}
       aria-label="Sidebar"
-      className="relative flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+      className="relative flex min-h-0 flex-col overflow-hidden rounded-lg border border-sidebar-border bg-sidebar px-(--sidebar-inset) text-sidebar-foreground shadow-panel"
       data-state={layoutSnapshot.state}
-      hidden={layoutSnapshot.state === "hidden"}
     >
-      <SectionList {...listProps} />
-      <div
-        className={
-          listProps.isExpanded
-            ? "flex justify-end p-2"
-            : "flex justify-center p-2"
+      <SidebarHeadingRow
+        layout={layout}
+        navigationId={SIDEBAR_NAV_ID}
+        heading={
+          <h1 className={readHeadingClass(listProps.isExpanded)}>{APP_NAME}</h1>
         }
-      >
-        {listProps.isExpanded ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Collapse sidebar"
-            onClick={handleCollapseClick}
-          >
-            <PanelLeftClose />
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Expand sidebar"
-            aria-expanded={isDrawerOpen}
-            onClick={handleExpandClick}
-          >
-            <PanelLeftOpen />
-          </Button>
-        )}
-      </div>
-      {layoutSnapshot.isNarrow ? null : (
-        <SidebarResizeHandle
-          layout={layout}
-          width={layoutSnapshot.width}
-          maxWidth={layoutSnapshot.maxWidth}
-          isCollapsed={layoutSnapshot.state === "collapsed"}
-        />
+      />
+      {isHidden ? null : (
+        <>
+          <SectionList {...listProps} navigationId={SIDEBAR_NAV_ID} />
+          <ThemeList appTheme={appTheme} isExpanded={listProps.isExpanded} />
+          <SidebarToggle
+            layout={layout}
+            isExpanded={listProps.isExpanded}
+            isDrawerOpen={isDrawerOpen}
+          />
+          {layoutSnapshot.isNarrow ? null : (
+            <SidebarResizeHandle
+              layout={layout}
+              width={layoutSnapshot.width}
+              maxWidth={layoutSnapshot.maxWidth}
+              isCollapsed={layoutSnapshot.state === "collapsed"}
+            />
+          )}
+          <SidebarDrawer
+            layout={layout}
+            appTheme={appTheme}
+            listProps={listProps}
+            isOpen={isDrawerOpen}
+          />
+        </>
       )}
-      <Sheet open={isDrawerOpen} onOpenChange={handleDrawerOpenChange}>
-        <SheetContent
-          side="left"
-          className="w-64 gap-0 bg-sidebar p-0 pt-10 text-sidebar-foreground"
-          aria-describedby={undefined}
-        >
-          <SheetTitle className="sr-only">Sections</SheetTitle>
-          <SectionList {...listProps} isExpanded={true} />
-        </SheetContent>
-      </Sheet>
     </aside>
   );
 }

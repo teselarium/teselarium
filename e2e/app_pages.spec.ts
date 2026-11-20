@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 import type { Locator, Page, Route } from "@playwright/test";
-import { openSection, pageBody, sectionItem, sidebar } from "./app_layout.ts";
+import {
+  hamburgerButton,
+  openSection,
+  pageBody,
+  sectionItem,
+  sidebar,
+  sidebarHeadingRow,
+} from "./app_layout.ts";
 import {
   buildProbeFiles,
   findModFrame,
@@ -108,6 +115,20 @@ function readPageContentBox(pageContent: Element): PageContentBox {
   return box;
 }
 
+function readBackgroundColor(element: Element): string {
+  return getComputedStyle(element).backgroundColor;
+}
+
+/** Runs in the page: the color of the canvas, the page's `<body>`. */
+function readCanvasColor(): string {
+  return getComputedStyle(document.body).backgroundColor;
+}
+
+/** Runs on the page's content: its left edge in the viewport. */
+function readLeftEdge(element: Element): number {
+  return element.getBoundingClientRect().left;
+}
+
 function readTextColor(element: Element): string {
   return getComputedStyle(element).color;
 }
@@ -144,10 +165,10 @@ function pageHeading(page: Page, name: string): Locator {
   return pageBody(page).getByRole("heading", { level: 1, name });
 }
 
-/** Interface elements whose look a page must not change: the header, the sidebar and an item. */
+/** Interface elements whose look a page must not change: the sidebar, its heading row and an item. */
 async function readInterfaceLooks(page: Page): Promise<InterfaceLook[]> {
   const looks = [
-    await page.getByRole("banner").evaluate(readInterfaceLook),
+    await sidebarHeadingRow(page).evaluate(readInterfaceLook),
     await sidebar(page).evaluate(readInterfaceLook),
     // Not the current item in either case, so only a leaking style could change it.
     await sectionItem(page, "Home").evaluate(readInterfaceLook),
@@ -203,6 +224,21 @@ test.describe("Pages look like mods", function describeLook(): void {
     });
   });
 
+  test("Card in a light page", async function keepsCardBorder({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "light" });
+    await servePage(page, "home/index", "<article>\n\nA card\n\n</article>\n");
+
+    await page.goto("/");
+
+    const card = pageBody(page).locator("article");
+    await expect(card).toBeVisible();
+    expect((await card.evaluate(readCardColors)).border).toBe(
+      LIGHT_COLORS.border.computed,
+    );
+  });
+
   test("Page styles stay inside", async function keepsStylesInside({
     page,
   }): Promise<void> {
@@ -238,6 +274,56 @@ test.describe("Pages look like mods", function describeLook(): void {
       })
       .toBe(DARK_COLORS.foreground.computed);
     expect(await page.evaluate(readPageMarker)).toBe(true);
+  });
+});
+
+test.describe("Pages are drawn on the canvas", function describeCanvas(): void {
+  test("Light page on the canvas", async function drawsOnCanvas({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 2560, height: 1080 });
+    await page.emulateMedia({ colorScheme: "light" });
+
+    await page.goto("/");
+
+    await expect(pageHeading(page, "Home")).toBeVisible();
+    expect(await pageBody(page).evaluate(readBackgroundColor)).toBe(
+      "rgba(0, 0, 0, 0)",
+    );
+    expect(await page.evaluate(readCanvasColor)).toBe(
+      LIGHT_COLORS.card.computed,
+    );
+  });
+});
+
+test.describe("Pages keep clear of the hamburger chip", function describeChip(): void {
+  test("Narrow page with a hidden sidebar", async function keepsClearOfChip({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 600, height: 800 });
+    await page.goto("/");
+    await expect(pageHeading(page, "Home")).toBeVisible();
+
+    await hamburgerButton(page).click();
+
+    await expect(hamburgerButton(page)).toHaveAccessibleName("Show sidebar");
+    const chip = await hamburgerButton(page).boundingBox();
+    const contentLeft = await pageBody(page).evaluate(readLeftEdge);
+    expect(contentLeft).toBeGreaterThan((chip?.x ?? 0) + (chip?.width ?? 0));
+  });
+
+  test("Wide page with a hidden sidebar", async function keepsReadingWidth({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 2560, height: 1080 });
+    await page.goto("/");
+    await expect(pageHeading(page, "Home")).toBeVisible();
+
+    await hamburgerButton(page).click();
+
+    await expect(hamburgerButton(page)).toHaveAccessibleName("Show sidebar");
+    const box = await pageBody(page).evaluate(readPageContentBox);
+    expect(box.contentWidth).toBeCloseTo(box.readingWidth, 0);
   });
 });
 

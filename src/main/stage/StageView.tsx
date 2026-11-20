@@ -251,7 +251,7 @@ export function StageView({
   return (
     <div
       ref={stageViewRef}
-      className="flex flex-1 flex-col gap-2 px-4 pt-2 pb-4"
+      className="flex flex-1 flex-col gap-(--shell-gap)"
       data-stage-view=""
       hidden={snapshot.visible?.kind === "page"}
     >

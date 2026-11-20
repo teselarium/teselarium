@@ -276,7 +276,7 @@ The stage bar's right side is, in order, the errors, warnings and notifications 
 
 ### The frame size
 
-The visible sandbox's frame fills the stage area: the page's width left beside the sidebar, and the viewport height left under the app header and the stage bar. It follows the window's size and the sidebar's width, and never depends on the mod's content: content taller than the frame scrolls inside the frame, not the page. The frame is at least 16rem tall; when less room is left, the page scrolls. It keeps this size in the `contained` and `theater` layouts alike: the content width limit is inside the frame (see [Frame layout](#frame-layout)). The layout lives in `src/main/app.css` and `src/main/stage/stage.css`.
+The visible sandbox's frame fills the stage area: the page's width left beside the sidebar, or the whole width when the sidebar is hidden (the chip of its hamburger button sits beside the stage bar, never over the frame), and the viewport height left under the stage bar. It follows the window's size and the sidebar's width, and never depends on the mod's content: content taller than the frame scrolls inside the frame, not the page. The frame is at least 16rem tall; when less room is left, the page scrolls. It keeps this size in the `contained` and `theater` layouts alike: the content width limit is inside the frame (see [Frame layout](#frame-layout)). The layout lives in `src/main/app.css` and `src/main/stage/stage.css`.
 
 ## Module Details
 

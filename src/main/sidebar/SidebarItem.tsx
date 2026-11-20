@@ -6,6 +6,8 @@ import {
 } from "@/vendor/shadcn/ui/tooltip.tsx";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import { SectionIcon } from "./SectionIcon.tsx";
+import { readSidebarRowClass } from "./sidebar_rows.ts";
+import { SidebarIconCell } from "./SidebarIconCell.tsx";
 
 interface SidebarItemProps {
   section: SectionDefinition;
@@ -18,14 +20,6 @@ interface SidebarItemProps {
 }
 
 const COMING_SOON = "Coming soon";
-
-const ITEM_CLASS = [
-  "flex items-center gap-3 rounded-md py-2 text-sm text-sidebar-foreground",
-  // Hover is a lighter accent than the current item's, so the two never look alike.
-  "hover:bg-sidebar-accent/40",
-  "aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-medium aria-[current=page]:text-sidebar-accent-foreground aria-[current=page]:hover:bg-sidebar-accent",
-  "aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:hover:bg-transparent",
-].join(" ");
 
 /** A plain left click gets tab-bar navigation; a modified click opens the address as the browser does. */
 function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
@@ -89,9 +83,7 @@ export function SidebarItem({
     }
   }
 
-  const className = isExpanded
-    ? `${ITEM_CLASS} px-3`
-    : `${ITEM_CLASS} justify-center px-0`;
+  const className = readSidebarRowClass(isExpanded);
   const link = section.comingSoon ? (
     <a
       role="link"
@@ -100,7 +92,9 @@ export function SidebarItem({
       className={className}
       onClick={handleClick}
     >
-      <SectionIcon icon={section.icon} />
+      <SidebarIconCell>
+        <SectionIcon icon={section.icon} />
+      </SidebarIconCell>
       {renderLabel(section, isExpanded)}
     </a>
   ) : (
@@ -110,7 +104,9 @@ export function SidebarItem({
       className={className}
       onClick={handleClick}
     >
-      <SectionIcon icon={section.icon} />
+      <SidebarIconCell>
+        <SectionIcon icon={section.icon} />
+      </SidebarIconCell>
       {renderLabel(section, isExpanded)}
     </a>
   );

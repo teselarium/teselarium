@@ -36,18 +36,31 @@ describe("App", function describeApp(): void {
     expect(title).toBeInTheDocument();
   });
 
-  it("No Theme control in the header", async function hasNoThemeControl(): Promise<void> {
+  it("No app header", async function hasNoHeader(): Promise<void> {
     renderApp(await startTestApp(""));
 
-    const header = screen.getByRole("banner");
+    const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
 
+    expect(screen.queryByRole("banner")).toBeNull();
     expect(
-      within(header).getByRole("button", { name: "Hide sidebar" }),
+      within(sidebar).getByRole("button", { name: "Hide sidebar" }),
     ).toBeInTheDocument();
     expect(
-      within(header).getByRole("heading", { name: "OpenTesela" }),
+      within(sidebar).getByRole("heading", { name: "OpenTesela" }),
     ).toBeInTheDocument();
-    expect(within(header).queryByLabelText("Theme")).toBeNull();
+  });
+
+  it("marks the layout with the sidebar's state", async function marksState(): Promise<void> {
+    const fixture = await startTestApp("");
+    const { container } = renderApp(fixture);
+    const layout = container.querySelector(".app-layout");
+    expect(layout).toHaveAttribute("data-sidebar-state", "expanded");
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(layout).toHaveAttribute("data-sidebar-state", "collapsed");
+    fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
+
+    expect(layout).toHaveAttribute("data-sidebar-state", "hidden");
   });
 
   it("No hash", async function rendersNoFrame(): Promise<void> {

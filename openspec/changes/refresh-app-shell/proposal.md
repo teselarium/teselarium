@@ -10,7 +10,7 @@ The app spends a full row on a header that only holds the hamburger button and t
 - **Hidden sidebar keeps the hamburger.** Hiding the sidebar shrinks it to a small floating chip holding only the hamburger button, in the same place. The first row of the main area (the stage bar) starts after the chip, and the rest of the main area, sandbox included, uses the full width. A page keeps its content clear of the chip.
 - **Fixed icon axis.** Every sidebar button (hamburger, section items, theme control, collapse toggle) keeps its position across expanded, collapsed and hidden: icons sit on the center of the rail, and the expanded sidebar adds labels to their right. The collapse toggle stays at the bottom, on that axis.
 - **Footer group follows the main group**, after the divider, instead of being pushed to the bottom.
-- **Theme control in the sidebar**, below About: a button that opens a menu with System, Light and Dark, in sync with the Settings page's Theme control.
+- **Theme control in the sidebar**, below About: a button that cycles System, Light and Dark, with a tooltip naming the current one, in sync with the Settings page's Theme control.
 - **White canvas with floating panels.** In light, the app's canvas is white (`--ot-card`); in dark, it stays `--ot-background`. The sidebar, the stage bar and the sandbox are panels with a gap around them, a hairline border and a soft app-only shadow. Pages sit on the canvas. No theme token changes, so mods look the same.
 - **New catalog icons**, shared by the sidebar and the stage bar: Tiles uses lucide's `Shapes`; Mods and Mosaics get custom icons drawn on lucide's grid (a dashed square with an arrow entering it towards the bottom right; a frame holding arranged shapes).
 

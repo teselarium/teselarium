@@ -48,6 +48,13 @@
   --sidebar-accent-foreground: var(--ot-accent-foreground);
   --sidebar-border: var(--ot-border);
   --sidebar-ring: var(--ot-ring);
+  /* The app's canvas, behind its panels and pages: white in light. Mods do not get it. */
+  --app-canvas: var(--ot-card);
+}
+
+/* In dark, the canvas stays the background, and the panels' lighter surface gives the depth. */
+[data-ot-color-scheme="dark"] {
+  --app-canvas: var(--ot-background);
 }
 
 @theme inline {
@@ -87,6 +94,12 @@
   --font-sans: var(--ot-font-sans);
   --font-mono: var(--ot-font-mono);
   --shadow-lg: var(--ot-shadow);
+  /*
+   * The panels' shadow (sidebar, stage bar, frame): 2px down and right, without blur.
+   * A blurred shadow beside a running mod's frame slows the mod down in
+   * WebKit; this one costs nothing to draw. App-only: mods do not get it.
+   */
+  --shadow-panel: 2px 2px 0 rgb(0 0 0 / 0.06);
   /* `p-4` is 4 × `--ot-space-1`, which is `--ot-space-4`. */
   --spacing: var(--ot-space-1);
 }
@@ -97,7 +110,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: var(--app-canvas);
     font-size: var(--ot-font-size);
     line-height: var(--ot-line-height);
   }
@@ -117,31 +131,141 @@
 }
 
 /*
- * The header across the top, then the sidebar's column and the main area,
- * which takes the rest of the viewport. App.tsx sets `--sidebar-column` from
- * the sidebar's state, so resizing it resizes the frame without a reload.
+ * The shell's geometry, shared by the sidebar, the hamburger chip, the stage
+ * view and the page area, so their alignment cannot drift. The narrow
+ * drawer, which is not inside the layout, gets the same values.
+ */
+.app-layout,
+.sidebar-drawer {
+  --shell-gap: var(--ot-space-2);
+  --sidebar-rail-width: calc(var(--ot-space-1) * 12);
+  /* The sidebar's first row and the stage bar: one row. */
+  --shell-row-height: calc(var(--ot-space-1) * 10);
+  /* The sidebar's padding on each side, inside its border. */
+  --sidebar-inset: var(--ot-space-1);
+  /* The icon cell every sidebar row starts with: the rail inside its 1px borders and padding. */
+  --sidebar-cell-size: calc(
+    var(--sidebar-rail-width) - 2 * var(--sidebar-inset) - 2px
+  );
+  /* What the hamburger chip and the gap after it take from the main area's left. */
+  --chip-inset: calc(var(--sidebar-rail-width) + var(--shell-gap));
+}
+
+/*
+ * The sidebar's column and the main area, which takes the rest of the
+ * viewport, with a gap around and between them. App.tsx sets
+ * `--sidebar-column` from the sidebar's state, so resizing it resizes the
+ * frame without a reload, and `data-sidebar-state`, so the hidden sidebar
+ * leaves the grid as the hamburger chip.
  */
 .app-layout {
-  --sidebar-rail-width: calc(var(--ot-space-1) * 12);
+  position: relative;
   display: grid;
   grid-template-columns: var(--sidebar-column, 240px) minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--shell-gap);
+  padding: var(--shell-gap);
   height: 100%;
 }
 
-.app-layout > header {
-  grid-column: 1 / -1;
+.app-layout[data-sidebar-state="hidden"] {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-/* Placed explicitly: a hidden sidebar leaves the grid, and the main area must keep its column. */
+/* Placed explicitly: the hidden sidebar leaves the grid, and the main area must keep its place. */
 .app-layout > aside {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
 }
 
 .app-layout > main {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
+}
+
+.app-layout[data-sidebar-state="hidden"] > main {
+  grid-column: 1;
+}
+
+/*
+ * The hamburger chip: one rail wide and one row tall, where the sidebar's
+ * first row is. Out of the grid's areas, so it is placed from the layout's
+ * edges.
+ */
+.app-layout[data-sidebar-state="hidden"] > aside {
+  grid-area: auto;
+  position: absolute;
+  top: var(--shell-gap);
+  left: var(--shell-gap);
+  z-index: 10;
+  width: var(--sidebar-rail-width);
+  height: var(--shell-row-height);
+}
+
+/* The first row of the main area starts after the chip. The frame keeps the full width. */
+.app-layout[data-sidebar-state="hidden"] .stage-bar {
+  margin-left: var(--chip-inset);
+}
+
+/* A page keeps its content clear of the chip. */
+.app-layout[data-sidebar-state="hidden"] .page-area {
+  padding-left: var(--chip-inset);
+}
+
+/*
+ * The mosaic icon's shapes (catalog_icons.ts): the theme's primary,
+ * secondary, destructive and warning colors, deep in light and pastel in
+ * dark, made 20% more saturated where the browser supports relative colors.
+ */
+.mosaic-shape-1 {
+  --mosaic-shape: var(--ot-primary);
+}
+
+.mosaic-shape-2 {
+  --mosaic-shape: var(--ot-secondary);
+}
+
+.mosaic-shape-3 {
+  --mosaic-shape: var(--ot-destructive);
+}
+
+.mosaic-shape-4 {
+  --mosaic-shape: var(--ot-warning);
+}
+
+.mosaic-shape {
+  --mosaic-shape-color: var(--mosaic-shape);
+  fill: var(--mosaic-shape-color);
+}
+
+@supports (color: hsl(from red h s l)) {
+  .mosaic-shape {
+    --mosaic-shape-color: hsl(from var(--mosaic-shape) h calc(s * 1.2) l);
+  }
+}
+
+/*
+ * In dark, the pastels lose their contrast on the accent (the sidebar's
+ * current item, a list's highlighted row, a menu's focused entry): there the
+ * shapes keep their hue and saturation, and are darkened to about the
+ * lightness of the light scheme's colors.
+ */
+[data-ot-color-scheme="dark"]
+  :is([aria-current="page"], [data-selected="true"], [data-highlighted])
+  .mosaic-shape {
+  fill: color-mix(
+    in oklch,
+    var(--mosaic-shape) 40%,
+    var(--ot-accent-foreground)
+  );
+}
+
+@supports (color: oklch(from red l c h)) {
+  [data-ot-color-scheme="dark"]
+    :is([aria-current="page"], [data-selected="true"], [data-highlighted])
+    .mosaic-shape {
+    fill: oklch(from var(--mosaic-shape) calc(l * 0.62) calc(c * 1.2) h);
+  }
 }
 
 /* While the sidebar is resized, a frame under the pointer must not take the drag. */

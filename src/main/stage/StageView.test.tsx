@@ -1175,21 +1175,23 @@ describe("combination capsules", function describeCombinationCapsules(): void {
     renderStageView(stage);
 
     expect(
-      findCapsule("Mod: Book List 1.0.0").querySelector("svg.lucide-puzzle"),
+      findCapsule("Mod: Book List 1.0.0").querySelector(
+        "svg.lucide-opentesela-mod",
+      ),
     ).not.toBeNull();
     expect(
       findCapsule("Collection: Science fiction books").querySelector(
-        "svg.lucide-layout-grid",
+        "svg.lucide-shapes",
       ),
     ).not.toBeNull();
     expect(
       findCapsule("Mosaic: Books on the shelf").querySelector(
-        "svg.lucide-shapes",
+        "svg.lucide-opentesela-mosaic",
       ),
     ).not.toBeNull();
     expect(
       findCapsule("Combination: Books on the shelf").querySelector(
-        "svg.lucide-shapes",
+        "svg.lucide-opentesela-mosaic",
       ),
     ).not.toBeNull();
   });

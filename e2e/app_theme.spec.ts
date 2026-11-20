@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { currentItem, openSection, sidebar } from "./app_layout.ts";
+import type { Locator, Page } from "@playwright/test";
+import {
+  currentItem,
+  hamburgerButton,
+  openSection,
+  sidebar,
+  sidebarThemeButton,
+} from "./app_layout.ts";
 import {
   actionDialog,
   buildProbeFiles,
@@ -20,6 +27,7 @@ import {
   DARK_COLORS,
   LIGHT_COLORS,
   readBodyColors,
+  readBoxShadow,
   readColorSchemeAttribute,
   readPageOverflow,
   readVisibleFrameBox,
@@ -30,8 +38,8 @@ import {
 
 const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
 
-/** The bottom of the frame may sit this far above the viewport's bottom: the stage's padding and border. */
-const BOTTOM_TOLERANCE = 24;
+/** The frame may sit this far from the viewport's edge: the shell's gap and the frame's border. */
+const EDGE_TOLERANCE = 24;
 
 function readStageBarColor(element: Element): string {
   return getComputedStyle(element).color;
@@ -48,6 +56,32 @@ function readDialogColors(element: Element): {
   const style = getComputedStyle(element);
   const colors = { background: style.backgroundColor, color: style.color };
   return colors;
+}
+
+/** The edges of an element's box, in pixels. */
+interface Edges {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+async function readEdges(locator: Locator): Promise<Edges> {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error("Expected the element to have a box");
+  }
+  const edges: Edges = {
+    left: box.x,
+    right: box.x + box.width,
+    top: box.y,
+    bottom: box.y + box.height,
+  };
+  return edges;
+}
+
+function visibleFrame(page: Page): Locator {
+  return page.locator("[data-sandbox-id]:not([hidden]) iframe");
 }
 
 function setPageMarker(): void {
@@ -75,6 +109,83 @@ test.describe("Theme choice", function describeThemeChoice(): void {
       color: DARK_COLORS.foreground.computed,
     });
     expect(await isFrameMarked(frame)).toBe(true);
+  });
+});
+
+test.describe("Theme choice in the sidebar", function describeSidebarChoice(): void {
+  test("Choose from the sidebar", async function choosesFromSidebar({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "light" });
+    const frame = await openProbe(page);
+    await waitForFrameColorScheme(frame, "light");
+    await markFrame(frame);
+
+    // System, then Light, then Dark.
+    await sidebarThemeButton(page).click();
+    await expect(page.getByRole("tooltip")).toHaveText("Theme: Light");
+    await sidebarThemeButton(page).click();
+    await expect(page.getByRole("tooltip")).toHaveText("Theme: Dark");
+
+    await waitForFrameColorScheme(frame, "dark");
+    expect(await page.evaluate(readColorSchemeAttribute)).toBe("dark");
+    expect(await isFrameMarked(frame)).toBe(true);
+    await expect(sidebarThemeButton(page)).toHaveAccessibleName("Theme: Dark");
+    await openSection(page, "Settings");
+    await expect(themeControl(page)).toHaveValue("dark");
+  });
+
+  test("No Theme control in the header", async function hasNoHeaderControl({
+    page,
+  }): Promise<void> {
+    await page.goto("/");
+
+    await expect(page.getByRole("banner")).toHaveCount(0);
+    await expect(sidebarThemeButton(page)).toHaveCount(1);
+    await expect(themeControl(page)).toHaveCount(0);
+    await openSection(page, "Settings");
+    await expect(themeControl(page)).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /^Theme: / })).toHaveCount(1);
+  });
+});
+
+test.describe("App canvas and panels", function describeCanvas(): void {
+  test("White canvas in light", async function drawsWhiteCanvas({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.emulateMedia({ colorScheme: "light" });
+
+    await openProbe(page);
+
+    expect((await page.evaluate(readBodyColors)).background).toBe(
+      LIGHT_COLORS.card.computed,
+    );
+    const panels = [sidebar(page), stageBar(page), visibleFrame(page)];
+    for (const panel of panels) {
+      expect(await panel.evaluate(readBoxShadow)).not.toBe("none");
+    }
+    const sidebarEdges = await readEdges(sidebar(page));
+    const barEdges = await readEdges(stageBar(page));
+    const frameEdges = await readEdges(visibleFrame(page));
+    expect(sidebarEdges.left).toBeGreaterThan(0);
+    expect(sidebarEdges.top).toBeGreaterThan(0);
+    expect(barEdges.left).toBeGreaterThan(sidebarEdges.right);
+    expect(frameEdges.left).toBeGreaterThan(sidebarEdges.right);
+    expect(frameEdges.top).toBeGreaterThan(barEdges.bottom);
+  });
+
+  test("Canvas in dark", async function drawsDarkCanvas({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    await page.goto("/");
+
+    await expect(sidebar(page)).toBeVisible();
+    expect((await page.evaluate(readBodyColors)).background).toBe(
+      DARK_COLORS.background.computed,
+    );
   });
 });
 
@@ -206,7 +317,7 @@ test.describe("The app follows the color scheme", function describeApp(): void {
     await chooseTheme(page, "Light");
 
     expect((await page.evaluate(readBodyColors)).background).toBe(
-      LIGHT_COLORS.background.computed,
+      LIGHT_COLORS.card.computed,
     );
     expect(await page.evaluate(readPageMarker)).toBe(true);
   });
@@ -225,7 +336,7 @@ test.describe(
 
       const frameBox = await readVisibleFrameBox(page);
       expect(800 - frameBox.bottom).toBeGreaterThanOrEqual(0);
-      expect(800 - frameBox.bottom).toBeLessThanOrEqual(BOTTOM_TOLERANCE);
+      expect(800 - frameBox.bottom).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(await page.evaluate(readPageOverflow)).toBe(0);
     });
 
@@ -242,7 +353,7 @@ test.describe(
           const frameBox = await readVisibleFrameBox(page);
           return 600 - frameBox.bottom;
         })
-        .toBeLessThanOrEqual(BOTTOM_TOLERANCE);
+        .toBeLessThanOrEqual(EDGE_TOLERANCE);
       const frameBox = await readVisibleFrameBox(page);
       expect(600 - frameBox.bottom).toBeGreaterThanOrEqual(0);
     });
@@ -266,6 +377,29 @@ test.describe(
       expect(tallBox.height).toBeCloseTo(shortBox.height, 0);
       expect(await frame.evaluate(canFrameScroll)).toBe(true);
       expect(await page.evaluate(readPageOverflow)).toBe(0);
+    });
+
+    test("Hidden sidebar widens the frame", async function widensFrame({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      const frame = await openProbe(page);
+      await markFrame(frame);
+      await sidebar(page)
+        .getByRole("button", { name: "Collapse sidebar" })
+        .click();
+      await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
+      const before = await readEdges(visibleFrame(page));
+
+      await hamburgerButton(page).click();
+
+      await expect(sidebar(page)).toHaveAttribute("data-state", "hidden");
+      const after = await readEdges(visibleFrame(page));
+      expect(after.right - after.left).toBeGreaterThan(
+        before.right - before.left,
+      );
+      expect(after.left).toBeLessThanOrEqual(EDGE_TOLERANCE);
+      expect(await isFrameMarked(frame)).toBe(true);
     });
 
     test("Small viewport", async function keepsMinimumHeight({

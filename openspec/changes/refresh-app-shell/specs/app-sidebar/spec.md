@@ -23,7 +23,7 @@ The hamburger button, every section item's icon, the theme control and the colla
 - **THEN** the hamburger button's bounding box is where it was before, within 1 pixel
 
 ### Requirement: Theme control in the sidebar
-The sidebar SHALL show the theme control (see `theme`) after the `footer` items. It SHALL be a button, not a section item: it SHALL never be marked as the current item. Its icon SHALL show the current choice. Expanded, it SHALL show the label `Theme`; in the rail, a tooltip SHALL name it and the current choice.
+The sidebar SHALL show the theme control (see `theme`) after the `footer` items. It SHALL be a button, not a section item: it SHALL never be marked as the current item. Its icon SHALL show the current choice: a sun and moon for System, a sun for Light, a moon for Dark. Expanded, it SHALL show the label `Theme`. In every state a tooltip SHALL name it and the current choice, and each change SHALL be announced to assistive technologies.
 
 #### Scenario: Below About
 - **WHEN** the vanilla sidebar is expanded
@@ -33,8 +33,12 @@ The sidebar SHALL show the theme control (see `theme`) after the `footer` items.
 - **WHEN** the sidebar is collapsed, the choice is Dark and the pointer rests on the theme control
 - **THEN** a tooltip with the text `Theme: Dark` is shown
 
+#### Scenario: Tooltip when expanded
+- **WHEN** the sidebar is expanded, the choice is Light and the pointer rests on the theme control
+- **THEN** a tooltip with the text `Theme: Light` is shown
+
 ### Requirement: Catalog kind icons
-The Tiles, Mods and Mosaics items SHALL each show the icon of their catalog kind, the same icon the stage bar and its lists show for that kind (see `stage-bar` and `combination-pickers`). The collection icon SHALL be a set of loose shapes, the mod icon a dashed square with an arrow entering it towards its bottom right, and the mosaic icon a frame holding arranged shapes. Each SHALL be drawn with lines in the item's text color, at the size of the other icons.
+The Tiles, Mods and Mosaics items SHALL each show the icon of their catalog kind, the same one the stage bar and its lists show (see `stage-bar` and `combination-pickers`): loose shapes for collections, a dashed square with an arrow entering it towards its bottom right for mods, and a tile holding arranged shapes for mosaics. The collection and mod icons SHALL be drawn with lines in the item's text color; the mosaic icon has its own colors (below). All three SHALL be the size of the other icons.
 
 #### Scenario: Same icon in the sidebar and the stage bar
 - **WHEN** a combination sandbox is visible
@@ -43,6 +47,17 @@ The Tiles, Mods and Mosaics items SHALL each show the icon of their catalog kind
 #### Scenario: Icons follow the text color
 - **WHEN** the color scheme changes from `light` to `dark`
 - **THEN** the Mods item's icon is drawn in the dark value of the item's text color
+
+### Requirement: Colored mosaic icon
+The mosaic icon SHALL be a tile outlined in the item's text color at a quarter of its opacity and filled with it at a tenth, holding four filled shapes in the theme's primary, secondary, destructive and warning colors, made more saturated. Where it sits on the accent background in the dark color scheme, its shapes SHALL be darkened towards the accent's text color, so they keep their contrast.
+
+#### Scenario: Mosaic icon follows the color scheme
+- **WHEN** the color scheme changes from `light` to `dark`
+- **THEN** the Mosaics item's shapes are drawn from the dark values of their theme colors
+
+#### Scenario: Mosaic icon on the current item
+- **WHEN** the color scheme is `dark` and the Mosaics item is the current one
+- **THEN** its shapes are darker than on a Mosaics item that is not current
 
 ## MODIFIED Requirements
 

@@ -46,6 +46,11 @@ import {
 } from "./test_mods.ts";
 import type { ModFiles } from "./mod_routes.ts";
 import {
+  hamburgerButton,
+  sectionItem,
+  sidebarHeadingRow,
+} from "./app_layout.ts";
+import {
   HOME_MOD_PREVIEW_URL,
   TEST_CATALOG_PREVIEW_URL,
 } from "./app_servers.ts";
@@ -373,6 +378,30 @@ test.describe("Combination capsules", function describeCapsules(): void {
     expect(barBox.height).toBeLessThan(boxes[0].height * 2);
   });
 
+  test("Same icon in the sidebar and the stage bar", async function sharesIcons({
+    page,
+  }): Promise<void> {
+    await openLabelsMosaic(page);
+    const bar = stageBar(page);
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
+    const pairs: [Locator, string][] = [
+      [bar.getByRole("button", { name: /^Mod: / }), "Mods"],
+      [bar.getByRole("button", { name: /^Collection: / }), "Tiles"],
+      [bar.getByRole("button", { name: /^Mosaic: / }), "Mosaics"],
+    ];
+
+    for (const [capsuleButton, itemName] of pairs) {
+      const capsuleDrawing = await capsuleButton
+        .locator("svg")
+        .first()
+        .evaluate(readDrawing);
+      const itemDrawing = await sectionItem(page, itemName)
+        .locator("svg")
+        .evaluate(readDrawing);
+      expect(capsuleDrawing).toBe(itemDrawing);
+    }
+  });
+
   test("Unsaved combination", async function showsUnsaved({
     page,
   }): Promise<void> {
@@ -432,6 +461,41 @@ test.describe("Details footer", function describeDetails(): void {
     const list = page.locator("[data-slot=popover-content]");
     const details = await list.locator("dd").allTextContents();
     expect(details).toEqual([mosaicSource, LABELS_MOSAIC_HASH]);
+  });
+});
+
+test.describe("Stage bar beside the hamburger chip", function describeChip(): void {
+  test.beforeEach(async function useWideViewport({ page }): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
+  test("Bar after the chip", async function startsAfterChip({
+    page,
+  }): Promise<void> {
+    await openProbe(page);
+
+    await hamburgerButton(page).click();
+
+    await expect(hamburgerButton(page)).toHaveAccessibleName("Show sidebar");
+    const chip = await readBox(hamburgerButton(page));
+    const bar = await readBox(stageBar(page));
+    const frame = await readBox(
+      page.locator("[data-sandbox-id]:not([hidden]) iframe"),
+    );
+    expect(bar.x).toBeGreaterThan(chip.x + chip.width);
+    expect(frame.x).toBeLessThan(chip.x + chip.width);
+  });
+
+  test("One row with the sidebar's heading row", async function sharesRow({
+    page,
+  }): Promise<void> {
+    await openProbe(page);
+
+    const row = await readBox(sidebarHeadingRow(page));
+    const bar = await readBox(stageBar(page));
+
+    expect(Math.abs(bar.y - row.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(bar.height - row.height)).toBeLessThanOrEqual(1);
   });
 });
 
@@ -1053,6 +1117,11 @@ function applyBarWidth(bar: HTMLElement, width: number): void {
   bar.style.alignSelf = "flex-start";
 }
 
+/** Runs on an icon: its drawing, the markup inside its `<svg>`. */
+function readDrawing(element: Element): string {
+  return element.innerHTML;
+}
+
 /** Whether an element's text is cut: wider than its box. */
 function isCut(element: HTMLElement): boolean {
   return element.scrollWidth > element.clientWidth;
@@ -1130,6 +1199,23 @@ test.describe("The bar folds as it narrows", function describeLadder(): void {
     const folded = capsule(page, `Combination: ${LABELS_MOSAIC_TITLE}`);
     await expect(folded).toBeVisible();
     expect(await readCloseOffset(page)).toBe(wideOffset);
+  });
+
+  test("Folding follows the space left", async function foldsBesideChip({
+    page,
+  }): Promise<void> {
+    // The chip and the gaps around it leave 600px to the bar.
+    await page.setViewportSize({ width: 672, height: 800 });
+    await openSwapMosaic(page);
+
+    await hamburgerButton(page).click();
+
+    await expect(hamburgerButton(page)).toHaveAccessibleName("Show sidebar");
+    expect((await readBox(stageBar(page))).width).toBe(600);
+    await expect(capsuleTitle(page, MOD_CAPSULE)).toBeHidden();
+    await expect(capsuleTitle(page, COLLECTION_CAPSULE)).toBeHidden();
+    await expect(capsule(page, MOD_CAPSULE)).toBeVisible();
+    await expect(capsule(page, COLLECTION_CAPSULE)).toBeVisible();
   });
 
   test("Phone width", async function opensFoldedMenu({ page }): Promise<void> {

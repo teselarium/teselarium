@@ -1,27 +1,31 @@
 # Main Module
 
-The main module is the app's own interface around the stage: the header, the sidebar and its sections, the pages, and the Settings page. It lives in `src/main/`, and `src/App.tsx` lays it out.
+The main module is the app's own interface around the stage: the sidebar and its sections, the pages, and the Settings page. It lives in `src/main/`, and `src/App.tsx` lays it out.
 
 ## Page layout
 
 ```
-+------------------------------------------------------------------+
-| [=] OpenTesela                                          (header) |
-+-------------+----------------------------------------------------+
-| Sidebar     | Main area                                          |
-|  Home       |   the page of the current entry (Home, Guides,     |
-|  Tiles      |   Settings, About...), or the stage: the stage bar |
-|  Mods       |   and the visible mod's frame                      |
-|  Mosaics    |                                                    |
-|  Guides     |                                                    |
-|             |                                                    |
-|  Settings   |                                                    |
-|  About      |                                                    |
-+-------------+----------------------------------------------------+
++----------------+ +-----------------------------------------------+
+| [=] OpenTesela | | stage bar                                     |
+|  Home          | +-----------------------------------------------+
+|  Tiles         | +-----------------------------------------------+
+|  Mods          | | Main area: the visible mod's frame, under the |
+|  Mosaics       | | stage bar; or, on the canvas with no panel,   |
+|  Guides        | | the page of the current entry (Home, Guides,  |
+|  ------------  | | Settings, About...)                           |
+|  Settings      | |                                               |
+|  About         | |                                               |
+|  Theme         | |                                               |
+|                | |                                               |
+|  [<]           | |                                               |
++----------------+ +-----------------------------------------------+
 ```
 
-- **Header**: the hamburger button, which hides and shows the sidebar and is always visible, then the `OpenTesela` heading.
-- **Sidebar**: one item per section, built from the section registry (below). The `main` group is at the top and the `footer` group at the bottom. The sidebar is expanded (resizable, 200–400px), collapsed to an icon rail, or hidden. While its edge is dragged, the sidebar collapses as soon as it is narrower than 160px and expands again at 160px or wider, from the expanded sidebar or from the rail; the release keeps that state. On viewports narrower than 768px it starts collapsed and expands over the content as a drawer. `Ctrl+B` (`Cmd+B` on macOS) toggles expanded and collapsed. The layout is kept in the app's storage under `opentesela.sidebar`.
+There is no header: the sidebar and the main area take the whole height.
+
+- **Sidebar**: its first row is the hamburger button, which hides and shows the sidebar and is always visible, then the `OpenTesela` level 1 heading, shown only while the sidebar is expanded (in the rail and the chip it stays the page's heading, `sr-only`). This row and the stage bar are one row: the same top edge and height (`--shell-row-height`). Then one item per section, built from the section registry (below): the `main` group, a divider, and the `footer` group right after it. Then the Theme control (below), and the collapse toggle at the bottom. The sidebar is expanded (resizable, 200–400px), collapsed to an icon rail, or hidden. Hidden, it shrinks to a chip that holds only the hamburger button, in the same place, and renders nothing else; the stage bar and a page's content start after the chip (`--chip-inset`), and the frame takes the whole width under the stage bar. While its edge is dragged, the sidebar collapses as soon as it is narrower than 160px and expands again at 160px or wider, from the expanded sidebar or from the rail; the release keeps that state. On viewports narrower than 768px it starts collapsed and expands over the content as a drawer, which starts with the same first row, its hamburger button where the rail's is. `Ctrl+B` (`Cmd+B` on macOS) toggles expanded and collapsed. The layout is kept in the app's storage under `opentesela.sidebar`.
+- **Fixed icon axis**: every sidebar row starts with the same icon cell (`SidebarIconCell`), as wide as the rail inside its padding, with its icon or button centered. Expanded, the label follows the cell; in the rail, the row is just the cell, with the label as its accessible name and tooltip. So the hamburger button, the section icons, the Theme control and the collapse toggle never move when the sidebar collapses or expands, and the hamburger button does not move when the sidebar is hidden. The current item's highlight spans the row when expanded, and the cell in the rail.
+- **Theme control**: after the `footer` items, in its own list, a button showing the current choice's icon (`SunMoon` for System, `Sun` for Light, `Moon` for Dark), labelled `Theme` when expanded and named `Theme: <choice>`. Each press moves to the next choice: System, Light, Dark, then System again (`readNextThemeChoice` in `theme/theme_options.ts`). It changes the same choice as the Settings page's Theme control (`sidebar/SidebarThemeControl.tsx`). A tooltip says `Theme: <choice>` in every state and stays open after a press, so it shows the new choice; a visually hidden polite live region announces it. It is a button, not a section, so it is never the current item.
 - **Main area**: what the current history entry shows. A page section's page is rendered by the app ([pages](homepage/README.md)); the stage, with every open sandbox, stays mounted beside it and is hidden while a page shows, so no frame reloads.
 
 ### The stage bar
@@ -83,6 +87,16 @@ While a sandbox is visible, the stage bar (`stage/StageBar.tsx`) is one row abov
 
 The theme tokens give everything its colors, fonts and spacing (see the [theme module](../lib/core/theme/README.md)), so the app, the pages and the mods look alike.
 
+### Canvas and panels
+
+The app's canvas, the page's `<body>`, is `--app-canvas`: an app-only alias in `app.css`, `--ot-card` (white) in light and `--ot-background` in dark. The sidebar, the hamburger chip, the stage bar and the visible frame are panels: a gap (`--shell-gap`) around and between them, `rounded-lg`, an `--ot-border` border and `shadow-panel`, a shadow 2px down and right without blur (`app.css`): a blurred shadow beside a running mod's frame slows the mod down in WebKit. In dark, the panels' lighter surface gives the depth and the shadow is nearly invisible. Pages are not in a panel: their content has no background, so the canvas shows behind them. No theme token changes for this, so mods look the same.
+
+The shell's geometry is a set of custom properties on `.app-layout` (and on the narrow drawer, which is not inside it): `--shell-gap`, `--sidebar-rail-width`, `--shell-row-height`, `--sidebar-inset`, `--sidebar-cell-size` and `--chip-inset`. The sidebar, the chip, the stage view and the page area all read them, so their alignment cannot drift. `App.tsx` sets `data-sidebar-state` on `.app-layout`, which turns the grid into one column and places the chip while the sidebar is hidden.
+
+### Catalog icons
+
+The Tiles, Mods and Mosaics items show the icon of their catalog kind, the same icon the stage bar's capsules and lists show (`catalog_icons.ts`): lucide's `Shapes` for collections; for mods, lucide's `square-arrow-right-enter` turned towards the bottom right on a dashed square; for mosaics, a soft tile holding four shapes on a grid. The mod and mosaic icons are drawn on lucide's 24×24 grid with `createLucideIcon`, so they are `LucideIcon`s. The collection and mod icons are lines in the text color. The mosaic's tile is outlined in the text color at 25% and filled with it at 10%, and its shapes are filled by `.mosaic-shape` in `app.css`: the theme's primary, secondary, destructive and warning colors, 20% more saturated (relative color syntax, with the plain token colors as fallback), so deep in light and pastel in dark. In dark, on the accent (the sidebar's current item, a list's highlighted row, a menu's focused entry), the shapes are darkened in OKLCH so they keep their contrast.
+
 ## Section navigation
 
 The sidebar works like a tab bar (see the [stage](../lib/core/stage/README.md#sections-and-tab-bar-navigation)):
@@ -132,7 +146,7 @@ Tiles opens the [collection explorer](../tiles/explorer/README.md), Mods the [mo
 | `label` | The item's name: its text, its accessible name and its tooltip in the rail. |
 | `icon` | `{ lucide: Icon }`, a [lucide](https://lucide.dev/icons) icon component, or `{ image: "./icons/example.svg" }`, an image relative to the app. An image is drawn in the item's text color, following the color scheme (a CSS mask, so use a monochrome image); `{ image, tint: false }` draws it with its own colors. Icons are decorative: the label names the item. |
 | `target` | `{ page: true }`: the section shows the markdown pages in `pages/<id>/` (the `settings` section shows the Settings page instead). `{ mod: { mod, collection, tile, params } }`: the section runs a mod link, the same value a mod passes to `mods.open`, for example `{ mod: "collection_explorer", collection: null, params: {} }` for Tiles. `tile` is optional: a target written without it has no tile, and equals a typed run link without `tile`. |
-| `group` | `main` (top of the sidebar) or `footer` (bottom). Items keep the registry's order within their group. |
+| `group` | `main` (top of the sidebar) or `footer` (right after the `main` group, after a divider). Items keep the registry's order within their group. |
 | `optional` | Whether the user can hide the item on the Settings page. Hiding only removes the item: links still work (see [Settings](settings/README.md)). |
 | `comingSoon` | Shown as a disabled item that says "Coming soon" and does not navigate, for an instantiation's section that is not ready yet. For example, an instantiation could add a section with the id `example_section` and the label Example Section, marked as coming soon. Its target is not used, and its address shows Home, until it becomes available. No vanilla section is coming soon. |
 
@@ -232,11 +246,12 @@ The frame is hidden by layout, not by `display: none` or a size of zero: it fill
 | `sections/section_registry.ts` | The section types, `validateRegistry`, `availableSections` (drops sections of switched-off mods) and `buildStageRouting` (the plain data the stage gets). |
 | `sections/vanilla_sections.ts` | The vanilla registry. |
 | `sections/section_switches.ts` | The user's switches of optional sections (see [Settings](settings/README.md)). |
-| `sidebar/` | The sidebar's layout state and its view. |
+| `sidebar/` | The sidebar's layout state and its view: the heading row, the icon cell, the items and the Theme control. |
 | `pages/` | The page view: markdown pages and the Settings page (see [pages](homepage/README.md)). |
 | `settings/` | The Settings page, and the stores it shows, recently used (`recently_used.ts`) among them. |
 | `stage/` | The stage view: the stage bar with its capsules, lists (`CombinationList`, `ModList`, `CollectionList`, `MosaicList`), Sites chip and "More actions" menu, the frames, the hidden check frames, the action dialog, the player dialog, the API mismatch dialog and the site consent dialog; the remembered theater choice (`theater_setting.ts`), the frames' fullscreen (`stage_fullscreen.ts`) and "Reload tiles" (`tile_reload.ts`). |
-| `theme/` | The app's theme and the Theme control. |
+| `theme/` | The app's theme, the Settings page's Theme control and the choices both Theme controls offer (`theme_options.ts`). |
+| `catalog_icons.ts` | The icon of each catalog kind, shared by the sidebar and the stage bar. |
 | `default_mods.ts` | The default mod settings: the default mods folder and the switched-off mods. |
 | `app_catalog.ts` | The app catalog: the mods, collections and mosaics the explorers list (see [The app catalog](#the-app-catalog)). |
 | `StartErrorScreen.tsx` | What the app shows instead of itself when the registry or the catalog breaks a rule. |

@@ -36,7 +36,8 @@ const LOADING: PageLoad = Object.freeze({ status: "loading" });
 /**
  * What the base stylesheet gives `html` and `body` in a mod frame, given to
  * the element that acts as the page's body, kept at the reading width and
- * centered (pages have no theater mode). The only class selector, and it
+ * centered (pages have no theater mode). All but the background: a page is
+ * drawn on the app's canvas. The only class selector, and it
  * never leaves the shadow root.
  */
 const PAGE_HOST_RULES = `@layer opentesela {
@@ -46,7 +47,6 @@ const PAGE_HOST_RULES = `@layer opentesela {
     max-width: var(--ot-reading-width);
     margin-inline: auto;
     padding: var(--ot-space-4);
-    background-color: var(--ot-background);
     color: var(--ot-foreground);
     accent-color: var(--ot-primary);
     font-family: var(--ot-font-sans);

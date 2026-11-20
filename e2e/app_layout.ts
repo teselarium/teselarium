@@ -16,12 +16,22 @@ export function currentItem(page: Page): Locator {
   return sectionsNav(page).locator('[aria-current="page"]');
 }
 
-export function hamburgerButton(page: Page): Locator {
-  return page.getByRole("banner").getByRole("button", { name: /sidebar/ });
-}
-
 export function sidebar(page: Page): Locator {
   return page.locator("#app-sidebar");
+}
+
+/** The sidebar's first row: the hamburger button and the app's name. */
+export function sidebarHeadingRow(page: Page): Locator {
+  return sidebar(page).locator("[data-sidebar-heading-row]");
+}
+
+export function hamburgerButton(page: Page): Locator {
+  return sidebarHeadingRow(page).getByRole("button", { name: /sidebar/ });
+}
+
+/** The sidebar's Theme control, named after the current choice. */
+export function sidebarThemeButton(page: Page): Locator {
+  return sidebar(page).getByRole("button", { name: /^Theme: / });
 }
 
 export function resizeHandle(page: Page): Locator {

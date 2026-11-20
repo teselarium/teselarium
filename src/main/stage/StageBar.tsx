@@ -289,7 +289,7 @@ export function StageBar({
 
   return (
     <section
-      className="@container flex items-center gap-2 rounded-lg border bg-card px-3 py-1 text-card-foreground"
+      className="stage-bar @container flex min-h-(--shell-row-height) items-center gap-2 rounded-lg border bg-card px-3 text-card-foreground shadow-panel"
       aria-label="Stage bar"
     >
       <div ref={leftSideRef} className="flex min-w-0 flex-1 items-center gap-2">
