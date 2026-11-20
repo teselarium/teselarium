@@ -18,6 +18,9 @@ schema: spec-driven
 #       - Always state what is out of scope
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
+context: |
+  Read `docs/code_conventions.md` before writing code or when proposing or 
+  updating openspec artifacts
 rules:
   proposal:
     - >-
@@ -52,7 +55,3 @@ rules:
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
-operations:
-  apply:
-    guidance:
-      - Read docs/code_conventions.md before writing code
