@@ -258,11 +258,11 @@ The "List the default mosaics of mods" switch SHALL be kept in the app's storage
 - **THEN** the switch is on, the catalog's mosaics hold the default mosaics, and no error is shown
 
 ### Requirement: Recently used in Settings
-The Catalog group SHALL say how many mods, collections and mosaics are recently used (see `recently-used`), and that the app keeps them only on this device. While any is kept, it SHALL have a "Clear" button that clears recently used at once, without reloading any frame.
+The Catalog group SHALL say how many mods, collections, mosaics and combinations are recently used (see `recently-used`), and that the app keeps them only on this device. While any is kept, it SHALL have a "Clear" button that clears recently used at once, without reloading any frame.
 
 #### Scenario: Count after trying combinations
-- **WHEN** two mods, one collection and no mosaic are recently used, and the user opens `#/settings`
-- **THEN** the Catalog group says 2 mods, 1 collection and 0 mosaics are recently used, and shows "Clear"
+- **WHEN** two mods, one collection, no mosaic and one combination are recently used, and the user opens `#/settings`
+- **THEN** the Catalog group says 2 mods, 1 collection, 0 mosaics and 1 combination are recently used, and shows "Clear"
 
 #### Scenario: Clear
 - **WHEN** the user presses "Clear"
