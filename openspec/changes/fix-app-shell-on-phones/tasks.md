@@ -9,6 +9,7 @@
   - the comment over `projects` explains the new project.
 
   Verify `npx playwright test --list` shows the `mobile` project in the default and full runs and not in `E2E_RUN=samples`, and that no existing test moves between projects.
+- [ ] 1.2 Move `PHONE_VIEWPORT` (412×915), `SMALL_PHONE_VIEWPORT` (360×740) and `DESKTOP_VIEWPORT` (1280×800) from `e2e/default_mods.spec.ts` and `e2e/sample_book_list.spec.ts` into `e2e/layout_probes.ts` (design D9), and import them in both files. Verify the two files declare no viewport constant of their own, and that their tests still pass (`npm run test:e2e`, and `npm run test:e2e:samples` for the book list).
 
 ## 2. Tooltips only where the pointer can hover (stage-bar, app-sidebar)
 
@@ -52,7 +53,11 @@
   - an open message panel closes when the flag changes.
 
   Verify the existing desktop e2e tests in `e2e/stage_bar.spec.ts` and `e2e/stage_layout.spec.ts` still pass unchanged.
-- [ ] 3.6 Add `@mobile` e2e tests for the stage-bar and stage-layout scenarios:
+- [ ] 3.6 Add e2e tests for the stage-bar and stage-layout scenarios, in the default project (not `@mobile`, design D9):
+  - each test sets its viewport with `page.setViewportSize` and the viewports of `e2e/layout_probes.ts`;
+  - "inside the viewport" and width checks use `readElementBox` and `isFullyShown`.
+
+  The tests:
   - phone at 360×740: right side order, no sideways scroll, Close inside the viewport;
   - the title is readable: the capsule is at least 120px;
   - the messages button with an error and notifications, its grouped popover, all read, empty;
@@ -75,7 +80,7 @@
 ## 5. Sidebar on short and narrow viewports (app-sidebar)
 
 - [ ] 5.1 Put the section `<nav>` and the theme list in one scrolling wrapper between the heading row and the toggle row in `Sidebar.tsx` (design D7). Add tests:
-  - a `@mobile` e2e test at 915×412: the "Collapse sidebar" button is inside the viewport and collapses the sidebar, and the theme control can be scrolled into view;
+  - an e2e test in the default project at 915×412 (`page.setViewportSize`, not `@mobile`, design D9): the "Collapse sidebar" button is inside the viewport (`isFullyShown` from `e2e/layout_probes.ts`) and collapses the sidebar, and the theme control can be scrolled into view;
   - a desktop e2e check at 1280×800: the items cannot scroll.
 
   Verify both pass, and that the existing sidebar tests still pass.
@@ -93,4 +98,4 @@
 ## 8. Verification
 
 - [ ] 8.1 On a clean install (`npm ci`), run `npm run build`, `npm run test`, `npm run lint`, `npm run format:check` and `npm run test:e2e`, which includes the new `mobile` project. Verify all pass.
-- [ ] 8.2 Re-run the local audit: `cd .audit/android-themes && node audit.mjs 01-app-shell`, `node audit.mjs 02-stage-chrome --frames=app` and `node behaviors.mjs`. Before running, remove the B1–B4 and A1 entries from `known.json`. Confirm that no B1–B4, A1 or F1 finding remains, and that the 19 behavior checks still pass. Then look at the stage bar screenshots on `pixel7` and `small`. Record the result in `.audit/android-themes/findings.md`.
+- [ ] 8.2 Re-run the local audit with the C1 stand-in off: `cd .audit/android-themes && node audit.mjs 01-app-shell --c1stub=off`, `node audit.mjs 02-stage-chrome --frames=app --c1stub=off` and `node behaviors.mjs`. The base stylesheet now wraps long words itself (`fix-mod-content-on-phones`), so the stand-in would hide a regression. Before running, remove the B1–B4 and A1 entries from `known.json`. Confirm that no B1–B4, A1 or F1 finding remains, and that the 19 behavior checks still pass. Then look at the stage bar screenshots on `pixel7` and `small`. Record the result in `.audit/android-themes/findings.md`.

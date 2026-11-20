@@ -25,14 +25,20 @@ No test runs the app on a phone-sized, touch viewport, and no planning rule asks
 - **Combination lists:** a highlighted row draws its secondary text (details, aliases, score) in the accent's foreground color, which meets 4.5:1 in both themes. The explorer links are at least 32px tall.
 - **Sidebar on short viewports:** the section items scroll when they do not fit. The heading row and the collapse or expand button always stay visible.
 - **Drawer:** the open drawer on a narrow viewport has no close button of its own. The hamburger button, the backdrop and Escape close it.
-- **Tests:** a Playwright project emulating a Pixel 7 (touch, 412×915) runs the tests tagged `@mobile`, which cover the narrow stage bar, the tooltips, the drawer and the short sidebar.
-- **Planning rule:** `openspec/config.yaml` gets rules for proposals, specs and tasks. A change that adds or changes the app's interface, or the layout of a default or sample mod, must cover a phone viewport (narrow, touch) and both color schemes, in its scenarios and in its tests (`@mobile` tests). This changes how changes are planned, not the app's behavior.
+- **Tests:**
+  - a Playwright project emulating a Pixel 7 (touch, 412×915) runs the tests tagged `@mobile`, which cover what depends on touch: the tooltips on tap and the drawer's taps;
+  - the narrow stage bar and the short sidebar depend only on the viewport's size, so their tests run in the default project at phone viewports (`page.setViewportSize`), as `fix-mod-content-on-phones` did.
+- **Planning rule:** `openspec/config.yaml` gets rules for proposals, specs and tasks. A change that adds or changes the app's interface, or the layout of a default or sample mod, must cover a phone viewport (narrow, touch) and both color schemes, in its scenarios and in its tests:
+  - tests at a phone viewport (`page.setViewportSize`) for layout;
+  - `@mobile` tests for touch and hover.
+
+  This changes how changes are planned, not the app's behavior.
 - **Versions:**
   - **Mod API version bump: none.** The stage bar, the sidebar and the lists are the app's interface. No engine method, event, mount context key or mod file key changes, and the fullscreen and theater behavior mods see (`stage-layout`'s layouts and events) is unchanged.
   - **App bump: patch.** This is a fix, and nothing breaks for users or instantiations.
 
 Out of scope:
-- The content of mod frames, which is `fix-mod-content-on-phones`.
+- The content of mod frames, fixed by `fix-mod-content-on-phones` (done and archived).
 - The sidebar resize handle on touch (accepted in the audit).
 - Mermaid diagram sizing (accepted).
 
@@ -61,7 +67,8 @@ Out of scope:
 - Sidebar: `src/main/sidebar/Sidebar.tsx` (scrolling item area, `showCloseButton={false}` on the drawer's `SheetContent`).
 - Tests:
   - `playwright.config.ts` gets a `mobile` project filtered on `@mobile`, run in the default run, since these tests depend on the device;
-  - new `@mobile` tests in `e2e/stage_bar.spec.ts` and `e2e/app_sidebar.spec.ts`;
+  - new phone-viewport tests and `@mobile` tests in `e2e/stage_bar.spec.ts` and `e2e/app_sidebar.spec.ts`;
+  - the phone and desktop viewports, today copied in `e2e/default_mods.spec.ts` and `e2e/sample_book_list.spec.ts`, shared from `e2e/layout_probes.ts`;
   - unit tests next to the changed modules.
 - Docs: the stage bar and sidebar sections of `docs/modules/main/README.md`, and the tooltip wrapper in the "UI components" rules of `docs/code_conventions.md` (when a vendored component needs app behavior, a project component wraps it).
 - OpenSpec config: `openspec/config.yaml` (`rules.proposal`, `rules.specs`, `rules.tasks`).

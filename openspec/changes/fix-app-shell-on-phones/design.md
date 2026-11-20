@@ -104,7 +104,11 @@ The same structure serves the rail and the drawer's content. On tall viewports t
 - **The project:** `playwright.config.ts` adds a project `mobile` with `devices["Pixel 7"]` (Chromium, `isMobile`, `hasTouch`, 412×915), filtered with `grep: /@mobile/`.
 - **Filters:** `buildProjectFilters` gains the rule that the desktop projects skip `@mobile`, and the `samples` run skips the `mobile` project.
 - **Runs:** the `default` and `full` runs include it, since these tests guard everyday phone use.
-- **What gets the tag:** only tests whose result depends on the device: the narrow bar on a real 360/412px viewport, tooltips with `(hover: none)`, drawer taps, and the short sidebar at 915×412.
+- **What gets the tag:** only tests whose result depends on the device, that is on touch or on a pointer that cannot hover: tooltips with `(hover: none)` and drawer taps.
+- **Phone sizes without the tag:** the narrow bar at 360×740 and 412×915, the switch at 479 and 481px, and the short sidebar at 915×412 depend only on the viewport's size. They run in the default project with `page.setViewportSize`, as `fix-mod-content-on-phones` tested its phone layouts. Running them under device emulation as well would be an expensive variant their result doesn't depend on, which the code conventions advise against.
+- **Shared test parts:**
+  - the phone and desktop viewports (`PHONE_VIEWPORT` 412×915, `SMALL_PHONE_VIEWPORT` 360×740, `DESKTOP_VIEWPORT` 1280×800), today copied in `e2e/default_mods.spec.ts` and `e2e/sample_book_list.spec.ts`, move to `e2e/layout_probes.ts`;
+  - the new tests use them, and that file's `readElementBox` and `isFullyShown` for "inside the viewport" and width checks.
 - **The rest:** pure logic (D2's functions) and component behavior (the menu items, the grouped popover, no close button in the drawer) are tested with Vitest and Testing Library at their own level, as the code conventions ask.
 
 ### D10. Phone and color scheme rules in `openspec/config.yaml`
@@ -112,7 +116,10 @@ The same structure serves the rail and the drawer's content. On tall viewports t
 The project's OpenSpec config gets one rule per artifact, applied to every change that adds or changes the app's interface, or the layout of a default or sample mod:
 - **proposal:** state how the change behaves on a phone viewport and in both color schemes, or why that does not apply;
 - **specs:** layout requirements get at least one scenario on a phone viewport (360×740 or 412×915), and color requirements say what holds in both color schemes;
-- **tasks:** behavior that depends on a phone viewport or on touch gets `@mobile` e2e tests, and new or changed colors get a check in both color schemes.
+- **tasks:**
+  - layout that depends only on the viewport's size gets e2e tests at a phone viewport (360×740 or 412×915) with `page.setViewportSize`, using the viewports of `e2e/layout_probes.ts`;
+  - behavior that depends on touch or on a pointer that cannot hover gets `@mobile` e2e tests;
+  - new or changed colors get a check in both color schemes.
 
 - **Why `rules` and not `context`:** `openspec instructions` hands each artifact's rules to whoever writes that artifact, at the moment they write it. A line in `context` is background that is easy to skip.
 - **Why in this change:** the rule's `@mobile` tests need the `mobile` project that D9 adds.
