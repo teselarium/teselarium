@@ -1,23 +1,46 @@
 import type { ReactElement } from "react";
+import type { ResolvedDefaultModSettings } from "../../lib/core/engine/index.ts";
 import type { SandboxSnapshot } from "../../lib/core/stage/index.ts";
 import {
   buildCollectionListRows,
   startCollectionListLoads,
 } from "./collection_list.ts";
 import { CombinationList } from "./CombinationList.tsx";
-import type { ListDetail } from "./CombinationList.tsx";
-import { buildExplorerLink } from "./combination_list_inputs.ts";
 import type { CapsuleListProps } from "./combination_list_inputs.ts";
+import { buildViewerOpen } from "./detail_viewers.ts";
+import type { ListDetail } from "./ListDetails.tsx";
 import { useListInputs } from "./use_list_inputs.ts";
 
-function buildCollectionDetails(sandbox: SandboxSnapshot): ListDetail[] {
-  const link = sandbox.link;
-  if (link.tile !== null) {
-    const tileDetails: ListDetail[] = [{ term: "Tile", value: link.tile }];
+/**
+ * The tile's resolved address for a tile link, opening in the tile viewer,
+ * otherwise the collection's, opening in the collection viewer, or "None".
+ */
+function buildCollectionDetails(
+  sandbox: SandboxSnapshot,
+  defaults: ResolvedDefaultModSettings,
+): ListDetail[] {
+  if (sandbox.tile !== null) {
+    const tileDetails: ListDetail[] = [
+      {
+        term: "Tile",
+        value: sandbox.tile,
+        open: buildViewerOpen("tile", sandbox.tile, defaults),
+      },
+    ];
     return tileDetails;
   }
+  if (sandbox.collection === null) {
+    const noneDetails: ListDetail[] = [
+      { term: "Collection", value: "None", open: null },
+    ];
+    return noneDetails;
+  }
   const details: ListDetail[] = [
-    { term: "Collection", value: link.collection ?? "None" },
+    {
+      term: "Collection",
+      value: sandbox.collection,
+      open: buildViewerOpen("collection", sandbox.collection, defaults),
+    },
   ];
   return details;
 }
@@ -41,12 +64,7 @@ export function CollectionList(props: CapsuleListProps): ReactElement {
       rows={buildCollectionListRows(inputs)}
       pairHeading=""
       listChoices={props.listChoices}
-      details={buildCollectionDetails(props.sandbox)}
-      explorer={buildExplorerLink(
-        props.stage,
-        "tiles",
-        "Open the collection explorer",
-      )}
+      details={buildCollectionDetails(props.sandbox, props.stage.defaults)}
     >
       {props.children}
     </CombinationList>

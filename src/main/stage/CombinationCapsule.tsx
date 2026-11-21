@@ -1,6 +1,5 @@
 import { ChevronDown } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
-import { Badge } from "@/vendor/shadcn/ui/badge.tsx";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
 import { HoverTooltip } from "../HoverTooltip.tsx";
 
@@ -15,8 +14,6 @@ type CombinationCapsuleProps = Omit<
   kind: string;
   icon: ReactNode;
   title: string;
-  /** Shown after the title from 960px of bar width, and part of the accessible name. */
-  version?: string;
   shrink: CapsuleShrink;
   /** The title is hidden under 720px of bar width, leaving the icon. */
   hidesTitleWhenNarrow?: boolean;
@@ -40,8 +37,7 @@ const SHRINK_CLASSES: Readonly<Record<CapsuleShrink, string>> = Object.freeze({
  * `sm` Button's padding with an icon (`has-[>svg]:px-2.5`, on each side), the
  * kind's icon and the chevron (`size-4` each), the `gap-1.5` between its
  * items, and its 1px borders. With its title shown, even shrunk to nothing,
- * there is one gap more. (The mod's version is shown only from 960px of bar
- * width, where the capsules never get this narrow.)
+ * there is one gap more.
  */
 export const CAPSULE_MIN_WIDTH_CLASS = "min-w-[calc(var(--spacing)*16+2px)]";
 
@@ -59,22 +55,15 @@ function joinClasses(classes: readonly (string | false)[]): string {
   return kept.join(" ");
 }
 
-/** "Mod: Country Map 1.0.1": the kind, the full title and the version. */
-function buildCapsuleName(
-  kind: string,
-  title: string,
-  version?: string,
-): string {
-  const name =
-    version === undefined
-      ? `${kind}: ${title}`
-      : `${kind}: ${title} ${version}`;
+/** "Mod: Country Map": the kind and the full title, as the capsule shows them. */
+function buildCapsuleName(kind: string, title: string): string {
+  const name = `${kind}: ${title}`;
   return name;
 }
 
 /**
  * A capsule of the stage bar's recipe: shadcn's outline Button with the
- * kind's icon, the title, the version for the mod, and a chevron. It is at
+ * kind's icon, the title and a chevron. It is at
  * most 16rem wide and never narrower than its icon and chevron, its title
  * ends with an ellipsis when it does not fit, and
  * its tooltip and accessible name give the kind and the full title. The
@@ -86,7 +75,6 @@ export function CombinationCapsule({
   kind,
   icon,
   title,
-  version,
   shrink,
   hidesTitleWhenNarrow = false,
   isDashed = false,
@@ -94,7 +82,7 @@ export function CombinationCapsule({
   className,
   ...buttonProps
 }: CombinationCapsuleProps): ReactElement {
-  const name = buildCapsuleName(kind, title, version);
+  const name = buildCapsuleName(kind, title);
 
   function handleTooltipOpenChange(isOpen: boolean): void {
     if (isOpen) {
@@ -128,11 +116,6 @@ export function CombinationCapsule({
         >
           {title}
         </span>
-        {version === undefined ? null : (
-          <Badge variant="outline" className="tabular-nums @max-[960px]:hidden">
-            {version}
-          </Badge>
-        )}
         <ChevronDown className="opacity-60" />
       </Button>
     </HoverTooltip>

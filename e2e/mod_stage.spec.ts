@@ -109,7 +109,7 @@ test.describe("Open a mod from a run link", function describeRunLinks(): void {
     await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
 
     await expect(stageBar(page)).toContainText(TILES_TITLE);
-    await expect(stageBar(page)).toContainText(TILES_VERSION);
+    await expect(stageBar(page)).not.toContainText(TILES_VERSION);
     const frame = page.frameLocator(`iframe[title="${TILES_TITLE}"]`);
     await expect(frame.getByRole("listitem")).toHaveText(TILES_ITEM_TITLES);
   });

@@ -17,19 +17,18 @@ describe("CombinationCapsule", function describeCombinationCapsule(): void {
           kind="Mod"
           icon={null}
           title="Country Map"
-          version="1.0.1"
           shrink={1}
           onIntent={onIntent}
         />
       </TooltipProvider>,
     );
     const capsule = screen.getByRole("button", {
-      name: "Mod: Country Map 1.0.1",
+      name: "Mod: Country Map",
     });
 
     const tooltip = await readTooltipOnFocus(capsule);
 
-    expect(tooltip).toBe("Mod: Country Map 1.0.1");
+    expect(tooltip).toBe("Mod: Country Map");
     expect(capsule).toHaveAccessibleName(tooltip);
     expect(onIntent).toHaveBeenCalledOnce();
   });

@@ -311,6 +311,7 @@ The work behind the public API is split so each file has one reason to change:
 - `openStageLink(stage, link, openerId, options?)`: opens a `RunLink` a mod asked for, in a new sandbox, or with `options.replace` in place of the opener (see [Replacing a sandbox](#replacing-a-sandbox)). Returns the engine's `OpenLinkOutcome`: `"opened"`, `"not-visible"` when the opener is not the visible sandbox, or `"home-mod"` when it asks to replace the Home mod. The sessions call it through their `onOpenLink`.
 - `openStageCombination(stage, sandboxId, link)`: opens a combination chosen in the stage bar in place of the visible sandbox, with a new history entry, or, from the Home mod, as a followed link (see [Opening a combination](#opening-a-combination)). Returns `"opened"` or `"not-visible"`.
 - `buildModChoice`, `buildCollectionChoice`, `buildMosaicChoice`, `buildSitesDrop`, `isCombinationSandbox` and `NO_COLLECTION`: the rules of what a stage bar choice opens (see [Opening a combination](#opening-a-combination)).
+- `buildRunLink(link)`: the run link hash of a `RunLink` (`#/run?…`), as the stage writes it in the address. The stage bar's list details build their viewer links with it.
 - `readStageCatalog(stage)`: the catalog listing as `catalog.list` answers it now, with the current value of "List the default mosaics of mods". The stage bar's lists read it, so the page and the mods read one catalog.
 - `closeSandbox(stage, id)`: the × button.
 - `reloadTiles(stage, id)`: the "Reload tiles" button.

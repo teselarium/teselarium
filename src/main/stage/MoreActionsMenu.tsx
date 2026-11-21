@@ -16,6 +16,11 @@ import {
   DropdownMenuTrigger,
 } from "@/vendor/shadcn/ui/dropdown-menu.tsx";
 import { keepFocusInFrame } from "./frame_focus.ts";
+import {
+  buildRunLinkAddress,
+  copyText,
+  scheduleFeedbackEnd,
+} from "./run_link_copy.ts";
 import { StageBarIconButton } from "./StageBarIconButton.tsx";
 
 /**
@@ -53,9 +58,6 @@ interface MoreActionsMenuProps {
 /** How the last "Copy link" went, while the button says so. */
 type CopyState = "idle" | "copied" | "failed";
 
-/** How long the button says how the copy went. */
-const COPY_FEEDBACK_MS = 2000;
-
 const MORE_ACTIONS_LABEL = "More actions";
 
 const COPY_FEEDBACK: Readonly<Record<CopyState, string>> = Object.freeze({
@@ -84,33 +86,6 @@ function renderViewItems(viewActions: ViewActions): ReactElement {
       )}
     </>
   );
-}
-
-/** The app's full address with the sandbox's run link as its hash. */
-function buildRunLinkAddress(hash: string): string {
-  const { origin, pathname, search } = window.location;
-  const address = `${origin}${pathname}${search}${hash}`;
-  return address;
-}
-
-function writeToClipboard(text: string): Promise<void> {
-  return navigator.clipboard.writeText(text);
-}
-
-/** Writes `text` to the clipboard. Rejects when the clipboard refuses it or the browser has none. */
-function copyText(text: string): Promise<void> {
-  // Starting from a resolved promise turns a missing clipboard's TypeError into a rejection.
-  return Promise.resolve(text).then(writeToClipboard);
-}
-
-function clearCopyTimer(timer: ReturnType<typeof setTimeout>): void {
-  clearTimeout(timer);
-}
-
-/** Calls `endFeedback` after `COPY_FEEDBACK_MS`. Returns the function that cancels it. */
-function scheduleFeedbackEnd(endFeedback: () => void): () => void {
-  const timer = setTimeout(endFeedback, COPY_FEEDBACK_MS);
-  return clearCopyTimer.bind(undefined, timer);
 }
 
 /**

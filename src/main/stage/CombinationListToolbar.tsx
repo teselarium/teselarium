@@ -1,5 +1,5 @@
-import { ArrowUpDown, ListFilter as ListFilterIcon } from "lucide-react";
-import type { KeyboardEvent, ReactElement } from "react";
+import { ArrowUpDown, Info, ListFilter as ListFilterIcon } from "lucide-react";
+import type { ReactElement } from "react";
 import { CommandInput } from "@/vendor/shadcn/ui/command.tsx";
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ import {
   subscribeListChoices,
 } from "./list_choices.ts";
 import type { ChoiceOption, ListChoices, ListKind } from "./list_choices.ts";
+import { stopKeyPropagation } from "./list_keys.ts";
 import type { ListFilter, ListSort } from "./list_order.ts";
 import { StageBarIconButton } from "./StageBarIconButton.tsx";
 
@@ -31,15 +32,15 @@ interface CombinationListToolbarProps {
   onSearchChange: (search: string) => void;
   /** Told after every sort choice, the one already chosen too, so the list sorts again. */
   onSortChoose: () => void;
+  /** Told after a filter is checked or unchecked. */
+  onFilterChange: () => void;
+  /** Whether the list shows its details page: the "Details" button is then pressed. */
+  isShowingDetails: boolean;
+  onDetailsToggle: () => void;
 }
 
-/**
- * Keeps the toolbar's and its menus' keys from the list: cmdk's root would
- * take Enter and the arrow keys as choosing and moving between rows.
- */
-function stopKeyPropagation(event: KeyboardEvent): void {
-  event.stopPropagation();
-}
+/** A toolbar button's look while it is on: an active filter, the details page shown. */
+const PRESSED_CLASSES = "bg-accent text-accent-foreground";
 
 /** A checkbox item keeps its menu open, so several filters can be checked in a row. */
 function keepMenuOpen(event: Event): void {
@@ -62,7 +63,9 @@ function findSort(
 /**
  * The search field of a list, then, behind a divider, its "Sort" menu, one
  * choice at a time, and its "Filter" menu, whose choices can be checked
- * together; the filter button is shown pressed while one is. The choices
+ * together; the filter button is shown pressed while one is. Behind a second
+ * divider, the "Details" button opens and closes the list's details page,
+ * and is shown pressed while it is open. The choices
  * are kept for each list kind in `listChoices`. Both menus are non-modal, so
  * a click in the mod's frame reaches it and closes them with the list, and
  * Escape or a click in a menu closes only the menu.
@@ -73,6 +76,9 @@ export function CombinationListToolbar({
   search,
   onSearchChange,
   onSortChoose,
+  onFilterChange,
+  isShowingDetails,
+  onDetailsToggle,
 }: CombinationListToolbarProps): ReactElement {
   const choice = useStoreSnapshot(
     listChoices,
@@ -95,6 +101,7 @@ export function CombinationListToolbar({
 
   function handleFilterChange(filter: ListFilter, isChecked: boolean): void {
     checkListFilter(listChoices, kind, filter, isChecked);
+    onFilterChange();
   }
 
   const sortItems: ReactElement[] = [];
@@ -156,7 +163,7 @@ export function CombinationListToolbar({
             <StageBarIconButton
               label="Filter"
               data-active={hasFilter}
-              className={hasFilter ? "bg-accent text-accent-foreground" : ""}
+              className={hasFilter ? PRESSED_CLASSES : ""}
             >
               <ListFilterIcon />
             </StageBarIconButton>
@@ -166,6 +173,18 @@ export function CombinationListToolbar({
             {filterItems}
           </DropdownMenuContent>
         </DropdownMenu>
+        <Separator
+          orientation="vertical"
+          className="mx-1 data-[orientation=vertical]:h-5"
+        />
+        <StageBarIconButton
+          label="Details"
+          aria-pressed={isShowingDetails}
+          className={isShowingDetails ? PRESSED_CLASSES : ""}
+          onClick={onDetailsToggle}
+        >
+          <Info />
+        </StageBarIconButton>
       </div>
     </div>
   );

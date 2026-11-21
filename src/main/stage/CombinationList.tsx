@@ -1,5 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type {
   Dispatch,
   KeyboardEvent,
@@ -37,6 +38,8 @@ import type {
 } from "./combination_rows.ts";
 import { CombinationListToolbar } from "./CombinationListToolbar.tsx";
 import { keepFocusInFrame } from "./frame_focus.ts";
+import { ListDetails } from "./ListDetails.tsx";
+import type { ListDetail } from "./ListDetails.tsx";
 import {
   readListChoicesSnapshot,
   subscribeListChoices,
@@ -63,18 +66,6 @@ import {
 } from "./list_settling.ts";
 import type { SettledGroup } from "./list_settling.ts";
 
-/** One line of the details footer. */
-export interface ListDetail {
-  term: string;
-  value: string;
-}
-
-/** The footer's link to the list's explorer. */
-export interface ExplorerLink {
-  label: string;
-  onOpen: () => void;
-}
-
 interface CombinationListProps {
   kind: ListKind;
   /** The list's accessible name, such as "Mod list". */
@@ -92,8 +83,8 @@ interface CombinationListProps {
   /** The heading of the current pair's group, sorted by "This pair first". */
   pairHeading: string;
   listChoices: ListChoices;
+  /** The current entry's details, which the details page shows. */
   details: readonly ListDetail[];
-  explorer: ExplorerLink | null;
 }
 
 /**
@@ -128,17 +119,23 @@ class CapsuleAnchor {
   }
 }
 
-/** What the list shows: the main list, or an entry's page, and the search of each. */
+/**
+ * What the list shows: the main list, or an entry's page, and the search of
+ * each. While `isShowingDetails`, the details page is shown in their place,
+ * and leaving it returns to them as they were.
+ */
 interface ListView {
   pageId: string | null;
   mainSearch: string;
   pageSearch: string;
+  isShowingDetails: boolean;
 }
 
 const MAIN_VIEW: ListView = Object.freeze({
   pageId: null,
   mainSearch: "",
   pageSearch: "",
+  isShowingDetails: false,
 });
 
 /**
@@ -419,45 +416,6 @@ function renderFailedRows(
   );
 }
 
-function renderDetail(detail: ListDetail): ReactElement {
-  return (
-    <div key={detail.term} className="flex flex-col gap-0.5">
-      <dt className="text-muted-foreground">{detail.term}</dt>
-      <dd className="[overflow-wrap:anywhere]">
-        <code>{detail.value}</code>
-      </dd>
-    </div>
-  );
-}
-
-function renderFooter(
-  details: readonly ListDetail[],
-  explorer: ExplorerLink | null,
-): ReactElement {
-  const lines: ReactElement[] = [];
-  for (const detail of details) {
-    lines.push(renderDetail(detail));
-  }
-  return (
-    <div className="flex flex-col gap-2 border-t p-3 text-xs select-text">
-      <dl aria-label="Details" className="flex flex-col gap-2">
-        {lines}
-      </dl>
-      {explorer === null ? null : (
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="justify-start self-start px-0"
-          onClick={explorer.onOpen}
-        >
-          {explorer.label}
-        </Button>
-      )}
-    </div>
-  );
-}
-
 function findEntry(
   entries: readonly CombinationRow[],
   id: string | null,
@@ -558,8 +516,14 @@ function recordSortTime(sortedAtRef: RefObject<number>): void {
  * An entry with mosaics opens its page in place of the main list: "Back",
  * named after it, then its options. "Back" and Backspace in an empty search
  * field return, with the main search and the entry highlighted. Entries that
- * cannot be loaded come last with their reason. The footer holds the
- * details, as text the user can select, and the explorer link.
+ * cannot be loaded come last with their reason.
+ *
+ * The toolbar's "Details" button opens the details page in place of the
+ * main list or of an entry's page: a "Back" row, then the current entry's
+ * details (`ListDetails`). "Back", Backspace in an empty search field and
+ * the "Details" button return to what was shown, with its search and its
+ * highlighted row, and sort again. Typing, choosing a sort and checking a
+ * filter return too.
  */
 export function CombinationList({
   kind,
@@ -572,7 +536,6 @@ export function CombinationList({
   pairHeading,
   listChoices,
   details,
-  explorer,
 }: CombinationListProps): ReactElement {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -597,6 +560,8 @@ export function CombinationList({
   )[kind];
   const [view, setView] = useState<ListView>(MAIN_VIEW);
   const [highlighted, setHighlighted] = useState("");
+  // The row highlighted when the details page opened, highlighted again when it is left.
+  const [detailsReturnId, setDetailsReturnId] = useState("");
   // The parent to show after Back, and when the rows were last sorted: read after rendering.
   const scrollTargetRef = useRef<string | null>(null);
   // The parent highlighted by Back. Removing the page's highlighted row may
@@ -671,8 +636,10 @@ export function CombinationList({
       pendingHighlightRef.current = null;
       scrollRowIntoView(listRef, scrollTargetRef);
     },
-    [view.pageId],
+    [view.pageId, view.isShowingDetails],
   );
+
+  const search = page === null ? view.mainSearch : view.pageSearch;
 
   function sortAgain(): void {
     setSettle(SORT_AGAIN);
@@ -684,11 +651,53 @@ export function CombinationList({
 
   function handleSearchChange(search: string): void {
     if (page !== null) {
-      setView({ ...view, pageSearch: search });
+      setView({ ...view, pageSearch: search, isShowingDetails: false });
       return;
     }
-    setView({ ...view, mainSearch: search });
+    setView({ ...view, mainSearch: search, isShowingDetails: false });
     sortAgain();
+  }
+
+  function openDetails(): void {
+    setDetailsReturnId(highlighted);
+    setView({ ...view, isShowingDetails: true });
+    setHighlighted(BACK_ID);
+  }
+
+  /**
+   * Returns to the main list or the entry's page, with the row highlighted
+   * before, sorted again. The highlight moves off "Back" before "Back" is
+   * removed: cmdk highlights the first row when the highlighted one goes.
+   */
+  function leaveDetails(): void {
+    flushSync(setHighlighted.bind(undefined, detailsReturnId));
+    setView({ ...view, isShowingDetails: false });
+    scrollTargetRef.current = detailsReturnId;
+    sortAgain();
+  }
+
+  function toggleDetails(): void {
+    if (view.isShowingDetails) {
+      leaveDetails();
+      return;
+    }
+    openDetails();
+  }
+
+  /** A sort choice sorts again, and leaves the details page to show its effect. */
+  function handleSortChoose(): void {
+    if (view.isShowingDetails) {
+      leaveDetails();
+      return;
+    }
+    sortAgain();
+  }
+
+  /** A filter change leaves the details page, to show its effect. */
+  function handleFilterChange(): void {
+    if (view.isShowingDetails) {
+      leaveDetails();
+    }
   }
 
   function openPage(entry: CombinationRow): void {
@@ -725,10 +734,25 @@ export function CombinationList({
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       freeze();
     }
-    if (event.key === "Backspace" && page !== null && view.pageSearch === "") {
+    if (event.key !== "Backspace" || search !== "") {
+      return;
+    }
+    if (view.isShowingDetails) {
+      event.preventDefault();
+      leaveDetails();
+      return;
+    }
+    if (page !== null) {
       event.preventDefault();
       goBack();
     }
+  }
+
+  function renderRows(): ReactElement | ReactElement[] {
+    if (view.isShowingDetails) {
+      return renderDetailsBack();
+    }
+    return page === null ? renderMainGroups() : renderPage(page);
   }
 
   function renderMainGroups(): ReactElement[] {
@@ -774,6 +798,22 @@ export function CombinationList({
     );
   }
 
+  /** The details page's only row, which goes back to what the list showed before. */
+  function renderDetailsBack(): ReactElement {
+    return (
+      <CommandGroup>
+        <CommandItem
+          value={BACK_ID}
+          onSelect={leaveDetails}
+          className={ROW_CLASSES}
+        >
+          <ChevronLeft aria-hidden="true" />
+          <span>Back</span>
+        </CommandItem>
+      </CommandGroup>
+    );
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={capsuleAnchorRef} />
@@ -795,17 +835,22 @@ export function CombinationList({
           <CombinationListToolbar
             kind={kind}
             listChoices={listChoices}
-            search={page === null ? view.mainSearch : view.pageSearch}
+            search={search}
             onSearchChange={handleSearchChange}
-            onSortChoose={sortAgain}
+            onSortChoose={handleSortChoose}
+            onFilterChange={handleFilterChange}
+            isShowingDetails={view.isShowingDetails}
+            onDetailsToggle={toggleDetails}
           />
           <CommandList ref={listRef} onPointerMove={freeze}>
             <CommandEmpty>Nothing found.</CommandEmpty>
-            {page === null ? renderMainGroups() : renderPage(page)}
+            {renderRows()}
           </CommandList>
-          {page === null ? renderFailedRows(rows.failedRows) : null}
+          {page === null && !view.isShowingDetails
+            ? renderFailedRows(rows.failedRows)
+            : null}
         </Command>
-        {renderFooter(details, explorer)}
+        {view.isShowingDetails ? <ListDetails details={details} /> : null}
       </PopoverContent>
     </Popover>
   );

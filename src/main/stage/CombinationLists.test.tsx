@@ -96,8 +96,11 @@ interface ListFixture {
   recentlyUsed: RecentlyUsed;
 }
 
-/** A stage on the list catalog, recording recently used as `main.tsx` does, at `hash`. */
-async function startListStage(hash: string): Promise<ListFixture> {
+/** A stage on the list catalog, recording recently used as `main.tsx` does, at `hash`, with the default mods `switchedOff`. */
+async function startListStage(
+  hash: string,
+  switchedOff: string[] = [],
+): Promise<ListFixture> {
   serveUntypedMod();
   serveAliasedMosaic();
   const storage = createMemoryStorage();
@@ -106,7 +109,7 @@ async function startListStage(hash: string): Promise<ListFixture> {
   const history = new FakeHistory(hash);
   const stage = createStage({
     history,
-    defaults: { folder: "./default_mods/", switchedOff: [] },
+    defaults: { folder: "./default_mods/", switchedOff },
     routing: LIST_ROUTING,
     appOrigin: APP_ORIGIN,
     baseUrl: APP_BASE_URL,
@@ -245,6 +248,52 @@ async function choose(option: HTMLElement): Promise<void> {
   });
 }
 
+/** Opens the list of the capsule whose name starts with `kind`, then its details page. */
+async function openDetails(kind: string): Promise<HTMLElement> {
+  const list = await openList(kind);
+  await act(async function clickDetails(): Promise<void> {
+    fireEvent.click(within(list).getByRole("button", { name: "Details" }));
+    await settleLoads();
+  });
+  return list;
+}
+
+/** The details the list shows, as `term: value` lines. */
+function readDetails(list: HTMLElement): string[] {
+  const details = list.querySelector("dl[aria-label=Details]");
+  if (details === null) {
+    throw new Error("Expected the list to show its details");
+  }
+  const lines: string[] = [];
+  for (const term of details.querySelectorAll("dt")) {
+    const value = term.nextElementSibling?.querySelector("code");
+    lines.push(`${term.textContent}: ${value?.textContent ?? ""}`);
+  }
+  return lines;
+}
+
+/** The Open links of the list's details, as `name: href` lines. */
+function readOpenLinks(list: HTMLElement): string[] {
+  const details = list.querySelector<HTMLElement>("dl[aria-label=Details]");
+  if (details === null) {
+    throw new Error("Expected the list to show its details");
+  }
+  const lines: string[] = [];
+  for (const link of within(details).queryAllByRole("link")) {
+    lines.push(
+      `${link.getAttribute("aria-label")}: ${link.getAttribute("href")}`,
+    );
+  }
+  return lines;
+}
+
+/** The app's full address with `hash`, as the test page is served. */
+function buildAppAddress(hash: string): string {
+  const { origin, pathname, search } = window.location;
+  const address = `${origin}${pathname}${search}${hash}`;
+  return address;
+}
+
 const BOOKS_RUN_HASH = `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`;
 const MOSAIC_HASH = `#/run?mosaic=${SAMPLE_MOSAIC_REFERENCE}`;
 
@@ -320,14 +369,18 @@ describe("mod list", function describeModList(): void {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("Details footer: the current mod's source", async function showsModDetails(): Promise<void> {
+  it("Mod details: the resolved mod file's address and the version", async function showsModDetails(): Promise<void> {
     renderLists(await startListStage(BOOKS_RUN_HASH));
 
-    const list = await openList("Mod");
+    const list = await openDetails("Mod");
 
-    const details = list.querySelector("dl[aria-label=Details]");
-    expect(details).toHaveTextContent(SAMPLE_MOD_SOURCE);
-    expect(details).toHaveTextContent("1.0.0");
+    expect(readDetails(list)).toEqual([
+      `Mod: ${SAMPLE_MOD_SOURCE}`,
+      "Version: 1.0.0",
+    ]);
+    expect(readOpenLinks(list)).toEqual([
+      `Open mod in the mod viewer: ${buildAppAddress(`#/run?mod=mod_viewer&target=${encodeURIComponent(SAMPLE_MOD_SOURCE)}`)}`,
+    ]);
   });
 });
 
@@ -410,6 +463,30 @@ describe("collection list", function describeCollectionList(): void {
     expect(list).not.toHaveTextContent(goneSource);
   });
 
+  it("No collection: the details say None", async function showsNoCollection(): Promise<void> {
+    renderLists(await startListStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`));
+
+    const list = await openDetails("Collection");
+
+    expect(readDetails(list)).toEqual(["Collection: None"]);
+  });
+
+  it("Tile details: the tile's resolved address", async function showsTileDetails(): Promise<void> {
+    renderLists(
+      await startListStage(
+        `#/run?mod=${SAMPLE_MOD_REFERENCE}&tile=./fixtures/tiles/books/kallocain.md`,
+      ),
+    );
+
+    const list = await openDetails("Collection");
+
+    const tile = `${FIXTURES_BASE_URL}tiles/books/kallocain.md`;
+    expect(readDetails(list)).toEqual([`Tile: ${tile}`]);
+    expect(readOpenLinks(list)).toEqual([
+      `Open tile in the tile viewer: ${buildAppAddress(`#/run?mod=tile_viewer&tile=${encodeURIComponent(tile)}`)}`,
+    ]);
+  });
+
   it("None: the same mod without a collection", async function choosesNone(): Promise<void> {
     const fixture = await startListStage(BOOKS_RUN_HASH);
     renderLists(fixture);
@@ -422,23 +499,6 @@ describe("collection list", function describeCollectionList(): void {
       collection: null,
       tile: null,
     });
-  });
-
-  it("Open the collection explorer: shows the Tiles section", async function opensExplorer(): Promise<void> {
-    const fixture = await startListStage(BOOKS_RUN_HASH);
-    renderLists(fixture);
-    const list = await openList("Collection");
-
-    await act(async function clickExplorer(): Promise<void> {
-      fireEvent.click(
-        within(list).getByRole("button", {
-          name: "Open the collection explorer",
-        }),
-      );
-      await settleLoads();
-    });
-
-    expect(readStageSnapshot(fixture.stage).activeSection).toBe("tiles");
   });
 });
 
@@ -501,17 +561,44 @@ describe("mosaic list", function describeMosaicList(): void {
     expect(readScore(options[0])).toBe("3/3");
   });
 
-  it("Mosaic details: the mosaic file's address and the run link, and no switched-off explorer", async function showsMosaicDetails(): Promise<void> {
+  it("Mosaic details: the mosaic file's address and the run link as the app's full address", async function showsMosaicDetails(): Promise<void> {
     const fixture = await startListStage(MOSAIC_HASH);
     renderLists(fixture);
 
-    const list = await openList("Mosaic");
+    const list = await openDetails("Mosaic");
 
-    expect(list).toHaveTextContent(SAMPLE_MOSAIC_SOURCE);
-    expect(list).toHaveTextContent(readVisible(fixture.stage).hash);
+    const { origin, pathname, search } = window.location;
+    expect(readDetails(list)).toEqual([
+      `Mosaic: ${SAMPLE_MOSAIC_SOURCE}`,
+      `Run link: ${origin}${pathname}${search}${readVisible(fixture.stage).hash}`,
+    ]);
+  });
+
+  it("Open links: the mosaic in the mosaic viewer, and the run link itself", async function opensInViewers(): Promise<void> {
+    const fixture = await startListStage(MOSAIC_HASH);
+    renderLists(fixture);
+
+    const list = await openDetails("Mosaic");
+
+    const viewerHash = `#/run?mod=mosaic_viewer&target=${encodeURIComponent(SAMPLE_MOSAIC_SOURCE)}`;
+    expect(readOpenLinks(list)).toEqual([
+      `Open mosaic in the mosaic viewer: ${buildAppAddress(viewerHash)}`,
+      `Open run link in a new tab: ${buildAppAddress(readVisible(fixture.stage).hash)}`,
+    ]);
+  });
+
+  it("Viewer switched off: the mosaic has no Open link, and the run link keeps its own", async function leavesOutSwitchedOffViewer(): Promise<void> {
+    const fixture = await startListStage(MOSAIC_HASH, ["mosaic_viewer"]);
+    renderLists(fixture);
+
+    const list = await openDetails("Mosaic");
+
     expect(
-      within(list).queryByRole("button", { name: "Open the mosaic explorer" }),
-    ).toBeNull();
+      within(list).getByRole("button", { name: "Copy mosaic" }),
+    ).toBeInTheDocument();
+    expect(readOpenLinks(list)).toEqual([
+      `Open run link in a new tab: ${buildAppAddress(readVisible(fixture.stage).hash)}`,
+    ]);
   });
 
   it("Other combination: opens that mosaic", async function choosesMosaic(): Promise<void> {

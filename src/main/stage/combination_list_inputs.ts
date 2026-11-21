@@ -2,10 +2,7 @@ import type {
   CombinationSnapshot,
   CountTarget,
 } from "../../lib/core/combinations/index.ts";
-import {
-  openStageCombination,
-  openStageSection,
-} from "../../lib/core/stage/index.ts";
+import { openStageCombination } from "../../lib/core/stage/index.ts";
 import type {
   SandboxLink,
   SandboxSnapshot,
@@ -19,7 +16,6 @@ import type {
   RecentlyUsedSnapshot,
 } from "../settings/recently_used.ts";
 import type { RowActions } from "./combination_rows.ts";
-import type { ExplorerLink } from "./CombinationList.tsx";
 import type { ListChoices } from "./list_choices.ts";
 
 /** What each capsule's list gets. */
@@ -121,30 +117,4 @@ export function openChoice(
   if (link !== null) {
     openStageCombination(stage, sandbox.id, link);
   }
-}
-
-function openExplorer(stage: Stage, section: string): void {
-  openStageSection(stage, section);
-}
-
-/**
- * The footer link to the explorer of `section`, which shows that section as
- * the sidebar item does, or `null` when the app has no such section, as when
- * its explorer is switched off.
- */
-export function buildExplorerLink(
-  stage: Stage,
-  section: string,
-  label: string,
-): ExplorerLink | null {
-  for (const sectionLink of stage.routing.sectionLinks) {
-    if (sectionLink.section === section) {
-      const explorer: ExplorerLink = {
-        label,
-        onOpen: openExplorer.bind(undefined, stage, section),
-      };
-      return explorer;
-    }
-  }
-  return null;
 }

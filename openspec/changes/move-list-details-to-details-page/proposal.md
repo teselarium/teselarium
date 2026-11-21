@@ -12,7 +12,7 @@ Each of the stage bar's three lists ends with a details footer that takes up a l
   - mosaic list: the mosaic file's address, or "Unsaved combination", then the run link as the app's full address.
 
   The values stay text the user can select. While the page is shown, the button is shown pressed, and pressing it again goes back.
-- **Copy and open buttons**: each value that is an `http:` or `https:` address gets a "Copy" button and an "Open in a new tab" button. A copy confirms with "Copied", or says "Cannot copy" when the clipboard refuses. The version, "None", "Unsaved combination" and any other address (such as a local file) get no buttons.
+- **Copy and open buttons**: each value that is an `http:` or `https:` address gets a "Copy" button, which copies the address, and an "Open" link to a new tab. The mod, collection, tile and mosaic open in their viewer (the mod viewer, the collection viewer, the tile viewer and the mosaic viewer), and the link is named after it, such as "Open mod in the mod viewer". The run link opens itself: "Open run link in a new tab". A detail whose viewer is switched off in the instance has no Open link. A copy confirms with "Copied", or says "Cannot copy" when the clipboard refuses. The version, "None", "Unsaved combination" and any other address (such as a local file) get no buttons.
 - **Removed**: the details footer is removed, and so are the "Open the mod explorer", "Open the collection explorer" and "Open the mosaic explorer" links. The explorers remain available from the sidebar.
 - **Removed**: the mod capsule no longer shows the mod's version, at any bar width. Its accessible name and tooltip follow what it shows: "Mod: Country Map". The version is shown on the mod list's details page. A sandbox shown with a plain title, which has no list, keeps its version in that title.
 - The bar's folding steps lose the step where the version is hidden (720px to 959px). The remaining steps are: full titles from 720px, icons only from 480px to 719px, and one capsule on a narrow bar.
@@ -31,14 +31,15 @@ Mod API version bump: **none**. The change touches no mod API spec. The engine's
 
 ### Modified Capabilities
 
-- `combination-pickers`: "Details footer" is removed and replaced by new requirements: "Details button", "Details page", "Details of each list", "Leaving the details page", "Copy and open buttons", "Copying a detail", "Opening a detail in a new tab" and "Details buttons are easy to tap". "Explorer links" and "Explorer links are easy to tap" are removed. "Rows are sorted again" also covers going back from the details page.
+- `combination-pickers`: "Details footer" is removed and replaced by new requirements: "Details button", "Details page", "Details of each list", "Leaving the details page", "Copy and open buttons", "Copying a detail", "Opening a detail" and "Details buttons are easy to tap". "Explorer links" and "Explorer links are easy to tap" are removed. "Rows are sorted again" also covers going back from the details page.
 - `stage-bar`: the mod capsule shows no version, and its accessible name and tooltip match what it shows ("Combination capsules", "Capsule contents", "Name while loading or after a failure"). "The bar folds as it narrows" loses its 720px to 959px step.
 
 ## Impact
 
 - `src/main/stage/CombinationList.tsx`: the footer is replaced by the details page, and the list's view gains a details state.
 - `src/main/stage/CombinationListToolbar.tsx`: the "Details" button.
-- `src/main/stage/ModList.tsx`, `CollectionList.tsx`, `MosaicList.tsx`: their details read the snapshot's resolved addresses, and they pass no explorer link.
+- `src/main/stage/ModList.tsx`, `CollectionList.tsx`, `MosaicList.tsx`: their details read the snapshot's resolved addresses and give each detail where its Open link goes, using the stage's default mod settings, and they pass no explorer link.
+- `src/main/stage/detail_viewers.ts` (new): the viewer link of a mod, collection, tile or mosaic address, or none when that viewer is switched off.
 - `src/main/stage/combination_list_inputs.ts`: `buildExplorerLink` and the `ExplorerLink` type are removed.
 - `src/main/stage/MoreActionsMenu.tsx`: its clipboard and run-link address code moves to a module that the details page shares.
 - `src/main/stage/CombinationCapsule.tsx`, `CombinationTitle.tsx`: the capsule's `version` prop is removed. `capsule_titles.ts` keeps the version for the plain title.

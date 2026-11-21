@@ -65,9 +65,24 @@ The three builders read the resolved fields:
 | Mosaic | `mosaic.source ?? mosaicReference`, or "Unsaved combination" |
 | Run link | `buildRunLinkAddress(hash)` |
 
-`ListDetail` keeps `{ term, value }`. Whether a detail gets buttons is decided while rendering, by `isWebAddress(value)`.
+`ListDetail` becomes `{ term, value, open }`, where `open` is a `DetailOpen` (`{ address, place }`, see "Open goes to the entry's viewer") or `null`. Whether a detail gets buttons is decided while rendering: Copy and Open only when `isWebAddress(value)`, and Open only when `open` is not `null` too.
 
 *Alternative: keep the raw link values.* They can be relative or a default mod name, so "Open" would have to resolve them in the view, and it would get default mod names wrong. The snapshot has already done that work.
+
+### Open goes to the entry's viewer
+
+A pure module in `src/main/stage/`, `detail_viewers.ts`, has `buildViewerOpen(kind, address, defaults)`. It returns the `DetailOpen` of a detail's address in its kind's default viewer:
+
+| Kind | Viewer | Link |
+| --- | --- | --- |
+| mod | `mod_viewer`, "the mod viewer" | `#/run?mod=mod_viewer&target=<address>` |
+| collection | `collection_viewer`, "the collection viewer" | `#/run?mod=collection_viewer&target=<address>` |
+| tile | `tile_viewer`, "the tile viewer" | `#/run?mod=tile_viewer&tile=<address>` |
+| mosaic | `mosaic_viewer`, "the mosaic viewer" | `#/run?mod=mosaic_viewer&target=<address>` |
+
+The hash comes from `buildRunLink`, and `address` is the app's full address with it (`buildRunLinkAddress`). `place` is the viewer's name. It returns `null` when the stage's default mod settings (`stage.defaults.switchedOff`) name that viewer, so no link leads to a viewer that would refuse to open. The tile viewer gets no `from`: a tile link has no collection to name. The run link's `open` is `{ address: value, place: "a new tab" }`, since it is already the app's address. The link's name and tooltip are `Open <term in lower case> in <place>`, such as "Open mod in the mod viewer" and "Open run link in a new tab".
+
+*Alternative: open the raw address.* It shows the YAML or Markdown source of the file, not what the app shows of it, and the viewers already exist for that.
 
 ### `isWebAddress`
 
@@ -77,7 +92,7 @@ The three builders read the resolved fields:
 
 A new `DetailActions` component draws, for one detail:
 - **Copy**: a `StageBarIconButton` with the `Copy` icon, labelled `Copy <term in lower case>`. It keeps its own copy state. Its pinned tooltip says "Copied" or "Cannot copy" for 2 seconds (`isTooltipOpen`), as the "More actions" button says "Link copied".
-- **Open**: an `<a>` with `href={value}`, `target="_blank"` and `rel="noopener noreferrer"`, labelled `Open <term in lower case> in a new tab`, with the `ExternalLink` icon. It is styled as an `icon-sm` ghost button through `buttonVariants`, inside `HoverTooltip`. It is a link because it navigates, so middle-click and "copy link address" also work. `noreferrer` keeps the app's address, with its run link hash, from reaching the opened site.
+- **Open**: an `<a>` with `href={open.address}`, `target="_blank"` and `rel="noopener noreferrer"`, labelled `Open <term in lower case> in <place>`, with the `ExternalLink` icon. It is left out when `open` is `null`. It is styled as an `icon-sm` ghost button through `buttonVariants`, inside `HoverTooltip`. It is a link because it navigates, so middle-click and "copy link address" also work. `noreferrer` keeps the app's address, with its run link hash, from reaching the opened tab, and `noopener` keeps the app's window from it.
 
 Both controls are 32px (`size-8`), which meets "Details buttons are easy to tap". The details page has one `sr-only` polite live region, which says the last copy's feedback, as `StageBar` does for "Copy link".
 
@@ -97,7 +112,8 @@ Both controls are 32px (`size-8`), which meets "Details buttons are easy to tap"
 
 - **The version is one tap further away** for users who checked it in the bar. → It is on the mod list's details page and in the plain title. "Wide bar" in the `stage-bar` delta makes the change explicit.
 - **Typing on the details page leaves it.** A user who wanted to select text by typing could be surprised. → The text is selected with the pointer or touch, not by typing, and the search field keeps the focus, as on every page.
-- **A collection address can be a folder** (`…/laureates/`). On a static host, opening it in a new tab may show an index page or a 404. → The detail shows the address the link names, which is what the old footer showed too. Opening the collection file itself would need the loader's resolved file, which the snapshot doesn't carry. That is left for a later change if users ask for it.
+- **A link can name a collection folder** (`…/laureates/`), which `collections.inspect` would not read. → Once the sandbox is launched, the snapshot's `collection` is the collection file's address (a folder means its `collection.yaml`), so the viewer gets the file. Before the launch, the values are the raw link values, which are not web addresses, so they get no buttons.
+- **An instance may replace a viewer** with its own mod of the same name. → The link names the viewer by its default mod name, so it opens whatever the instance ships under that name, as the explorers do.
 - **The clipboard can be refused** (insecure context, permissions). → "Cannot copy" is shown and announced, and the text stays selectable.
 - **e2e tests that relied on the footer or the version Badge break.** → The tasks update them (`stage_bar.spec.ts` "Each step of the ladder", `CombinationLists.test.tsx` details and explorer cases, `CombinationCapsule.test.tsx`).
 

@@ -14,6 +14,7 @@ describe("stage module entry point", function describeEntryPoint(): void {
       "buildModChoice",
       "buildMosaicChoice",
       "buildPairChoice",
+      "buildRunLink",
       "buildSectionHash",
       "buildSitesDrop",
       "changeStageCatalogDefaultMosaics",

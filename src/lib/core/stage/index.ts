@@ -67,6 +67,7 @@ export type { CollectionChoice } from "./combination_links.ts";
 export type { StageHistory } from "./stage_history.ts";
 export type { FrameLayout } from "./stage_layout.ts";
 export { buildSectionHash } from "./stage_routes.ts";
+export { buildRunLink } from "./run_links.ts";
 export type { SectionLink, StageHome, StageRouting } from "./stage_routes.ts";
 export type {
   LoadedCombination,

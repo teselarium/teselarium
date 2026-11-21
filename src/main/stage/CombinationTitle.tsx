@@ -104,7 +104,6 @@ function renderCapsuleRow(props: CombinationTitleProps): ReactElement {
       kind="Mod"
       icon={<ModIcon />}
       title={modTitle.title}
-      version={modTitle.version}
       shrink={isUnsaved ? 1 : 2}
       hidesTitleWhenNarrow
       onIntent={startListLoads.bind(undefined, props, startModListLoads)}

@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/vendor/shadcn/ui/tooltip.tsx";
 import type { EntryScore } from "../../lib/core/combinations/index.ts";
 import { CombinationList } from "./CombinationList.tsx";
 import type { CombinationRow, ListRows } from "./combination_rows.ts";
+import type { ListDetail } from "./ListDetails.tsx";
 import { createListChoices, readListChoicesSnapshot } from "./list_choices.ts";
 import type { ListChoices, ListKind } from "./list_choices.ts";
 import { SETTLE_INTERVAL_MS } from "./list_settling.ts";
@@ -43,7 +44,13 @@ interface HarnessProps {
   rows: ListRows;
   kind?: ListKind;
   listChoices?: ListChoices;
+  details?: readonly ListDetail[];
 }
+
+const MOD_DETAILS: readonly ListDetail[] = Object.freeze([
+  { term: "Mod", value: "https://example.org/mod.yaml", open: null },
+  { term: "Version", value: "1.0.1", open: null },
+]);
 
 const SHARED_CHOICES = createListChoices();
 
@@ -52,6 +59,7 @@ function ListHarness({
   rows,
   kind = "mod",
   listChoices = SHARED_CHOICES,
+  details = MOD_DETAILS,
 }: HarnessProps): ReactElement {
   const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -67,8 +75,7 @@ function ListHarness({
           rows={rows}
           pairHeading="For Flashcards + Laureates"
           listChoices={listChoices}
-          details={[{ term: "Mod", value: "https://example.org/mod.yaml" }]}
-          explorer={null}
+          details={details}
         >
           <button type="button">Mod: Map</button>
         </CombinationList>
@@ -106,6 +113,18 @@ async function flushTurns(): Promise<void> {
   });
 }
 
+function findDetails(): HTMLElement | null {
+  return document.querySelector<HTMLElement>("dl[aria-label=Details]");
+}
+
+function findDetailsButton(): HTMLElement {
+  return screen.getByRole("button", { name: "Details" });
+}
+
+function pressDetails(): void {
+  fireEvent.click(findDetailsButton());
+}
+
 /** Opens a menu of the toolbar, as a pointer does. */
 function openMenu(name: string): void {
   const trigger = screen.getByRole("button", { name });
@@ -113,16 +132,15 @@ function openMenu(name: string): void {
 }
 
 describe("CombinationList", function describeCombinationList(): void {
-  it("opens with the search field focused, and shows the details", function opensList(): void {
+  it("opens with the search field focused, and no details", function opensList(): void {
     render(<ListHarness rows={buildRows([buildTestRow("Country Map")])} />);
 
     openList();
 
     expect(screen.getByRole("combobox")).toHaveFocus();
     expect(screen.getByRole("combobox")).toHaveAccessibleName("Mod list");
-    expect(
-      screen.getByText("https://example.org/mod.yaml"),
-    ).toBeInTheDocument();
+    expect(findDetails()).toBeNull();
+    expect(screen.queryByText("https://example.org/mod.yaml")).toBeNull();
   });
 
   it("chooses with the arrow keys and Enter", function choosesWithKeyboard(): void {
@@ -301,6 +319,28 @@ describe("columns", function describeColumns(): void {
 });
 
 describe("toolbar", function describeToolbar(): void {
+  it("Details button: after the filter button, pressed only while the details page is shown", async function showsDetailsButton(): Promise<void> {
+    render(<ListHarness rows={buildRows([buildTestRow("Book List")])} />);
+    openList();
+    const buttons = screen.getAllByRole("button");
+    const filterIndex = buttons.indexOf(
+      screen.getByRole("button", { name: "Filter" }),
+    );
+
+    expect(buttons[filterIndex + 1]).toBe(findDetailsButton());
+    expect(findDetailsButton()).toHaveAttribute("aria-pressed", "false");
+    expect(await readTooltipOnHover(findDetailsButton())).toBe("Details");
+
+    pressDetails();
+    await flushTurns();
+
+    expect(findDetailsButton()).toHaveAttribute("aria-pressed", "true");
+    expect(findDetailsButton()).toHaveClass(
+      "bg-accent",
+      "text-accent-foreground",
+    );
+  });
+
   it("Sort by name: the menu offers the list's sorts, and a choice orders the rows", async function sortsByName(): Promise<void> {
     const listChoices = createListChoices();
     const rows = buildRows([
@@ -479,6 +519,195 @@ describe("pages", function describePages(): void {
   });
 });
 
+/** Book List, then Flashcards, then Country Map with its page, sorted by name. */
+function buildDetailsRows(): ListRows {
+  return buildRows(
+    [
+      buildTestRow("Book List"),
+      buildTestRow("Flashcards"),
+      buildPageRows(vi.fn<() => void>()).entries[0],
+    ],
+    {
+      failedRows: [
+        buildTestRow("Gone", { failure: "HTTP 404", isSelectable: false }),
+      ],
+    },
+  );
+}
+
+function buildNameChoices(): ListChoices {
+  const listChoices = createListChoices();
+  listChoices.snapshot = {
+    ...listChoices.snapshot,
+    mod: { sort: "name", filters: [] },
+  };
+  return listChoices;
+}
+
+/** Opens the list, highlights Flashcards with the arrow keys, and opens the details page. */
+async function openDetailsFromFlashcards(): Promise<void> {
+  render(
+    <ListHarness rows={buildDetailsRows()} listChoices={buildNameChoices()} />,
+  );
+  openList();
+  fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+  fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+  expect(readHighlighted()).toBe("Flashcards");
+  pressDetails();
+  await flushTurns();
+}
+
+/** What the list shows: its rows, the highlighted one, and whether the details page is shown. */
+interface ShownList {
+  rowIds: string[];
+  highlighted: string | null;
+  hasDetails: boolean;
+  isDetailsPressed: boolean;
+}
+
+function readShownList(): ShownList {
+  const shown: ShownList = {
+    rowIds: listOptionIds(),
+    highlighted: readHighlighted(),
+    hasDetails: findDetails() !== null,
+    isDetailsPressed:
+      findDetailsButton().getAttribute("aria-pressed") === "true",
+  };
+  return shown;
+}
+
+/** The main list shown again, with Flashcards highlighted, the details gone. */
+const MAIN_LIST_WITH_FLASHCARDS: ShownList = Object.freeze({
+  rowIds: ["Book List", "Country Map", "Flashcards"],
+  highlighted: "Flashcards",
+  hasDetails: false,
+  isDetailsPressed: false,
+});
+
+describe("details page", function describeDetailsPage(): void {
+  it("Back row first: the page holds Back, highlighted, then the details, and no failed rows", async function opensDetails(): Promise<void> {
+    await openDetailsFromFlashcards();
+
+    expect(listOptionIds()).toEqual(["back"]);
+    expect(findOption("back")).toHaveAccessibleName("Back");
+    expect(readHighlighted()).toBe("back");
+    expect(findDetails()).toHaveTextContent("https://example.org/mod.yaml");
+    expect(findDetails()).toHaveTextContent("1.0.1");
+    expect(screen.queryByRole("list", { name: "Cannot be loaded" })).toBeNull();
+    expect(findDetailsButton()).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("Back: the main list with the row highlighted before", async function goesBack(): Promise<void> {
+    await openDetailsFromFlashcards();
+
+    fireEvent.click(findOption("back"));
+    await flushTurns();
+
+    expect(readShownList()).toEqual(MAIN_LIST_WITH_FLASHCARDS);
+    expect(
+      screen.getByRole("list", { name: "Cannot be loaded" }),
+    ).toBeInTheDocument();
+  });
+
+  it("Backspace in an empty search goes back", async function goesBackWithBackspace(): Promise<void> {
+    await openDetailsFromFlashcards();
+
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Backspace" });
+    await flushTurns();
+
+    expect(readShownList()).toEqual(MAIN_LIST_WITH_FLASHCARDS);
+  });
+
+  it("Press again: the Details button goes back", async function goesBackWithButton(): Promise<void> {
+    await openDetailsFromFlashcards();
+
+    pressDetails();
+    await flushTurns();
+
+    expect(readShownList()).toEqual(MAIN_LIST_WITH_FLASHCARDS);
+  });
+
+  it("Typing: the main list with the typed search", async function leavesOnTyping(): Promise<void> {
+    await openDetailsFromFlashcards();
+
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "map" },
+    });
+    await flushTurns();
+
+    expect(listOptionIds()).toEqual(["Country Map"]);
+    expect(findDetails()).toBeNull();
+  });
+
+  it("Choosing a sort goes back", async function leavesOnSort(): Promise<void> {
+    await openDetailsFromFlashcards();
+
+    openMenu("Sort");
+    fireEvent.click(
+      within(await screen.findByRole("menu")).getByRole("menuitemradio", {
+        name: "Name",
+      }),
+    );
+    await flushTurns();
+
+    expect(readShownList()).toEqual(MAIN_LIST_WITH_FLASHCARDS);
+  });
+
+  it("Checking a filter goes back", async function leavesOnFilter(): Promise<void> {
+    await openDetailsFromFlashcards();
+
+    openMenu("Filter");
+    const item = within(await screen.findByRole("menu")).getByRole(
+      "menuitemcheckbox",
+      { name: "Compatible only" },
+    );
+    fireEvent.click(item);
+    await flushTurns();
+
+    expect(findDetails()).toBeNull();
+    expect(findDetailsButton()).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("From an entry's page: Backspace returns to that page", async function returnsToPage(): Promise<void> {
+    render(
+      <ListHarness
+        rows={buildDetailsRows()}
+        listChoices={buildNameChoices()}
+      />,
+    );
+    openList();
+    fireEvent.click(findOption("Country Map"));
+    await flushTurns();
+    pressDetails();
+    await flushTurns();
+
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Backspace" });
+    await flushTurns();
+
+    expect(listOptionIds()).toEqual([
+      "back",
+      "Nobel laureates on the map",
+      "Country Map#without-mosaic",
+    ]);
+    expect(findOption("back")).toHaveAccessibleName("Back to Country Map");
+    expect(readHighlighted()).toBe("Nobel laureates on the map");
+  });
+
+  it("Opened again: Escape closes the list, which opens again on its main list", async function reopensOnMainList(): Promise<void> {
+    await openDetailsFromFlashcards();
+
+    await act(async function closeList(): Promise<void> {
+      fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+      await new Promise<void>(waitForTimers);
+    });
+    expect(screen.queryByRole("combobox")).toBeNull();
+    openList();
+
+    expect(listOptionIds()).toEqual(["Book List", "Country Map", "Flashcards"]);
+    expect(findDetails()).toBeNull();
+  });
+});
+
 /** Two mods sorted by "Match ratio", Flashcards still counting. */
 function buildSettlingRows(flashcardsScore: EntryScore): ListRows {
   return buildRows([
@@ -618,6 +847,36 @@ describe("settling", function describeSettling(): void {
 
     expect(listOptionIds()).toEqual(["Flashcards", "Country Map"]);
     expect(findOption("Country Map")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("Back from the details page: the stopped list is sorted with the scores that arrived, the row highlighted before", function sortsAgainOnDetailsBack(): void {
+    vi.useFakeTimers();
+    const listChoices = buildRatioChoices();
+    const { rerender } = render(
+      <ListHarness
+        rows={buildSettlingRows({ state: "loading" })}
+        listChoices={listChoices}
+      />,
+    );
+    openList();
+    expect(listOptionIds()).toEqual(["Book List", "Flashcards"]);
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+    rerender(
+      <ListHarness
+        rows={buildSettlingRows(buildTestScore(2, 2))}
+        listChoices={listChoices}
+      />,
+    );
+    advanceTime(SETTLE_INTERVAL_MS * 3);
+    expect(listOptionIds()).toEqual(["Book List", "Flashcards"]);
+
+    pressDetails();
+    advanceTime(0);
+    fireEvent.click(findOption("back"));
+    advanceTime(0);
+
+    expect(listOptionIds()).toEqual(["Flashcards", "Book List"]);
+    expect(findOption("Flashcards")).toHaveAttribute("aria-selected", "true");
   });
 
   it("choosing the sort already chosen sorts the stopped list again", async function sortsAgainOnSort(): Promise<void> {

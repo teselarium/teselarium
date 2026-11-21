@@ -67,15 +67,23 @@ The mod list's details page SHALL hold "Mod" and the mod's address, then "Versio
 - **THEN** the list shows its main list
 
 ### Requirement: Copy and open buttons
-Each detail whose value is an `http:` or `https:` address SHALL have, after its value, a "Copy" button and an "Open in a new tab" link, named after the term, such as "Copy run link" and "Open run link in a new tab". Other values, such as the version, "None", "Unsaved combination" or a local file's address, SHALL have neither.
+Each detail whose value is an `http:` or `https:` address SHALL have, after its value, a "Copy" button named after the term and an "Open" link named after the term and where it goes (see "Opening a detail"). A detail whose viewer is switched off SHALL have no "Open" link. Other values, such as the version, "None", "Unsaved combination" or a local file's address, SHALL have neither.
+
+#### Scenario: Names
+- **WHEN** the user opens the details pages of the mod, collection and mosaic lists of "Nobel laureates on the map"
+- **THEN** the controls are "Copy mod" and "Open mod in the mod viewer", "Copy collection" and "Open collection in the collection viewer", "Copy mosaic" and "Open mosaic in the mosaic viewer", and "Copy run link" and "Open run link in a new tab"
 
 #### Scenario: No buttons
 - **WHEN** the user opens the details page of an unsaved combination's mosaic list, and of the mod list
-- **THEN** "Unsaved combination" and the version have no "Copy" button and no "Open in a new tab" link
+- **THEN** "Unsaved combination" and the version have no "Copy" button and no "Open" link
 
 #### Scenario: Not a web address
 - **WHEN** the current mod was opened from a local file and the user opens the details page of the mod list
-- **THEN** the mod's address has no "Copy" button and no "Open in a new tab" link
+- **THEN** the mod's address has no "Copy" button and no "Open" link
+
+#### Scenario: Viewer switched off
+- **WHEN** the instance switches off `mosaic_viewer` and the user opens the details page of the mosaic list of "Nobel laureates on the map"
+- **THEN** "Mosaic" has a "Copy mosaic" button and no "Open" link, and "Run link" keeps "Open run link in a new tab"
 
 ### Requirement: Copying a detail
 A "Copy" button SHALL put its value on the clipboard and show "Copied" at the button for a moment, or "Cannot copy" when the clipboard refuses, also announced to assistive technologies.
@@ -88,15 +96,19 @@ A "Copy" button SHALL put its value on the clipboard and show "Copied" at the bu
 - **WHEN** the user presses "Copy mod" and the clipboard refuses the text
 - **THEN** "Cannot copy" shows at the button
 
-### Requirement: Opening a detail in a new tab
-An "Open in a new tab" link SHALL open its value in a new tab, without giving that tab the app's window or the app's address.
+### Requirement: Opening a detail
+An "Open" link SHALL open, in a new tab, its kind's viewer showing the detail's address (the mod viewer and the collection viewer and the mosaic viewer with it as `target`, the tile viewer with it as `tile`), or, for the run link, the run link itself, without giving that tab the app's window or the app's address. "Copy" SHALL still copy the detail's own address.
 
-#### Scenario: Open the mosaic file
-- **WHEN** the user follows "Open mosaic in a new tab" on the mosaic list's details page of "Nobel laureates on the map"
-- **THEN** a new tab opens the mosaic file's address, with no opener and no referrer
+#### Scenario: Open the mosaic in its viewer
+- **WHEN** the user follows "Open mosaic in the mosaic viewer" on the mosaic list's details page of "Nobel laureates on the map"
+- **THEN** a new tab opens `#/run?mod=mosaic_viewer&target=` followed by the mosaic file's address, with no opener and no referrer, and shows the mosaic viewer for that mosaic
+
+#### Scenario: Open the run link
+- **WHEN** the user follows "Open run link in a new tab" on the mosaic list's details page
+- **THEN** a new tab opens the run link's full address, with no opener and no referrer
 
 ### Requirement: Details buttons are easy to tap
-The "Details" button and each "Copy" button and "Open in a new tab" link SHALL be at least 32px wide and tall.
+The "Details" button and each "Copy" button and "Open" link SHALL be at least 32px wide and tall.
 
 #### Scenario: Buttons on a phone
 - **WHEN** the user opens the details page of the mosaic list on a 360×740 viewport

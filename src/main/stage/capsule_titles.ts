@@ -1,7 +1,10 @@
 import type { SandboxSnapshot } from "../../lib/core/stage/index.ts";
 import { readTileName } from "./combination_rows.ts";
 
-/** What a capsule shows: its title, and the mod's version once its file is loaded. */
+/**
+ * What a capsule shows: its title. The mod's version, once its file is
+ * loaded, is shown only by the plain title, not by the mod capsule.
+ */
 export interface CapsuleTitle {
   title: string;
   version?: string;

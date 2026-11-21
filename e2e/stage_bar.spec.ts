@@ -48,7 +48,6 @@ import {
 } from "./test_mods.ts";
 import type { ModFiles } from "./mod_routes.ts";
 import {
-  currentItem,
   hamburgerButton,
   sectionItem,
   sidebarHeadingRow,
@@ -57,8 +56,13 @@ import {
   HOME_MOD_PREVIEW_URL,
   TEST_CATALOG_PREVIEW_URL,
 } from "./app_servers.ts";
-import { MINIMUM_TEXT_CONTRAST, readContrastRatio } from "./theme_probes.ts";
 import {
+  MINIMUM_TEXT_CONTRAST,
+  readContrastRatio,
+  readTokenAs,
+} from "./theme_probes.ts";
+import {
+  countLines,
   DESKTOP_VIEWPORT,
   isFullyShown,
   readElementBox,
@@ -303,7 +307,7 @@ test.describe("One-row stage bar", function describeLayout(): void {
     const bar = stageBar(page);
 
     const items = [
-      bar.getByRole("button", { name: "Mod: probe 0.1.0" }),
+      bar.getByRole("button", { name: "Mod: probe" }),
       bar.getByRole("button", { name: "Collection: Probe notes" }),
       bar.getByRole("button", { name: "Mosaic: Unsaved combination" }),
       moreActionsButton(page),
@@ -367,7 +371,7 @@ test.describe("Combination capsules", function describeCapsules(): void {
     await waitForProbe(await findModFrame(page, TILES_TITLE));
 
     const items = [
-      bar.getByRole("button", { name: `Mod: ${TILES_TITLE} ${TILES_VERSION}` }),
+      bar.getByRole("button", { name: `Mod: ${TILES_TITLE}` }),
       bar.getByText("+", { exact: true }),
       bar.getByRole("button", { name: "Collection: Labelled tiles" }),
       bar.getByText("→", { exact: true }),
@@ -457,21 +461,224 @@ test.describe("Mosaic name while loading or after a failure", function describeM
   });
 });
 
-test.describe("Details footer", function describeDetails(): void {
-  test("Mosaic details", async function listsMosaicDetails({
+/** The open list's details page: its terms and their values. */
+function detailsSection(page: Page): Locator {
+  return page.locator("[data-slot=popover-content] dl[aria-label=Details]");
+}
+
+function detailsButton(page: Page): Locator {
+  return page
+    .locator("[data-slot=popover-content]")
+    .getByRole("button", { name: "Details" });
+}
+
+/** Opens the labels mosaic's list and its details page. */
+async function openMosaicDetails(page: Page): Promise<void> {
+  await stageBar(page)
+    .getByRole("button", { name: `Mosaic: ${LABELS_MOSAIC_TITLE}` })
+    .click();
+  await detailsButton(page).click();
+  await expect(detailsSection(page)).toBeVisible();
+}
+
+/** Opens the labels mosaic's details page on a narrow bar, through the folded capsule's menu. */
+async function openFoldedMosaicDetails(page: Page): Promise<void> {
+  await stageBar(page)
+    .getByRole("button", { name: `Combination: ${LABELS_MOSAIC_TITLE}` })
+    .click();
+  await page.getByRole("menuitem", { name: "Mosaic" }).click();
+  await detailsButton(page).click();
+  await expect(detailsSection(page)).toBeVisible();
+}
+
+/** Runs on an element: its background and text colors. */
+function readButtonColors(element: Element): string[] {
+  const style = getComputedStyle(element);
+  const colors = [style.backgroundColor, style.color];
+  return colors;
+}
+
+async function readLocatorColors(locator: Locator): Promise<string[]> {
+  return locator.evaluate(readButtonColors);
+}
+
+/** Runs on an element: whether its content is wider than its box. */
+function overflowsSideways(element: Element): boolean {
+  return element.scrollWidth > element.clientWidth;
+}
+
+/** The pressed "Details" button has the accent background and foreground, readable together. */
+async function expectPressedDetailsButton(page: Page): Promise<void> {
+  await openLabelsMosaic(page);
+  await waitForProbe(await findModFrame(page, TILES_TITLE));
+  await openMosaicDetails(page);
+  const button = detailsButton(page);
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+  // Away from the button, so its colors are the pressed ones, not the hover ones.
+  await page.mouse.move(0, 0);
+  const accent = await page.evaluate(readTokenAs, [
+    "--ot-accent",
+    "background-color",
+  ]);
+  const accentForeground = await page.evaluate(readTokenAs, [
+    "--ot-accent-foreground",
+    "color",
+  ]);
+
+  await expect
+    .poll(readLocatorColors.bind(undefined, button))
+    .toEqual([accent, accentForeground]);
+  expect(readContrastRatio(accent, accentForeground)).toBeGreaterThanOrEqual(
+    MINIMUM_TEXT_CONTRAST,
+  );
+}
+
+test.describe("Details page", function describeDetails(): void {
+  test("Mosaic details: copy and open the run link, then back", async function usesMosaicDetails({
     page,
+    context,
+    browserName,
   }): Promise<void> {
+    const canGrantClipboard = browserName === "chromium";
+    if (canGrantClipboard) {
+      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    } else {
+      await page.addInitScript({ content: CLIPBOARD_RECORDER });
+    }
     await openLabelsMosaic(page);
     await waitForProbe(await findModFrame(page, TILES_TITLE));
     const mosaicSource = new URL(LABELS_MOSAIC_PATH, page.url()).href;
+    const runLink = new URL(LABELS_MOSAIC_HASH, page.url()).href;
 
-    await stageBar(page)
-      .getByRole("button", { name: `Mosaic: ${LABELS_MOSAIC_TITLE}` })
+    await openMosaicDetails(page);
+
+    const details = detailsSection(page);
+    expect(await details.locator("dd code").allTextContents()).toEqual([
+      mosaicSource,
+      runLink,
+    ]);
+    await details.getByRole("button", { name: "Copy run link" }).click();
+    // The Details button's tooltip may still be fading out.
+    await expect(page.getByRole("tooltip", { name: "Copied" })).toBeVisible();
+    const copied = await page.evaluate(
+      canGrantClipboard ? readClipboard : readRecordedClipboard,
+    );
+    expect(copied).toBe(runLink);
+    const open = details.getByRole("link", {
+      name: "Open run link in a new tab",
+    });
+    await expect(open).toHaveAttribute("href", runLink);
+    await expect(open).toHaveAttribute("target", "_blank");
+    await expect(open).toHaveAttribute("rel", "noopener noreferrer");
+
+    await page
+      .locator("[data-slot=popover-content]")
+      .getByRole("option", { name: "Back" })
       .click();
+    await expect(detailsSection(page)).toHaveCount(0);
+    await expect(detailsButton(page)).toHaveAttribute("aria-pressed", "false");
+
+    await detailsButton(page).click();
+    await expect(detailsSection(page)).toBeVisible();
+    await page.getByRole("combobox").press("Backspace");
+    await expect(detailsSection(page)).toHaveCount(0);
+  });
+
+  test("Open the mosaic in its viewer", async function opensMosaicViewer({
+    page,
+    context,
+  }): Promise<void> {
+    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    const mosaicSource = new URL(
+      "./samples/mosaics/nobel_laureates_map.yaml",
+      page.url(),
+    ).href;
+    const viewerLink = new URL(
+      `#/run?mod=mosaic_viewer&target=${encodeURIComponent(mosaicSource)}`,
+      page.url(),
+    ).href;
+    await stageBar(page)
+      .getByRole("button", { name: `Mosaic: ${MAP_MOSAIC_TITLE}` })
+      .click();
+    await detailsButton(page).click();
+
+    const open = detailsSection(page).getByRole("link", {
+      name: "Open mosaic in the mosaic viewer",
+    });
+    await expect(open).toHaveAttribute("href", viewerLink);
+    await expect(open).toHaveAttribute("target", "_blank");
+    await expect(open).toHaveAttribute("rel", "noopener noreferrer");
+    const viewerPagePromise = context.waitForEvent("page");
+    await open.click();
+    const viewerPage = await viewerPagePromise;
+
+    await expect(viewerPage).toHaveURL(viewerLink);
+    await expect(
+      viewerPage
+        .frameLocator('iframe[title="Mosaic Viewer"]')
+        .getByRole("heading", { name: MAP_MOSAIC_TITLE }),
+    ).toBeVisible();
+  });
+
+  test("Details on a phone", async function fitsPhone({ page }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await openLabelsMosaic(page);
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
+
+    await openFoldedMosaicDetails(page);
 
     const list = page.locator("[data-slot=popover-content]");
-    const details = await list.locator("dd").allTextContents();
-    expect(details).toEqual([mosaicSource, LABELS_MOSAIC_HASH]);
+    // The list zooms in as it opens, so its boxes are read once it settled.
+    await list.evaluate(finishAnimations);
+    const listBox = await list.evaluate(readElementBox);
+    const toolbarItems = [
+      page.getByRole("combobox"),
+      list.getByRole("button", { name: "Sort" }),
+      list.getByRole("button", { name: "Filter" }),
+      detailsButton(page),
+    ];
+    const searchBox = await toolbarItems[0].evaluate(readElementBox);
+    for (const item of toolbarItems) {
+      const box = await item.evaluate(readElementBox);
+      expect(box.left).toBeGreaterThanOrEqual(listBox.left);
+      expect(box.right).toBeLessThanOrEqual(listBox.right);
+      expect(
+        Math.abs(
+          box.top + box.height / 2 - (searchBox.top + searchBox.height / 2),
+        ),
+      ).toBeLessThan(4);
+    }
+    const runLink = detailsSection(page).locator("dd code").last();
+    expect(await runLink.evaluate(countLines)).toBeGreaterThan(1);
+    expect(await list.evaluate(overflowsSideways)).toBe(false);
+    expect(await page.evaluate(canScrollSideways)).toBe(false);
+    const controls = [
+      detailsSection(page).getByRole("button", { name: "Copy run link" }),
+      detailsSection(page).getByRole("link", {
+        name: "Open run link in a new tab",
+      }),
+    ];
+    for (const control of controls) {
+      const box = await control.evaluate(readElementBox);
+      expect(box.width).toBeGreaterThanOrEqual(32);
+      expect(box.height).toBeGreaterThanOrEqual(32);
+    }
+  });
+
+  test("Pressed Details button", async function pressesLight({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "light" });
+
+    await expectPressedDetailsButton(page);
+  });
+
+  test("Pressed Details button, dark color scheme", async function pressesDark({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    await expectPressedDetailsButton(page);
   });
 });
 
@@ -829,9 +1036,7 @@ test.describe(
       files["collection.yaml"] = buildNoteCollection([]);
       const frame = await openTypedProbe(page, files);
       await frame.evaluate(CLICK_RECORDER);
-      await stageBar(page)
-        .getByRole("button", { name: "Mod: probe 0.1.0" })
-        .click();
+      await stageBar(page).getByRole("button", { name: "Mod: probe" }).click();
       await expect(page.getByRole("combobox")).toBeFocused();
 
       await clickInFrame(page, "probe");
@@ -848,9 +1053,7 @@ test.describe(
       files["collection.yaml"] = buildNoteCollection([]);
       const frame = await openTypedProbe(page, files);
       await frame.evaluate(CLICK_RECORDER);
-      await stageBar(page)
-        .getByRole("button", { name: "Mod: probe 0.1.0" })
-        .click();
+      await stageBar(page).getByRole("button", { name: "Mod: probe" }).click();
       await page.getByRole("button", { name: "Sort" }).click();
       await expect(page.getByRole("menu")).toBeVisible();
 
@@ -1018,7 +1221,7 @@ function readRunParams(page: Page): URLSearchParams {
 
 /** Chooses the probe in the mosaic's mod list and waits for its frame. */
 async function swapToProbe(page: Page): Promise<void> {
-  await chooseInList(page, `Mod: ${TILES_TITLE} ${TILES_VERSION}`, "probe");
+  await chooseInList(page, `Mod: ${TILES_TITLE}`, "probe");
   await waitForProbe(await findModFrame(page, "probe"));
 }
 
@@ -1110,9 +1313,7 @@ test.describe("Swapping combinations", function describeSwaps(): void {
     );
     await waitForProbe(await findModFrame(page, TILES_TITLE));
 
-    await expect(
-      capsule(page, `Mod: ${TILES_TITLE} ${TILES_VERSION}`),
-    ).toBeVisible();
+    await expect(capsule(page, `Mod: ${TILES_TITLE}`)).toBeVisible();
     await expect(capsule(page, "Collection: Labelled tiles")).toBeVisible();
     await expect(capsule(page, `Mosaic: ${LABELS_MOSAIC_TITLE}`)).toBeVisible();
   });
@@ -1150,7 +1351,7 @@ async function readCloseOffset(page: Page): Promise<number> {
   return barBox.x + barBox.width - (closeBox.x + closeBox.width);
 }
 
-const MOD_CAPSULE = `Mod: ${TILES_TITLE} ${TILES_VERSION}`;
+const MOD_CAPSULE = `Mod: ${TILES_TITLE}`;
 const MOSAIC_CAPSULE = `Mosaic: ${LABELS_MOSAIC_TITLE}`;
 const COLLECTION_CAPSULE = "Collection: Labelled tiles";
 
@@ -1186,15 +1387,15 @@ test.describe("The bar folds as it narrows", function describeLadder(): void {
     page,
   }): Promise<void> {
     await openSwapMosaic(page);
-    const version = capsule(page, MOD_CAPSULE).getByText(TILES_VERSION);
 
     await setBarWidth(page, 1100);
-    await expect(version).toBeVisible();
+    await expect(capsuleTitle(page, MOD_CAPSULE)).toBeVisible();
+    await expect(capsule(page, MOD_CAPSULE)).not.toContainText(TILES_VERSION);
     const wideOffset = await readCloseOffset(page);
 
     await setBarWidth(page, 800);
-    await expect(version).toBeHidden();
     await expect(capsuleTitle(page, MOD_CAPSULE)).toBeVisible();
+    await expect(capsule(page, MOD_CAPSULE)).not.toContainText(TILES_VERSION);
     expect(await readCloseOffset(page)).toBe(wideOffset);
 
     await setBarWidth(page, 600);
@@ -1315,11 +1516,6 @@ async function openModList(page: Page): Promise<void> {
 const NOBEL_MAP_MOSAIC_LINK =
   "/#/run?mosaic=./samples/mosaics/nobel_laureates_map.yaml";
 
-async function readLocatorHeight(locator: Locator): Promise<number> {
-  const box = await locator.evaluate(readElementBox);
-  return box.height;
-}
-
 /** The computed colors of a highlighted row's alias and background, and of `--ot-accent-foreground`. */
 interface HighlightColors {
   aliasColor: string;
@@ -1385,26 +1581,6 @@ async function expectReadableAliases(page: Page): Promise<void> {
 }
 
 test.describe("Combination lists", function describeCombinationLists(): void {
-  test("Collection explorer link", async function opensCollectionExplorer({
-    page,
-  }): Promise<void> {
-    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
-    await stageBar(page)
-      .getByRole("button", { name: /^Collection: / })
-      .click();
-    const link = openList(page).getByRole("button", {
-      name: "Open the collection explorer",
-    });
-
-    // The list zooms in as it opens, so the link reaches its height once it settled.
-    await expect
-      .poll(readLocatorHeight.bind(undefined, link))
-      .toBeGreaterThanOrEqual(32);
-    await link.click();
-
-    await expect(currentItem(page)).toHaveText(/Tiles/);
-  });
-
   test("Aliases of a highlighted mosaic", async function readsHighlightedLight({
     page,
   }): Promise<void> {

@@ -1,18 +1,34 @@
 import type { ReactElement } from "react";
+import type { ResolvedDefaultModSettings } from "../../lib/core/engine/index.ts";
 import type { SandboxSnapshot } from "../../lib/core/stage/index.ts";
 import { CombinationList } from "./CombinationList.tsx";
-import type { ListDetail } from "./CombinationList.tsx";
-import { buildExplorerLink } from "./combination_list_inputs.ts";
 import type { CapsuleListProps } from "./combination_list_inputs.ts";
+import { buildViewerOpen } from "./detail_viewers.ts";
+import type { ListDetail } from "./ListDetails.tsx";
 import { buildModListRows, startModListLoads } from "./mod_list.ts";
 import { useListInputs } from "./use_list_inputs.ts";
 
-function buildModDetails(sandbox: SandboxSnapshot): ListDetail[] {
-  const details: ListDetail[] = [
-    { term: "Mod", value: sandbox.mod?.source ?? sandbox.link.mod },
-  ];
+/**
+ * The mod's address, once known: its mod file once loaded, the resolved
+ * reference before, and nothing while a mosaic link's mod is still unknown.
+ * The address opens in the mod viewer. Then its version, once its file is
+ * loaded.
+ */
+function buildModDetails(
+  sandbox: SandboxSnapshot,
+  defaults: ResolvedDefaultModSettings,
+): ListDetail[] {
+  const details: ListDetail[] = [];
+  const address = sandbox.mod?.source ?? sandbox.modReference;
+  if (address !== "") {
+    details.push({
+      term: "Mod",
+      value: address,
+      open: buildViewerOpen("mod", address, defaults),
+    });
+  }
   if (sandbox.mod !== null) {
-    details.push({ term: "Version", value: sandbox.mod.version });
+    details.push({ term: "Version", value: sandbox.mod.version, open: null });
   }
   return details;
 }
@@ -35,8 +51,7 @@ export function ModList(props: CapsuleListProps): ReactElement {
       rows={buildModListRows(inputs)}
       pairHeading=""
       listChoices={props.listChoices}
-      details={buildModDetails(props.sandbox)}
-      explorer={buildExplorerLink(props.stage, "mods", "Open the mod explorer")}
+      details={buildModDetails(props.sandbox, props.stage.defaults)}
     >
       {props.children}
     </CombinationList>

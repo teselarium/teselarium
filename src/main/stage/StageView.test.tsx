@@ -426,7 +426,7 @@ describe("StageView", function describeStageView(): void {
     renderStageView(stage);
 
     expect(
-      screen.getByRole("button", { name: "Mod: Book List 1.0.0" }),
+      screen.getByRole("button", { name: "Mod: Book List" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
   });
@@ -450,7 +450,7 @@ describe("StageView", function describeStageView(): void {
       names.push(button.getAttribute("aria-label") ?? "");
     }
     expect(names).toEqual([
-      "Mod: Book List 1.0.0",
+      "Mod: Book List",
       "Collection: None",
       "Mosaic: Unsaved combination",
       "Combination: Book List",
@@ -477,15 +477,17 @@ describe("StageView", function describeStageView(): void {
     ).toBeInTheDocument();
   });
 
-  it("shows the title and the version of the visible mod", async function showsTitle(): Promise<void> {
+  it("shows the title of the visible mod, without its version", async function showsTitle(): Promise<void> {
     const stage = await startTestStage("");
     renderStageView(stage);
 
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
 
-    expect(
-      within(stageBar).getByRole("button", { name: "Mod: Book List 1.0.0" }),
-    ).toHaveTextContent("Book List1.0.0");
+    const capsule = within(stageBar).getByRole("button", {
+      name: "Mod: Book List",
+    });
+    expect(capsule).toHaveTextContent("Book List");
+    expect(capsule).not.toHaveTextContent("1.0.0");
   });
 
   it("Missing mod file", async function showsLoadFailure(): Promise<void> {
@@ -515,7 +517,7 @@ describe("StageView", function describeStageView(): void {
     expect(container.querySelector("iframe")).toBeNull();
     const stageBar = screen.getByRole("region", { name: "Stage bar" });
     expect(
-      within(stageBar).getByRole("button", { name: "Mod: Book List 1.0.0" }),
+      within(stageBar).getByRole("button", { name: "Mod: Book List" }),
     ).toBeInTheDocument();
     expect(
       within(stageBar).getByRole("button", {
@@ -715,7 +717,7 @@ describe("StageView", function describeStageView(): void {
       names.push(button.getAttribute("aria-label") ?? "");
     }
     expect(names).toEqual([
-      "Mod: Book List 1.0.0",
+      "Mod: Book List",
       "Collection: Science fiction books",
       "Mosaic: Unsaved combination",
       "Combination: Book List",
@@ -1158,9 +1160,7 @@ describe("combination capsules", function describeCombinationCapsules(): void {
     const stage = await startTestStage(MOSAIC_HASH);
     renderStageView(stage);
 
-    expect(findCapsule("Mod: Book List 1.0.0")).toHaveTextContent(
-      "Book List1.0.0",
-    );
+    expect(findCapsule("Mod: Book List")).toHaveTextContent(/^Book List$/);
     expect(findCapsule("Collection: Science fiction books")).toHaveTextContent(
       "Science fiction books",
     );
@@ -1182,9 +1182,7 @@ describe("combination capsules", function describeCombinationCapsules(): void {
     renderStageView(stage);
 
     expect(
-      findCapsule("Mod: Book List 1.0.0").querySelector(
-        "svg.lucide-opentesela-mod",
-      ),
+      findCapsule("Mod: Book List").querySelector("svg.lucide-opentesela-mod"),
     ).not.toBeNull();
     expect(
       findCapsule("Collection: Science fiction books").querySelector(
@@ -1207,13 +1205,13 @@ describe("combination capsules", function describeCombinationCapsules(): void {
     const stage = await startTestStage(MOSAIC_HASH);
     renderStageView(stage);
 
-    const row = findCapsule("Mod: Book List 1.0.0").parentElement;
+    const row = findCapsule("Mod: Book List").parentElement;
     const texts: string[] = [];
     for (const child of row?.children ?? []) {
       texts.push(child.getAttribute("aria-label") ?? child.textContent ?? "");
     }
     expect(texts).toEqual([
-      "Mod: Book List 1.0.0",
+      "Mod: Book List",
       "+",
       "Collection: Science fiction books",
       "→",
@@ -1342,7 +1340,7 @@ describe("closing on a click outside", function describeClickOutside(): void {
       `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
     );
     renderStageView(stage);
-    fireEvent.click(findCapsule("Mod: Book List 1.0.0"));
+    fireEvent.click(findCapsule("Mod: Book List"));
     expect(screen.getByRole("combobox")).toBeInTheDocument();
     const frame = appendFrame();
 
@@ -1357,12 +1355,12 @@ describe("closing on a click outside", function describeClickOutside(): void {
       `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
     );
     renderStageView(stage);
-    fireEvent.click(findCapsule("Mod: Book List 1.0.0"));
+    fireEvent.click(findCapsule("Mod: Book List"));
 
     fireEvent.click(findCapsule("Mosaic: Unsaved combination"));
 
     expect(screen.getAllByRole("combobox")).toHaveLength(1);
-    expect(screen.getByRole("dialog")).toHaveTextContent("Run link");
+    expect(screen.getByRole("combobox")).toHaveAccessibleName("Mosaic list");
   });
 });
 
