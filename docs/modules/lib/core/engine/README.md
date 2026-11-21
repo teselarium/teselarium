@@ -681,7 +681,7 @@ Version notes:
 - `0.1.16` added the run link field `sites`, a mosaic reference whose `show` lines a mod link's sandbox gets (see [Launch](#launch)). It also made `sites` a reserved link name: a link parameter named `sites` is no longer passed in `params`, and `mods.open` and `mosaics.open` refuse `params.sites` with `-32602`. That could break a mod that read or passed a `sites` parameter, which would call for a minor bump. No shipped, test or known mod does, and no mod exists outside this repository, so it was taken as a patch, as `tile` was in `0.1.12` and `mosaic` in `0.1.13`. The surface guard's `0.1.16` entry repeats `0.1.15`'s, since it records names and no name was added.
 - `0.1.17` added the mount context key `collection` (`source`, `title`, `description`, or `null`), the collection the mod's tiles were loaded from, and `options.collection` for `mount(options)` in the test API. These are additions that existing mods keep working with, so it is a patch.
 
-An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `openspec/config.yaml` asks.
+An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `docs/code_conventions.md`, "OpenSpec changes", asks.
 
 ### Hosting note
 

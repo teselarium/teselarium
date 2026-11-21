@@ -16,7 +16,7 @@ import type { CheckTestResult, ModFiles } from "./mod_routes.ts";
 
 /*
  * The mods the e2e tests own, so the tests of the engine, the stage, the
- * default mods and the app need no shipped sample (docs/code_conventions.md,
+ * default mods and the app need no shipped sample (docs/code_principles.md,
  * Tests):
  * - the probe: a mod that keeps its engine API object on `globalThis.probe`
  * - the typed probe: the probe with a `note` tile type and two notes

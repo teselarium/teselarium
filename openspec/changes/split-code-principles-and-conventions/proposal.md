@@ -2,24 +2,28 @@
 
 ## Why
 
-`docs/code_conventions.md` mixes two kinds of rules: general ones that would hold in any project (design principles, naming, error context, the test rules) and ones specific to this project (code shape, the vendored zone, the UI component policy). Nothing says which is which, so a new rule has no clear home, and every artifact loads the whole file even when it only needs the general part. The project-specific part is the one that keeps growing.
+`docs/code_conventions.md` mixes two kinds of rules: general ones that would hold in any project (design principles, naming, error context, the test rules) and ones specific to this project (code shape, the vendored zone, the UI component policy). Nothing says which is which, so a new rule has no clear home. The project-specific part is the one that keeps growing.
+
+`openspec/config.yaml` is a second home for project rules: its per-artifact `rules` hold the phone and color-scheme requirements, the mod API bump, the changeset task and the verification task. They are rules of this project like the others, but a reader of the conventions never sees them.
 
 ## What Changes
 
 - **New `docs/code_principles.md`** with the general rules: the design principles list, the UI/UX and module coherence paragraphs, the general rules of today's "Conventions" section (readable code, functional style, domain naming, errors with context, TDD for complex bugs, no hardcoded fixes), the "spec-driven, not vibe coding" stance, and the "Tests" section.
-- **`docs/code_conventions.md` keeps only the project-specific rules**: the code-shape rules (no anonymous functions, no returned literals, explicit loops, at most three levels of indentation, no nested functions, explicit return types), "Vendored code" and "UI components". Each rule that oxlint enforces gets a "(lint)" marker.
+- **`docs/code_conventions.md` keeps only the project-specific rules**:
+  - the code-shape rules (no anonymous functions, no returned literals, explicit loops, at most three levels of indentation, no nested functions, explicit return types), "Vendored code" and "UI components";
+  - a new "Phones and color schemes" section and a new "OpenSpec changes" section, with the rules that move out of `openspec/config.yaml`. "OpenSpec changes" has a "Proposal", a "Specs" and a "Tasks" subsection.
 - **Opening lines of both files**:
   - Both state the placement test, which is new: "Would this rule hold in another project with another stack?" Yes means the rule goes in the principles, no means it goes in the conventions.
   - The conventions file also says to read the principles first. The conventions apply the principles, so they are never read alone.
-- **One home per rule**: the "AI may not commit or push" sentence leaves the docs, because `AGENTS.md` already holds it.
-- **Loading by activity**:
-  - Exploring, proposing and writing specs load the principles only.
-  - Design, tasks and writing code load the principles and then the full conventions file.
+- **One home per rule**:
+  - The "AI may not commit or push" sentence leaves the docs, because `AGENTS.md` already holds it.
+  - The per-artifact `rules` move from `openspec/config.yaml` to the conventions. Each artifact's `rules` entry only points to its subsection.
+- **Loading**:
+  - Exploring loads the principles only.
+  - Every artifact and writing code load the principles and then the conventions.
   - The loading instructions say to read each file once per session, and again only when its text is no longer in context.
-- **`openspec/config.yaml`**:
-  - `context` points to the principles.
-  - The `design` and `tasks` rules add the conventions, read after the principles.
-- **`AGENTS.md`**: read `docs/code_principles.md`, then `docs/code_conventions.md`, before writing code.
+- **`openspec/config.yaml`** keeps `schema`, a `context` that says to read both files, and for the proposal, specs and tasks one rule that points to their subsection of "OpenSpec changes".
+- **`AGENTS.md`**: before writing code, read `docs/code_principles.md`, then `docs/code_conventions.md`.
 - **References**:
   - `docs/README.md` lists both files.
   - The two links to the "Tests" section point to the principles: the lint message in `.oxlintrc.json` and the comment in `e2e/test_mods.ts`.
@@ -47,5 +51,5 @@ None. This is a docs and workflow-configuration change with no spec-level behavi
 - **Out of scope**:
   - a zone index in the conventions, and moving zone rules into zone READMEs (revisit when a third zone section appears);
   - Claude Code path-scoped rules;
-  - lint rule changes;
+  - lint rule changes, and markers that say which rules lint enforces;
   - archived changes, which keep their links to the old file as history.

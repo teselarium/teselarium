@@ -1,24 +1,11 @@
-## Design principles
+# Code conventions
 
-This project follows the next principles:
+The rules specific to this project. They apply [code_principles.md](code_principles.md) to this stack and this code. A rule that would hold in another project with another stack goes in the principles instead.
 
-- Don't Repeat Yourself
-- Keep It Simple
-- Separation of Concerns
-- Single Responsibility
-- Modular and Composable
-- Composition over inheritance
-- Domain Driven Design
-- Test Driven Development
+Read the principles first: these conventions are never read alone. Read this file before writing an OpenSpec artifact or code. Agents read it once per session, and again only when its text is no longer in their context.
 
-UI and user experience must be coherent between the different pages and components of the application. The consistency helps to accelerate the user learning curve by making the interaction more intuitive.
+## Code
 
-Code modules and components must be coherent, simple and with well defined boundaries (see the principles mentioned before). The application design and the code design should make the developer experience easier and reduce the learning curve, and also make the application more consistent, intuitive, robust and easy to evolve.
-
-## Conventions
-
-AI is used in this project for accelerating development via OpenSpec (spec-driven development, not vibe coding), but AI is not authorized to create commits or push changes by it self.
-Keep code readable for humans.
 Don't use anonymous functions.
 Don't write returns of anonymous object like anonymous list or dict (e.g. "return [a, b, ...]" or "return {a, b}"). Store the function output in a variable first and then return this variable (e.g. "variable_name = [a, b, ...]; return variable_name;").
 
@@ -26,32 +13,7 @@ Use explicit loops (like: for, for..of, for..in).
 Reduce complexity by avoiding embedded logics and thus reducing the levels of indentation. For example, when finding more than three levels of indentation inside a function, it must be refactored by extracting some logic outside (for example in a separated function).
 Avoid defining functions inside functions.
 
-Whenever possible, prefer functional programming approach, for example creating functions that return an output without modifying the state of the input.
-
 Use explicit return types.
-
-Use clear naming of variables, functions, classes, methods, etc.
-Prefer naming based on domain concepts (use ubiquitous language, avoid generic names like utils, helpers, manager).
-
-Error messages must include context.
-
-When fixing complex bugs prefer a TDD approach: write the failing test first, then fix the code.
-
-Do not hardcode fixes, search instead for robust solutions that prevents the problem from reappearing.
-
-## Tests
-
-- Test each behavior once, at the lowest level that can prove it. Go up a
-  level only for what the lower one cannot observe.
-- A module's tests protect that module and use their own fixtures. They never
-  depend on examples, demos or other modules' fixtures.
-- Test effort follows importance: critical modules are tested thoroughly,
-  examples and optional parts lightly.
-- The default run covers what every change can break. Tests of optional or
-  isolated parts run when those parts change, and in a full run before a
-  release.
-- Run expensive variants (environments, platforms, configurations) only for
-  tests whose result depends on them.
 
 ## Vendored code
 
@@ -75,3 +37,30 @@ The app's interface is built with Tailwind CSS utilities and shadcn/ui component
 Tooltips go through `HoverTooltip` (`src/main/HoverTooltip.tsx`), never shadcn's tooltip directly. It opens the tooltip only where the primary pointer can hover (`(hover: hover)`), so a tap on a phone never leaves one on screen, and it shows a tooltip the app pins open (such as "Link copied") on every device. A tooltip's text must also be in its element's accessible name or visible text, since touch devices don't show it.
 
 Mods don't get Tailwind or shadcn. Their frames get the classless base stylesheet, which gives semantic HTML the app's look.
+
+## Phones and color schemes
+
+The app's interface and the layout of the default and sample mods work on a phone viewport (narrow, touch) and in both color schemes (light and dark). Their tests cover both:
+
+- Layout that depends only on the viewport's size gets e2e tests at a phone viewport (360×740 or 412×915) with `page.setViewportSize`, using the viewports of `e2e/layout_probes.ts`.
+- Behavior that depends on touch or on a pointer that cannot hover gets e2e tests tagged `@mobile`, which run in the mobile project.
+- New or changed colors get a check in the light and the dark color scheme.
+
+## OpenSpec changes
+
+What each artifact of a change must contain, on top of what the OpenSpec schema asks.
+
+### Proposal
+
+- When the change modifies the specs of the mod API (mod-engine-api, mod-loading's mod file format, mod-api-version, mod-theme's mount context and events, mod-app-actions), state the mod API version bump it needs (none, patch or minor while the version is 0.x) and why, following the "Mod API version" section of [the engine module](modules/lib/core/engine/README.md).
+- When the change adds or changes the app's interface, or the layout of a default or sample mod, state how it behaves on a phone viewport (narrow, touch) and in both color schemes (light and dark), or why that does not apply.
+
+### Specs
+
+- When the change adds or changes the app's interface, or the layout of a default or sample mod, give each layout requirement at least one scenario on a phone viewport (360×740 or 412×915), and say what each color requirement holds in both color schemes (light and dark).
+
+### Tasks
+
+- When the change adds or changes the app's interface, or the layout of a default or sample mod, cover a phone viewport and both color schemes in its tests, as "Phones and color schemes" says.
+- Before the final verification task, add a task that adds `.changeset/<change-name>.md` with the bump that fits the change (patch, minor or major), following the "Bump rule" section of [releasing.md](releasing.md), and a one-line summary for the people who use or instantiate the app. A change that bumps the mod API bumps the app at least as much.
+- End tasks.md with a verification task: on a clean install (`npm ci`), run `npm run build`, `npm run test`, `npm run lint`, `npm run format:check` and `npm run test:e2e`. When the change touches `public/samples/` or the specs of the mod API (mod-engine-api, mod-loading's mod file format, mod-api-version, mod-theme's mount context and events, mod-app-actions), it also runs `npm run test:e2e:samples`.

@@ -59,7 +59,7 @@
             "paths": [
               {
                 "name": "./sample_mod.ts",
-                "message": "Only the shipped samples' own tests use e2e/sample_mod.ts (docs/code_conventions.md, Tests)."
+                "message": "Only the shipped samples' own tests use e2e/sample_mod.ts (docs/code_principles.md, Tests)."
               }
             ]
           }

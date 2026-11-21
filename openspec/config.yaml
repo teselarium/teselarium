@@ -19,50 +19,16 @@ schema: spec-driven
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
 context: |
-  Read `docs/code_conventions.md` before writing code or when proposing or 
-  updating openspec artifacts
+  Read `docs/code_principles.md`, then `docs/code_conventions.md`, before
+  proposing or updating openspec artifacts or writing code. Read each file once
+  per session, and again only when its text is no longer in your context.
 rules:
   proposal:
-    - >-
-      When the change modifies the specs of the mod API (mod-engine-api,
-      mod-loading's mod file format, mod-api-version, mod-theme's mount context
-      and events, mod-app-actions), state the mod API version bump it needs
-      (none, patch or minor while the version is 0.x) and why, following the
-      "Mod API version" section of docs/modules/lib/core/engine/README.md
-    - >-
-      When the change adds or changes the app's interface, or the layout of a
-      default or sample mod, state how it behaves on a phone viewport (narrow,
-      touch) and in both color schemes (light and dark), or why that does not
-      apply
+    - Follow `docs/code_conventions.md`, "OpenSpec changes", "Proposal".
   specs:
-    - >-
-      When the change adds or changes the app's interface, or the layout of a
-      default or sample mod, give each layout requirement at least one
-      scenario on a phone viewport (360×740 or 412×915), and say what each
-      color requirement holds in both color schemes (light and dark)
+    - Follow `docs/code_conventions.md`, "OpenSpec changes", "Specs".
   tasks:
-    - >-
-      Before the final verification task, add a task that adds
-      .changeset/<change-name>.md with the bump that fits the change (patch,
-      minor or major), following the "Bump rule" section of docs/releasing.md,
-      and a one-line summary for the people who use or instantiate the app. A
-      change that bumps the mod API bumps the app at least as much
-    - >-
-      End tasks.md with a verification task: on a clean install (npm ci), run
-      npm run build, npm run test, npm run lint, npm run format:check and npm
-      run test:e2e. When the change touches public/samples/ or the specs of the
-      mod API (mod-engine-api, mod-loading's mod file format, mod-api-version,
-      mod-theme's mount context and events, mod-app-actions), it also runs npm
-      run test:e2e:samples
-    - >-
-      When the change adds or changes the app's interface, or the layout of a
-      default or sample mod, cover a phone viewport and both color schemes in
-      its tests: layout that depends only on the viewport's size gets e2e tests
-      at a phone viewport (360×740 or 412×915) with page.setViewportSize, using
-      the viewports of e2e/layout_probes.ts; behavior that depends on touch or
-      on a pointer that cannot hover gets e2e tests tagged @mobile, which run
-      in the mobile project; new or changed colors get a check in the light
-      and the dark color scheme
+    - Follow `docs/code_conventions.md`, "OpenSpec changes", "Tasks".
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.
