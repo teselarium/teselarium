@@ -1,6 +1,6 @@
 # Tasks
 
-Prerequisite: `rename-catalog-vocabulary` is applied. Its names (`Catalog`, `buildCatalog`, `instanceCatalog`, `readLiveCatalog`) are used below.
+The tasks use the names of `rename-catalog-vocabulary` (`Catalog`, `buildCatalog`, `instanceCatalog`, `readLiveCatalog`).
 
 ## 1. Browser file addresses and reading
 
@@ -101,7 +101,3 @@ Prerequisite: `rename-catalog-vocabulary` is applied. Its names (`Catalog`, `bui
 
 - [ ] 10.1 Add `.changeset/add-user-catalog.md` with a `patch` bump, since the mod API bump is a patch and nothing breaks for users or instantiations ("Bump rule" in `docs/releasing.md`). Add a one-line summary: users can import mosaics from their files into this browser, add mosaics by URL, and update, export and remove them, and the mosaic explorer shows where each mosaic lives. Verify the file follows the format of the other files in `.changeset/`.
 - [ ] 10.2 On a clean install (`npm ci`), run `npm run build`, `npm run test`, `npm run lint`, `npm run format:check`, `npm run test:e2e` and, since the change touches the specs of the mod API (`mod-engine-api`, `mod-api-version`, `mod-app-actions`), `npm run test:e2e:samples`. Verify each passes.
-
-## Workflow follow-up
-
-- Archive `rename-catalog-vocabulary` before archiving this change, since the `catalog` delta modifies the spec it creates.

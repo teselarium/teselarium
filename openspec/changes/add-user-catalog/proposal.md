@@ -69,7 +69,7 @@ Each new engine request opens an app dialog, only for the visible mod, and resol
 
 ### Modified Capabilities
 
-- `catalog`: the catalog's mosaics also hold the user catalog's, after the default mosaics. (Created by `rename-catalog-vocabulary`, which must be archived first.)
+- `catalog`: the catalog's mosaics also hold the user catalog's, after the default mosaics.
 - `mod-engine-api`: the `userCatalog.*` requests; "Read the catalog" gives `listedBy`, `place` and `provenance`; "Catalog changed event" also fires when the user catalog changes.
 - `mod-app-actions`: "Only the visible mod asks" covers the `userCatalog.*` requests.
 - `mod-tests`: `answer` accepts the `userCatalog.*` requests with a boolean, and the scripted catalog accepts and completes the new entry keys.

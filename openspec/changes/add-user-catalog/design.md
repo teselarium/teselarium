@@ -2,14 +2,14 @@
 
 ## Context
 
-See proposal.md, "Why". This change starts from the code as `rename-catalog-vocabulary` leaves it, which must be applied first (and archived before this change, since the `catalog` delta modifies its spec). Today:
+See proposal.md, "Why". This change starts from the code as `rename-catalog-vocabulary` left it. Today:
 
 - **Files.** `fetchFile(location, options)` (`src/lib/files/file_fetcher.ts`) reads `file:` addresses from an injected `localFiles` map and fetches the rest. Picked files already get virtual `file:///` addresses (`indexLocalFiles`), so relative paths resolve inside a picked folder.
 - **Fetch options.** The stage builds one `fetchOptions` in `createStage` (`stage_controller.ts`). Every launch, inspection, check and the stage bar's measures use it.
 - **Catalog.** `buildCatalog(instanceCatalog, includesDefaultMosaics, fetchOptions)` builds the merged `Catalog` that `catalog.list` answers. `readStageCatalog` builds it anew for each request. `changeStageCatalogDefaultMosaics` pushes `catalog.changed`.
 - **Trust.** `collectContentHosts` keeps only `http:` and `https:` origins. `isFromAppOrigin` compares `new URL(source).origin`, which is `"null"` for a custom scheme, so a stored mosaic is never granted as the app's origin.
 - **App actions.** A request that needs the user is checked into an `AppAction` (`app_actions.ts`). The stage queues it, and `ActionDialog.tsx` shows it in a native `<dialog>` opened with `showModal()`. The visible-mod rule and "one dialog at a time" already live there.
-- **Settings stores.** `src/main/settings/` keeps small stores in `localStorage` through `stored_json.ts`, read with `use_store_snapshot.ts`.
+- **Settings stores.** `src/main/settings/` keeps small stores in `localStorage` through `stored_json.ts`, read with `src/main/use_store_snapshot.ts`.
 - **Tests.** Vitest runs in Node or jsdom, which have no IndexedDB. Playwright runs Chromium for most tests, and Chromium, Firefox and WebKit for the tests tagged `@frames`.
 
 ## Goals / Non-Goals
@@ -129,8 +129,6 @@ The planning steps are functions that return new values, so their tests need no 
 - [A folder picked again under the same name but from another place is treated as the same folder.] → The review shows every match as "Changed" or "Not in the folder" before anything is applied, and removals are unchecked by default.
 - [Large folders: `webkitdirectory` hands over every file, and media folders can hold thousands.] → Only `.yaml` and `.yml` files are read. The others are counted and never read, and a mosaic file above 1 MB is "Not a mosaic: larger than 1 MB".
 - [A run link with a stored mosaic, copied with "Copy link", opens nothing in another browser.] → Accepted for now. The mosaic viewer and Settings say where stored mosaics live. Sharing stays the job of export, and of the inline-link idea for later.
-- [The `catalog` delta modifies a spec that exists only after `rename-catalog-vocabulary` is archived.] → Archive that change first. `openspec validate` already reports this as information.
-
 ## Migration Plan
 
 Nothing to migrate: the user catalog starts empty. Database version 1 creates the two object stores. A later change that needs another store raises the version in `onupgradeneeded`.
