@@ -11,8 +11,14 @@ import {
   sectionItem,
   sectionsNav,
   sidebar,
+  sidebarItems,
   sidebarThemeButton,
 } from "./app_layout.ts";
+import {
+  DESKTOP_VIEWPORT,
+  isFullyShown,
+  readElementBox,
+} from "./layout_probes.ts";
 import {
   EXPLORER_OFF_PREVIEW_URL,
   HOME_MOD_PREVIEW_URL,
@@ -699,3 +705,137 @@ test.describe("Sidebar colors", function describeColors(): void {
     );
   });
 });
+
+/** A phone held sideways: wide enough for the expanded sidebar, but short. */
+const LANDSCAPE_PHONE_VIEWPORT = { width: 915, height: 412 };
+
+/** Runs on an element: whether its content is taller than its box, so it can scroll. */
+function canScrollVertically(element: Element): boolean {
+  return element.scrollHeight > element.clientHeight;
+}
+
+/** Runs in the page: the viewport's height. */
+function readViewportHeight(): number {
+  return window.innerHeight;
+}
+
+/** Whether `locator` is fully inside the viewport, sideways and up and down. */
+async function isInsideViewport(
+  page: Page,
+  locator: Locator,
+): Promise<boolean> {
+  const box = await locator.evaluate(readElementBox);
+  const viewportHeight = await page.evaluate(readViewportHeight);
+  const isShown = await locator.evaluate(isFullyShown);
+  return isShown && box.top >= 0 && box.bottom <= viewportHeight;
+}
+
+test.describe("Sidebar fits short viewports", function describeShortViewports(): void {
+  test("Landscape phone", async function scrollsItems({ page }): Promise<void> {
+    await page.setViewportSize(LANDSCAPE_PHONE_VIEWPORT);
+    await page.goto("/");
+    const collapseButton = sidebar(page).getByRole("button", {
+      name: "Collapse sidebar",
+    });
+    await expect(collapseButton).toBeVisible();
+    expect(await isInsideViewport(page, collapseButton)).toBe(true);
+    expect(await isInsideViewport(page, hamburgerButton(page))).toBe(true);
+
+    await sidebarThemeButton(page).scrollIntoViewIfNeeded();
+
+    expect(await isInsideViewport(page, sidebarThemeButton(page))).toBe(true);
+    const itemsBox = await sidebarItems(page).evaluate(readElementBox);
+    const themeBox = await sidebarThemeButton(page).evaluate(readElementBox);
+    expect(themeBox.bottom).toBeLessThanOrEqual(itemsBox.bottom);
+    expect(await isInsideViewport(page, collapseButton)).toBe(true);
+    await collapseButton.click();
+    await expect(
+      sidebar(page).getByRole("button", { name: "Expand sidebar" }),
+    ).toBeVisible();
+    expect(
+      await isInsideViewport(
+        page,
+        sidebar(page).getByRole("button", { name: "Expand sidebar" }),
+      ),
+    ).toBe(true);
+  });
+
+  test("Tall viewport does not scroll", async function keepsItemsStill({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await page.goto("/");
+    await expect(sidebarThemeButton(page)).toBeVisible();
+
+    expect(await sidebarItems(page).evaluate(canScrollVertically)).toBe(false);
+  });
+});
+
+/** The tooltips shown on the page. */
+function shownTooltips(page: Page): Locator {
+  return page.locator('[data-slot="tooltip-content"]');
+}
+
+test.describe(
+  "Phone: tooltips and the drawer",
+  { tag: "@mobile" },
+  function describePhone(): void {
+    test("Tap a rail icon on a phone", async function tapsRailIcon({
+      page,
+    }): Promise<void> {
+      await page.goto("/");
+      await expect(
+        sidebar(page).getByRole("button", { name: "Expand sidebar" }),
+      ).toBeVisible();
+
+      await sectionItem(page, "Mods").tap();
+
+      await expect(currentItem(page)).toHaveAccessibleName("Mods");
+      await expect(stageBar(page)).toContainText("Mods");
+      await expect(shownTooltips(page)).toHaveCount(0);
+    });
+
+    test("Tap the theme control on a phone", async function tapsThemeControl({
+      page,
+    }): Promise<void> {
+      await page.goto("/");
+
+      await sidebarThemeButton(page).tap();
+
+      await expect(sidebarThemeButton(page)).toHaveAccessibleName(
+        "Theme: Light",
+      );
+      await expect(shownTooltips(page)).toHaveCount(0);
+    });
+
+    test("The hamburger button, the backdrop and Escape close the drawer", async function closesDrawer({
+      page,
+    }): Promise<void> {
+      await page.goto("/");
+      const drawer = page.getByRole("dialog");
+      const expandButton = sidebar(page).getByRole("button", {
+        name: "Expand sidebar",
+      });
+
+      await expandButton.tap();
+      await expect(drawer).toBeVisible();
+      await expect(drawer.getByRole("button", { name: "Close" })).toHaveCount(
+        0,
+      );
+      const viewport = page.viewportSize() ?? { width: 412, height: 915 };
+      await page.touchscreen.tap(viewport.width - 20, viewport.height / 2);
+      await expect(drawer).toHaveCount(0);
+
+      await expandButton.tap();
+      await expect(drawer).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(drawer).toHaveCount(0);
+
+      // The drawer's hamburger button closes it too, and hides the sidebar (see "Sidebar states").
+      await expandButton.tap();
+      await expect(drawer).toBeVisible();
+      await drawer.getByRole("button", { name: "Hide sidebar" }).tap();
+      await expect(drawer).toHaveCount(0);
+    });
+  },
+);

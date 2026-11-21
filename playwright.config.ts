@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import type { Project } from "@playwright/test";
 import {
   EXPLORER_OFF_PREVIEW_URL,
   HOME_MOD_PREVIEW_URL,
@@ -32,6 +33,12 @@ const FRAMES_TAG = /@frames/;
 /** The shipped samples' own tests. */
 const SAMPLE_TAG = /@sample/;
 
+/** The tests whose result depends on the device: touch, or a pointer that cannot hover. */
+const MOBILE_TAG = /@mobile/;
+
+/** The tests a desktop project of the default run leaves out. */
+const NOT_IN_DEFAULT_DESKTOP = /@sample|@mobile/;
+
 /** The filters of one project: the tests it runs, minus the ones it skips. */
 interface ProjectFilters {
   grep?: RegExp;
@@ -52,23 +59,37 @@ function readE2eRun(value: string | undefined): E2eRun {
 }
 
 /**
- * The filters of an engine's project in a run. `runsEveryTest` is true for
- * the engine that runs every test of the default run, false for the engines
- * that run only the `@frames` tests in it.
+ * The filters of a desktop engine's project in a run. `runsEveryTest` is
+ * true for the engine that runs every test of the default run, false for the
+ * engines that run only the `@frames` tests in it. Desktop projects never
+ * run the `@mobile` tests, which need a phone.
  */
 function buildProjectFilters(
   run: E2eRun,
   runsEveryTest: boolean,
 ): ProjectFilters {
-  let filters: ProjectFilters = {};
+  let filters: ProjectFilters = { grepInvert: MOBILE_TAG };
   if (run === "samples") {
-    filters = { grep: SAMPLE_TAG };
+    filters = { grep: SAMPLE_TAG, grepInvert: MOBILE_TAG };
   } else if (run === "default" && runsEveryTest) {
-    filters = { grepInvert: SAMPLE_TAG };
+    filters = { grepInvert: NOT_IN_DEFAULT_DESKTOP };
   } else if (run === "default") {
-    filters = { grep: FRAMES_TAG, grepInvert: SAMPLE_TAG };
+    filters = { grep: FRAMES_TAG, grepInvert: NOT_IN_DEFAULT_DESKTOP };
   }
   return filters;
+}
+
+/** The phone project: the `@mobile` tests, in the default and full runs. */
+function buildMobileProjects(run: E2eRun): Project[] {
+  const projects: Project[] = [];
+  if (run !== "samples") {
+    projects.push({
+      name: "mobile",
+      use: { ...devices["Pixel 7"] },
+      grep: MOBILE_TAG,
+    });
+  }
+  return projects;
 }
 
 const e2eRun = readE2eRun(process.env.E2E_RUN);
@@ -87,6 +108,12 @@ export default defineConfig({
   //   but `@sample` in Firefox and WebKit
   // - samples: the shipped samples' own tests (`@sample`) in all three
   // - full: every test in all three, before a release (docs/releasing.md)
+  // Phone: the tests tagged `@mobile` depend on the device (touch, a pointer
+  // that cannot hover), so they run only in the `mobile` project, a Pixel 7
+  // in Chromium, in the default and full runs, never in the desktop ones.
+  // Tests that depend only on the viewport's size run in the desktop
+  // projects with `page.setViewportSize` (design.md of
+  // fix-app-shell-on-phones, D9).
   projects: [
     {
       name: "chromium",
@@ -103,6 +130,7 @@ export default defineConfig({
       use: { ...devices["Desktop Safari"] },
       ...buildProjectFilters(e2eRun, false),
     },
+    ...buildMobileProjects(e2eRun),
   ],
   webServer: [
     {

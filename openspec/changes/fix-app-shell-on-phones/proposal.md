@@ -10,6 +10,7 @@ The Android audit (`.audit/android-themes/findings.md`, not committed) found tha
 - **B4, explorer links:** the lists' explorer links are 20px tall.
 - **A1, the drawer:** it has a second, 16px close button.
 - **F1, short screens:** on a landscape phone the expanded sidebar's collapse button is cut off and cannot be reached.
+- **B5, broken capsules:** between 480px and 719px of bar width, a capsule can shrink below its icon and chevron, which then spill out of it. The Collection capsule is 22×28 on a landscape phone with the sidebar expanded. Found when the audit was run again during this change.
 
 No test runs the app on a phone-sized, touch viewport, and no planning rule asks changes to consider phones or both color schemes, which is how these went unnoticed.
 
@@ -19,8 +20,9 @@ No test runs the app on a phone-sized, touch viewport, and no planning rule asks
   - The three message buttons become one **messages button**. It shows the icon of the most severe level that has messages and the total count. Its capsule is filled in the color of the most severe level with unread messages, and muted once all are read.
   - The button opens one popover listing the messages grouped by level (errors, warnings, notifications), with the same unread marks, dismiss buttons and "Clear all" as today.
   - **Theater mode** and **Fullscreen** move into the "More actions" menu, as a checkable item and an item.
-  - Close stays last. The right side keeps one fixed size within each width range.
-  - From 480px up, the stage bar is unchanged.
+  - Close stays last. The right side keeps one fixed size while the bar stays wide, or stays narrow.
+  - From 480px up, the stage bar is unchanged, unless its capsules do not fit (below).
+- **Capsules never break:** a capsule is never narrower than its padding, icon and chevron. When the capsules at that width do not fit beside the bar's other items, the bar folds as it does under 480px, and unfolds once they fit again.
 - **Tooltips** of the stage bar, its lists and the sidebar open only on devices that can hover. On a touch-only device a tap no longer leaves a tooltip behind. Every tooltip's text is still in its element's accessible name.
 - **Combination lists:** a highlighted row draws its secondary text (details, aliases, score) in the accent's foreground color, which meets 4.5:1 in both themes. The explorer links are at least 32px tall.
 - **Sidebar on short viewports:** the section items scroll when they do not fit. The heading row and the collapse or expand button always stay visible.
@@ -58,7 +60,8 @@ Out of scope:
 ## Impact
 
 - Stage bar:
-  - `src/main/stage/StageBar.tsx` (the right side in two forms switched by the existing container query, as the left side is);
+  - `src/main/stage/StageBar.tsx` (the right side in two forms, switched by `use_narrow_stage_bar.ts`, which the left side's fold follows too);
+  - `CombinationCapsule.tsx` (its minimum width) and `CombinationTitle.tsx` (the fold step follows the bar's `data-narrow`);
   - `MessageButton.tsx`, `MessagePopover.tsx`, `message_level_views.ts` (a messages button and a grouped popover built from the per-level parts);
   - `MoreActionsMenu.tsx` (the "Theater mode" and "Fullscreen" items);
   - `stage_bar_panels.ts` (the new panel).

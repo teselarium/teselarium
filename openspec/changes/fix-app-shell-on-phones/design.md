@@ -36,14 +36,20 @@ See proposal.md (Why) and the audit notes (`.audit/android-themes/findings.md`: 
 
 ## Decisions
 
-### D1. The bar measures its own width once, and the right side and the menu follow it
+### D1. The bar decides once whether it is narrow, and both sides and the menu follow it
 
-A small hook, `useNarrowStageBar(ref)`, observes the bar's content box with a `ResizeObserver` and returns `true` under 480px. The right side renders either its wide form (as today) or its narrow form from that value, and passes it to `MoreActionsMenu`.
+A small hook, `useNarrowStageBar`, observes the bar's content box and its left side with a `ResizeObserver`. It returns `true` (narrow) when:
+- the bar's content box is under 480px; or
+- the bar is wide and its left side, or the capsule row in it, overflows (`scrollWidth > clientWidth`): its capsules have reached their minimum width (D11) and still do not fit beside the bar's other items. The row is measured too because it shrinks with the left side: its capsules can overflow it, under the "More actions" button, while the left side itself does not.
 
-- **Why JavaScript and not container variants, as the left side uses:** the menu is portaled outside the bar, where no container query reaches. Rendering both right sides and hiding one with CSS would also keep two sets of popover triggers mounted, and an open popover anchored to a hidden trigger is drawn at the corner.
-- **Why it still matches the left side:** a container query on an `inline-size` container compares the container's content box, which is what `ResizeObserver`'s `contentBoxSize` reports. So both sides switch at the same width.
-- **Crossing 480px:** when the value changes, `StageBar` closes an open message panel (`setOpenPanel(null)`). It's the same thing it already does before fullscreen.
-- **Alternative:** move the whole bar to JavaScript widths. That is a larger rewrite of the left side for no user-visible gain.
+When it turns narrow because of an overflow, it records the bar's content width at that moment, and stays narrow until the bar is wider than that width. While narrow, the capsule row is hidden and cannot be measured, and the recorded width keeps the bar from switching back and forth. The record is dropped when what the bar holds changes (the sandbox, the Sites chip, the fullscreen or the close button), and the bar is measured again in its wide form.
+
+The right side renders either its wide form (as today) or its narrow form from that value, and passes it to `MoreActionsMenu`. The bar carries it as a `data-narrow` attribute, which the left side's fold step follows (`group-data-[narrow]` variants) in place of the `@max-[480px]` container variant. The 720px and 960px steps stay container variants: they only hide text inside capsules.
+
+- **Why JavaScript and not container variants, as the left side used:** the menu is portaled outside the bar, where no container query reaches. Rendering both right sides and hiding one with CSS would also keep two sets of popover triggers mounted, and an open popover anchored to a hidden trigger is drawn at the corner. A container query cannot know whether the capsules fit either.
+- **Why both sides agree:** they read the same flag. The 480px part compares the content box, which `ResizeObserver`'s `contentBoxSize` reports and which the container queries of the other steps compare too.
+- **Crossing between narrow and wide:** when the value changes, `StageBar` closes an open message panel (`setOpenPanel(null)`). It's the same thing it already does before fullscreen.
+- **Alternatives:** move the whole bar to JavaScript widths, a larger rewrite of the left side for no user-visible gain; or a fixed higher threshold (about 600px), which ignores whether the bar has a Sites chip or a close button, and would fold bars that fit.
 
 ### D2. The messages button and popover are built from the per-level parts
 
@@ -125,10 +131,17 @@ The project's OpenSpec config gets one rule per artifact, applied to every chang
 - **Why in this change:** the rule's `@mobile` tests need the `mobile` project that D9 adds.
 - **Alternative:** an automated phone and theme sweep over every screen. It catches what the rule can't (screens nobody planned for), but it's a change of its own, and it was left for later.
 
+### D11. A capsule is never narrower than its icon and chevron
+
+`CombinationCapsule` replaces `min-w-0` with a minimum width of its padding, its icon, its chevron and the gaps between them (and the title's gaps when the title is shown), so when the capsules shrink, the title shrinks to its ellipsis and the icons stay inside the capsule. When even that does not fit, the bar turns narrow (D1).
+
+- **Alternative:** `min-w-min`, which would count the title's longest word and keep capsules too wide.
+
 ## Risks / Trade-offs
 
 - [A capsule's full title is only in its tooltip on desktop, and touch has none] → The capsule's accessible name holds the full title (stage-bar "Narrow bar"). On a narrow bar, the capsule's menu rows name the mosaic, mod and collection.
-- [The `ResizeObserver` and the container query could disagree by a fraction of a pixel at 480px] → Both read the content box. The hook uses `< 480` as the `@max-[479px]` variant does at whole pixels. An e2e check at 479 and 481px pins it.
+- [The bar's sides could disagree at the fold] → Both follow the hook's flag (D1). The other steps' container variants name their lower bound, `@max-[720px]` and `@max-[960px]`, which Tailwind compiles to `width < 720px` and `width < 960px`. (`@max-[479px]`, used before, compiled to `width < 479px`, so between 479 and 480px both left-side forms showed.) An e2e check at 479 and 481px pins the fold.
+- [Folding on overflow could flip back and forth] → The bar stays narrow until it is wider than the width at which it folded (D1), and that width is measured again only when the bar's content changes.
 - [An open popover when the bar crosses 480px] → D1 closes it, as fullscreen does.
 - [Theater mode moves out of sight on phones] → It is in "More actions", checked when on. Its effect on a phone frame is nil anyway.
 - [The mobile project lengthens the default e2e run] → Only `@mobile` tests run there, a handful.

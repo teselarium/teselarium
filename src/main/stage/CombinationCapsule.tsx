@@ -2,11 +2,7 @@ import { ChevronDown } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { Badge } from "@/vendor/shadcn/ui/badge.tsx";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/vendor/shadcn/ui/tooltip.tsx";
+import { HoverTooltip } from "../HoverTooltip.tsx";
 
 /** How a capsule shrinks when the capsules do not fit: the higher the weight, the sooner. */
 export type CapsuleShrink = 1 | 2 | 3;
@@ -39,6 +35,20 @@ const SHRINK_CLASSES: Readonly<Record<CapsuleShrink, string>> = Object.freeze({
   3: "shrink-[3]",
 });
 
+/**
+ * The narrowest a capsule may be, so its icons always stay inside it: the
+ * `sm` Button's padding with an icon (`has-[>svg]:px-2.5`, on each side), the
+ * kind's icon and the chevron (`size-4` each), the `gap-1.5` between its
+ * items, and its 1px borders. With its title shown, even shrunk to nothing,
+ * there is one gap more. (The mod's version is shown only from 960px of bar
+ * width, where the capsules never get this narrow.)
+ */
+export const CAPSULE_MIN_WIDTH_CLASS = "min-w-[calc(var(--spacing)*16+2px)]";
+
+/** The narrowest a capsule whose title is hidden under 720px of bar width may be: one gap less. */
+export const ICONS_ONLY_MIN_WIDTH_CLASS =
+  "@max-[720px]:min-w-[calc(var(--spacing)*14.5+2px)]";
+
 function joinClasses(classes: readonly (string | false)[]): string {
   const kept: string[] = [];
   for (const className of classes) {
@@ -65,7 +75,8 @@ function buildCapsuleName(
 /**
  * A capsule of the stage bar's recipe: shadcn's outline Button with the
  * kind's icon, the title, the version for the mod, and a chevron. It is at
- * most 16rem wide, its title ends with an ellipsis when it does not fit, and
+ * most 16rem wide and never narrower than its icon and chevron, its title
+ * ends with an ellipsis when it does not fit, and
  * its tooltip and accessible name give the kind and the full title. The
  * other props, and the ones a `PopoverTrigger` or `DropdownMenuTrigger`
  * passes with `asChild`, go to the button. Its tooltip opening tells
@@ -92,42 +103,38 @@ export function CombinationCapsule({
   }
 
   return (
-    <Tooltip onOpenChange={handleTooltipOpenChange}>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={name}
+    <HoverTooltip content={name} onOpenChange={handleTooltipOpenChange}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={name}
+        className={joinClasses([
+          "h-7 max-w-[16rem] gap-1.5 px-2 font-normal",
+          CAPSULE_MIN_WIDTH_CLASS,
+          hidesTitleWhenNarrow && ICONS_ONLY_MIN_WIDTH_CLASS,
+          SHRINK_CLASSES[shrink],
+          isDashed && "border-dashed",
+          className ?? false,
+        ])}
+        {...buttonProps}
+      >
+        {icon}
+        <span
           className={joinClasses([
-            "h-7 min-w-0 max-w-[16rem] gap-1.5 px-2 font-normal",
-            SHRINK_CLASSES[shrink],
-            isDashed && "border-dashed",
-            className ?? false,
+            "min-w-0 truncate",
+            hidesTitleWhenNarrow && "@max-[720px]:hidden",
           ])}
-          {...buttonProps}
         >
-          {icon}
-          <span
-            className={joinClasses([
-              "min-w-0 truncate",
-              hidesTitleWhenNarrow && "@max-[719px]:hidden",
-            ])}
-          >
-            {title}
-          </span>
-          {version === undefined ? null : (
-            <Badge
-              variant="outline"
-              className="tabular-nums @max-[959px]:hidden"
-            >
-              {version}
-            </Badge>
-          )}
-          <ChevronDown className="opacity-60" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{name}</TooltipContent>
-    </Tooltip>
+          {title}
+        </span>
+        {version === undefined ? null : (
+          <Badge variant="outline" className="tabular-nums @max-[960px]:hidden">
+            {version}
+          </Badge>
+        )}
+        <ChevronDown className="opacity-60" />
+      </Button>
+    </HoverTooltip>
   );
 }

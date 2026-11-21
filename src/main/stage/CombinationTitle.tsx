@@ -94,7 +94,7 @@ function buildListProps(
   return listProps;
 }
 
-/** The capsules' row: mod + collection -> mosaic, each opening its list. Hidden under 480px of bar width. */
+/** The capsules' row: mod + collection -> mosaic, each opening its list. Hidden on a narrow bar (`data-narrow`, see `useNarrowStageBar`). */
 function renderCapsuleRow(props: CombinationTitleProps): ReactElement {
   const sandbox = props.sandbox;
   const isUnsaved = sandbox.mosaicReference === null;
@@ -131,7 +131,10 @@ function renderCapsuleRow(props: CombinationTitleProps): ReactElement {
     />
   );
   return (
-    <div className="flex min-w-0 items-center gap-1 @max-[479px]:hidden">
+    <div
+      data-capsule-row=""
+      className="flex min-w-0 items-center gap-1 group-data-narrow/stage-bar:hidden"
+    >
       <ModList {...buildListProps(props, "mod-list", modCapsule)} />
       <span aria-hidden="true" className={SEPARATOR_CLASSES}>
         +
@@ -148,7 +151,7 @@ function renderCapsuleRow(props: CombinationTitleProps): ReactElement {
 }
 
 /**
- * The single capsule of a bar under 480px wide: the mosaic's title, or the
+ * The single capsule of a narrow bar (under 480px, or when the capsules do not fit): the mosaic's title, or the
  * mod's for an unsaved combination, whose menu has "Mosaic", "Mod" and
  * "Collection" rows that open their lists.
  */
@@ -194,7 +197,7 @@ function FoldedCapsule(props: CombinationTitleProps): ReactElement {
   }
 
   return (
-    <div className="flex min-w-0 @min-[480px]:hidden">
+    <div className="hidden min-w-0 group-data-narrow/stage-bar:flex">
       <DropdownMenu
         open={props.openPanel === "folded"}
         onOpenChange={handleOpenChange}

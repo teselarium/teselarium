@@ -8,6 +8,8 @@ import {
   findModFrame,
   followLink,
   FOREIGN_HOST,
+  isFrameMarked,
+  markFrame,
   messageButton,
   messageCapsule,
   messagePopover,
@@ -46,6 +48,7 @@ import {
 } from "./test_mods.ts";
 import type { ModFiles } from "./mod_routes.ts";
 import {
+  currentItem,
   hamburgerButton,
   sectionItem,
   sidebarHeadingRow,
@@ -54,6 +57,14 @@ import {
   HOME_MOD_PREVIEW_URL,
   TEST_CATALOG_PREVIEW_URL,
 } from "./app_servers.ts";
+import { MINIMUM_TEXT_CONTRAST, readContrastRatio } from "./theme_probes.ts";
+import {
+  DESKTOP_VIEWPORT,
+  isFullyShown,
+  readElementBox,
+  SMALL_PHONE_VIEWPORT,
+  THEATER_MODE_KEY,
+} from "./layout_probes.ts";
 
 /** The lines of a probe that shows images from `COVER_HOST`, so a foreign probe asks for consent. */
 const SHOW_COVERS_LINES = [
@@ -983,7 +994,7 @@ async function openSwapMosaic(
   await waitForProbe(await findModFrame(page, TILES_TITLE));
 }
 
-function capsule(page: Page, name: string): Locator {
+function capsule(page: Page, name: string | RegExp): Locator {
   return stageBar(page).getByRole("button", { name });
 }
 
@@ -1301,7 +1312,115 @@ async function openModList(page: Page): Promise<void> {
   await expect(page.getByRole("combobox")).toBeFocused();
 }
 
+const NOBEL_MAP_MOSAIC_LINK =
+  "/#/run?mosaic=./samples/mosaics/nobel_laureates_map.yaml";
+
+async function readLocatorHeight(locator: Locator): Promise<number> {
+  const box = await locator.evaluate(readElementBox);
+  return box.height;
+}
+
+/** The computed colors of a highlighted row's alias and background, and of `--ot-accent-foreground`. */
+interface HighlightColors {
+  aliasColor: string;
+  rowBackground: string;
+  accentForeground: string;
+}
+
+/** Runs on a row's alias: its color, its row's background and the accent's foreground. */
+function readHighlightColors(alias: Element): HighlightColors {
+  const row = alias.closest("[cmdk-item]");
+  if (row === null) {
+    throw new Error("Expected the alias to be inside a list row");
+  }
+  const probe = document.createElement("div");
+  probe.style.color = "var(--ot-accent-foreground)";
+  document.body.append(probe);
+  const colors: HighlightColors = {
+    aliasColor: getComputedStyle(alias).color,
+    rowBackground: getComputedStyle(row).backgroundColor,
+    accentForeground: getComputedStyle(probe).color,
+  };
+  probe.remove();
+  return colors;
+}
+
+/** Whether the alias is drawn in `--ot-accent-foreground`, once the row's highlight settled. */
+async function readAliasMatchesAccent(alias: Locator): Promise<boolean> {
+  const colors = await alias.evaluate(readHighlightColors);
+  return colors.aliasColor === colors.accentForeground;
+}
+
+/** The contrast of the alias with its row's background, or `0` while they cannot be read. */
+async function readAliasContrast(alias: Locator): Promise<number> {
+  const colors = await alias.evaluate(readHighlightColors);
+  if (colors.aliasColor === "" || colors.rowBackground === "") {
+    return 0;
+  }
+  return readContrastRatio(colors.aliasColor, colors.rowBackground);
+}
+
+/** Opens the Nobel map mosaic's list, with its own row highlighted, and checks its aliases' colors. */
+async function expectReadableAliases(page: Page): Promise<void> {
+  await page.goto(NOBEL_MAP_MOSAIC_LINK);
+  await stageBar(page)
+    .getByRole("button", { name: `Mosaic: ${MAP_MOSAIC_TITLE}` })
+    .click();
+  // The mosaic's own row is the current one: other rows can name it too.
+  const row = openList(page).locator('[cmdk-item][aria-current="true"]');
+  await expect(row).toContainText(MAP_MOSAIC_TITLE);
+  await expect(row).toHaveAttribute("aria-selected", "true");
+  await expect(row.locator("[data-column=score]")).toHaveText("17/17");
+  // The pointer highlights the row too, and stops the list's settling, so its rows stay.
+  await row.hover();
+  await expect(row).toHaveAttribute("aria-selected", "true");
+
+  for (const aliasText of ["title <- name", "country <- birth_country"]) {
+    const alias = row.getByText(aliasText, { exact: true });
+    await expect.poll(readAliasMatchesAccent.bind(undefined, alias)).toBe(true);
+    await expect
+      .poll(readAliasContrast.bind(undefined, alias))
+      .toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
+  }
+}
+
 test.describe("Combination lists", function describeCombinationLists(): void {
+  test("Collection explorer link", async function opensCollectionExplorer({
+    page,
+  }): Promise<void> {
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+    await stageBar(page)
+      .getByRole("button", { name: /^Collection: / })
+      .click();
+    const link = openList(page).getByRole("button", {
+      name: "Open the collection explorer",
+    });
+
+    // The list zooms in as it opens, so the link reaches its height once it settled.
+    await expect
+      .poll(readLocatorHeight.bind(undefined, link))
+      .toBeGreaterThanOrEqual(32);
+    await link.click();
+
+    await expect(currentItem(page)).toHaveText(/Tiles/);
+  });
+
+  test("Aliases of a highlighted mosaic", async function readsHighlightedLight({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "light" });
+
+    await expectReadableAliases(page);
+  });
+
+  test("Aliases of a highlighted mosaic, dark color scheme", async function readsHighlightedDark({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    await expectReadableAliases(page);
+  });
+
   test("Default order and columns", async function ordersEntries({
     page,
   }): Promise<void> {
@@ -1507,3 +1626,363 @@ function hasCountryTypeFile(requested: readonly string[]): boolean {
   }
   return false;
 }
+
+/** The messages button of a narrow bar, whose accessible name starts with `Messages: `. */
+function messagesButton(page: Page): Locator {
+  return stageBar(page).getByRole("button", { name: /^Messages: / });
+}
+
+/** The open messages popover of a narrow bar. */
+function messagesPopover(page: Page): Locator {
+  return page.locator("[data-slot=popover-content]");
+}
+
+/** The texts of the headings of the open messages popover, in order. */
+async function readGroupHeadings(page: Page): Promise<string[]> {
+  return messagesPopover(page).getByRole("heading").allTextContents();
+}
+
+/** The texts of a group's items, newest first, as the popover lists them. */
+async function readGroupTexts(page: Page, level: string): Promise<string[]> {
+  return messagesPopover(page)
+    .getByRole("list", { name: level })
+    .locator("li div > span")
+    .allTextContents();
+}
+
+/** Runs in the app's page: whether the page can scroll sideways. */
+function canScrollSideways(): boolean {
+  const root = document.documentElement;
+  return root.scrollWidth > root.clientWidth;
+}
+
+/** Sets the bar's content box, which its container queries and its narrow form compare, to `width` pixels. */
+async function setBarContentWidth(page: Page, width: number): Promise<void> {
+  await stageBar(page).evaluate(applyBarContentWidth, width);
+}
+
+function applyBarContentWidth(bar: HTMLElement, width: number): void {
+  bar.style.boxSizing = "content-box";
+  bar.style.width = `${width}px`;
+  bar.style.alignSelf = "flex-start";
+}
+
+/** The accessible names of the bar's buttons after "More actions": its right side. */
+async function readRightSideNames(page: Page): Promise<string[]> {
+  const names: string[] = [];
+  let isRightSide = false;
+  for (const button of await stageBar(page).getByRole("button").all()) {
+    const name = (await button.getAttribute("aria-label")) ?? "";
+    if (isRightSide) {
+      names.push(name);
+    }
+    isRightSide ||= name === "More actions";
+  }
+  return names;
+}
+
+test.describe("Narrow stage bar", function describeNarrowBar(): void {
+  test("Phone: the messages button, a separator and Close", async function foldsRightSide({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await openProbe(page);
+
+    await expect(messagesButton(page)).toBeVisible();
+    expect(await readRightSideNames(page)).toEqual([
+      "Messages: 0 errors, 0 warnings, 0 notifications, 0 unread",
+      "Close",
+    ]);
+    const messagesBox = await messagesButton(page).evaluate(readElementBox);
+    const separatorBox = await separator(page).last().evaluate(readElementBox);
+    const closeBox = await closeButton(page).evaluate(readElementBox);
+    expect(separatorBox.left).toBeGreaterThanOrEqual(messagesBox.right);
+    expect(closeBox.left).toBeGreaterThanOrEqual(separatorBox.right);
+    expect(await page.evaluate(canScrollSideways)).toBe(false);
+    expect(await closeButton(page).evaluate(isFullyShown)).toBe(true);
+  });
+
+  test("The title is readable on a phone", async function showsTitle({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    const folded = capsule(page, `Combination: ${MAP_MOSAIC_TITLE}`);
+    await expect(folded).toBeVisible();
+
+    const box = await folded.evaluate(readElementBox);
+
+    expect(box.width).toBeGreaterThanOrEqual(120);
+    const title = folded.locator("span").first();
+    await expect(title).toBeVisible();
+    await expect(title).toHaveText(MAP_MOSAIC_TITLE);
+    expect((await title.evaluate(readElementBox)).width).toBeGreaterThan(48);
+  });
+
+  test("Errors and notifications: one button, a grouped popover, then all read", async function groupsMessages({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    const frame = await openProbe(page);
+    await notify(frame, { message: "First note", level: "info" });
+    await notify(frame, { message: "Broken", level: "error" });
+    await notify(frame, { message: "Second note", level: "info" });
+
+    const capsuleOf = messagesButton(page).locator("[data-capsule]");
+    await expect(messagesButton(page)).toHaveAttribute("data-level", "error");
+    await expect(capsuleOf).toHaveText("3");
+    await expect(capsuleOf).toHaveAttribute("data-capsule", "unread");
+    await expect(capsuleOf).toHaveClass(/bg-destructive/);
+    await messagesButton(page).click();
+
+    expect(await readGroupHeadings(page)).toEqual(["Errors", "Notifications"]);
+    expect(await readGroupTexts(page, "Errors")).toEqual(["Broken"]);
+    expect(await readGroupTexts(page, "Notifications")).toEqual([
+      "Second note",
+      "First note",
+    ]);
+    await expect(unreadItems(messagesPopover(page))).toHaveCount(3);
+
+    await messagesButton(page).click();
+    await expect(messagesPopover(page)).toHaveCount(0);
+    await expect(capsuleOf).toHaveText("3");
+    await expect(capsuleOf).toHaveAttribute("data-capsule", "read");
+  });
+
+  test("Dismiss from the grouped popover", async function dismissesGrouped({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    const frame = await openProbe(page);
+    await notify(frame, { message: "First note", level: "info" });
+    await notify(frame, { message: "Second note", level: "info" });
+    await messagesButton(page).click();
+
+    await messagesPopover(page)
+      .getByRole("button", { name: "Dismiss: Second note" })
+      .click();
+
+    expect(await readGroupTexts(page, "Notifications")).toEqual(["First note"]);
+    await expect(messagesButton(page).locator("[data-capsule]")).toHaveText(
+      "1",
+    );
+  });
+
+  test("No messages: dimmed, and the popover says No messages.", async function showsEmpty({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await openProbe(page);
+    await expect(messagesButton(page)).toHaveAttribute("data-empty");
+    await expect(messagesButton(page).locator("[data-capsule]")).toHaveCount(0);
+
+    await messagesButton(page).click();
+
+    await expect(messagesPopover(page)).toHaveText("No messages.");
+  });
+
+  test("Theater mode from the menu on a phone", async function togglesTheaterFromMenu({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    const frame = await openProbe(page);
+    await markFrame(frame);
+    await expect(theaterButton(page)).toHaveCount(0);
+    const menu = await openMoreActions(page);
+    const item = menu.getByRole("menuitemcheckbox", { name: "Theater mode" });
+    await expect(item).toHaveAttribute("aria-checked", "false");
+
+    await item.click();
+
+    await expect(menu).toHaveCount(0);
+    await expect
+      .poll(readStoredTheaterChoice.bind(undefined, page))
+      .toBe("true");
+    const reopened = await openMoreActions(page);
+    await expect(
+      reopened.getByRole("menuitemcheckbox", { name: "Theater mode" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(await isFrameMarked(frame)).toBe(true);
+  });
+
+  test("Fullscreen in the menu on a phone, and no button", async function offersFullscreenItem({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await openProbe(page);
+
+    const menu = await openMoreActions(page);
+
+    await expect(
+      menu.getByRole("menuitem", { name: "Fullscreen" }),
+    ).toBeVisible();
+    await expect(fullscreenButton(page)).toHaveCount(0);
+  });
+
+  test("Wide bar keeps the menu short", async function keepsMenuShort({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await openProbe(page);
+
+    const menu = await openMoreActions(page);
+
+    await expect(
+      menu.getByRole("menuitem", { name: "Copy link" }),
+    ).toBeVisible();
+    await expect(
+      menu.getByRole("menuitemcheckbox", { name: "Theater mode" }),
+    ).toHaveCount(0);
+    await expect(
+      menu.getByRole("menuitem", { name: "Fullscreen" }),
+    ).toHaveCount(0);
+  });
+
+  test("Both sides switch at 480px", async function switchesAtThreshold({
+    page,
+  }): Promise<void> {
+    // The probe's plain title always fits, so only the width folds its bar.
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await openProbe(page);
+
+    await setBarContentWidth(page, 481);
+    await expect(messageButton(page, "Errors")).toBeVisible();
+    await expect(messagesButton(page)).toHaveCount(0);
+    await expect(theaterButton(page)).toBeVisible();
+
+    await setBarContentWidth(page, 479);
+    await expect(messagesButton(page)).toBeVisible();
+    await expect(messageButton(page, "Errors")).toHaveCount(0);
+    await expect(theaterButton(page)).toHaveCount(0);
+    const offsetAt479 = await readCloseOffset(page);
+    const messagesAt479 = await readBox(messagesButton(page));
+
+    await setBarContentWidth(page, 300);
+    expect(await readCloseOffset(page)).toBe(offsetAt479);
+    const messagesAt300 = await readBox(messagesButton(page));
+    expect(messagesAt300.width).toBe(messagesAt479.width);
+  });
+
+  test("Capsules never break", async function keepsCapsulesWhole({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    const mosaicCapsule = capsule(page, `Mosaic: ${MAP_MOSAIC_TITLE}`);
+    await expect(mosaicCapsule).toBeVisible();
+
+    // As on a landscape phone with the sidebar expanded: the capsules have to shrink, and still fit.
+    await setBarContentWidth(page, 575);
+
+    await expect(mosaicCapsule).toBeVisible();
+    await expect(capsule(page, /^Collection: /)).toBeVisible();
+    expect(await stageBar(page).evaluate(listBrokenBarItems)).toEqual([]);
+  });
+
+  test("Folds when the capsules do not fit", async function foldsOnFit({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    const folded = capsule(page, `Combination: ${MAP_MOSAIC_TITLE}`);
+    const mosaicCapsule = capsule(page, `Mosaic: ${MAP_MOSAIC_TITLE}`);
+    await expect(mosaicCapsule).toBeVisible();
+
+    await setBarContentWidth(page, 500);
+    await expect(folded).toBeVisible();
+    await expect(mosaicCapsule).toBeHidden();
+    await expect(messagesButton(page)).toBeVisible();
+    await expect(messageButton(page, "Errors")).toHaveCount(0);
+    expect(await stageBar(page).evaluate(listBrokenBarItems)).toEqual([]);
+
+    // Around where the capsules stop fitting, nothing overlaps, folded or not.
+    for (const width of [540, 560, 580, 600, 620, 640]) {
+      await setBarContentWidth(page, width);
+      // The bar folds on its next frame: the check waits for it.
+      await expect.poll(readBrokenBarItems.bind(undefined, page)).toEqual([]);
+    }
+
+    await setBarContentWidth(page, 900);
+    await expect(mosaicCapsule).toBeVisible();
+    await expect(capsule(page, /^Mod: /)).toBeVisible();
+    await expect(capsule(page, /^Collection: /)).toBeVisible();
+    await expect(folded).toBeHidden();
+    await expect(messageButton(page, "Errors")).toBeVisible();
+    await expect(messagesButton(page)).toHaveCount(0);
+    expect(await stageBar(page).evaluate(listBrokenBarItems)).toEqual([]);
+  });
+});
+
+function readBrokenBarItems(page: Page): Promise<string[]> {
+  return stageBar(page).evaluate(listBrokenBarItems);
+}
+
+/**
+ * Runs on the stage bar: each shown button or separator that sticks out of
+ * the bar or overlaps the one before it, and each icon that sticks out of
+ * its button, named. Empty when nothing is broken. Half a pixel of rounding
+ * is allowed.
+ */
+function listBrokenBarItems(bar: Element): string[] {
+  const tolerance = 0.5;
+  const barBox = bar.getBoundingClientRect();
+  const broken: string[] = [];
+  let previous: { name: string; right: number } | null = null;
+  for (const item of bar.querySelectorAll("button, [data-slot=separator]")) {
+    const box = item.getBoundingClientRect();
+    if (box.width === 0 && box.height === 0) {
+      continue;
+    }
+    const name = item.getAttribute("aria-label") ?? item.tagName;
+    if (previous !== null && box.left < previous.right - tolerance) {
+      broken.push(`${name} overlaps ${previous.name}`);
+    }
+    previous = { name, right: box.right };
+    if (
+      box.left < barBox.left - tolerance ||
+      box.right > barBox.right + tolerance
+    ) {
+      broken.push(`${name} is outside the bar`);
+    }
+    for (const icon of item.querySelectorAll("svg")) {
+      const iconBox = icon.getBoundingClientRect();
+      if (
+        iconBox.left < box.left - tolerance ||
+        iconBox.right > box.right + tolerance
+      ) {
+        broken.push(`an icon sticks out of ${name}`);
+      }
+    }
+  }
+  return broken;
+}
+
+/** Runs in the app's page: the stored theater choice. */
+function readTheaterChoice(key: string): string | null {
+  return localStorage.getItem(key);
+}
+
+function readStoredTheaterChoice(page: Page): Promise<string | null> {
+  return page.evaluate(readTheaterChoice, THEATER_MODE_KEY);
+}
+
+test.describe(
+  "Stage bar tooltips on a phone",
+  { tag: "@mobile" },
+  function describePhoneTooltips(): void {
+    test("Tap on a phone", async function tapsMessagesButton({
+      page,
+    }): Promise<void> {
+      await openProbe(page);
+
+      await messagesButton(page).tap();
+      await expect(messagesPopover(page)).toBeVisible();
+      await messagesButton(page).tap();
+
+      await expect(messagesPopover(page)).toHaveCount(0);
+      await expect(page.locator('[data-slot="tooltip-content"]')).toHaveCount(
+        0,
+      );
+    });
+  },
+);

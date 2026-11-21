@@ -9,6 +9,15 @@ export const THEATER_MODE_KEY = "opentesela.theater-mode";
 /** The viewport where the stage area is wider than `--ot-content-width`. */
 export const WIDE_VIEWPORT = { width: 2560, height: 1080 };
 
+/** A phone in portrait. */
+export const PHONE_VIEWPORT = { width: 412, height: 915 };
+
+/** A small phone in portrait. */
+export const SMALL_PHONE_VIEWPORT = { width: 360, height: 740 };
+
+/** A laptop screen. */
+export const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
+
 /**
  * A mod that keeps its engine API object and context on `globalThis.probe`,
  * the layout attribute it saw in `mount`, and each `layout.changed` it

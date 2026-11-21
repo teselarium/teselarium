@@ -1,5 +1,5 @@
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
 import { Separator } from "@/vendor/shadcn/ui/separator.tsx";
 import { Sheet, SheetContent, SheetTitle } from "@/vendor/shadcn/ui/sheet.tsx";
@@ -98,7 +98,7 @@ function SectionList(props: SectionListProps): ReactElement {
     <nav
       id={props.navigationId}
       aria-label="Sections"
-      className="flex min-h-0 shrink-0 flex-col pt-2"
+      className="flex flex-col pt-2"
     >
       <ul className={LIST_CLASS}>{renderItems(props, "main")}</ul>
       <Separator className="my-2" />
@@ -118,6 +118,27 @@ function ThemeList({ appTheme, isExpanded }: ThemeListProps): ReactElement {
     <ul className={`${LIST_CLASS} pt-1 pb-2`}>
       <SidebarThemeControl appTheme={appTheme} isExpanded={isExpanded} />
     </ul>
+  );
+}
+
+interface SidebarItemsProps {
+  children: ReactNode;
+}
+
+/**
+ * The section items and the Theme control, between the heading row and the
+ * toggle row, which stay in place: when they do not fit, as on a landscape
+ * phone, only they scroll. It spans the sidebar's inset, so the rows' focus
+ * outlines are not cut at its edges.
+ */
+function SidebarItems({ children }: SidebarItemsProps): ReactElement {
+  return (
+    <div
+      data-sidebar-items=""
+      className="-mx-(--sidebar-inset) flex min-h-0 flex-1 flex-col overflow-y-auto px-(--sidebar-inset)"
+    >
+      {children}
+    </div>
   );
 }
 
@@ -165,7 +186,7 @@ function SidebarToggle({
     </Button>
   );
   return (
-    <div className="mt-auto flex py-2">
+    <div className="flex shrink-0 py-2">
       <SidebarIconCell>{button}</SidebarIconCell>
     </div>
   );
@@ -199,8 +220,10 @@ function SidebarDrawer({
   );
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
+      {/* The hamburger button, the backdrop and Escape close it: no close button of its own. */}
       <SheetContent
         side="left"
+        showCloseButton={false}
         className="sidebar-drawer w-64 gap-0 bg-sidebar p-0 text-sidebar-foreground"
         aria-describedby={undefined}
       >
@@ -210,8 +233,10 @@ function SidebarDrawer({
             navigationId={SIDEBAR_NAV_ID}
             heading={heading}
           />
-          <SectionList {...listProps} isExpanded={true} />
-          <ThemeList appTheme={appTheme} isExpanded={true} />
+          <SidebarItems>
+            <SectionList {...listProps} isExpanded={true} />
+            <ThemeList appTheme={appTheme} isExpanded={true} />
+          </SidebarItems>
         </div>
       </SheetContent>
     </Sheet>
@@ -314,8 +339,10 @@ export function Sidebar({
       />
       {isHidden ? null : (
         <>
-          <SectionList {...listProps} navigationId={SIDEBAR_NAV_ID} />
-          <ThemeList appTheme={appTheme} isExpanded={listProps.isExpanded} />
+          <SidebarItems>
+            <SectionList {...listProps} navigationId={SIDEBAR_NAV_ID} />
+            <ThemeList appTheme={appTheme} isExpanded={listProps.isExpanded} />
+          </SidebarItems>
           <SidebarToggle
             layout={layout}
             isExpanded={listProps.isExpanded}

@@ -3,11 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/vendor/shadcn/ui/tooltip.tsx";
+import { HoverTooltip } from "../HoverTooltip.tsx";
 import type { ThemeChoice } from "../../lib/core/theme/index.ts";
 import {
   chooseTheme,
@@ -46,8 +42,9 @@ function readControlName(choice: ThemeChoice): string {
  * The sidebar's Theme control, after the `footer` items: a button showing
  * the current choice's icon. Each press moves to the next choice (System,
  * Light, Dark, then System again), the same choice as the Settings page's
- * Theme control. A tooltip names the current choice in every state, and
- * stays open after a press so it shows the new one; a polite live region
+ * Theme control. Where the pointer can hover, a tooltip names the current
+ * choice in every state, and stays open after a press so it shows the new
+ * one; the accessible name always holds it, and a polite live region
  * announces it. It is a button, not a section item, so it is never the
  * current item.
  */
@@ -80,27 +77,29 @@ export function SidebarThemeControl({
   const ChoiceIcon = CHOICE_ICONS[snapshot.choice];
   return (
     <li>
-      <Tooltip open={isTooltipOpen} onOpenChange={setTooltipOpen}>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            className={`${BUTTON_RESET_CLASS} ${readSidebarRowClass(isExpanded)}`}
-            aria-label={name}
-            onClick={handleClick}
-          >
-            <SidebarIconCell>
-              <ChoiceIcon className="size-5" aria-hidden="true" />
-            </SidebarIconCell>
-            {isExpanded ? (
-              <span className="min-w-0 flex-1 truncate text-left">
-                {THEME_LABEL}
-              </span>
-            ) : null}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="right">{name}</TooltipContent>
-      </Tooltip>
+      <HoverTooltip
+        content={name}
+        side="right"
+        open={isTooltipOpen}
+        onOpenChange={setTooltipOpen}
+      >
+        <Button
+          type="button"
+          variant="ghost"
+          className={`${BUTTON_RESET_CLASS} ${readSidebarRowClass(isExpanded)}`}
+          aria-label={name}
+          onClick={handleClick}
+        >
+          <SidebarIconCell>
+            <ChoiceIcon className="size-5" aria-hidden="true" />
+          </SidebarIconCell>
+          {isExpanded ? (
+            <span className="min-w-0 flex-1 truncate text-left">
+              {THEME_LABEL}
+            </span>
+          ) : null}
+        </Button>
+      </HoverTooltip>
       <span className="sr-only" aria-live="polite">
         {announcement}
       </span>

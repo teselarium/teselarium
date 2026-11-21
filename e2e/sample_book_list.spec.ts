@@ -41,7 +41,13 @@ import {
   readBodyColors,
   readTokenAs,
 } from "./theme_probes.ts";
-import { countLines, readElementBox, sizeModFrame } from "./layout_probes.ts";
+import {
+  countLines,
+  DESKTOP_VIEWPORT,
+  PHONE_VIEWPORT,
+  readElementBox,
+  sizeModFrame,
+} from "./layout_probes.ts";
 
 const SAMPLE_TITLES = ["Fahrenheit 451", "Kallocain", "The Library of Babel"];
 
@@ -564,12 +570,6 @@ test.describe(
     });
   },
 );
-
-/** A phone in portrait. */
-const PHONE_VIEWPORT = { width: 412, height: 915 };
-
-/** A laptop screen. */
-const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
 
 /** Expects each of the card's values that are `texts` to be one line high. */
 async function expectValuesOnOneLine(

@@ -535,3 +535,47 @@ export function listOwnLookDeclarations(): string[] {
   }
   return found;
 }
+
+/** WCAG's minimum contrast ratio for normal text. */
+export const MINIMUM_TEXT_CONTRAST = 4.5;
+
+/** The channels of an opaque `rgb(r, g, b)` color, as `getComputedStyle` gives it. */
+function readRgbChannels(color: string): number[] {
+  const match = /^rgb\((\d+), (\d+), (\d+)\)$/.exec(color);
+  if (match === null) {
+    throw new Error(
+      `Expected an opaque rgb() color to measure its contrast, got "${color}"`,
+    );
+  }
+  const channels = [Number(match[1]), Number(match[2]), Number(match[3])];
+  return channels;
+}
+
+function linearizeChannel(channel: number): number {
+  const value = channel / 255;
+  if (value <= 0.04045) {
+    return value / 12.92;
+  }
+  return ((value + 0.055) / 1.055) ** 2.4;
+}
+
+/** WCAG relative luminance of an opaque `rgb()` color. */
+function readRelativeLuminance(color: string): number {
+  const linear: number[] = [];
+  for (const channel of readRgbChannels(color)) {
+    linear.push(linearizeChannel(channel));
+  }
+  const [red, green, blue] = linear;
+  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return luminance;
+}
+
+/** WCAG contrast ratio of two opaque `rgb()` colors, from 1 to 21. */
+export function readContrastRatio(first: string, second: string): number {
+  const firstLuminance = readRelativeLuminance(first);
+  const secondLuminance = readRelativeLuminance(second);
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  const ratio = (lighter + 0.05) / (darker + 0.05);
+  return ratio;
+}

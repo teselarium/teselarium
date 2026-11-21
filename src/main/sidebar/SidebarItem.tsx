@@ -1,9 +1,5 @@
 import type { MouseEvent, ReactElement } from "react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/vendor/shadcn/ui/tooltip.tsx";
+import { HoverTooltip } from "../HoverTooltip.tsx";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import { SectionIcon } from "./SectionIcon.tsx";
 import { readSidebarRowClass } from "./sidebar_rows.ts";
@@ -32,12 +28,25 @@ function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   );
 }
 
+function readTooltipText(
+  section: SectionDefinition,
+  isExpanded: boolean,
+): string {
+  if (!section.comingSoon) {
+    return section.label;
+  }
+  return isExpanded ? COMING_SOON : `${section.label}: ${COMING_SOON}`;
+}
+
 function renderLabel(
   section: SectionDefinition,
   isExpanded: boolean,
 ): ReactElement {
   if (!isExpanded) {
-    return <span className="sr-only">{section.label}</span>;
+    // The tooltip's text, which a device that cannot hover does not show.
+    return (
+      <span className="sr-only">{readTooltipText(section, isExpanded)}</span>
+    );
   }
   return (
     <>
@@ -47,16 +56,6 @@ function renderLabel(
       ) : null}
     </>
   );
-}
-
-function readTooltipText(
-  section: SectionDefinition,
-  isExpanded: boolean,
-): string {
-  if (!section.comingSoon) {
-    return section.label;
-  }
-  return isExpanded ? COMING_SOON : `${section.label}: ${COMING_SOON}`;
 }
 
 /**
@@ -115,12 +114,9 @@ export function SidebarItem({
   }
   return (
     <li>
-      <Tooltip>
-        <TooltipTrigger asChild>{link}</TooltipTrigger>
-        <TooltipContent side="right">
-          {readTooltipText(section, isExpanded)}
-        </TooltipContent>
-      </Tooltip>
+      <HoverTooltip content={readTooltipText(section, isExpanded)} side="right">
+        {link}
+      </HoverTooltip>
     </li>
   );
 }

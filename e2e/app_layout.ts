@@ -20,6 +20,11 @@ export function sidebar(page: Page): Locator {
   return page.locator("#app-sidebar");
 }
 
+/** The sidebar's section items and Theme control, which scroll when they do not fit. */
+export function sidebarItems(page: Page): Locator {
+  return sidebar(page).locator("[data-sidebar-items]");
+}
+
 /** The sidebar's first row: the hamburger button and the app's name. */
 export function sidebarHeadingRow(page: Page): Locator {
   return sidebar(page).locator("[data-sidebar-heading-row]");

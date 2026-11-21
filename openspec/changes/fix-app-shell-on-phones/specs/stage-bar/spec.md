@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Messages button on a narrow bar
-On a stage bar under 480px wide, one messages button SHALL take the place of the errors, warnings and notifications buttons. It SHALL show the icon of the most severe level that has messages (errors, then warnings, then notifications), or the notifications icon, dimmed, when there is none. Its capsule SHALL give the total count, as `99+` above 99, filled in the color of the most severe level with unread messages and muted once all are read.
+On a narrow stage bar (see "The bar folds as it narrows"), one messages button SHALL take the place of the errors, warnings and notifications buttons. It SHALL show the icon of the most severe level that has messages (errors, then warnings, then notifications), or the notifications icon, dimmed, when there is none. Its capsule SHALL give the total count, as `99+` above 99, filled in the color of the most severe level with unread messages and muted once all are read.
 
 #### Scenario: Errors and notifications
 - **WHEN** the visible sandbox has one unread error and two unread notifications, and the stage bar is 340px wide
@@ -54,7 +54,7 @@ The tooltips of the stage bar, of its capsules and chip, and of the lists it ope
 ## MODIFIED Requirements
 
 ### Requirement: One-row stage bar
-While a sandbox is visible, the stage bar SHALL be one row above its frame. Its left side SHALL hold the sandbox's title, as capsules for a combination sandbox (see "Combination capsules") or as a plain title otherwise, then the "More actions" button. From 480px wide, its right side SHALL hold, in order, the errors, warnings and notifications buttons, a separator, the theater mode button, the fullscreen button when the sandbox has a running mod frame and, when the sandbox has a close button, a separator and the close button. Under 480px wide, its right side SHALL hold the messages button and, when the sandbox has a close button, a separator and the close button. No list of messages SHALL be shown under the bar.
+While a sandbox is visible, the stage bar SHALL be one row above its frame. Its left side SHALL hold the sandbox's title, as capsules for a combination sandbox (see "Combination capsules") or as a plain title otherwise, then the "More actions" button. On a wide bar (see "The bar folds as it narrows"), its right side SHALL hold, in order, the errors, warnings and notifications buttons, a separator, the theater mode button, the fullscreen button when the sandbox has a running mod frame and, when the sandbox has a close button, a separator and the close button. On a narrow bar, its right side SHALL hold the messages button and, when the sandbox has a close button, a separator and the close button. No list of messages SHALL be shown under the bar.
 
 #### Scenario: Sample mod with its collection
 - **WHEN** a mod opened from a run link runs with a collection
@@ -79,13 +79,13 @@ While a sandbox is visible, the stage bar SHALL be one row above its frame. Its 
 - **AND** the page cannot scroll sideways and the close button is fully inside the viewport
 
 ### Requirement: The bar folds as it narrows
-The left side SHALL follow the stage bar's width:
+The stage bar SHALL be narrow when it is under 480px wide, or when its capsules, at their minimum width, do not fit beside the bar's other items; otherwise it SHALL be wide. A bar that is narrow because its capsules did not fit SHALL become wide again once they fit. The left side SHALL follow the stage bar's width:
 - at least 960px: everything shown;
 - 720px to 959px: no version in the mod capsule, which moves to the mod list's details;
 - 480px to 719px: the mod and collection capsules show only their icons;
-- under 480px: one capsule with the mosaic's title, or the mod's for an unsaved combination, whose menu has "Mosaic", "Mod" and "Collection" rows that open their lists.
+- on a narrow bar: one capsule with the mosaic's title, or the mod's for an unsaved combination, whose menu has "Mosaic", "Mod" and "Collection" rows that open their lists.
 
-The right side SHALL fold under 480px as "One-row stage bar" says. A change of width that stays on the same side of 480px SHALL NOT move any item of the bar's right side.
+No capsule SHALL be narrower than its padding, its icon, its chevron and the gaps between them, so its icons always stay inside it. The right side SHALL fold on a narrow bar as "One-row stage bar" says. A change of width while the bar stays wide, or stays narrow, SHALL NOT move any item of the bar's right side.
 
 #### Scenario: Narrow bar
 - **WHEN** the stage bar of "Nobel laureates on the map" is 600px wide
@@ -95,12 +95,21 @@ The right side SHALL fold under 480px as "One-row stage bar" says. A change of w
 - **WHEN** the stage bar is 400px wide
 - **THEN** the left side holds one capsule `Nobel laureates on the map`, and its menu's "Collection" row opens the collection list
 
+#### Scenario: Capsules never break
+- **WHEN** the stage bar of "Nobel laureates on the map" is 575px wide, as on a landscape phone with the sidebar expanded, where its capsules have to shrink
+- **THEN** every capsule's icon and chevron are inside the capsule's box, and every item of the stage bar is inside the bar
+
+#### Scenario: Folds when the capsules do not fit
+- **WHEN** the stage bar of "Nobel laureates on the map" is at least 480px wide but too narrow for its capsules at their minimum width
+- **THEN** the left side holds one capsule `Nobel laureates on the map`, and the right side holds the messages button
+- **AND** once the bar is wide enough for the capsules, it shows the mod, collection and mosaic capsules and the errors, warnings and notifications buttons again
+
 #### Scenario: The title is readable on a phone
 - **WHEN** "Nobel laureates on the map" runs on a 360×740 viewport
 - **THEN** its capsule is at least 120px wide and shows the start of the mosaic's title
 
 ### Requirement: Theater mode button
-From 480px wide, the stage bar SHALL have a theater mode toggle button whose accessible name and tooltip are "Theater mode", and which is pressed (`aria-pressed="true"`) while theater mode is on. Under 480px wide, the "More actions" menu SHALL hold a "Theater mode" item instead, checked while theater mode is on. Pressing either SHALL turn theater mode on or off (see `stage-layout`). It SHALL be offered for every visible sandbox, also while its mod loads or after it failed.
+On a wide bar (see "The bar folds as it narrows"), the stage bar SHALL have a theater mode toggle button whose accessible name and tooltip are "Theater mode", and which is pressed (`aria-pressed="true"`) while theater mode is on. On a narrow bar, the "More actions" menu SHALL hold a "Theater mode" item instead, checked while theater mode is on. Pressing either SHALL turn theater mode on or off (see `stage-layout`). It SHALL be offered for every visible sandbox, also while its mod loads or after it failed.
 
 #### Scenario: Turn theater mode on
 - **WHEN** theater mode is off and the user presses the theater mode button
@@ -119,7 +128,7 @@ From 480px wide, the stage bar SHALL have a theater mode toggle button whose acc
 - **THEN** theater mode is on, and the menu's "Theater mode" item is checked the next time it opens
 
 ### Requirement: Fullscreen button
-From 480px wide, the stage bar SHALL have an icon button whose accessible name and tooltip are "Fullscreen" while the visible sandbox has a running mod frame, and none while its mod loads, waits for an answer or failed. Under 480px wide, the "More actions" menu SHALL hold a "Fullscreen" item in the same cases instead. Pressing either SHALL show the visible mod fullscreen (see `stage-layout`).
+On a wide bar (see "The bar folds as it narrows"), the stage bar SHALL have an icon button whose accessible name and tooltip are "Fullscreen" while the visible sandbox has a running mod frame, and none while its mod loads, waits for an answer or failed. On a narrow bar, the "More actions" menu SHALL hold a "Fullscreen" item in the same cases instead. Pressing either SHALL show the visible mod fullscreen (see `stage-layout`).
 
 #### Scenario: Running mod
 - **WHEN** a mod runs
@@ -138,7 +147,7 @@ From 480px wide, the stage bar SHALL have an icon button whose accessible name a
 - **THEN** the menu holds a "Fullscreen" item, and the stage bar has no button named "Fullscreen"
 
 ### Requirement: More actions menu
-The "More actions" button (`…`) SHALL open a menu that holds "Copy link" and, for a sandbox opened with a collection or a tile, "Reload tiles". On a stage bar under 480px wide, it SHALL also hold "Theater mode" and, while the sandbox has a running mod frame, "Fullscreen" (see "Theater mode button" and "Fullscreen button"). "Copy link" SHALL copy the full address of the app with the sandbox's run link as its hash, close the menu, and show "Link copied" at the button for a moment, also announced to assistive technologies, or "Cannot copy the link" when the clipboard refuses.
+The "More actions" button (`…`) SHALL open a menu that holds "Copy link" and, for a sandbox opened with a collection or a tile, "Reload tiles". On a narrow stage bar (see "The bar folds as it narrows"), it SHALL also hold "Theater mode" and, while the sandbox has a running mod frame, "Fullscreen" (see "Theater mode button" and "Fullscreen button"). "Copy link" SHALL copy the full address of the app with the sandbox's run link as its hash, close the menu, and show "Link copied" at the button for a moment, also announced to assistive technologies, or "Cannot copy the link" when the clipboard refuses.
 
 #### Scenario: Copy the link
 - **WHEN** the user opens the "More actions" menu of the app at `https://example.org/` and chooses "Copy link"

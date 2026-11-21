@@ -21,13 +21,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/vendor/shadcn/ui/popover.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/vendor/shadcn/ui/tooltip.tsx";
-import type { EntryScore } from "../../lib/core/combinations/index.ts";
+import type {
+  EntryScore,
+  TileCount,
+} from "../../lib/core/combinations/index.ts";
 import { MOSAIC_ICON as MosaicIcon } from "../catalog_icons.ts";
+import { HoverTooltip } from "../HoverTooltip.tsx";
 import { LoadingSpinner } from "../LoadingSpinner.tsx";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import type {
@@ -178,16 +177,22 @@ const SCORE_COLUMN_CLASSES =
 
 const UNTYPED_TOOLTIP = "Accepts any tile: this mod has no tile type";
 
+/**
+ * A row's secondary text: muted, and in the accent's foreground color while
+ * the row is highlighted (a `group`), a pair that meets 4.5:1 on the accent
+ * in both color schemes (`theme`, "Token contrast").
+ */
+const SECONDARY_TEXT_CLASSES =
+  "text-muted-foreground group-data-[selected=true]:text-accent-foreground";
+
+/** The cmdk item of a row is a `group`, so its secondary text follows its highlight. */
+const ROW_CLASSES = "group";
+
 function renderWithTooltip(
   trigger: ReactElement,
   tooltip: string,
 ): ReactElement {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
-    </Tooltip>
-  );
+  return <HoverTooltip content={tooltip}>{trigger}</HoverTooltip>;
 }
 
 /** The mark column: the dot or the ring, named, or an empty column. */
@@ -244,6 +249,42 @@ function renderBadge(mosaics: CombinationRow["mosaics"]): ReactElement {
   );
 }
 
+/**
+ * A measured score, `matching/total`, muted without a matching tile. An
+ * untyped mod's score is named with its tooltip, which a device that cannot
+ * hover does not show.
+ */
+function renderMeasuredScore(count: TileCount): ReactElement {
+  const value = `${count.matching}/${count.total}`;
+  const classes =
+    count.matching === 0
+      ? `${SCORE_COLUMN_CLASSES} ${SECONDARY_TEXT_CLASSES}`
+      : SCORE_COLUMN_CLASSES;
+  if (!count.isUntyped) {
+    return (
+      <span
+        data-column="score"
+        data-muted={count.matching === 0}
+        className={classes}
+      >
+        {value}
+      </span>
+    );
+  }
+  return renderWithTooltip(
+    <span
+      role="img"
+      aria-label={`${value}: ${UNTYPED_TOOLTIP}`}
+      data-column="score"
+      data-muted={count.matching === 0}
+      className={classes}
+    >
+      {value}
+    </span>,
+    UNTYPED_TOOLTIP,
+  );
+}
+
 /** The score column: `matching/total`, muted without a matching tile, the spinner while counting, or an empty column. */
 function renderScore(score: EntryScore): ReactElement {
   if (score === null) {
@@ -254,7 +295,7 @@ function renderScore(score: EntryScore): ReactElement {
       <span className={SCORE_COLUMN_CLASSES} data-column="score">
         <LoadingSpinner
           label="Counting"
-          className="size-3.5 text-muted-foreground"
+          className={`size-3.5 ${SECONDARY_TEXT_CLASSES}`}
         />
       </span>
     );
@@ -262,30 +303,17 @@ function renderScore(score: EntryScore): ReactElement {
   if (score.state === "failed") {
     return renderWithTooltip(
       <span
+        role="img"
         data-column="score"
         aria-label={`No score: ${score.reason}`}
-        className={`${SCORE_COLUMN_CLASSES} text-muted-foreground`}
+        className={`${SCORE_COLUMN_CLASSES} ${SECONDARY_TEXT_CLASSES}`}
       >
         –
       </span>,
       score.reason,
     );
   }
-  const count = score.value;
-  const classes =
-    count.matching === 0
-      ? `${SCORE_COLUMN_CLASSES} text-muted-foreground`
-      : SCORE_COLUMN_CLASSES;
-  const text = (
-    <span
-      data-column="score"
-      data-muted={count.matching === 0}
-      className={classes}
-    >
-      {`${count.matching}/${count.total}`}
-    </span>
-  );
-  return count.isUntyped ? renderWithTooltip(text, UNTYPED_TOOLTIP) : text;
+  return renderMeasuredScore(score.value);
 }
 
 function renderDetailItem(item: string): ReactElement {
@@ -303,7 +331,9 @@ function renderFoundMosaics(row: CombinationRow): ReactElement | null {
     return null;
   }
   return (
-    <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+    <span
+      className={`flex min-w-0 items-center gap-1 text-xs ${SECONDARY_TEXT_CLASSES}`}
+    >
       <MosaicIcon aria-hidden="true" className="size-3" />
       <span className="truncate">{found.title}</span>
       {found.moreCount === 0 ? null : (
@@ -322,7 +352,9 @@ function renderRowText(row: CombinationRow): ReactElement {
     <div className="flex min-w-0 flex-1 flex-col" data-column="title">
       <span className="truncate">{row.title}</span>
       {items.length === 0 ? null : (
-        <span className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+        <span
+          className={`flex flex-wrap gap-x-3 text-xs ${SECONDARY_TEXT_CLASSES}`}
+        >
           {items}
         </span>
       )}
@@ -339,6 +371,7 @@ function renderRow(row: CombinationRow, onSelect: () => void): ReactElement {
       value={row.id}
       disabled={!row.isSelectable}
       onSelect={onSelect}
+      className={ROW_CLASSES}
       aria-current={row.mark === "current" ? "true" : undefined}
       data-row-id={row.id}
     >
@@ -415,7 +448,7 @@ function renderFooter(
           type="button"
           variant="link"
           size="sm"
-          className="h-auto justify-start self-start p-0"
+          className="justify-start self-start px-0"
           onClick={explorer.onOpen}
         >
           {explorer.label}
@@ -727,11 +760,14 @@ export function CombinationList({
         <CommandItem
           value={BACK_ID}
           onSelect={goBack}
+          className={ROW_CLASSES}
           aria-label={`Back to ${entry.title}`}
         >
           <ChevronLeft aria-hidden="true" />
           <span>Back</span>
-          <span className="truncate text-muted-foreground">{entry.title}</span>
+          <span className={`truncate ${SECONDARY_TEXT_CLASSES}`}>
+            {entry.title}
+          </span>
         </CommandItem>
         {items}
       </CommandGroup>

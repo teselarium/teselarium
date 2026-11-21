@@ -72,4 +72,6 @@ The app's interface is built with Tailwind CSS utilities and shadcn/ui component
 2. When no shadcn component meets the requirement, compose a project component from shadcn parts.
 3. When a native control works better (mobile, accessibility, testability), use shadcn's native-styled variant if one exists, otherwise the native element styled with utilities. For example, the Theme control is shadcn's `NativeSelect`.
 
+Tooltips go through `HoverTooltip` (`src/main/HoverTooltip.tsx`), never shadcn's tooltip directly. It opens the tooltip only where the primary pointer can hover (`(hover: hover)`), so a tap on a phone never leaves one on screen, and it shows a tooltip the app pins open (such as "Link copied") on every device. A tooltip's text must also be in its element's accessible name or visible text, since touch devices don't show it.
+
 Mods don't get Tailwind or shadcn. Their frames get the classless base stylesheet, which gives semantic HTML the app's look.

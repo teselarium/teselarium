@@ -1,6 +1,10 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
+import {
+  buildFakeMatchMedia,
+  createFakeHoverDevice,
+} from "./fake_hover_queries.ts";
 
 // Vitest globals are off, so Testing Library cannot register its own cleanup.
 afterEach(cleanup);
@@ -43,3 +47,8 @@ function scrollNowhere(): void {
 
 // cmdk scrolls the selected entry of a list into view. Scrolling is checked in Playwright.
 Element.prototype.scrollIntoView ??= scrollNowhere;
+
+// jsdom has no `matchMedia`. The app's tests run as on a desktop, whose
+// primary pointer can hover, so tooltips open as there. A test of a touch
+// device stubs its own (fake_hover_queries.ts).
+window.matchMedia ??= buildFakeMatchMedia(createFakeHoverDevice(true));

@@ -7,11 +7,6 @@ import {
   PopoverTrigger,
 } from "@/vendor/shadcn/ui/popover.tsx";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/vendor/shadcn/ui/tooltip.tsx";
-import {
   buildSitesDrop,
   openStageCombination,
 } from "../../lib/core/stage/index.ts";
@@ -20,6 +15,7 @@ import type {
   SitesLine,
   Stage,
 } from "../../lib/core/stage/index.ts";
+import { HoverTooltip } from "../HoverTooltip.tsx";
 import { keepFocusInFrame } from "./frame_focus.ts";
 
 interface SitesChipProps {
@@ -71,23 +67,20 @@ export function SitesChip({
   }
   return (
     <Popover open={isOpen} onOpenChange={onOpenChange}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={name}
-              className="h-7 shrink-0 gap-1 px-2 tabular-nums"
-            >
-              <ShieldCheck />
-              {sites.lines.length}
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>{name}</TooltipContent>
-      </Tooltip>
+      <HoverTooltip content={name}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={name}
+            className="h-7 shrink-0 gap-1 px-2 tabular-nums"
+          >
+            <ShieldCheck />
+            {sites.lines.length}
+          </Button>
+        </PopoverTrigger>
+      </HoverTooltip>
       <PopoverContent
         align="start"
         className="flex w-96 max-w-[calc(100vw-2rem)] flex-col gap-3 text-sm"

@@ -29,6 +29,17 @@ rules:
       and events, mod-app-actions), state the mod API version bump it needs
       (none, patch or minor while the version is 0.x) and why, following the
       "Mod API version" section of docs/modules/lib/core/engine/README.md
+    - >-
+      When the change adds or changes the app's interface, or the layout of a
+      default or sample mod, state how it behaves on a phone viewport (narrow,
+      touch) and in both color schemes (light and dark), or why that does not
+      apply
+  specs:
+    - >-
+      When the change adds or changes the app's interface, or the layout of a
+      default or sample mod, give each layout requirement at least one
+      scenario on a phone viewport (360×740 or 412×915), and say what each
+      color requirement holds in both color schemes (light and dark)
   tasks:
     - >-
       Before the final verification task, add a task that adds
@@ -43,6 +54,15 @@ rules:
       mod API (mod-engine-api, mod-loading's mod file format, mod-api-version,
       mod-theme's mount context and events, mod-app-actions), it also runs npm
       run test:e2e:samples
+    - >-
+      When the change adds or changes the app's interface, or the layout of a
+      default or sample mod, cover a phone viewport and both color schemes in
+      its tests: layout that depends only on the viewport's size gets e2e tests
+      at a phone viewport (360×740 or 412×915) with page.setViewportSize, using
+      the viewports of e2e/layout_probes.ts; behavior that depends on touch or
+      on a pointer that cannot hover gets e2e tests tagged @mobile, which run
+      in the mobile project; new or changed colors get a check in the light
+      and the dark color scheme
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.

@@ -6,12 +6,15 @@ export type CapsulePanel =
 
 /**
  * The stage bar's popovers, menus and lists: one per message level, the
- * capsules' lists and the folded capsule's menu, the "More actions" menu and
- * the Sites chip's popover. One is open at a time.
+ * messages popover of a narrow bar, which groups every level, the capsules'
+ * lists and the folded capsule's menu, the "More actions" menu and the Sites
+ * chip's popover. One is open at a time.
  */
-export type StageBarPanel = MessageLevel | CapsulePanel | "more" | "sites";
+export type StageBarPanel =
+  MessageLevel | "messages" | CapsulePanel | "more" | "sites";
 
 const OTHER_PANELS: readonly StageBarPanel[] = [
+  "messages",
   "mod-list",
   "collection-list",
   "mosaic-list",
@@ -33,4 +36,9 @@ export function isListPanel(panel: StageBarPanel | null): boolean {
     panel === "collection-list" ||
     panel === "mosaic-list"
   );
+}
+
+/** Whether `panel` shows messages: a level's popover, or the messages popover that groups them. */
+export function isMessagesPanel(panel: StageBarPanel): boolean {
+  return panel === "messages" || isMessageLevelPanel(panel);
 }

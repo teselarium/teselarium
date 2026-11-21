@@ -1,10 +1,6 @@
 import type { ComponentProps, ReactElement } from "react";
 import { Button } from "@/vendor/shadcn/ui/button.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/vendor/shadcn/ui/tooltip.tsx";
+import { HoverTooltip } from "../HoverTooltip.tsx";
 
 type StageBarIconButtonProps = Omit<
   ComponentProps<typeof Button>,
@@ -14,7 +10,11 @@ type StageBarIconButtonProps = Omit<
   label: string;
   /** What the tooltip says instead of `label`, such as how an action went. */
   tooltip?: string;
-  /** Holds the tooltip open while `true`. Without it, the tooltip opens on hover and focus. */
+  /**
+   * Holds the tooltip open while `true`, on every device, for feedback such
+   * as "Link copied". Without it, the tooltip opens on hover and focus, where
+   * the pointer can hover.
+   */
   isTooltipOpen?: boolean;
 };
 
@@ -32,19 +32,16 @@ export function StageBarIconButton({
   ...buttonProps
 }: StageBarIconButtonProps): ReactElement {
   return (
-    <Tooltip open={isTooltipOpen}>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={label}
-          {...buttonProps}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{tooltip ?? label}</TooltipContent>
-    </Tooltip>
+    <HoverTooltip content={tooltip ?? label} isPinnedOpen={isTooltipOpen}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={label}
+        {...buttonProps}
+      >
+        {children}
+      </Button>
+    </HoverTooltip>
   );
 }

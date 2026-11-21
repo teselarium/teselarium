@@ -66,10 +66,13 @@ import {
 import type { RowSeparators } from "./theme_probes.ts";
 import {
   countLines,
+  DESKTOP_VIEWPORT,
   isFullyShown,
+  PHONE_VIEWPORT,
   readDocumentWidth,
   readExtraWidth,
   readElementBox,
+  SMALL_PHONE_VIEWPORT,
 } from "./layout_probes.ts";
 import type { ElementBox } from "./layout_probes.ts";
 
@@ -2050,15 +2053,6 @@ test.describe(
     });
   },
 );
-
-/** A phone in portrait. */
-const PHONE_VIEWPORT = { width: 412, height: 915 };
-
-/** A small phone in portrait. */
-const SMALL_PHONE_VIEWPORT = { width: 360, height: 740 };
-
-/** A laptop screen. */
-const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
 
 /** The mosaic viewer's fixture mosaic that declares a permission, which every built app serves. */
 const SHOWN_MOSAIC_REFERENCE =

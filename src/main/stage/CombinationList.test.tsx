@@ -10,6 +10,7 @@ import type { CombinationRow, ListRows } from "./combination_rows.ts";
 import { createListChoices, readListChoicesSnapshot } from "./list_choices.ts";
 import type { ListChoices, ListKind } from "./list_choices.ts";
 import { SETTLE_INTERVAL_MS } from "./list_settling.ts";
+import { readTooltipOnHover } from "../../test/tooltip_texts.ts";
 import { buildTestRow, buildTestScore } from "./test_rows.ts";
 
 afterEach(function useRealTimers(): void {
@@ -266,6 +267,36 @@ describe("columns", function describeColumns(): void {
       within(findOption("Book List")).getByRole("img", { name: "Counting" }),
     ).toHaveClass("motion-safe:animate-spin");
     expect(findOption("Viewer")).toHaveTextContent("17/17");
+  });
+
+  it("An untyped score's tooltip is in its accessible name", async function namesUntypedScore(): Promise<void> {
+    const rows = buildRows([buildTestRow("Viewer", { score: UNTYPED_SCORE })]);
+    render(<ListHarness rows={rows} listChoices={createListChoices()} />);
+    openList();
+    const score = within(findOption("Viewer")).getByRole("img", {
+      name: /^17\/17: /,
+    });
+
+    const tooltip = await readTooltipOnHover(score);
+
+    expect(tooltip).toBe("Accepts any tile: this mod has no tile type");
+    expect(score).toHaveAccessibleName(`17/17: ${tooltip}`);
+    expect(score).toHaveTextContent("17/17");
+  });
+
+  it("A failed score's tooltip is in its accessible name", async function namesFailedScore(): Promise<void> {
+    const failedScore: EntryScore = { state: "failed", reason: "HTTP 404" };
+    const rows = buildRows([buildTestRow("Atlas", { score: failedScore })]);
+    render(<ListHarness rows={rows} listChoices={createListChoices()} />);
+    openList();
+    const score = within(findOption("Atlas")).getByRole("img", {
+      name: /^No score: /,
+    });
+
+    const tooltip = await readTooltipOnHover(score);
+
+    expect(tooltip).toBe("HTTP 404");
+    expect(score).toHaveAccessibleName(`No score: ${tooltip}`);
   });
 });
 

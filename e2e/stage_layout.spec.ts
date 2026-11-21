@@ -5,6 +5,7 @@ import {
   findModFrame,
   isFrameMarked,
   markFrame,
+  openMoreActions,
   requestFromProbe,
   serveAppOriginMod,
   stageBar,
@@ -25,6 +26,7 @@ import {
   readLayoutAttribute,
   readLayoutEvents,
   readScrollTop,
+  SMALL_PHONE_VIEWPORT,
   storeTheaterBeforeLoad,
   TALL_LAYOUT_PROBE_MOD_CODE,
   THEATER_MODE_KEY,
@@ -417,6 +419,21 @@ test.describe(
           .locator(`iframe[title="${PROBE_TITLE}"]`)
           .evaluate(readFrameEdge),
       ).toEqual({ borderWidth: "0px", borderRadius: "0px" });
+    });
+
+    test("Fullscreen from the menu", async function fillsScreenFromMenu({
+      page,
+    }): Promise<void> {
+      await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+      const frame = await openLayoutProbe(page);
+      await markFrame(frame);
+      await expect(fullscreenButton(page)).toHaveCount(0);
+
+      const menu = await openMoreActions(page);
+      await menu.getByRole("menuitem", { name: "Fullscreen" }).click();
+
+      await expect.poll(isProbeFullscreen.bind(undefined, page)).toBe(true);
+      expect(await isFrameMarked(frame)).toBe(true);
     });
 
     test("Escape leaves fullscreen", async function leavesWithEscape({

@@ -8,6 +8,7 @@ import type { AppFixture } from "../../test/test_app.ts";
 import type { SectionDefinition } from "../sections/section_registry.ts";
 import { VANILLA_SECTIONS } from "../sections/vanilla_sections.ts";
 import { COMING_SOON_SECTIONS } from "../../test/registries/coming_soon_sections.ts";
+import { readTooltipOnFocus } from "../../test/tooltip_texts.ts";
 import { chooseTheme } from "../theme/app_theme.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import {
@@ -293,6 +294,7 @@ describe("theme control", function describeThemeControl(): void {
     });
 
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Theme: Dark");
+    expect(themeButton()).toHaveAccessibleName("Theme: Dark");
     expect(themeButton()).not.toHaveTextContent("Theme");
   });
 
@@ -363,6 +365,18 @@ describe("collapsed rail", function describeRail(): void {
     expect(findItem("Guides")).toHaveAccessibleName("Guides");
   });
 
+  it("A coming-soon item's tooltip is in its accessible name", async function namesComingSoonInRail(): Promise<void> {
+    const fixture = await startTestApp("", { sections: COMING_SOON_SECTIONS });
+    collapseSidebar(fixture.layout);
+    renderSidebar(fixture);
+    const example = findItem(/Example Section/);
+
+    const tooltip = await readTooltipOnFocus(example);
+
+    expect(tooltip).toBe("Example Section: Coming soon");
+    expect(example).toHaveAccessibleName(tooltip);
+  });
+
   it("Tooltip on focus", async function showsTooltipOnFocus(): Promise<void> {
     const fixture = await startTestApp("");
     collapseSidebar(fixture.layout);
@@ -430,6 +444,19 @@ describe("narrow drawer", function describeDrawer(): void {
 
     expect(readSidebarSnapshot(fixture.layout).state).toBe("collapsed");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Only the hamburger button: the drawer has no button named Close", async function hasNoCloseButton(): Promise<void> {
+    const fixture = await startTestApp("", { isNarrow: true });
+    expandSidebar(fixture.layout);
+    renderSidebar(fixture);
+
+    const drawer = screen.getByRole("dialog");
+
+    expect(within(drawer).queryByRole("button", { name: "Close" })).toBeNull();
+    expect(
+      within(drawer).getByRole("button", { name: /sidebar/ }),
+    ).toBeInTheDocument();
   });
 
   it("closes the drawer when a section is chosen", async function closesOnChoice(): Promise<void> {

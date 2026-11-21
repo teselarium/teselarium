@@ -48,6 +48,12 @@ import type { MemoryStorage } from "../../test/memory_storage.ts";
 import { createPlayerSites } from "../settings/player_sites.ts";
 import { createRecentlyUsed } from "../settings/recently_used.ts";
 import type { PlayerSites } from "../settings/player_sites.ts";
+import {
+  FakeResizeObserver,
+  forgetFakeResizeObservers,
+  resizeObservedElements,
+} from "../../test/fake_resize_observer.ts";
+import { readTooltipOnFocus } from "../../test/tooltip_texts.ts";
 import { createListChoices } from "./list_choices.ts";
 import { StageView } from "./StageView.tsx";
 import { createTheaterSetting, THEATER_MODE_KEY } from "./theater_setting.ts";
@@ -83,6 +89,7 @@ const appendedFrames: HTMLIFrameElement[] = [];
 
 afterEach(function cleanUp(): void {
   vi.unstubAllGlobals();
+  forgetFakeResizeObservers();
   testTexts.clear();
   for (const port of openPorts) {
     port.close();
@@ -1394,6 +1401,18 @@ describe("sites chip", function describeSitesChip(): void {
     ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
   });
 
+  it("The chip's tooltip is its accessible name", async function namesChip(): Promise<void> {
+    serveCoversSites();
+    const stage = await startTestStage(SITES_HASH);
+    renderStageView(stage);
+    const chip = findCapsule("Sites from Covers on the shelf");
+
+    const tooltip = await readTooltipOnFocus(chip);
+
+    expect(tooltip).toBe("Sites from Covers on the shelf");
+    expect(chip).toHaveAccessibleName(tooltip);
+  });
+
   it("Stop using them: the same combination and params without sites, and no chip", async function dropsSites(): Promise<void> {
     serveCoversSites();
     const stage = await startTestStage(SITES_HASH);
@@ -1431,3 +1450,108 @@ describe("sites chip", function describeSitesChip(): void {
 function isVisibleSandbox(sandbox: { isVisible: boolean }): boolean {
   return sandbox.isVisible;
 }
+
+/** The stage bar's content box becomes `width` pixels wide. */
+function resizeStageBar(width: number): void {
+  act(resizeObservedElements.bind(undefined, "section.stage-bar", width));
+}
+
+function readStageBarButtonNames(): string[] {
+  const names: string[] = [];
+  const stageBar = screen.getByRole("region", { name: "Stage bar" });
+  for (const button of within(stageBar).getAllByRole("button")) {
+    names.push(button.getAttribute("aria-label") ?? "");
+  }
+  return names;
+}
+
+describe("narrow stage bar", function describeNarrowStageBar(): void {
+  it("Phone: the messages button, then Close", async function foldsRightSide(): Promise<void> {
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+    const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);
+    renderStageView(stage);
+
+    resizeStageBar(340);
+
+    const names = readStageBarButtonNames();
+    expect(names.slice(-2)).toEqual([
+      "Messages: 0 errors, 0 warnings, 0 notifications, 0 unread",
+      "Close",
+    ]);
+    expect(names).not.toContain("Theater mode");
+    expect(names).not.toContain("Fullscreen");
+    resizeStageBar(480);
+    expect(readStageBarButtonNames().slice(-6)).toEqual([
+      "Errors: 0, 0 unread",
+      "Warnings: 0, 0 unread",
+      "Notifications: 0, 0 unread",
+      "Theater mode",
+      "Fullscreen",
+      "Close",
+    ]);
+  });
+
+  it("Opening marks every level read, and the capsule is muted once it closes", async function readsEveryLevel(): Promise<void> {
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    resizeStageBar(340);
+    await reportBlockedImageAndFailure(modPort);
+    expect(readCapsuleState("Messages")).toBe("unread");
+
+    await openLevel("Messages");
+
+    const popover = screen.getByRole("dialog");
+    expect(within(popover).getAllByText("Unread")).toHaveLength(2);
+    await closeLevel("Messages");
+    expect(readCapsuleState("Messages")).toBe("read");
+    expect(findLevelButton("Messages")).toHaveAccessibleName(
+      "Messages: 1 error, 1 warning, 0 notifications, 0 unread",
+    );
+  });
+
+  it("A message that arrives while it is open is read once it closes", async function readsOnClose(): Promise<void> {
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+    const stage = await startTestStage("");
+    const modPort = attachTestFrame(stage, "sandbox-1");
+    renderStageView(stage);
+    resizeStageBar(340);
+    await openLevel("Messages");
+    expect(screen.getByText("No messages.")).toBeInTheDocument();
+
+    await reportBlockedImage(modPort, "https://images.example.net");
+    expect(
+      within(screen.getByRole("dialog")).getByText("Unread"),
+    ).toBeVisible();
+    await closeLevel("Messages");
+
+    expect(readCapsuleState("Messages")).toBe("read");
+  });
+
+  it("Crossing 480px closes the open messages popover", async function closesOnCrossing(): Promise<void> {
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+    const stage = await startTestStage("");
+    renderStageView(stage);
+    resizeStageBar(340);
+    await openLevel("Messages");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    resizeStageBar(600);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(findLevelButton("Errors")).toBeInTheDocument();
+  });
+
+  it("A width on the same side of 480px keeps the popover open", async function staysOpen(): Promise<void> {
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+    const stage = await startTestStage("");
+    renderStageView(stage);
+    resizeStageBar(340);
+    await openLevel("Messages");
+
+    resizeStageBar(400);
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+});
