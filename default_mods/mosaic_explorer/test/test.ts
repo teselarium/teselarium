@@ -8,12 +8,15 @@
 
 import type { ModTestRegistration } from "../../mod_api.d.ts";
 import {
+  addsByUrlWhenCancelled,
+  importsWhenAsked,
   listsFailureAsAlert,
   listsMosaicsAsCards,
   marksDefaultMosaic,
   opensSelectedMosaic,
   opensViewerForSelectedMosaic,
   showsRefusedOpen,
+  showsWhereMosaicsLive,
 } from "./explorer_cases.ts";
 import {
   drawsBusyListWhileLoading,
@@ -36,6 +39,12 @@ export default function registerExplorerTests(t: ModTestRegistration): void {
     opensViewerForSelectedMosaic,
   );
   t.test("shows a refused open", showsRefusedOpen);
+  t.test(
+    "shows where each mosaic lives and marks the user's",
+    showsWhereMosaicsLive,
+  );
+  t.test("imports mosaics when asked", importsWhenAsked);
+  t.test("adds a mosaic by URL when asked", addsByUrlWhenCancelled);
   t.test("says the list is busy while it loads", drawsBusyListWhileLoading);
   t.test("keeps its own styles to layout", keepsOwnStylesToLayout);
   t.test("draws each mosaic on the card background", drawsCardBackground);

@@ -42,34 +42,56 @@ function buildCardActions(
   return actions;
 }
 
+/** Who listed the mosaic, under the title, or `null` for the instance catalog's mosaics. */
+function describeListedBy(catalogEntry: CatalogMosaicEntry): string | null {
+  if (catalogEntry.defaultOf !== null) {
+    return `Default mosaic of ${catalogEntry.defaultOf.title}`;
+  }
+  if (catalogEntry.listedBy === "user") {
+    return "Added by you";
+  }
+  return null;
+}
+
 /**
- * The default mosaic mark, under the title: a `<small>`, not a `<p>`, so the
- * card's first paragraph stays its description.
+ * The mark of who listed the mosaic, under the title: a `<small>`, not a
+ * `<p>`, so the card's first paragraph stays its description.
  */
-function buildDefaultMark(
-  defaultOf: NonNullable<CatalogMosaicEntry["defaultOf"]>,
-): HTMLElement {
+function buildListedByMark(text: string): HTMLElement {
   const mark = document.createElement("small");
-  mark.textContent = `Default mosaic of ${defaultOf.title}`;
+  mark.textContent = text;
   return mark;
 }
 
 /**
- * A mosaic as a card: an `<article>` with its title, the mark of a mod's
- * default mosaic, its description and its actions.
+ * Where the mosaic's file lives, after its title: "Browser", a secondary
+ * badge, for a file stored in this browser, or "Remote", an outline badge.
+ */
+function buildPlaceBadge(catalogEntry: CatalogMosaicEntry): HTMLElement {
+  const badge = document.createElement("span");
+  const isStored = catalogEntry.place === "browser";
+  badge.textContent = isStored ? "Browser" : "Remote";
+  badge.dataset.otVariant = isStored ? "secondary" : "outline";
+  return badge;
+}
+
+/**
+ * A mosaic as a card: an `<article>` with its title and where its file
+ * lives, the mark of who listed it, its description and its actions.
  */
 function buildMosaicCard(
   view: ExplorerView,
   inspection: MosaicInspection,
-  defaultOf: CatalogMosaicEntry["defaultOf"],
+  catalogEntry: CatalogMosaicEntry,
 ): HTMLElement {
   const card = document.createElement("article");
   const heading = document.createElement("header");
   const title = document.createElement("h2");
   title.textContent = inspection.title;
-  heading.append(title);
-  if (defaultOf !== null) {
-    heading.append(buildDefaultMark(defaultOf));
+  heading.append(title, buildPlaceBadge(catalogEntry));
+  const listedBy = describeListedBy(catalogEntry);
+  if (listedBy !== null) {
+    heading.append(buildListedByMark(listedBy));
   }
   const description = document.createElement("p");
   description.textContent = inspection.description;
@@ -96,9 +118,9 @@ export function buildMosaicItem(
 ): HTMLElement {
   const item = document.createElement("li");
   if (entry.inspection === null) {
-    item.append(buildFailureAlert(entry.source, entry.error));
+    item.append(buildFailureAlert(entry.catalogEntry.source, entry.error));
     return item;
   }
-  item.append(buildMosaicCard(view, entry.inspection, entry.defaultOf));
+  item.append(buildMosaicCard(view, entry.inspection, entry.catalogEntry));
   return item;
 }

@@ -187,15 +187,41 @@ export interface MosaicInspection {
   permissions: ModGrants;
 }
 
-/** A mod or collection of the catalog: the resolved address of its file. */
-export interface CatalogEntry {
-  source: string;
+/** Who listed a catalog entry: the instance catalog, a mod as its default mosaic, or the user. */
+export type CatalogListedBy = "instance" | "default" | "user";
+
+/** Where a catalog entry's file lives: `"browser"` for an `opentesela-browser:` address, `"remote"` for any other. */
+export type CatalogPlace = "remote" | "browser";
+
+/**
+ * Where a user mosaic came from. A stored one has the picked folder's name,
+ * or `null` for a single file, and its path inside the folder or its file
+ * name. One added by URL has `null` for both. Times are ISO 8601 strings in UTC.
+ */
+export interface CatalogProvenance {
+  folder: string | null;
+  path: string | null;
+  addedAt: string;
+  updatedAt: string | null;
 }
 
-/** A mosaic of the catalog. `defaultOf` is the mod whose default mosaic it is, or `null`. */
+/** A mod or collection of the catalog: the resolved address of its file, who listed it and where it lives. */
+export interface CatalogEntry {
+  source: string;
+  listedBy: CatalogListedBy;
+  place: CatalogPlace;
+}
+
+/**
+ * A mosaic of the catalog. `defaultOf` is the mod whose default mosaic it is,
+ * or `null`. `provenance` is `null` unless `listedBy` is `"user"`.
+ */
 export interface CatalogMosaicEntry {
   source: string;
+  listedBy: CatalogListedBy;
+  place: CatalogPlace;
   defaultOf: { source: string; title: string } | null;
+  provenance: CatalogProvenance | null;
 }
 
 /** What `catalog.list` answers and `catalog.changed` pushes: the catalog, each list in catalog order. */
@@ -275,6 +301,11 @@ export interface ModApiMethods {
   "mosaics.open": { params: MosaicOpenParams; result: null };
   "mosaics.check": { params: { mosaic: string }; result: ModCheckReport };
   "catalog.list": { params: Record<string, never>; result: Catalog };
+  "userCatalog.import": { params: Record<string, never>; result: boolean };
+  "userCatalog.update": { params: { mosaic: string }; result: boolean };
+  "userCatalog.add": { params: { mosaic?: string }; result: boolean };
+  "userCatalog.export": { params: { mosaic: string }; result: boolean };
+  "userCatalog.remove": { params: { mosaic: string }; result: boolean };
 }
 
 /** The engine events this file types: the params each one pushes. */
@@ -348,13 +379,40 @@ export interface CaseStorage {
 
 /** The methods whose next request a case can answer with a boolean. */
 export type CaseBooleanAnswerMethod =
-  "links.open" | "files.save" | "ui.confirm" | "players.open";
+  | "links.open"
+  | "files.save"
+  | "ui.confirm"
+  | "players.open"
+  | "userCatalog.import"
+  | "userCatalog.update"
+  | "userCatalog.add"
+  | "userCatalog.export"
+  | "userCatalog.remove";
 
-/** A catalog a case answers `catalog.list` with: missing lists are empty, and a missing `defaultOf` is `null`. */
+/** A catalog entry a case answers with: a missing mark is completed. */
+export interface CaseCatalogEntry {
+  source: string;
+  listedBy?: CatalogListedBy;
+  place?: CatalogPlace;
+}
+
+/** A catalog mosaic a case answers with: a missing mark is completed. */
+export interface CaseCatalogMosaicEntry extends CaseCatalogEntry {
+  defaultOf?: CatalogMosaicEntry["defaultOf"];
+  provenance?: CatalogProvenance | null;
+}
+
+/**
+ * A catalog a case answers `catalog.list` with: missing lists are empty. A
+ * missing `listedBy` is `"default"` for a mosaic with a `defaultOf`, `"user"`
+ * for one with a `provenance`, and `"instance"` otherwise. A missing `place`
+ * is `"browser"` for an `opentesela-browser:` source and `"remote"`
+ * otherwise. A missing `defaultOf` or `provenance` is `null`.
+ */
 export interface CaseCatalogAnswer {
-  mods?: CatalogEntry[];
-  collections?: CatalogEntry[];
-  mosaics?: { source: string; defaultOf?: CatalogMosaicEntry["defaultOf"] }[];
+  mods?: CaseCatalogEntry[];
+  collections?: CaseCatalogEntry[];
+  mosaics?: CaseCatalogMosaicEntry[];
 }
 
 /** The values of `Value` that are truthy, which `waitFor` resolves with. */

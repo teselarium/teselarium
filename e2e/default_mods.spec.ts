@@ -57,9 +57,13 @@ import {
   EXPLORER_OFF_PREVIEW_URL,
   TEST_CATALOG_PREVIEW_URL,
 } from "./app_servers.ts";
+import { buildStoredSeedEntry, seedUserCatalog } from "./user_catalog_seeds.ts";
+import type { UserCatalogSeed } from "./user_catalog_seeds.ts";
 import {
   canFrameScrollSideways,
   listOwnLookDeclarations,
+  MINIMUM_TEXT_CONTRAST,
+  readContrastRatio,
   readRowSeparators,
   readTokenAs,
 } from "./theme_probes.ts";
@@ -649,6 +653,9 @@ const MOSAIC_EXPLORER_CASES = [
   "opens the selected mosaic",
   "opens the viewer for the selected mosaic",
   "shows a refused open",
+  "shows where each mosaic lives and marks the user's",
+  "imports mosaics when asked",
+  "adds a mosaic by URL when asked",
   "says the list is busy while it loads",
   "keeps its own styles to layout",
   "draws each mosaic on the card background",
@@ -673,6 +680,12 @@ const MOSAIC_VIEWER_CASES = [
   "opens the collection viewer from the collection's title",
   "opens the mosaic",
   "shows a refused check and enables it again",
+  "shows where a stored mosaic comes from",
+  "shows where a remote mosaic comes from",
+  "shows no provenance for a mosaic the user did not add",
+  "removes a stored mosaic",
+  "exports a stored mosaic",
+  "updates a stored mosaic from a file",
   "makes opening the mosaic the primary action",
   "draws the mosaic on the card background",
   "draws a failure with the destructive border",
@@ -2344,5 +2357,213 @@ test.describe("Tile viewer keeps its position on one line", function describePla
     const title = place.getByRole("button", { name: LONG_TITLE });
     await expect(title).toHaveText(LONG_TITLE);
     expect(await title.evaluate(isFullyShown)).toBe(true);
+  });
+});
+
+/** A mosaic of the sample book list, on the app's origin, so opening and inspecting it asks nothing. */
+function writeBookListMosaic(page: Page, title: string): string {
+  const modAddress = new URL("/samples/mods/book_list/", page.url()).href;
+  const text = ["mosaic:", `  title: "${title}"`, `  mod: "${modAddress}"`, ""];
+  return text.join("\n");
+}
+
+/** A stored mosaic of the sample book list, seeded under `path` of `my-mosaics`. */
+function buildStoredBookListSeed(
+  page: Page,
+  title: string,
+  path: string,
+): UserCatalogSeed {
+  const entry = buildStoredSeedEntry(path);
+  const seed: UserCatalogSeed = {
+    entries: [entry],
+    files: { [entry.address]: writeBookListMosaic(page, title) },
+  };
+  return seed;
+}
+
+function mosaicCard(page: Page, title: string): Locator {
+  return mosaicExplorerCards(page).filter({
+    has: page.getByRole("heading", { name: title }),
+  });
+}
+
+interface BadgeContrast {
+  text: string;
+  variant: string | null;
+  contrast: number;
+}
+
+/** Runs in the explorer's frame: each place badge's text color and the fill behind it. */
+function readPlaceBadgeColors(): {
+  text: string;
+  variant: string | null;
+  color: string;
+  fill: string;
+}[] {
+  const badges: {
+    text: string;
+    variant: string | null;
+    color: string;
+    fill: string;
+  }[] = [];
+  for (const badge of document.querySelectorAll("article header > h2 + span")) {
+    const card = badge.closest("article") as Element;
+    const badgeFill = getComputedStyle(badge).backgroundColor;
+    const isTransparent = badgeFill === "rgba(0, 0, 0, 0)";
+    badges.push({
+      text: badge.textContent ?? "",
+      variant: badge.getAttribute("data-ot-variant"),
+      color: getComputedStyle(badge).color,
+      fill: isTransparent ? getComputedStyle(card).backgroundColor : badgeFill,
+    });
+  }
+  return badges;
+}
+
+async function readPlaceBadgeContrasts(page: Page): Promise<BadgeContrast[]> {
+  const frame = await findModFrame(page, "Mosaics");
+  const contrasts: BadgeContrast[] = [];
+  for (const badge of await frame.evaluate(readPlaceBadgeColors)) {
+    contrasts.push({
+      text: badge.text,
+      variant: badge.variant,
+      contrast: readContrastRatio(badge.color, badge.fill),
+    });
+  }
+  return contrasts;
+}
+
+async function readLowestPlaceBadgeContrast(page: Page): Promise<number> {
+  let lowest = Number.POSITIVE_INFINITY;
+  for (const badge of await readPlaceBadgeContrasts(page)) {
+    lowest = Math.min(lowest, badge.contrast);
+  }
+  return lowest;
+}
+
+test.describe("Mosaic explorer and viewer of user mosaics", function describeUserMosaics(): void {
+  test("Import from the explorer", async function importsFromExplorer({
+    page,
+  }): Promise<void> {
+    await page.goto("/#/");
+    await openSection(page, "Mosaics");
+    await waitForMosaicList(page);
+    const explorer = await findModFrame(page, "Mosaics");
+    await markFrame(explorer);
+
+    await mosaicExplorerFrame(page)
+      .getByRole("button", { name: "Import…" })
+      .click();
+    const dialog = page.locator("dialog[open]");
+    await dialog.getByLabel("Mosaic files").setInputFiles({
+      name: "nobel_map.yaml",
+      mimeType: "application/yaml",
+      buffer: Buffer.from(writeBookListMosaic(page, "Imported books")),
+    });
+    await expect(dialog.getByText("New")).toBeVisible();
+    await dialog.getByRole("button", { name: "Import" }).click();
+
+    const card = mosaicCard(page, "Imported books");
+    await expect(card.getByText("Browser", { exact: true })).toBeVisible();
+    await expect(card.getByText("Added by you")).toBeVisible();
+    expect(await isFrameMarked(explorer)).toBe(true);
+  });
+
+  test("Removed from the viewer", async function removesInViewer({
+    page,
+  }): Promise<void> {
+    await page.goto("/#/");
+    const seed = buildStoredBookListSeed(
+      page,
+      "Stored books",
+      "maps/stored_books.yaml",
+    );
+    await seedUserCatalog(page, seed);
+    const address = seed.entries[0].address;
+
+    await page.goto(
+      `/#/run?mod=mosaic_viewer&target=${encodeURIComponent(address)}`,
+    );
+
+    const viewer = mosaicViewerFrame(page);
+    const section = viewer.getByRole("region", { name: "Where it comes from" });
+    await expect(section).toContainText("maps/stored_books.yaml");
+    await expect(section).toContainText("kept only in this browser");
+    await section.getByRole("button", { name: "Remove" }).click();
+    const dialog = page.locator("dialog[open]");
+    await expect(dialog).toContainText(
+      'Remove "Stored books" from your catalog?',
+    );
+    await dialog.getByRole("button", { name: "Remove" }).click();
+    await expect(viewer.getByRole("status")).toHaveText(
+      "The mosaic was removed from your catalog.",
+    );
+    await expect(viewer.getByRole("button", { name: "Remove" })).toHaveCount(0);
+    await expect(viewer.getByRole("button", { name: "Export" })).toHaveCount(0);
+  });
+
+  test("Badges, buttons and the section on a phone", async function laysOutOnPhone({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await page.goto("/#/");
+    const seed = buildStoredBookListSeed(
+      page,
+      "A stored mosaic with a rather long title that wraps on a phone",
+      "maps/a/rather/long/path/to/a/stored_mosaic_with_a_long_name.yaml",
+    );
+    await seedUserCatalog(page, seed);
+
+    await openSection(page, "Mosaics");
+    await waitForMosaicList(page);
+    const explorer = await findModFrame(page, "Mosaics");
+    expect(await explorer.evaluate(canFrameScrollSideways)).toBe(false);
+    for (const name of ["Import…", "Add by URL…"]) {
+      const box = await mosaicExplorerFrame(page)
+        .getByRole("button", { name })
+        .boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(32);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+        SMALL_PHONE_VIEWPORT.width,
+      );
+    }
+    await page.goto(
+      `/#/run?mod=mosaic_viewer&target=${encodeURIComponent(seed.entries[0].address)}`,
+    );
+    const viewer = await findModFrame(page, "Mosaic Viewer");
+    await expect(
+      mosaicViewerFrame(page).getByRole("region", {
+        name: "Where it comes from",
+      }),
+    ).toBeVisible();
+    expect(await viewer.evaluate(canFrameScrollSideways)).toBe(false);
+  });
+
+  test("Place badges in both schemes", async function checksBadgeColors({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/#/");
+    await seedUserCatalog(
+      page,
+      buildStoredBookListSeed(page, "Stored books", "stored_books.yaml"),
+    );
+    await openSection(page, "Mosaics");
+    await waitForMosaicList(page);
+
+    const badges = await readPlaceBadgeContrasts(page);
+    expect(badges).toContainEqual(
+      expect.objectContaining({ text: "Browser", variant: "secondary" }),
+    );
+    expect(badges).toContainEqual(
+      expect.objectContaining({ text: "Remote", variant: "outline" }),
+    );
+    await expect
+      .poll(readLowestPlaceBadgeContrast.bind(undefined, page))
+      .toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect
+      .poll(readLowestPlaceBadgeContrast.bind(undefined, page))
+      .toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
   });
 });

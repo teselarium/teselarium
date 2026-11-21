@@ -21,6 +21,7 @@ import type {
   SidebarSnapshot,
 } from "./main/sidebar/sidebar_layout.ts";
 import { StageView } from "./main/stage/StageView.tsx";
+import type { UserCatalogStore } from "./main/user_catalog/user_catalog_store.ts";
 import type { TheaterSetting } from "./main/stage/theater_setting.ts";
 import type { AppTheme } from "./main/theme/app_theme.ts";
 import { useStoreSnapshot } from "./main/use_store_snapshot.ts";
@@ -34,6 +35,8 @@ interface AppProps {
   listChoices: ListChoices;
   /** The mods, collections and mosaics tried in combination sandboxes. */
   recentlyUsed: RecentlyUsed;
+  /** The user's own mosaics, which the user catalog dialogs and Settings change. */
+  userCatalog: UserCatalogStore;
   appTheme: AppTheme;
   /** The available sections, in registry order. */
   sections: readonly SectionDefinition[];
@@ -67,6 +70,7 @@ function App({
   combinations,
   listChoices,
   recentlyUsed,
+  userCatalog,
   appTheme,
   sections,
   switches,
@@ -109,6 +113,7 @@ function App({
               tileMedia={tileMedia}
               catalogSetting={catalogSetting}
               recentlyUsed={recentlyUsed}
+              userCatalog={userCatalog}
               siteDecisions={siteDecisions}
               playerSites={playerSites}
             />
@@ -118,6 +123,7 @@ function App({
             combinations={combinations}
             listChoices={listChoices}
             recentlyUsed={recentlyUsed}
+            userCatalog={userCatalog}
             playerSites={playerSites}
             theater={theater}
           />

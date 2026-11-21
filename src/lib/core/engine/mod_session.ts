@@ -21,6 +21,7 @@ import type {
 import type { SiteDecision } from "../permissions/index.ts";
 import type { LoadedMosaic } from "../../mosaic/index.ts";
 import type { ModStorage } from "../storage/index.ts";
+import type { UserCatalogEntry } from "../../user_catalog/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
 import { CATALOG_METHODS } from "./catalog_methods.ts";
@@ -70,6 +71,12 @@ import { PLAYERS_METHODS } from "./players_methods.ts";
 import { buildLaunchSlot, STORAGE_METHODS } from "./storage_methods.ts";
 import { TILES_METHODS } from "./tiles_methods.ts";
 import { UI_METHODS } from "./ui_methods.ts";
+import { USER_CATALOG_METHODS } from "./user_catalog_methods.ts";
+
+/** The user catalog of a check's session: none, so its requests are not checked against entries. */
+function readNoUserCatalog(): null {
+  return null;
+}
 
 /** The services a session needs from the app. */
 export interface ModSessionOptions {
@@ -82,6 +89,8 @@ export interface ModSessionOptions {
   readSiteDecisions: () => readonly SiteDecision[];
   /** The catalog, read by `catalog.list`. */
   readCatalog: () => Promise<Catalog>;
+  /** The user catalog's entries, read by the `userCatalog.*` requests. Checks leave it out. */
+  readUserCatalog?: () => readonly UserCatalogEntry[];
   onIssue: (issue: ModIssue) => void;
   /** Asks the stage to open a link (see `ModMethodContext.onOpenLink`). */
   onOpenLink: (link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome;
@@ -168,6 +177,7 @@ export const ENGINE_METHODS: ModMethodTable = {
   ...LINKS_METHODS,
   ...FILES_METHODS,
   ...UI_METHODS,
+  ...USER_CATALOG_METHODS,
   ...TILES_METHODS,
   ...PLAYERS_METHODS,
   ...LIBS_METHODS,
@@ -417,6 +427,7 @@ export function connectModSession(
       tileBodies: launch.tileBodies,
       readSiteDecisions: options.readSiteDecisions,
       readCatalog: options.readCatalog,
+      readUserCatalog: options.readUserCatalog ?? readNoUserCatalog,
       onOpenLink: options.onOpenLink,
       onRequestAction: options.onRequestAction,
       onCheckMod: options.onCheckMod,

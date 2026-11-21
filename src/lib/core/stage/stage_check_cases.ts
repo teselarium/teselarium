@@ -34,6 +34,11 @@ export const ACTION_METHODS: Record<AppAction["kind"], AnswerMethod> = {
   save: "files.save",
   confirm: "ui.confirm",
   player: "players.open",
+  catalogImport: "userCatalog.import",
+  catalogUpdate: "userCatalog.update",
+  catalogAdd: "userCatalog.add",
+  catalogExport: "userCatalog.export",
+  catalogRemove: "userCatalog.remove",
 };
 
 /** The callbacks of a check frame's session, which the check passes to `connectModSession`. */
@@ -217,7 +222,11 @@ function takeCaseAnswer(
   return queue.shift();
 }
 
-/** `links.open`, `files.save` and `ui.confirm` of a case: the queued answer, or `false`, with no dialog. */
+/**
+ * A request of a case that asks the user (`links.open`, `files.save`,
+ * `ui.confirm`, `players.open` and the `userCatalog.*` requests): the queued
+ * answer, or `false`, with no dialog and no change.
+ */
 function answerCaseAction(
   checkCase: CheckCase,
   action: AppAction,

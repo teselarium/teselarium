@@ -28,6 +28,7 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "grantInputsMosaic",
       "grantLaunchMosaic",
       "inspectMod",
+      "isCatalogAction",
       "isMosaicCheckTarget",
       "loadLaunchMod",
       "loadLaunchMosaic",

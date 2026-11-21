@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { RenderResult } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "./App";
+import { readStageCatalog } from "./lib/core/stage/index.ts";
 import { SAMPLE_MOD_REFERENCE } from "./test/sample_mods.ts";
 import { startTestApp } from "./test/test_app.ts";
 import type { AppFixture } from "./test/test_app.ts";
@@ -14,6 +15,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       combinations={fixture.combinations}
       listChoices={fixture.listChoices}
       recentlyUsed={fixture.recentlyUsed}
+      userCatalog={fixture.userCatalog}
       appTheme={fixture.appTheme}
       sections={fixture.sections}
       switches={fixture.switches}
@@ -34,6 +36,20 @@ describe("App", function describeApp(): void {
     const title = screen.getByRole("heading", { name: "OpenTesela" });
 
     expect(title).toBeInTheDocument();
+  });
+
+  it("Store refused at start", async function startsWithoutStore(): Promise<void> {
+    const fixture = await startTestApp("", { userCatalog: { database: null } });
+
+    renderApp(fixture);
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "OpenTesela" }),
+    ).toBeTruthy();
+    const catalog = await readStageCatalog(fixture.stage);
+    for (const mosaic of catalog.mosaics) {
+      expect(mosaic.listedBy).not.toBe("user");
+    }
   });
 
   it("No app header", async function hasNoHeader(): Promise<void> {

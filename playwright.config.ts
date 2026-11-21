@@ -27,8 +27,13 @@ const E2E_RUNS = ["default", "samples", "full"] as const;
 
 type E2eRun = (typeof E2E_RUNS)[number];
 
-/** The tests whose result depends on how the engine treats frames. */
-const FRAMES_TAG = /@frames/;
+/**
+ * The tests that run in every engine of the default run: those tagged
+ * `@frames`, whose result depends on how the engine treats frames, and those
+ * tagged `@storage`, whose result depends on the
+ * engine's IndexedDB and on how it picks and drops folders.
+ */
+const EVERY_ENGINE_TAG = /@frames|@storage/;
 
 /** The shipped samples' own tests. */
 const SAMPLE_TAG = /@sample/;
@@ -61,7 +66,7 @@ function readE2eRun(value: string | undefined): E2eRun {
 /**
  * The filters of a desktop engine's project in a run. `runsEveryTest` is
  * true for the engine that runs every test of the default run, false for the
- * engines that run only the `@frames` tests in it. Desktop projects never
+ * engines that run only the `@frames` and `@storage` tests in it. Desktop projects never
  * run the `@mobile` tests, which need a phone.
  */
 function buildProjectFilters(
@@ -74,7 +79,7 @@ function buildProjectFilters(
   } else if (run === "default" && runsEveryTest) {
     filters = { grepInvert: NOT_IN_DEFAULT_DESKTOP };
   } else if (run === "default") {
-    filters = { grep: FRAMES_TAG, grepInvert: NOT_IN_DEFAULT_DESKTOP };
+    filters = { grep: EVERY_ENGINE_TAG, grepInvert: NOT_IN_DEFAULT_DESKTOP };
   }
   return filters;
 }
@@ -104,8 +109,10 @@ export default defineConfig({
   // `@frames` depend on the engine, because mods rely on frame behavior that
   // differs between engines (design.md of add-mod-ui-capabilities, Browser
   // differences). `E2E_RUN` chooses the run (package.json scripts):
-  // - default: every test but `@sample` in Chromium, and the `@frames` tests
-  //   but `@sample` in Firefox and WebKit
+  // - default: every test but `@sample` in Chromium, and the `@frames` and
+  //   `@storage` tests but `@sample` in Firefox and WebKit. `@storage` tags
+  //   the tests that depend on the engine's IndexedDB and on how it picks
+  //   and drops folders (design.md of add-user-catalog, decision 9).
   // - samples: the shipped samples' own tests (`@sample`) in all three
   // - full: every test in all three, before a release (docs/releasing.md)
   // Phone: the tests tagged `@mobile` depend on the device (touch, a pointer

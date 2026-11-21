@@ -41,10 +41,66 @@ export interface PlayerAction {
   shape: PlayerShape;
 }
 
+/** `userCatalog.import`: the import dialog, to choose files or a folder and review them. */
+export interface CatalogImportAction {
+  kind: "catalogImport";
+}
+
+/** `userCatalog.update`: the update dialog of one stored entry. */
+export interface CatalogUpdateAction {
+  kind: "catalogUpdate";
+  /** The stored entry's `opentesela-browser:` address. */
+  address: string;
+}
+
+/** `userCatalog.add`: the "Add a mosaic" dialog. */
+export interface CatalogAddAction {
+  kind: "catalogAdd";
+  /** The resolved address the field starts with, or `null` for an empty field. */
+  suggested: string | null;
+}
+
+/** `userCatalog.export`: the save dialog of one stored entry's file. */
+export interface CatalogExportAction {
+  kind: "catalogExport";
+  /** The stored entry's `opentesela-browser:` address. */
+  address: string;
+}
+
+/** `userCatalog.remove`: the confirmation that removes one user entry. */
+export interface CatalogRemoveAction {
+  kind: "catalogRemove";
+  /** The user entry's address, stored or remote. */
+  address: string;
+}
+
+/** The actions of the `userCatalog.*` requests, which the app's user catalog store applies. */
+export type CatalogAction =
+  | CatalogImportAction
+  | CatalogUpdateAction
+  | CatalogAddAction
+  | CatalogExportAction
+  | CatalogRemoveAction;
+
+const CATALOG_ACTION_KINDS: ReadonlySet<string> = new Set<
+  CatalogAction["kind"]
+>([
+  "catalogImport",
+  "catalogUpdate",
+  "catalogAdd",
+  "catalogExport",
+  "catalogRemove",
+]);
+
+/** Whether the action is one of the `userCatalog.*` requests'. */
+export function isCatalogAction(action: AppAction): action is CatalogAction {
+  return CATALOG_ACTION_KINDS.has(action.kind);
+}
+
 /**
  * Something a mod asks the app to do for the user, checked and decoded, so
  * the app can perform it without more checks. Actions never cross
  * `postMessage`: they go from the session to the stage and the page.
  */
 export type AppAction =
-  LinkAction | SaveFileAction | ConfirmAction | PlayerAction;
+  LinkAction | SaveFileAction | ConfirmAction | PlayerAction | CatalogAction;

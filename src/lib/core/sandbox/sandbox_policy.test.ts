@@ -67,6 +67,19 @@ describe("collectContentHosts", function describeCollectContentHosts(): void {
     expect(contentHosts).toEqual(["http://localhost:5173"]);
   });
 
+  it("Stored mosaic's sandbox", function dropsBrowserSources(): void {
+    const contentHosts = collectContentHosts([
+      "opentesela-browser:///r1/maps/nobel_map.yaml",
+      "https://mods.example.net/book_list/mod_conf.yaml",
+      "https://tiles.example.net/laureates/collection.yaml",
+    ]);
+
+    expect(contentHosts).toEqual([
+      "https://mods.example.net",
+      "https://tiles.example.net",
+    ]);
+  });
+
   it("removes duplicates and sorts the hosts", function sortsHosts(): void {
     const contentHosts = collectContentHosts([
       "https://zeta.example.net/a.md",

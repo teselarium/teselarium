@@ -265,9 +265,29 @@ describe("Scripted answers", function describeScriptedAnswers(): void {
         jsonrpc: "2.0",
         id: 2,
         result: {
-          mods: [{ source: SAMPLE_MOD_SOURCE }],
-          collections: [{ source: SAMPLE_COLLECTION_SOURCE }],
-          mosaics: [{ source: SAMPLE_MOSAIC_SOURCE, defaultOf: null }],
+          mods: [
+            {
+              source: SAMPLE_MOD_SOURCE,
+              listedBy: "instance",
+              place: "remote",
+            },
+          ],
+          collections: [
+            {
+              source: SAMPLE_COLLECTION_SOURCE,
+              listedBy: "instance",
+              place: "remote",
+            },
+          ],
+          mosaics: [
+            {
+              source: SAMPLE_MOSAIC_SOURCE,
+              listedBy: "instance",
+              place: "remote",
+              defaultOf: null,
+              provenance: null,
+            },
+          ],
         },
       },
     ]);

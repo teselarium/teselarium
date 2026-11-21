@@ -7,6 +7,7 @@ import type { MemoryStorage } from "../../test/memory_storage.ts";
 import {
   clearRecentlyUsed,
   createRecentlyUsed,
+  forgetRecentlyUsedMosaics,
   readRecentlyUsedSnapshot,
   RECENTLY_USED_KEY,
   recordRecentlyUsed,
@@ -263,6 +264,36 @@ describe("createRecentlyUsed", function describeCreateRecentlyUsed(): void {
   it("Mods cannot reach it", function keepsKeyApart(): void {
     expect(RECENTLY_USED_KEY).toBe("opentesela.recently-used");
     expect(RECENTLY_USED_KEY.startsWith("opentesela.mod-storage:")).toBe(false);
+  });
+});
+
+describe("forgetRecentlyUsedMosaics", function describeForgetMosaics(): void {
+  it("Opened, then removed", function forgetsRemovedMosaic(): void {
+    const storage = createMemoryStorage();
+    const store = createRecentlyUsed({ storage });
+    recordRecentlyUsed(store, { kind: "mosaic", source: MOSAIC });
+    recordRecentlyUsed(store, { kind: "mod", source: MOD });
+    recordRecentlyUsed(store, { kind: "collection", source: COLLECTION_A });
+
+    forgetRecentlyUsedMosaics(store, [MOSAIC]);
+
+    const snapshot = readRecentlyUsedSnapshot(store);
+    expect(snapshot.mosaics).toEqual([]);
+    expect(snapshot.mods).toEqual([MOD]);
+    expect(snapshot.collections).toEqual([COLLECTION_A]);
+    expect(readStored(storage)).toMatchObject({ mosaics: [] });
+  });
+
+  it("changes nothing for mosaics it does not hold", function keepsUnknown(): void {
+    const store = createRecentlyUsed({ storage: createMemoryStorage() });
+    recordRecentlyUsed(store, { kind: "mosaic", source: MOSAIC });
+    const listener = vi.fn<() => void>();
+    subscribeRecentlyUsed(store, listener);
+
+    forgetRecentlyUsedMosaics(store, [`${BASE}mosaics/other.yaml`]);
+
+    expect(readRecentlyUsedSnapshot(store).mosaics).toEqual([MOSAIC]);
+    expect(listener).not.toHaveBeenCalled();
   });
 });
 

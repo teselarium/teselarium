@@ -19,6 +19,7 @@ import type {
 } from "../../mod_api.d.ts";
 import { describeError } from "./error_messages.ts";
 import { buildErrorAlert, buildStatusMessage } from "./page_elements.ts";
+import { showProvenance } from "./provenance_section.ts";
 import {
   addViewerStyle,
   renderInspection,
@@ -29,6 +30,19 @@ import type { ViewerView } from "./viewer_view.ts";
 /** The viewers the titles open when the config names none. */
 const DEFAULT_MOD_VIEWER = "mod_viewer";
 const DEFAULT_COLLECTION_VIEWER = "collection_viewer";
+
+/** After an update from a file: the mosaic inspected anew and shown again, or the error. */
+async function showUpdatedMosaic(view: ViewerView): Promise<void> {
+  try {
+    view.inspection = await view.engine.request("mosaics.inspect", {
+      mosaic: view.inspection.source,
+    });
+  } catch (error) {
+    view.messages.replaceChildren(buildErrorAlert(describeError(error)));
+    return;
+  }
+  await renderInspection(view);
+}
 
 function buildViewerView(
   engine: ModEngine,
@@ -44,8 +58,15 @@ function buildViewerView(
     ),
     inspection,
     messages: document.createElement("div"),
+    provenance: document.createElement("div"),
+    onUpdated: noUpdate,
   };
+  view.onUpdated = showUpdatedMosaic.bind(undefined, view);
   return view;
+}
+
+async function noUpdate(): Promise<void> {
+  // Replaced once the view is built.
 }
 
 /** Entry point called by the frame loader with the engine API object and the mount context. */
@@ -69,5 +90,8 @@ export default async function mount(
     renderMessage(context.mod.title, buildErrorAlert(describeError(error)));
     return;
   }
-  await renderInspection(buildViewerView(engine, context, inspection));
+  const view = buildViewerView(engine, context, inspection);
+  // The catalog's changes reach "Where it comes from" without a reload.
+  engine.on("catalog.changed", showProvenance.bind(undefined, view));
+  await renderInspection(view);
 }

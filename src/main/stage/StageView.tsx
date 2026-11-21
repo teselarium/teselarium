@@ -6,6 +6,7 @@ import {
   answerApiMismatch,
   answerSiteConsent,
   answerStageAction,
+  isCatalogAction,
   markStageActionPlaying,
   readStageSnapshot,
   subscribeStage,
@@ -37,6 +38,9 @@ import {
   showSandboxFullscreen,
 } from "./stage_fullscreen.ts";
 import type { TheaterSetting } from "./theater_setting.ts";
+import { UserCatalogDialog } from "../user_catalog/UserCatalogDialog.tsx";
+import type { CatalogActionSnapshot } from "../user_catalog/UserCatalogDialog.tsx";
+import type { UserCatalogStore } from "../user_catalog/user_catalog_store.ts";
 import "./stage.css";
 
 interface StageViewProps {
@@ -49,6 +53,8 @@ interface StageViewProps {
   recentlyUsed: RecentlyUsed;
   /** The sites the user always plays from, which the player dialog reads and remembers. */
   playerSites: PlayerSites;
+  /** The user's own mosaics, which the user catalog dialogs change. */
+  userCatalog: UserCatalogStore;
   /** Theater mode, which the stage bar's button turns on and off. */
   theater: TheaterSetting;
 }
@@ -66,11 +72,30 @@ function readShownPlayer(shown: ActionSnapshot | null): PlayerSnapshot | null {
   return player;
 }
 
-/** The shown action for the action dialog, or `null` when it is a player. */
+/** The shown action for the user catalog dialogs, or `null` when it is not a `userCatalog.*` request's. */
+function readShownCatalogAction(
+  shown: ActionSnapshot | null,
+): CatalogActionSnapshot | null {
+  if (shown === null || !isCatalogAction(shown.action)) {
+    return null;
+  }
+  const catalogAction: CatalogActionSnapshot = {
+    id: shown.id,
+    mod: shown.mod,
+    action: shown.action,
+  };
+  return catalogAction;
+}
+
+/** The shown action for the action dialog, or `null` when it is a player or a user catalog action. */
 function readShownQuestion(
   shown: ActionSnapshot | null,
 ): QuestionSnapshot | null {
-  if (shown === null || shown.action.kind === "player") {
+  if (
+    shown === null ||
+    shown.action.kind === "player" ||
+    isCatalogAction(shown.action)
+  ) {
     return null;
   }
   const question: QuestionSnapshot = {
@@ -185,6 +210,7 @@ export function StageView({
   listChoices,
   recentlyUsed,
   playerSites,
+  userCatalog,
   theater,
 }: StageViewProps): ReactElement {
   const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
@@ -232,6 +258,7 @@ export function StageView({
     answerSiteConsent(stage, sandboxId, answer);
   }
 
+  const shownCatalogAction = readShownCatalogAction(snapshot.action);
   const visibleSandbox = findVisibleSandbox(snapshot);
   const visibleId = visibleSandbox?.id ?? null;
   useEffect(
@@ -275,6 +302,13 @@ export function StageView({
         shown={readShownQuestion(snapshot.action)}
         onAnswer={handleActionAnswer}
       />
+      {shownCatalogAction === null ? null : (
+        <UserCatalogDialog
+          shown={shownCatalogAction}
+          userCatalog={userCatalog}
+          onAnswer={handleActionAnswer}
+        />
+      )}
       <PlayerDialog
         shown={readShownPlayer(snapshot.action)}
         playerSites={playerSites}

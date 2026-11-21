@@ -9,6 +9,7 @@ import {
   hasProbeAnswer,
   navigateFrame,
   readProbeAnswers,
+  requestFromProbe,
   serveAppOriginMod,
   startProbeRequests,
   waitForProbe,
@@ -334,6 +335,32 @@ test.describe(
         { result: false },
       ]);
       await expect(actionDialog(page)).toBeHidden();
+    });
+  },
+);
+
+test.describe(
+  "Only the visible mod asks",
+  { tag: "@frames" },
+  function describeVisibleMod(): void {
+    test("Hidden mod asks for an import", async function refusesHiddenImport({
+      page,
+    }): Promise<void> {
+      const opener = await openProbe(page, OPEN_ANY_SITE_LINES);
+      await ask(opener, "mods.open", { mod: "./test-mods/probe/" });
+      const opened = await findSandboxFrame(page, "sandbox-2");
+      await waitForProbe(opened);
+
+      const answer = await opener.evaluate(requestFromProbe, [
+        "userCatalog.import",
+        {},
+      ]);
+
+      expect(answer.code).toBe(-32002);
+      expect(answer.message).toBe(
+        "userCatalog.import: only the visible mod can ask the user",
+      );
+      await expect(page.getByRole("dialog")).toHaveCount(0);
     });
   },
 );

@@ -235,6 +235,10 @@ const FOREIGN_MOSAIC = {
     },
   ] satisfies ModPermission[],
 };
+const STORED_MOSAIC = {
+  source: "opentesela-browser:///r1/maps/nobel_map.yaml",
+  permissions: FOREIGN_MOSAIC.permissions,
+};
 
 function buildMosaicDecision(
   mosaic: string,
@@ -256,6 +260,12 @@ describe("grantMosaicPermissions", function describeGrantMosaicPermissions(): vo
     const grants = grantMosaicPermissions(APP_MOSAIC, APP_ORIGIN, []);
 
     expect(grants).toEqual(buildGrants(APP_MOSAIC.permissions, []));
+  });
+
+  it("Stored mosaic's show lines", function deniesStoredMosaic(): void {
+    const grants = grantMosaicPermissions(STORED_MOSAIC, APP_ORIGIN, []);
+
+    expect(grants).toEqual(buildGrants([], STORED_MOSAIC.permissions));
   });
 
   it("denies the lines of a foreign mosaic without a decision", function deniesForeignMosaic(): void {
@@ -340,6 +350,14 @@ describe("listConsentLines with a mosaic", function describeMosaicConsentLines()
 
     expect(lines).toEqual([
       { ...FOREIGN_MOSAIC.permissions[0], subject: "mosaic" },
+    ]);
+  });
+
+  it("Stored mosaic's show lines are asked", function listsStoredMosaicLines(): void {
+    const lines = listConsentLines(SAMPLE_MOD, APP_ORIGIN, [], STORED_MOSAIC);
+
+    expect(lines).toEqual([
+      { ...STORED_MOSAIC.permissions[0], subject: "mosaic" },
     ]);
   });
 

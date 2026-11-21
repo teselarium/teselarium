@@ -15,13 +15,24 @@ const ANSWER_KINDS = {
   "files.save": "boolean",
   "ui.confirm": "boolean",
   "players.open": "boolean",
+  "userCatalog.import": "boolean",
+  "userCatalog.update": "boolean",
+  "userCatalog.add": "boolean",
+  "userCatalog.export": "boolean",
+  "userCatalog.remove": "boolean",
   "mods.open": "null",
   "mosaics.open": "null",
   "catalog.list": "catalog",
 };
 
-// The lists of a scripted catalog, and whether their entries may have `defaultOf`.
+// The lists of a scripted catalog, and whether their entries are mosaics,
+// which may also have `defaultOf` and `provenance`.
 const CATALOG_LISTS = { mods: false, collections: false, mosaics: true };
+
+const CATALOG_LISTED_BY = ["instance", "default", "user"];
+const CATALOG_PLACES = ["remote", "browser"];
+const BROWSER_FILE_PROTOCOL = "opentesela-browser:";
+const PROVENANCE_KEYS = ["folder", "path", "addedAt", "updatedAt"];
 
 function isPlainMapping(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -229,7 +240,7 @@ function throwNotCatalog(reason) {
 }
 
 // A mosaic entry's `defaultOf`: `null`, or `{ source, title }` with non-empty strings.
-function readCatalogMark(mark, place) {
+function readCatalogMark(mark, label) {
   if (mark === undefined || mark === null) {
     return null;
   }
@@ -240,35 +251,137 @@ function readCatalogMark(mark, place) {
     Object.keys(mark).length !== 2
   ) {
     throwNotCatalog(
-      `"${place}.defaultOf" must be null or { source, title } with non-empty strings`,
+      `"${label}.defaultOf" must be null or { source, title } with non-empty strings`,
     );
   }
   const readMark = { source: mark.source, title: mark.title };
   return readMark;
 }
 
-function readCatalogEntry(entry, place, hasMark) {
-  const keys = hasMark ? ["source", "defaultOf"] : ["source"];
+function isTextOrNull(value) {
+  return value === null || typeof value === "string";
+}
+
+function hasEveryKey(mapping, keys) {
+  for (const key of keys) {
+    if (!Object.hasOwn(mapping, key)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function hasProvenanceShape(provenance) {
+  const keys = Object.keys(provenance);
+  const hasShape =
+    keys.length === PROVENANCE_KEYS.length &&
+    hasEveryKey(provenance, PROVENANCE_KEYS) &&
+    isTextOrNull(provenance.folder) &&
+    isTextOrNull(provenance.path) &&
+    isNonEmptyText(provenance.addedAt) &&
+    isTextOrNull(provenance.updatedAt);
+  return hasShape;
+}
+
+// A mosaic entry's `provenance`: `null`, or `{ folder, path, addedAt, updatedAt }`.
+function readCatalogProvenance(provenance, label) {
+  if (provenance === undefined || provenance === null) {
+    return null;
+  }
+  if (!isPlainMapping(provenance) || !hasProvenanceShape(provenance)) {
+    throwNotCatalog(
+      `"${label}.provenance" must be null or { folder, path, addedAt, updatedAt } with strings or null, and a non-empty "addedAt"`,
+    );
+  }
+  const readProvenance = {
+    folder: provenance.folder,
+    path: provenance.path,
+    addedAt: provenance.addedAt,
+    updatedAt: provenance.updatedAt,
+  };
+  return readProvenance;
+}
+
+function describeChoices(allowed) {
+  const quoted = [];
+  for (const choice of allowed) {
+    quoted.push(`"${choice}"`);
+  }
+  return quoted.join(" or ");
+}
+
+// One of `allowed`, or the default when it is missing.
+function readCatalogChoice(value, allowed, defaultValue, label) {
+  if (value === undefined) {
+    return defaultValue;
+  }
+  if (!allowed.includes(value)) {
+    throwNotCatalog(`"${label}" must be ${describeChoices(allowed)}`);
+  }
+  return value;
+}
+
+function readDefaultPlace(source) {
+  if (source.startsWith(BROWSER_FILE_PROTOCOL)) {
+    return "browser";
+  }
+  return "remote";
+}
+
+function readDefaultListedBy(defaultOf, provenance) {
+  if (defaultOf !== null) {
+    return "default";
+  }
+  if (provenance !== null) {
+    return "user";
+  }
+  return "instance";
+}
+
+function checkCatalogKeys(entry, label, isMosaic) {
+  const keys = isMosaic
+    ? ["source", "listedBy", "place", "defaultOf", "provenance"]
+    : ["source", "listedBy", "place"];
   if (!isPlainMapping(entry) || !isNonEmptyText(entry.source)) {
-    throwNotCatalog(`"${place}" must be a mapping with a non-empty "source"`);
+    throwNotCatalog(`"${label}" must be a mapping with a non-empty "source"`);
   }
   for (const key of Object.keys(entry)) {
     if (!keys.includes(key)) {
-      throwNotCatalog(`"${place}" has the unknown key "${key}"`);
+      throwNotCatalog(`"${label}" has the unknown key "${key}"`);
     }
   }
-  if (!hasMark) {
-    const readEntry = { source: entry.source };
-    return readEntry;
-  }
-  const readEntry = {
-    source: entry.source,
-    defaultOf: readCatalogMark(entry.defaultOf, place),
-  };
-  return readEntry;
 }
 
-function readCatalogList(entries, listName, hasMark) {
+// An entry in its complete form, with its missing marks completed.
+function readCatalogEntry(entry, label, isMosaic) {
+  checkCatalogKeys(entry, label, isMosaic);
+  const defaultOf = isMosaic ? readCatalogMark(entry.defaultOf, label) : null;
+  const provenance = isMosaic
+    ? readCatalogProvenance(entry.provenance, label)
+    : null;
+  const marks = {
+    source: entry.source,
+    listedBy: readCatalogChoice(
+      entry.listedBy,
+      CATALOG_LISTED_BY,
+      readDefaultListedBy(defaultOf, provenance),
+      `${label}.listedBy`,
+    ),
+    place: readCatalogChoice(
+      entry.place,
+      CATALOG_PLACES,
+      readDefaultPlace(entry.source),
+      `${label}.place`,
+    ),
+  };
+  if (!isMosaic) {
+    return marks;
+  }
+  const readMosaic = { ...marks, defaultOf, provenance };
+  return readMosaic;
+}
+
+function readCatalogList(entries, listName, isMosaic) {
   if (entries === undefined) {
     const emptyList = [];
     return emptyList;
@@ -278,13 +391,15 @@ function readCatalogList(entries, listName, hasMark) {
   }
   const readEntries = [];
   for (const [index, entry] of entries.entries()) {
-    readEntries.push(readCatalogEntry(entry, `${listName}[${index}]`, hasMark));
+    readEntries.push(
+      readCatalogEntry(entry, `${listName}[${index}]`, isMosaic),
+    );
   }
   return readEntries;
 }
 
-// The scripted catalog in its complete form: a missing list is empty and a
-// missing `defaultOf` is `null`. Throws naming the first key that is wrong.
+// The scripted catalog in its complete form: a missing list is empty, and
+// missing marks are completed. Throws naming the first key that is wrong.
 function readCatalogAnswer(value) {
   if (!isPlainMapping(value)) {
     throwNotCatalog(`got ${describeValue(value)}`);
@@ -295,8 +410,8 @@ function readCatalogAnswer(value) {
     }
   }
   const catalog = {};
-  for (const [listName, hasMark] of Object.entries(CATALOG_LISTS)) {
-    catalog[listName] = readCatalogList(value[listName], listName, hasMark);
+  for (const [listName, isMosaic] of Object.entries(CATALOG_LISTS)) {
+    catalog[listName] = readCatalogList(value[listName], listName, isMosaic);
   }
   return catalog;
 }
@@ -305,7 +420,7 @@ function readCatalogAnswer(value) {
 function checkAnswer(method, value) {
   if (typeof method !== "string" || !Object.hasOwn(ANSWER_KINDS, method)) {
     throw new Error(
-      `answer: ${describeValue(method)} cannot be answered, only links.open, files.save, ui.confirm, players.open, mods.open, mosaics.open and catalog.list`,
+      `answer: ${describeValue(method)} cannot be answered, only links.open, files.save, ui.confirm, players.open, the userCatalog.* requests, mods.open, mosaics.open and catalog.list`,
     );
   }
   if (ANSWER_KINDS[method] === "catalog") {

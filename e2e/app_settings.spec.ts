@@ -35,6 +35,13 @@ import {
   waitForProbe,
 } from "./mod_routes.ts";
 import { openProbe } from "./test_mods.ts";
+import { SMALL_PHONE_VIEWPORT } from "./layout_probes.ts";
+import {
+  buildRemoteSeedEntry,
+  buildStoredSeedEntry,
+  seedUserCatalog,
+} from "./user_catalog_seeds.ts";
+import type { UserCatalogSeed } from "./user_catalog_seeds.ts";
 import { PREVIEW_URL as PREVIEW_ORIGIN } from "./app_servers.ts";
 import {
   openBodyProbe,
@@ -537,6 +544,86 @@ test.describe("Catalog group", function describeCatalogGroup(): void {
     expect(headings.indexOf("Privacy")).toBe(headings.indexOf("Catalog") + 1);
   });
 });
+
+/** A stored mosaic of the sample book list, and a remote one the catalog cannot load. */
+function buildSettingsSeed(page: Page): UserCatalogSeed {
+  const stored = buildStoredSeedEntry("maps/stored_books.yaml");
+  const modAddress = new URL("/samples/mods/book_list/", page.url()).href;
+  const seed: UserCatalogSeed = {
+    entries: [
+      stored,
+      buildRemoteSeedEntry("https://mosaics.example.net/maps/laureates.yml"),
+    ],
+    files: {
+      [stored.address]: [
+        "mosaic:",
+        '  title: "Stored books"',
+        `  mod: "${modAddress}"`,
+        "",
+      ].join("\n"),
+    },
+  };
+  return seed;
+}
+
+function userMosaicsRow(page: Page): Locator {
+  return page.locator("[data-user-mosaics]");
+}
+
+test.describe("Your mosaics in Settings", function describeUserMosaics(): void {
+  test("Remove all", async function removesAll({ page }): Promise<void> {
+    await page.goto("/#/settings");
+    await seedUserCatalog(page, buildSettingsSeed(page));
+    await openSection(page, "Mosaics");
+    const explorer = await findModFrame(page, "Mosaics");
+    const titles = explorer.locator("li > article h2");
+    await expect(titles.filter({ hasText: "Stored books" })).toHaveCount(1);
+    await markFrame(explorer);
+
+    await openSection(page, "Settings");
+    await expect(userMosaicsRow(page)).toContainText(
+      "You added 2 mosaics, 1 of them stored in this browser.",
+    );
+    await userMosaicsRow(page)
+      .getByRole("button", { name: "Remove all" })
+      .click();
+    await userMosaicsRow(page)
+      .getByRole("button", { name: "Remove 2 mosaics" })
+      .click();
+    await expect(userMosaicsRow(page)).toContainText(
+      "You have added no mosaic.",
+    );
+    await openSection(page, "Mosaics");
+
+    await expect(titles.filter({ hasText: "Stored books" })).toHaveCount(0);
+    expect(await isFrameMarked(explorer)).toBe(true);
+  });
+
+  test("On a phone", async function laysOutOnPhone({ page }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await page.goto("/#/settings");
+    await seedUserCatalog(page, buildSettingsSeed(page));
+
+    const row = userMosaicsRow(page);
+    await expect(row).toContainText("You added 2 mosaics");
+    const rowBox = await row.boundingBox();
+    const textBox = await row.locator("p").first().boundingBox();
+    const removeBox = await row
+      .getByRole("button", { name: "Remove all" })
+      .boundingBox();
+    expect(rowBox).not.toBeNull();
+    expect((textBox?.x ?? 0) + (textBox?.width ?? 0)).toBeLessThanOrEqual(
+      (rowBox?.x ?? 0) + (rowBox?.width ?? 0) + 1,
+    );
+    expect(removeBox?.height).toBeGreaterThanOrEqual(32);
+    expect(await page.evaluate(readSidewaysOverflow)).toBeLessThanOrEqual(0);
+  });
+});
+
+/** Runs in the page: how far the page scrolls sideways. */
+function readSidewaysOverflow(): number {
+  return document.documentElement.scrollWidth - window.innerWidth;
+}
 
 test.describe("Versions on the Settings page", function describeVersions(): void {
   test("Copy the versions", async function copiesVersions({

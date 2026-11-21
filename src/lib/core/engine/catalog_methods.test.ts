@@ -8,8 +8,10 @@ import {
   SAMPLE_MOSAIC_SOURCE,
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, readRequestedUrl } from "../../../test/test_files.ts";
+import type { UserCatalogEntry } from "../../user_catalog/index.ts";
 import type { ResolvedInstanceCatalog } from "./instance_catalog.ts";
 import { buildCatalog } from "./catalog.ts";
+import type { Catalog } from "./catalog.ts";
 import { CATALOG_METHODS } from "./catalog_methods.ts";
 import type { ModMethodContext } from "./mod_methods.ts";
 
@@ -27,10 +29,40 @@ function recordFetch(
   return fetchTestFile(input);
 }
 
-/** A context of a mod with no permission, whose catalog is `CATALOG` with the switch as given. Requests go to `requested`. */
+const STORED_ENTRY: UserCatalogEntry = {
+  address: "opentesela-browser:///r1/maps/nobel_map.yaml",
+  place: "browser",
+  root: "r1",
+  provenance: {
+    folder: "my-mosaics",
+    path: "maps/nobel_map.yaml",
+    addedAt: "2026-11-20T10:00:00.000Z",
+    updatedAt: null,
+  },
+};
+
+const REMOTE_ENTRY: UserCatalogEntry = {
+  address: "https://mosaics.example.net/maps/laureates.yml",
+  place: "remote",
+  root: null,
+  provenance: {
+    folder: null,
+    path: null,
+    addedAt: "2026-11-20T11:00:00.000Z",
+    updatedAt: null,
+  },
+};
+
+const INSTANCE_MARKS = { listedBy: "instance", place: "remote" };
+
+/**
+ * A context of a mod with no permission, whose catalog is `CATALOG` with the
+ * switch and the user catalog as given. Requests go to `requested`.
+ */
 function buildCatalogContext(
   includesDefaultMosaics: boolean,
   requested: string[],
+  userCatalog: readonly UserCatalogEntry[] = [],
 ): ModMethodContext {
   const context = buildMethodContext([]);
   context.fetchOptions = {
@@ -41,6 +73,7 @@ function buildCatalogContext(
     undefined,
     CATALOG,
     includesDefaultMosaics,
+    userCatalog,
     context.fetchOptions,
   );
   return context;
@@ -60,9 +93,16 @@ describe("catalog.list", function describeCatalogList(): void {
     const result = await listCatalog(context, {});
 
     expect(result).toEqual({
-      mods: [{ source: SAMPLE_MOD_SOURCE }],
-      collections: [{ source: SAMPLE_COLLECTION_SOURCE }],
-      mosaics: [{ source: SAMPLE_MOSAIC_SOURCE, defaultOf: null }],
+      mods: [{ source: SAMPLE_MOD_SOURCE, ...INSTANCE_MARKS }],
+      collections: [{ source: SAMPLE_COLLECTION_SOURCE, ...INSTANCE_MARKS }],
+      mosaics: [
+        {
+          source: SAMPLE_MOSAIC_SOURCE,
+          ...INSTANCE_MARKS,
+          defaultOf: null,
+          provenance: null,
+        },
+      ],
     });
   });
 
@@ -73,13 +113,21 @@ describe("catalog.list", function describeCatalogList(): void {
     const result = await listCatalog(context, {});
 
     expect(result).toEqual({
-      mods: [{ source: SAMPLE_MOD_SOURCE }],
-      collections: [{ source: SAMPLE_COLLECTION_SOURCE }],
+      mods: [{ source: SAMPLE_MOD_SOURCE, ...INSTANCE_MARKS }],
+      collections: [{ source: SAMPLE_COLLECTION_SOURCE, ...INSTANCE_MARKS }],
       mosaics: [
-        { source: SAMPLE_MOSAIC_SOURCE, defaultOf: null },
+        {
+          source: SAMPLE_MOSAIC_SOURCE,
+          ...INSTANCE_MARKS,
+          defaultOf: null,
+          provenance: null,
+        },
         {
           source: SAMPLE_DEFAULT_MOSAIC_SOURCE,
+          listedBy: "default",
+          place: "remote",
           defaultOf: { source: SAMPLE_MOD_SOURCE, title: "Book List" },
+          provenance: null,
         },
       ],
     });
@@ -93,7 +141,9 @@ describe("catalog.list", function describeCatalogList(): void {
     const result = await listCatalog(context, {});
 
     expect(context.grants.granted).toEqual([]);
-    expect(result).toHaveProperty("mods", [{ source: SAMPLE_MOD_SOURCE }]);
+    expect(result).toHaveProperty("mods", [
+      { source: SAMPLE_MOD_SOURCE, ...INSTANCE_MARKS },
+    ]);
     expect(requested).toEqual([]);
   });
 
@@ -104,6 +154,41 @@ describe("catalog.list", function describeCatalogList(): void {
       mods: [`${APP_BASE_URL}other/mod_conf.yaml`],
     });
 
-    expect(result).toHaveProperty("mods", [{ source: SAMPLE_MOD_SOURCE }]);
+    expect(result).toHaveProperty("mods", [
+      { source: SAMPLE_MOD_SOURCE, ...INSTANCE_MARKS },
+    ]);
+  });
+
+  it("Stored user mosaic entry", async function answersStoredMosaic(): Promise<void> {
+    const context = buildCatalogContext(false, [], [STORED_ENTRY]);
+
+    const result = (await listCatalog(context, {})) as Catalog;
+
+    expect(result.mosaics.at(-1)).toEqual({
+      source: STORED_ENTRY.address,
+      listedBy: "user",
+      place: "browser",
+      defaultOf: null,
+      provenance: STORED_ENTRY.provenance,
+    });
+  });
+
+  it("Remote entry", async function answersRemoteMosaic(): Promise<void> {
+    const context = buildCatalogContext(false, [], [REMOTE_ENTRY]);
+
+    const result = (await listCatalog(context, {})) as Catalog;
+
+    expect(result.mosaics.at(-1)).toEqual({
+      source: REMOTE_ENTRY.address,
+      listedBy: "user",
+      place: "remote",
+      defaultOf: null,
+      provenance: {
+        folder: null,
+        path: null,
+        addedAt: "2026-11-20T11:00:00.000Z",
+        updatedAt: null,
+      },
+    });
   });
 });

@@ -14,7 +14,9 @@ import {
   readStageCatalog,
 } from "./lib/core/stage/index.ts";
 import type { Stage } from "./lib/core/stage/index.ts";
+import { openBrowserDatabase } from "./lib/core/storage/index.ts";
 import { buildThemeTokenStyles } from "./lib/core/theme/index.ts";
+import type { UserCatalogEntry } from "./lib/user_catalog/index.ts";
 import { DEFAULT_MODS } from "./main/default_mods.ts";
 import { INSTANCE_CATALOG } from "./main/instance_catalog.ts";
 import { NPM_HOST } from "./main/library_host.ts";
@@ -57,6 +59,12 @@ import type { SidebarLayoutStore } from "./main/sidebar/sidebar_layout.ts";
 import { createListChoices } from "./main/stage/list_choices.ts";
 import { StartErrorScreen } from "./main/StartErrorScreen.tsx";
 import {
+  createUserCatalogStore,
+  readStartingText,
+  readStartUserCatalog,
+} from "./main/user_catalog/user_catalog_store.ts";
+import type { UserCatalogDatabase } from "./main/user_catalog/user_catalog_store.ts";
+import {
   createAppTheme,
   readStartColorScheme,
 } from "./main/theme/app_theme.ts";
@@ -84,15 +92,23 @@ function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
   return optionalIds;
 }
 
+function openUserCatalogDatabase(): Promise<UserCatalogDatabase | null> {
+  return openBrowserDatabase<UserCatalogEntry>();
+}
+
 /**
- * Builds the site decisions, the player sites, the stage, the app theme, the
- * sidebar layout, the section switches, the tile media setting and the catalog setting once,
- * outside React, so StrictMode's double effect run in dev does not launch mods twice.
+ * Builds the site decisions, the player sites, the stage, the user catalog,
+ * the app theme, the sidebar layout, the section switches, the tile media
+ * setting and the catalog setting once, outside React, so StrictMode's double
+ * effect run in dev does not launch mods twice. The browser database opens
+ * meanwhile.
  */
 function startApp(
   sections: readonly SectionDefinition[],
   instanceCatalog: ResolvedInstanceCatalog,
 ): ReactElement {
+  // Opened in parallel: the app does not wait for it to start.
+  const startUserCatalog = readStartUserCatalog(openUserCatalogDatabase);
   const systemQuery = window.matchMedia("(prefers-color-scheme: dark)");
   // Before the stage, which reads and remembers the decisions through it.
   const siteDecisions = createSiteDecisions({ storage: window.localStorage });
@@ -111,10 +127,22 @@ function startApp(
     loadsTileLinkedMedia: readStartTileLinkedMedia(window.localStorage),
     instanceCatalog,
     catalogDefaultMosaics: readStartCatalogDefaultMosaics(window.localStorage),
+    // Empty until the store has read the entries, which it then gives the stage.
+    userCatalog: [],
+    browserFiles: {
+      readText: readStartingText.bind(undefined, startUserCatalog),
+    },
     theaterMode: readStartTheaterMode(window.localStorage),
     readSiteDecisions: readSiteDecisionsSnapshot.bind(undefined, siteDecisions),
     rememberSiteDecisions: rememberSiteDecisions.bind(undefined, siteDecisions),
     onFilesLoaded: recordRecentlyUsed.bind(undefined, recentlyUsed),
+  });
+  // Same lifetime as the stage: it tells the stage when the user catalog changes.
+  const userCatalog = createUserCatalogStore({
+    start: startUserCatalog,
+    stage,
+    recentlyUsed,
+    persistentStorage: navigator.storage ?? null,
   });
   // The stage bar's lists measure what they show, cached for the page.
   const combinations = createCombinationCatalog({
@@ -174,6 +202,7 @@ function startApp(
       combinations={combinations}
       listChoices={listChoices}
       recentlyUsed={recentlyUsed}
+      userCatalog={userCatalog}
       appTheme={appTheme}
       sections={sections}
       switches={switches}

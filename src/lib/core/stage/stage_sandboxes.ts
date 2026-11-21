@@ -1,6 +1,7 @@
 import { resolveLocation } from "../../files/index.ts";
 import { resolveModReference } from "../../mod/index.ts";
 import { resolveMosaicReference } from "../../mosaic/index.ts";
+import type { UserCatalogEntry } from "../../user_catalog/index.ts";
 import type { LoadedMosaic } from "../../mosaic/index.ts";
 import { resolveCollectionReference } from "../../tile/index.ts";
 import type { LoadedMod, ModIssue, ModLoadOptions } from "../../mod/index.ts";
@@ -112,6 +113,8 @@ export interface SandboxServices {
   readSiteDecisions: () => readonly SiteDecision[];
   /** The catalog as `catalog.list` answers it, read anew for each request. */
   readCatalog: () => Promise<Catalog>;
+  /** The user catalog's entries, which the `userCatalog.*` requests are checked against. */
+  readUserCatalog: () => readonly UserCatalogEntry[];
   /** Keeps the decisions of an answer whose Remember was checked. */
   rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
   /** Told about each file a combination sandbox loaded (see `isRecordedLaunch`). */
@@ -933,6 +936,7 @@ export function attachSandboxFrame(
     fetchOptions: services.fetchOptions,
     readSiteDecisions: services.readSiteDecisions,
     readCatalog: services.readCatalog,
+    readUserCatalog: services.readUserCatalog,
     onIssue: addRuntimeIssue.bind(undefined, runtime, services),
     onOpenLink: services.onOpenLink.bind(undefined, runtime.id),
     onRequestAction: services.onRequestAction.bind(undefined, runtime.id),

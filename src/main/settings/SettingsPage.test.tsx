@@ -25,6 +25,10 @@ import {
 } from "../../test/sample_mods.ts";
 import { PLAYER_SITES_KEY, readPlayerSitesSnapshot } from "./player_sites.ts";
 import { recordRecentlyUsed } from "./recently_used.ts";
+import { createMemoryBrowserDatabase } from "../../lib/core/storage/index.ts";
+import type { UserCatalogEntry } from "../../lib/user_catalog/index.ts";
+import type { TestUserCatalogOptions } from "../../test/test_user_catalog.ts";
+import { readUserCatalogSnapshot } from "../user_catalog/user_catalog_store.ts";
 import { SITE_DECISIONS_KEY } from "./site_decisions.ts";
 import { CATALOG_SETTING_KEY } from "./catalog_setting.ts";
 import { TILE_MEDIA_SETTING_KEY } from "./tile_media_setting.ts";
@@ -49,6 +53,7 @@ function renderApp(fixture: AppFixture): RenderResult {
       combinations={fixture.combinations}
       listChoices={fixture.listChoices}
       recentlyUsed={fixture.recentlyUsed}
+      userCatalog={fixture.userCatalog}
       appTheme={fixture.appTheme}
       sections={fixture.sections}
       switches={fixture.switches}
@@ -60,6 +65,49 @@ function renderApp(fixture: AppFixture): RenderResult {
       layout={fixture.layout}
     />,
   );
+}
+
+function buildUserEntry(
+  address: string,
+  place: "browser" | "remote",
+): UserCatalogEntry {
+  const entry: UserCatalogEntry = {
+    address,
+    place,
+    root: place === "browser" ? "r1" : null,
+    provenance: {
+      folder: null,
+      path: place === "browser" ? "a.yaml" : null,
+      addedAt: "2026-11-20T10:00:00.000Z",
+      updatedAt: null,
+    },
+  };
+  return entry;
+}
+
+/** Two stored mosaics and one added by URL, in a memory database, kept persistently when `isKept`. */
+async function buildUserCatalogOptions(
+  isKept: boolean,
+): Promise<TestUserCatalogOptions> {
+  const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+  await database.apply({
+    putFiles: [
+      { address: "opentesela-browser:///r1/a.yaml", text: "mosaic: {}\n" },
+      { address: "opentesela-browser:///r1/b.yaml", text: "mosaic: {}\n" },
+    ],
+    putEntries: [
+      buildUserEntry("opentesela-browser:///r1/a.yaml", "browser"),
+      buildUserEntry("opentesela-browser:///r1/b.yaml", "browser"),
+      buildUserEntry("https://mosaics.example.net/c.yaml", "remote"),
+    ],
+    deleteAddresses: [],
+  });
+  const options: TestUserCatalogOptions = {
+    database,
+    entries: await database.readEntries(),
+    isKept,
+  };
+  return options;
 }
 
 /** Records two mods, one collection and one combination as recently used. */
@@ -212,7 +260,79 @@ describe("SettingsPage", function describeSettingsPage(): void {
     ).toBeChecked();
     expect(screen.getByText("Nothing is recently used.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+    expect(screen.getByText("You have added no mosaic.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove all" })).toBeNull();
     expect(screen.getByText("No remembered decisions.")).toBeInTheDocument();
+  });
+
+  it("Count after importing", async function countsUserMosaics(): Promise<void> {
+    const fixture = await startTestApp("#/settings", {
+      userCatalog: await buildUserCatalogOptions(true),
+    });
+
+    renderApp(fixture);
+
+    expect(
+      await screen.findByText(
+        "You added 3 mosaics, 2 of them stored in this browser. This browser keeps them.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove all" }),
+    ).toBeInTheDocument();
+  });
+
+  it("Not kept persistently", async function warnsNotKept(): Promise<void> {
+    const fixture = await startTestApp("#/settings", {
+      userCatalog: await buildUserCatalogOptions(false),
+    });
+
+    renderApp(fixture);
+
+    expect(
+      await screen.findByText(
+        "You added 3 mosaics, 2 of them stored in this browser. This browser may clear the stored mosaics when space runs low: export them to keep a copy.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("Remove all", async function removesAllUserMosaics(): Promise<void> {
+    const options = await buildUserCatalogOptions(true);
+    const fixture = await startTestApp("#/settings", { userCatalog: options });
+    renderApp(fixture);
+    const sandboxesBefore = readStageSnapshot(fixture.stage).sandboxes;
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove all" }));
+    expect(
+      screen.getByText(
+        "Remove all 3 mosaics from your catalog? The 2 stored in this browser are deleted.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove 3 mosaics" }));
+
+    expect(
+      await screen.findByText("You have added no mosaic."),
+    ).toBeInTheDocument();
+    expect(fixture.stage.userCatalog).toEqual([]);
+    expect(await options.database?.readEntries()).toEqual([]);
+    expect(readStageSnapshot(fixture.stage).sandboxes).toBe(sandboxesBefore);
+  });
+
+  it("keeps the mosaics when Remove all is cancelled", async function keepsOnCancel(): Promise<void> {
+    const fixture = await startTestApp("#/settings", {
+      userCatalog: await buildUserCatalogOptions(true),
+    });
+    renderApp(fixture);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove all" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(
+      screen.getByRole("button", { name: "Remove all" }),
+    ).toBeInTheDocument();
+    expect(readUserCatalogSnapshot(fixture.userCatalog).entries).toHaveLength(
+      3,
+    );
   });
 
   it("Count after trying combinations", async function countsRecentlyUsed(): Promise<void> {

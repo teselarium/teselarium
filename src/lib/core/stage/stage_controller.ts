@@ -1,4 +1,6 @@
+import type { BrowserFileReader } from "../../files/index.ts";
 import type { ModLoadOptions, ModPermission } from "../../mod/index.ts";
+import type { UserCatalogEntry } from "../../user_catalog/index.ts";
 import {
   buildCatalog,
   MOD_API_VERSION,
@@ -142,6 +144,10 @@ export interface StageOptions {
   instanceCatalog: ResolvedInstanceCatalog;
   /** Whether "List the default mosaics of mods" is on as the app starts. */
   catalogDefaultMosaics: boolean;
+  /** The user catalog's entries as the app starts, read from the browser database. Empty by default. */
+  userCatalog?: readonly UserCatalogEntry[];
+  /** Reads the files stored in the browser, at `opentesela-browser:` addresses. None are stored without it. */
+  browserFiles?: BrowserFileReader;
   /** Whether theater mode is on as the app starts. */
   theaterMode: boolean;
   /** The remembered site decisions, read before a mod from another origin starts, by checks and by `mods.inspect`. */
@@ -330,7 +336,9 @@ export interface Stage {
   instanceCatalog: ResolvedInstanceCatalog;
   /** Whether the catalog's mosaics also hold the default mosaics of its mods. */
   catalogDefaultMosaics: boolean;
-  /** Counts the switch's changes, so a `catalog.changed` whose catalog a newer change overtook is dropped. */
+  /** The user catalog's entries, whose mosaics end the catalog's mosaics. */
+  userCatalog: readonly UserCatalogEntry[];
+  /** Counts the catalog's changes, so a `catalog.changed` whose catalog a newer change overtook is dropped. */
   catalogGeneration: number;
   /** Whether theater mode is on. With `fullscreenSandboxId`, it decides each frame's layout (`readSandboxLayout`). */
   theaterMode: boolean;
@@ -373,15 +381,20 @@ function readStageTheme(stage: Stage): Theme {
 
 /**
  * The catalog as `catalog.list` answers it now, with the current value of
- * "List the default mosaics of mods". The stage bar's lists read it too, so
- * the page and the mods read one catalog.
+ * "List the default mosaics of mods" and the current user catalog. The stage
+ * bar's lists read it too, so the page and the mods read one catalog.
  */
 export function readStageCatalog(stage: Stage): Promise<Catalog> {
   return buildCatalog(
     stage.instanceCatalog,
     stage.catalogDefaultMosaics,
+    stage.userCatalog,
     stage.fetchOptions,
   );
+}
+
+function readStageUserCatalog(stage: Stage): readonly UserCatalogEntry[] {
+  return stage.userCatalog;
 }
 
 function readStageLayout(stage: Stage, sandboxId: string): FrameLayout {
@@ -407,6 +420,7 @@ function buildSandboxServices(stage: Stage): SandboxServices {
     loadsTileLinkedMedia: stage.loadsTileLinkedMedia,
     readSiteDecisions: stage.readSiteDecisions,
     readCatalog: readStageCatalog.bind(undefined, stage),
+    readUserCatalog: readStageUserCatalog.bind(undefined, stage),
     rememberSiteDecisions: stage.rememberSiteDecisions,
     onFilesLoaded: stage.onFilesLoaded,
   };
@@ -841,12 +855,14 @@ export function createStage(options: StageOptions): Stage {
       baseUrl: options.baseUrl,
       fetch: options.fetch,
       npmHost: options.npmHost,
+      browserFiles: options.browserFiles,
     },
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
     loadsTileLinkedMedia: options.loadsTileLinkedMedia,
     instanceCatalog: options.instanceCatalog,
     catalogDefaultMosaics: options.catalogDefaultMosaics,
+    userCatalog: options.userCatalog ?? [],
     catalogGeneration: 0,
     theaterMode: options.theaterMode,
     fullscreenSandboxId: null,
@@ -1470,7 +1486,7 @@ export function changeStageTileLinkedMedia(stage: Stage, isOn: boolean): void {
   stage.loadsTileLinkedMedia = isOn;
 }
 
-/** Pushes the catalog to every running sandbox, unless a newer change of the switch started meanwhile. */
+/** Pushes the catalog to every running sandbox, unless a newer change of the catalog started meanwhile. */
 function pushStageCatalog(
   stage: Stage,
   generation: number,
@@ -1485,21 +1501,42 @@ function pushStageCatalog(
 }
 
 /**
- * Switches "List the default mosaics of mods". Every `catalog.list` from now
- * on answers with the new value. The catalog is built once and pushed as
- * `catalog.changed` to every running mod, visible or hidden, with no frame
- * reloaded. A catalog that a newer change overtook is dropped, so two quick
+ * Builds the catalog with the current switch and user catalog, and pushes it
+ * as `catalog.changed` to every running mod, visible or hidden, with no frame
+ * reloaded. A catalog that a newer refresh overtook is dropped, so two quick
  * changes leave the mods on the second. Resolves once the push is done.
  */
-export async function changeStageCatalogDefaultMosaics(
-  stage: Stage,
-  isOn: boolean,
-): Promise<void> {
-  stage.catalogDefaultMosaics = isOn;
+export async function refreshStageCatalog(stage: Stage): Promise<void> {
   stage.catalogGeneration += 1;
   const generation = stage.catalogGeneration;
   const catalog = await readStageCatalog(stage);
   pushStageCatalog(stage, generation, catalog);
+}
+
+/**
+ * Switches "List the default mosaics of mods". Every `catalog.list` from now
+ * on answers with the new value, and running mods get the new catalog (see
+ * `refreshStageCatalog`).
+ */
+export function changeStageCatalogDefaultMosaics(
+  stage: Stage,
+  isOn: boolean,
+): Promise<void> {
+  stage.catalogDefaultMosaics = isOn;
+  return refreshStageCatalog(stage);
+}
+
+/**
+ * Replaces the user catalog's entries after the user changed them. Every
+ * `catalog.list` from now on answers with them, and running mods get the new
+ * catalog (see `refreshStageCatalog`).
+ */
+export function changeStageUserCatalog(
+  stage: Stage,
+  entries: readonly UserCatalogEntry[],
+): Promise<void> {
+  stage.userCatalog = structuredClone(entries);
+  return refreshStageCatalog(stage);
 }
 
 export function readStageSnapshot(stage: Stage): StageSnapshot {

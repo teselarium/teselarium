@@ -63,9 +63,29 @@ export type AnswerMethod =
   | "files.save"
   | "ui.confirm"
   | "players.open"
+  | "userCatalog.import"
+  | "userCatalog.update"
+  | "userCatalog.add"
+  | "userCatalog.export"
+  | "userCatalog.remove"
   | "mods.open"
   | "mosaics.open"
   | "catalog.list";
+
+const ANSWER_METHODS: ReadonlySet<string> = new Set<AnswerMethod>([
+  "links.open",
+  "files.save",
+  "ui.confirm",
+  "players.open",
+  "userCatalog.import",
+  "userCatalog.update",
+  "userCatalog.add",
+  "userCatalog.export",
+  "userCatalog.remove",
+  "mods.open",
+  "mosaics.open",
+  "catalog.list",
+]);
 
 /** A test notification of a check's frame, read by `readSandboxTestReport`. */
 export type SandboxTestReport =
@@ -165,15 +185,7 @@ function isAnswerValue(method: AnswerMethod, value: unknown): boolean {
 }
 
 function isAnswerMethod(method: string): method is AnswerMethod {
-  return (
-    method === "links.open" ||
-    method === "files.save" ||
-    method === "ui.confirm" ||
-    method === "players.open" ||
-    method === "mods.open" ||
-    method === "mosaics.open" ||
-    method === "catalog.list"
-  );
+  return ANSWER_METHODS.has(method);
 }
 
 function readAnswerQueued(params: unknown): SandboxTestReport | null {

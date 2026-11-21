@@ -97,6 +97,47 @@ const PLAYER_ANSWER_TEST_CODE = buildTestCode(
 /** The fixture mod source the catalog cases script, which is never requested. */
 const LISTED_MOD_SOURCE = "./default_mods/mod_explorer/fixtures/listed_mod";
 
+/** Cases that answer `userCatalog.import` and send `userCatalog.remove` unanswered. */
+const USER_CATALOG_ANSWER_TEST_CODE = buildTestCode(
+  [
+    "function requestFromMod(method, params) {",
+    "  return globalThis.probe.engine.request(method, params);",
+    "}",
+    "",
+    "function isUserMosaic(entry) {",
+    '  return entry.listedBy === "user";',
+    "}",
+    "",
+    "async function importsAnswered(context) {",
+    "  await context.mount();",
+    '  context.answer("userCatalog.import", true);',
+    '  context.expect(await requestFromMod("userCatalog.import", {})).toBe(true);',
+    '  context.expect(context.requests[0].method).toBe("userCatalog.import");',
+    '  const catalog = await requestFromMod("catalog.list", {});',
+    "  context.expect(catalog.mosaics.filter(isUserMosaic)).toEqual([]);",
+    "}",
+    "",
+    "async function removesUnanswered(context) {",
+    "  await context.mount();",
+    '  const removed = await requestFromMod("userCatalog.remove", { mosaic: "opentesela-browser:///fixture/nobel_map.yaml" });',
+    "  context.expect(removed).toBe(false);",
+    "}",
+  ],
+  [
+    ["imports with an answer", "importsAnswered"],
+    ["removes nothing without an answer", "removesUnanswered"],
+  ],
+);
+
+/** A fixture stored mosaic, which no store holds. */
+const STORED_MOSAIC_SOURCE = "opentesela-browser:///fixture/nobel_map.yaml";
+const STORED_MOSAIC_PROVENANCE = {
+  folder: "my-mosaics",
+  path: "nobel_map.yaml",
+  addedAt: "2026-11-20T10:00:00.000Z",
+  updatedAt: null,
+};
+
 /** Cases that script `catalog.list` with a fixture catalog, with a wrong catalog, and send it unanswered. */
 const CATALOG_ANSWER_TEST_CODE = buildTestCode(
   [
@@ -104,11 +145,22 @@ const CATALOG_ANSWER_TEST_CODE = buildTestCode(
     `  context.answer("catalog.list", { mods: [{ source: "${LISTED_MOD_SOURCE}" }] });`,
     "  await context.mount();",
     '  const catalog = await globalThis.probe.engine.request("catalog.list", {});',
-    `  context.expect(catalog).toEqual({ mods: [{ source: "${LISTED_MOD_SOURCE}" }], collections: [], mosaics: [] });`,
+    `  context.expect(catalog).toEqual({ mods: [{ source: "${LISTED_MOD_SOURCE}", listedBy: "instance", place: "remote" }], collections: [], mosaics: [] });`,
+    "}",
+    "",
+    "async function listsFixtureUserMosaic(context) {",
+    `  context.answer("catalog.list", { mosaics: [{ source: "${STORED_MOSAIC_SOURCE}", provenance: ${JSON.stringify(STORED_MOSAIC_PROVENANCE)} }] });`,
+    "  await context.mount();",
+    '  const catalog = await globalThis.probe.engine.request("catalog.list", {});',
+    `  context.expect(catalog.mosaics).toEqual([{ source: "${STORED_MOSAIC_SOURCE}", listedBy: "user", place: "browser", defaultOf: null, provenance: ${JSON.stringify(STORED_MOSAIC_PROVENANCE)} }]);`,
     "}",
     "",
     "function answersWrongCatalog(context) {",
     '  context.answer("catalog.list", { mods: ["./listed_mod"] });',
+    "}",
+    "",
+    "function answersWrongMark(context) {",
+    '  context.answer("catalog.list", { mosaics: [{ source: "./a.yaml", place: "disk" }] });',
     "}",
     "",
     "async function listsLiveCatalog(context) {",
@@ -120,7 +172,9 @@ const CATALOG_ANSWER_TEST_CODE = buildTestCode(
   ],
   [
     ["lists a fixture catalog", "listsFixtureCatalog"],
+    ["lists a fixture user mosaic", "listsFixtureUserMosaic"],
     ["answers a wrong catalog", "answersWrongCatalog"],
+    ["answers a wrong mark", "answersWrongMark"],
     ["lists the live catalog", "listsLiveCatalog"],
   ],
 );
@@ -445,6 +499,42 @@ test.describe(
       expect(playerRequests).toEqual([]);
     });
 
+    test("Import answered", async function answersImport({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("user_catalog", USER_CATALOG_ANSWER_TEST_CODE),
+        "user_catalog",
+      );
+
+      expect(findCase(report, "imports with an answer")).toEqual({
+        name: "imports with an answer",
+        status: "pass",
+        message: null,
+      });
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      expect(report.findings).toEqual([]);
+    });
+
+    test("Unanswered removal", async function answersRemovalFalse({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("user_catalog", USER_CATALOG_ANSWER_TEST_CODE),
+        "user_catalog",
+      );
+
+      expect(findCase(report, "removes nothing without an answer")).toEqual({
+        name: "removes nothing without an answer",
+        status: "pass",
+        message: null,
+      });
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      expect(report.findings).toEqual([]);
+    });
+
     test("Fixture catalog", async function answersCatalog({
       page,
     }): Promise<void> {
@@ -484,6 +574,39 @@ test.describe(
         "the answer to catalog.list must be a catalog",
       );
       expect(result.message).toContain("mods");
+    });
+
+    test("Fixture user mosaic", async function answersUserMosaic({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("catalog_answer", CATALOG_ANSWER_TEST_CODE),
+        "catalog_answer",
+      );
+
+      expect(findCase(report, "lists a fixture user mosaic")).toEqual({
+        name: "lists a fixture user mosaic",
+        status: "pass",
+        message: null,
+      });
+    });
+
+    test("Wrong mark", async function rejectsWrongMark({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("catalog_answer", CATALOG_ANSWER_TEST_CODE),
+        "catalog_answer",
+      );
+
+      const result = findCase(report, "answers a wrong mark");
+      expect(result.status).toBe("fail");
+      expect(result.message).toContain(
+        "the answer to catalog.list must be a catalog",
+      );
+      expect(result.message).toContain("mosaics[0].place");
     });
 
     test("Case without a scripted catalog", async function answersLiveCatalog({

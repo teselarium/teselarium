@@ -54,6 +54,7 @@ import {
   resizeObservedElements,
 } from "../../test/fake_resize_observer.ts";
 import { readTooltipOnFocus } from "../../test/tooltip_texts.ts";
+import { createTestUserCatalog } from "../../test/test_user_catalog.ts";
 import { createListChoices } from "./list_choices.ts";
 import { StageView } from "./StageView.tsx";
 import { createTheaterSetting, THEATER_MODE_KEY } from "./theater_setting.ts";
@@ -68,13 +69,15 @@ function renderStageView(
   stage: Stage,
   storage: MemoryStorage = createMemoryStorage(),
 ): RenderResult {
+  const recentlyUsed = createRecentlyUsed({ storage });
   return render(
     <TooltipProvider>
       <StageView
         stage={stage}
         combinations={buildTestCombinations(stage)}
         listChoices={createListChoices()}
-        recentlyUsed={createRecentlyUsed({ storage })}
+        recentlyUsed={recentlyUsed}
+        userCatalog={createTestUserCatalog(stage, recentlyUsed)}
         playerSites={createTestPlayerSites()}
         theater={createTheaterSetting({ storage, stage })}
       />

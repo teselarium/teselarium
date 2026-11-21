@@ -40,6 +40,9 @@ import {
 } from "./test_stages.ts";
 import type { CombinationCatalog } from "../lib/core/combinations/index.ts";
 import { createListChoices } from "../main/stage/list_choices.ts";
+import type { UserCatalogStore } from "../main/user_catalog/user_catalog_store.ts";
+import { createTestUserCatalog } from "./test_user_catalog.ts";
+import type { TestUserCatalogOptions } from "./test_user_catalog.ts";
 import type { ListChoices } from "../main/stage/list_choices.ts";
 
 /** Everything `App` gets, built as `main.tsx` builds it, on fakes. The site decisions and player sites use `storage`. */
@@ -49,6 +52,7 @@ export interface AppFixture {
   combinations: CombinationCatalog;
   listChoices: ListChoices;
   recentlyUsed: RecentlyUsed;
+  userCatalog: UserCatalogStore;
   appTheme: AppTheme;
   sections: readonly SectionDefinition[];
   switches: SectionSwitches;
@@ -68,6 +72,8 @@ export interface AppFixtureOptions {
   routing?: StageRouting;
   storage?: MemoryStorage;
   isNarrow?: boolean;
+  /** The user catalog's database, entries and persistence. A memory database by default. */
+  userCatalog?: TestUserCatalogOptions;
 }
 
 function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
@@ -107,6 +113,11 @@ export async function startTestApp(
     combinations: buildTestCombinations(stage),
     listChoices: createListChoices(),
     recentlyUsed,
+    userCatalog: createTestUserCatalog(
+      stage,
+      recentlyUsed,
+      options.userCatalog,
+    ),
     appTheme: createAppTheme({
       storage,
       systemQuery: createFakeColorSchemeQuery(false),

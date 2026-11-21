@@ -15,6 +15,7 @@ import type {
 } from "../lib/core/engine/mod_methods.ts";
 import type { SiteDecision } from "../lib/core/permissions/index.ts";
 import type { LoadedMod, ModPermission } from "../lib/mod/index.ts";
+import type { UserCatalogEntry } from "../lib/user_catalog/index.ts";
 import { createMemoryStorage } from "./memory_storage.ts";
 import { APP_BASE_URL } from "./sample_files.ts";
 import {
@@ -83,6 +84,12 @@ export function readNoSiteDecisions(): SiteDecision[] {
 export function readEmptyCatalog(): Promise<Catalog> {
   const catalog: Catalog = { mods: [], collections: [], mosaics: [] };
   return Promise.resolve(catalog);
+}
+
+/** The `readUserCatalog` of handler tests: an empty user catalog. A test that reads it sets its own. */
+export function readEmptyUserCatalog(): readonly UserCatalogEntry[] {
+  const entries: UserCatalogEntry[] = [];
+  return entries;
 }
 
 function acceptOpenLink(): OpenLinkOutcome {
@@ -161,6 +168,7 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
     tileBodies: buildTileBodies([]),
     readSiteDecisions: readNoSiteDecisions,
     readCatalog: readEmptyCatalog,
+    readUserCatalog: readEmptyUserCatalog,
     onOpenLink: acceptOpenLink,
     onRequestAction: acceptAction,
     onCheckMod: failOnCheckMod,

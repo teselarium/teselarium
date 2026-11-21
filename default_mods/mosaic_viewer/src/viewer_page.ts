@@ -4,6 +4,7 @@ import {
   showMod,
 } from "./bundle_sections.ts";
 import { buildMosaicActions } from "./mosaic_actions.ts";
+import { readProvenance } from "./provenance_section.ts";
 import {
   buildAliasesSection,
   buildConfigSection,
@@ -50,8 +51,9 @@ export function addViewerStyle(): void {
 
 /**
  * The viewed mosaic: its card, "Mod" and "Collection", which load in
- * parallel, its config, aliases and permissions, the actions and the
- * messages. Resolves once the mod and the collection are shown.
+ * parallel, its config, aliases and permissions, "Where it comes from" for
+ * a user mosaic of the catalog, the actions and the messages. Resolves once
+ * the mod, the collection and the provenance are shown.
  */
 export async function renderInspection(view: ViewerView): Promise<void> {
   const modSection = buildLoadingSection("Mod", "the mod");
@@ -63,12 +65,14 @@ export async function renderInspection(view: ViewerView): Promise<void> {
     buildConfigSection(view.inspection),
     buildAliasesSection(view.inspection),
     buildPermissionsSection(view.inspection),
+    view.provenance,
     buildMosaicActions(view),
     view.messages,
   );
   await Promise.all([
     showMod(view, modSection),
     showCollection(view, collectionSection),
+    readProvenance(view),
   ]);
 }
 

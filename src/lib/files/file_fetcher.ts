@@ -1,3 +1,5 @@
+import { BROWSER_FILE_PROTOCOL } from "./browser_files.ts";
+import type { BrowserFileReader } from "./browser_files.ts";
 import { describeErrorCause, FileFetchError } from "./file_errors.ts";
 import { readLocalFile } from "./local_files.ts";
 import type { LocalFiles } from "./local_files.ts";
@@ -25,6 +27,8 @@ export interface FileFetchOptions {
   fetch?: typeof globalThis.fetch;
   /** Files the user picked, needed for `file:` locations. */
   localFiles?: LocalFiles;
+  /** Files stored in the browser, needed for `opentesela-browser:` locations. */
+  browserFiles?: BrowserFileReader;
 }
 
 function describeUnresolvedLocation(baseUrl: string | undefined): string {
@@ -102,9 +106,23 @@ async function readRemoteFile(
   }
 }
 
+async function readStoredFile(
+  url: URL,
+  browserFiles: BrowserFileReader | undefined,
+): Promise<string> {
+  const text = (await browserFiles?.readText(url.href)) ?? null;
+  if (text === null) {
+    throw new FileFetchError(url.href, "it is not stored in this browser");
+  }
+  return text;
+}
+
 function readFileContent(url: URL, options: FileFetchOptions): Promise<string> {
   if (url.protocol === LOCAL_FILE_PROTOCOL) {
     return readLocalFile(url, options.localFiles);
+  }
+  if (url.protocol === BROWSER_FILE_PROTOCOL) {
+    return readStoredFile(url, options.browserFiles);
   }
   const fetchFunction = options.fetch ?? globalThis.fetch;
   return readRemoteFile(url, fetchFunction);
@@ -112,7 +130,8 @@ function readFileContent(url: URL, options: FileFetchOptions): Promise<string> {
 
 /**
  * Loads the text of a file from a path or URL. `file:` URLs are read from the
- * picked local files, any other URL is fetched.
+ * picked local files, `opentesela-browser:` URLs from the files stored in the
+ * browser, and any other URL is fetched.
  */
 export async function fetchFile(
   location: string,

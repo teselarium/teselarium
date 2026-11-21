@@ -59,6 +59,7 @@ import {
 import type { CombinationCatalog } from "../../lib/core/combinations/index.ts";
 import { readStageCatalog } from "../../lib/core/stage/index.ts";
 import { FIXTURES_BASE_URL } from "../../test/sample_files.ts";
+import { createTestUserCatalog } from "../../test/test_user_catalog.ts";
 import { createListChoices } from "./list_choices.ts";
 import { SETTLE_INTERVAL_MS } from "./list_settling.ts";
 import { StageView } from "./StageView.tsx";
@@ -143,6 +144,7 @@ function renderLists(
         combinations={combinations}
         listChoices={createListChoices()}
         recentlyUsed={fixture.recentlyUsed}
+        userCatalog={createTestUserCatalog(fixture.stage, fixture.recentlyUsed)}
         playerSites={createPlayerSites({ storage })}
         theater={createTheaterSetting({ storage, stage: fixture.stage })}
       />

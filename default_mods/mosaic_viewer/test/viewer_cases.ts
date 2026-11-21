@@ -43,7 +43,12 @@ export async function showsTargetMosaic(context: CaseContext): Promise<void> {
     .toEqual(["title ← name, label"]);
   context
     .expect(listRequestMethods(context).sort())
-    .toEqual(["collections.inspect", "mods.inspect", "mosaics.inspect"]);
+    .toEqual([
+      "catalog.list",
+      "collections.inspect",
+      "mods.inspect",
+      "mosaics.inspect",
+    ]);
 }
 
 export async function showsPermissionBadges(

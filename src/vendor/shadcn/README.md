@@ -26,12 +26,13 @@ This folder holds the code that the [shadcn/ui](https://ui.shadcn.com) CLI gener
 | Component    | File                   | Used by                                                |
 | ------------ | ---------------------- | ------------------------------------------------------ |
 | Button       | `ui/button.tsx`        | stage bar, stage dialogs, sidebar                      |
-| Badge        | `ui/badge.tsx`         | stage bar (version, App and Mod labels)                |
+| Badge        | `ui/badge.tsx`         | stage bar (version, App and Mod labels), user catalog dialogs |
 | Alert        | `ui/alert.tsx`         | load error, page load error                            |
 | NativeSelect | `ui/native-select.tsx` | Theme control                                          |
 | Card         | `ui/card.tsx`          | Settings page                                          |
 | Switch       | `ui/switch.tsx`        | Settings page (section and media switches)             |
-| Checkbox     | `ui/checkbox.tsx`      | site consent dialog, Settings page                     |
+| Checkbox     | `ui/checkbox.tsx`      | site consent dialog, Settings page, import review      |
+| Input        | `ui/input.tsx`         | "Add a mosaic" dialog                                  |
 | Label        | `ui/label.tsx`         | Settings page, site consent dialog                     |
 | Separator    | `ui/separator.tsx`     | sidebar (above the footer group), stage bar            |
 | Tooltip      | `ui/tooltip.tsx`       | sidebar (collapsed rail, coming-soon items), stage bar |

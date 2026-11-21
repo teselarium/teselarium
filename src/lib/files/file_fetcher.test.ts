@@ -7,6 +7,7 @@ import {
 } from "../../test/sample_files.ts";
 import { FileFetchError } from "./file_errors.ts";
 import { fetchFile, resolveLocation } from "./file_fetcher.ts";
+import type { BrowserFileReader } from "./browser_files.ts";
 import { indexLocalFiles } from "./local_files.ts";
 import type { LocalFiles } from "./local_files.ts";
 
@@ -37,6 +38,34 @@ function pickLibraryFolder(): LocalFiles {
     { path: "library/my books/kallocain.md", content: kallocainContent },
   ]);
   return localFiles;
+}
+
+const STORED_MOSAIC_ADDRESS = "opentesela-browser:///r1/maps/nobel_map.yaml";
+
+async function readStoredText(
+  storedFiles: ReadonlyMap<string, string>,
+  address: string,
+): Promise<string | null> {
+  const text = storedFiles.get(address) ?? null;
+  return text;
+}
+
+function createStoredFileReader(
+  storedFiles: ReadonlyMap<string, string>,
+): BrowserFileReader {
+  const reader: BrowserFileReader = {
+    readText: readStoredText.bind(undefined, storedFiles),
+  };
+  return reader;
+}
+
+function storeNobelMap(): BrowserFileReader {
+  const storedFiles = new Map<string, string>([
+    [STORED_MOSAIC_ADDRESS, "title: Nobel map\n"],
+    ["opentesela-browser:///r1/tiles/laureates/collection.yaml", "title: L\n"],
+  ]);
+  const reader = createStoredFileReader(storedFiles);
+  return reader;
 }
 
 describe("resolveLocation", function describeResolveLocation(): void {
@@ -330,6 +359,64 @@ describe("fetchFile", function describeFetchFile(): void {
     await expect(fetching).rejects.toThrowError(
       "file:///library/books/kallocain.md",
     );
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("Load a stored file", async function readsStoredFile(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetchedFile = await fetchFile(STORED_MOSAIC_ADDRESS, {
+      fetch: sampleFetch,
+      browserFiles: storeNobelMap(),
+    });
+
+    expect(fetchedFile).toEqual({
+      source: STORED_MOSAIC_ADDRESS,
+      content: "title: Nobel map\n",
+    });
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("Relative path against a stored file", async function resolvesInsideStore(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetchedFile = await fetchFile("../tiles/laureates/collection.yaml", {
+      baseUrl: STORED_MOSAIC_ADDRESS,
+      fetch: sampleFetch,
+      browserFiles: storeNobelMap(),
+    });
+
+    expect(fetchedFile.source).toBe(
+      "opentesela-browser:///r1/tiles/laureates/collection.yaml",
+    );
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("File is not stored", async function rejectsMissingStoredFile(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+    const missingAddress = "opentesela-browser:///r1/poets.yaml";
+
+    const fetching = fetchFile(missingAddress, {
+      fetch: sampleFetch,
+      browserFiles: storeNobelMap(),
+    });
+
+    await expect(fetching).rejects.toBeInstanceOf(FileFetchError);
+    await expect(fetching).rejects.toThrowError(
+      `Cannot load file "${missingAddress}": it is not stored in this browser`,
+    );
+    expect(sampleFetch).not.toHaveBeenCalled();
+  });
+
+  it("No browser files reader", async function rejectsWithoutReader(): Promise<void> {
+    const sampleFetch = createSampleFetch();
+
+    const fetching = fetchFile(STORED_MOSAIC_ADDRESS, { fetch: sampleFetch });
+
+    await expect(fetching).rejects.toMatchObject({
+      source: STORED_MOSAIC_ADDRESS,
+      message: expect.stringContaining("it is not stored in this browser"),
+    });
     expect(sampleFetch).not.toHaveBeenCalled();
   });
 });

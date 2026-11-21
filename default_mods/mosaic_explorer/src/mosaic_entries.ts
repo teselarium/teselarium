@@ -6,34 +6,28 @@ import type {
 } from "../../mod_api.d.ts";
 import { describeError } from "./error_messages.ts";
 
-/** The mod whose default mosaic a catalog mosaic is, or `null`. */
-type DefaultOf = CatalogMosaicEntry["defaultOf"];
-
-/** A mosaic of the catalog, with its mod mark: its inspection, or why it cannot be inspected. */
+/** A mosaic of the catalog, with its marks: its inspection, or why it cannot be inspected. */
 export type MosaicEntry =
   | {
-      source: string;
-      defaultOf: DefaultOf;
+      catalogEntry: CatalogMosaicEntry;
       inspection: MosaicInspection;
       error: null;
     }
-  | { source: string; defaultOf: DefaultOf; inspection: null; error: string };
+  | { catalogEntry: CatalogMosaicEntry; inspection: null; error: string };
 
 async function inspectCatalogMosaic(
   engine: ModEngine,
-  catalogMosaic: CatalogMosaicEntry,
+  catalogEntry: CatalogMosaicEntry,
 ): Promise<MosaicEntry> {
-  const { source, defaultOf } = catalogMosaic;
   try {
     const inspection = await engine.request("mosaics.inspect", {
-      mosaic: source,
+      mosaic: catalogEntry.source,
     });
-    const entry: MosaicEntry = { source, defaultOf, inspection, error: null };
+    const entry: MosaicEntry = { catalogEntry, inspection, error: null };
     return entry;
   } catch (error) {
     const failedEntry: MosaicEntry = {
-      source,
-      defaultOf,
+      catalogEntry,
       inspection: null,
       error: describeError(error),
     };

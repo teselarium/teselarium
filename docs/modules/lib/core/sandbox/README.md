@@ -6,7 +6,7 @@ Each mod runs isolated from the app in its own sandboxed frame. This module buil
 
 ### Content hosts
 
-The content hosts of a mod are the `http:` and `https:` origins of the files the engine read to start it: the mosaic file (when the mod was opened from a mosaic), the mod file, its entrypoint, its tile type file, the collection file (when the mod was opened with one) and each tile. They are always allowed for `show`, so a mod can show images from where its tiles live. `file:` and `data:` sources are dropped, and the list is sorted and without duplicates.
+The content hosts of a mod are the `http:` and `https:` origins of the files the engine read to start it: the mosaic file (when the mod was opened from a mosaic), the mod file, its entrypoint, its tile type file, the collection file (when the mod was opened with one) and each tile. They are always allowed for `show`, so a mod can show images from where its tiles live. `file:`, `data:` and `opentesela-browser:` sources are dropped, and the list is sorted and without duplicates. So a mosaic stored in the browser adds no content host: its mod's and collection's `https:` origins are the sandbox's content hosts, and its `show` lines are asked in the site consent dialog, as for a mosaic from another site, since its address is not from the app's origin.
 
 - The collection of the mod's default mosaic is not a content host unless the mod was opened with it, from the mosaic or by a run link.
 - Content hosts are fixed when the mod starts. Tiles reloaded later from a new host are blocked, and the block is reported.

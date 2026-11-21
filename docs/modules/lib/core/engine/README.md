@@ -66,10 +66,15 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `mosaics.inspect` | `{ mosaic }`, a mosaic reference | The mosaic file's content, without opening it (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
 | `mosaics.open` | `{ mosaic, params?, replace? }` | `null`, once the stage opened the mosaic in a new sandbox. With `replace: true`, the requester is replaced and gets no answer (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
 | `mosaics.check` | `{ mosaic }`, a mosaic reference | The check report of the mosaic's mod, checked as the mosaic opens it, without the mod's tests (see [Checking a mosaic](#checking-a-mosaic)). Added in mod API `0.1.14`. |
-| `catalog.list` | none, params are ignored | The catalog, `{ mods, collections, mosaics }`, each list in catalog order with resolved addresses, without any permission (see [Reading the catalog](#reading-the-catalog)). Added in mod API `0.1.15`. |
+| `catalog.list` | none, params are ignored | The catalog, `{ mods, collections, mosaics }`, each list in catalog order with resolved addresses, without any permission (see [Reading the catalog](#reading-the-catalog)). Added in mod API `0.1.15`; `listedBy`, `place` and `provenance` since `0.1.18`. |
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
+| `userCatalog.import` | none, params are ignored | `true` once the user imported the reviewed files, `false` if the user cancelled or nothing changed (see [The user catalog](#the-user-catalog)). Added in mod API `0.1.18`. |
+| `userCatalog.update` | `{ mosaic }`, the address of a stored user mosaic | `true` once the user updated it from a file, `false` otherwise. Added in mod API `0.1.18`. |
+| `userCatalog.add` | `{ mosaic? }`, an address that fills the dialog's field | `true` once the user added a mosaic by URL, `false` otherwise. Added in mod API `0.1.18`. |
+| `userCatalog.export` | `{ mosaic }`, the address of a stored user mosaic | `true` once the user saved its file, `false` otherwise. Added in mod API `0.1.18`. |
+| `userCatalog.remove` | `{ mosaic }`, the address of a user mosaic, stored or remote | `true` once the user confirmed and it is removed, `false` otherwise. Added in mod API `0.1.18`. |
 | `ui.notify` | `{ message, level?, source? }` | `null`, once the message is in the mod's stage bar (see [Telling the user something](#telling-the-user-something)). Added in mod API `0.1.8`. |
 | `tiles.renderBody` | `{ source }`, the `source` of one of the mod's tiles | `{ html }`: the tile's body rendered to safe HTML (see [Tile bodies](#tile-bodies)). Added in mod API `0.1.5`; formulas as MathML, highlighted code and emoji since `0.1.7`. |
 | `players.open` | `{ url }`, a player address of the mod's tiles | `true` once the player was shown and closed, `false` if the user cancelled (see [Players](#players)). Added in mod API `0.1.5`. |
@@ -80,7 +85,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `tiles.changed` | `{ tiles, issues }`: the reloaded tiles, with the same rules as the mount context. Pushed when the user presses "Reload tiles" for a mod opened with a collection. |
 | `theme.changed` | `{ colorScheme, tokens }`: the new theme, the same shape as `context.theme`. Pushed to every running mod, visible or hidden, once each time the app's resolved color scheme changes. A new theme choice that resolves to the same color scheme pushes nothing. The frame loader updates the frame's `data-ot-color-scheme` attribute before the mod's handlers run. |
 | `layout.changed` | `{ layout }`: the frame's new layout, `"contained"`, `"theater"` or `"fullscreen"`, the same value as `context.layout` (see [Frame layout](#frame-layout)). Pushed to a running mod, visible or hidden, once each time its layout changes. A change of theater mode that leaves the mod's layout the same, such as for a fullscreen mod, pushes nothing. The frame loader updates the frame's `data-ot-layout` attribute before the mod's handlers run. Added in mod API `0.1.9`. |
-| `catalog.changed` | `{ mods, collections, mosaics }`: the new catalog, the same shape as the result of `catalog.list`. Pushed to every running mod, visible or hidden, once each time "List the default mosaics of mods" changes (see [Reading the catalog](#reading-the-catalog)). Added in mod API `0.1.15`. |
+| `catalog.changed` | `{ mods, collections, mosaics }`: the new catalog, the same shape as the result of `catalog.list`. Pushed to every running mod, visible or hidden, once each time "List the default mosaics of mods" or the user catalog changes (see [Reading the catalog](#reading-the-catalog)). Added in mod API `0.1.15`; also pushed when the user catalog changes since `0.1.18`. |
 
 Inside the frame, a mod uses them through its engine API object:
 
@@ -103,7 +108,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | `mod` | `source`, `title`, `version`, `description`. `name` was removed in mod API `0.1.14`. |
 | `mosaic` | `source`, `title`, `description` of the mosaic the mod was opened from (see the [mosaic module](../../mosaic/README.md)), or `null` for a mod opened from a mod link. It never holds the mosaic's `config`, `aliases` or `permissions`: the mod receives their effect in `config`, `tiles` and `permissions`. Added in mod API `0.1.13`. |
 | `collection` | `source`, `title`, `description` of the collection the mod's tiles were loaded from, or `null` for a mod opened with a tile or without a collection. A collection without a `description` gives `""`. A mod opened from a mosaic gets the mosaic's collection. It does not change when the tiles are reloaded, so `tiles.changed` does not carry it. Added in mod API `0.1.17`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.17"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.18"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. For a mod opened from a mosaic, the mod's config merged with the mosaic's: mappings are merged key by key, and any other mosaic value, `null` included, replaces the mod's (see [Config merge](../../mosaic/README.md#config-merge)). `mods.inspect` still gives the mod's own config. |
 | `params` | The link's parameters other than `mod`, `collection`, `tile` and `mosaic`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection, or its one tile, that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -297,23 +302,40 @@ const report = await engine.request("mosaics.check", {
 
 ### Reading the catalog
 
-`catalog.list` answers the catalog as `{ mods, collections, mosaics }`, each list in catalog order. The catalog lists the things the app can open: mods, collections and mosaics, each a catalog entry of a catalog kind. It is made of the [instance catalog](#instance-catalog), the lists the instantiation sets, and of the default mosaics while "List the default mosaics of mods" is on. A later change adds the user catalog to it. "Catalog" alone always means this whole; each part is qualified (*instance catalog*, *user catalog*) or has its own name (*default mosaics*). Each mod and collection entry is `{ source }`, the resolved address of its file. Each mosaic entry is `{ source, defaultOf }`, where `defaultOf` is `{ source, title }` of the mod whose default mosaic it is, or `null` for the instance catalog's mosaics. It needs no permission: the addresses come from the instantiation, not from the mod, and any mod, visible or hidden, gets them. Its params are ignored.
+`catalog.list` answers the catalog as `{ mods, collections, mosaics }`, each list in catalog order. The catalog lists the things the app can open: mods, collections and mosaics, each a catalog entry of a catalog kind. It is made of the [instance catalog](#instance-catalog), the lists the instantiation sets, of the default mosaics while "List the default mosaics of mods" is on, and of the user catalog's mosaics (see the [user catalog module](../../user_catalog/README.md)). "Catalog" alone always means this whole; each part is qualified (*instance catalog*, *user catalog*) or has its own name (*default mosaics*). It needs no permission: any mod, visible or hidden, gets it. Its params are ignored.
+
+| Entry | Keys |
+| --- | --- |
+| Mod and collection | `{ source, listedBy, place }` |
+| Mosaic | `{ source, listedBy, place, defaultOf, provenance }` |
+
+- `source`: the resolved address of the entry's file.
+- `listedBy`: who listed it: `"instance"` for an entry of the instance catalog, `"default"` for a default mosaic, `"user"` for a user catalog entry. Added in mod API `0.1.18`.
+- `place`: where its file lives: `"browser"` for an `opentesela-browser:` address, a file stored in this browser, or `"remote"` for any other address. Added in mod API `0.1.18`.
+- `defaultOf`: `{ source, title }` of the mod whose default mosaic it is, or `null`.
+- `provenance`: where a user mosaic came from, `{ folder, path, addedAt, updatedAt }`, or `null` unless `listedBy` is `"user"`. For a stored mosaic, `folder` is the picked folder's name or `null` for a single file, `path` its path inside the folder or its file name, `addedAt` when it was first imported, and `updatedAt` when it was last updated, or `null`. For a mosaic added by URL, `folder`, `path` and `updatedAt` are `null` and `addedAt` is when it was added. Times are ISO 8601 strings in UTC. Added in mod API `0.1.18`.
 
 ```js
 const catalog = await engine.request("catalog.list", {});
-// catalog.mods[0] is { source: "https://example.org/samples/mods/book_list/mod_conf.yaml" }
-// catalog.mosaics[0] is { source: "https://example.org/samples/mosaics/nobel_books_list.yaml", defaultOf: null }
+// catalog.mods[0] is { source: "https://example.org/samples/mods/book_list/mod_conf.yaml", listedBy: "instance", place: "remote" }
+// catalog.mosaics[0] is { source: "https://example.org/samples/mosaics/nobel_books_list.yaml", listedBy: "instance", place: "remote", defaultOf: null, provenance: null }
 ```
 
 While "List the default mosaics of mods" is off, nothing is fetched to answer it. While it is on, the mosaics also hold the default mosaic of each catalog mod that declares one, after the instance catalog's mosaics, in the order of the mods, with `defaultOf` naming its mod:
 
 ```json
-{ "source": "https://example.org/samples/mods/book_list/mosaic.yaml", "defaultOf": { "source": "https://example.org/samples/mods/book_list/mod_conf.yaml", "title": "Book List" } }
+{ "source": "https://example.org/samples/mods/book_list/mosaic.yaml", "listedBy": "default", "place": "remote", "defaultOf": { "source": "https://example.org/samples/mods/book_list/mod_conf.yaml", "title": "Book List" }, "provenance": null }
 ```
 
 To find them, each catalog mod's mod file is fetched, in parallel, and nothing else: no entrypoint, library, collection or mosaic file. A mod whose file cannot be loaded, or that declares no default mosaic, adds nothing. A default mosaic that the instance catalog's mosaics or an earlier mod already list appears once, at its first place, so one the instance catalog lists keeps `defaultOf: null`. Lookups are not cached, so a mod author who edits `default_mosaic` sees the change at the next request.
 
-When the switch changes, the engine pushes `catalog.changed` to every running mod, visible or hidden, with the new catalog. A mod that lists the catalog follows it without a reload:
+The user catalog's mosaics come last, in the order the user added them. A user mosaic that an earlier mosaic of the catalog already lists appears once, at its earlier place and with its marks, and stays in the user catalog: switched off, the same default mosaic is listed at the user catalog's place, with `listedBy: "user"`. A stored mosaic, imported from the user's files:
+
+```json
+{ "source": "opentesela-browser:///7f3a…/maps/nobel_map.yaml", "listedBy": "user", "place": "browser", "defaultOf": null, "provenance": { "folder": "my-mosaics", "path": "maps/nobel_map.yaml", "addedAt": "2026-11-20T10:00:00.000Z", "updatedAt": null } }
+```
+
+When the switch changes, or the user catalog changes, the engine pushes `catalog.changed` to every running mod, visible or hidden, once, with the new catalog. A mod that lists the catalog follows it without a reload:
 
 ```js
 engine.on("catalog.changed", function relist(catalog) {
@@ -321,7 +343,7 @@ engine.on("catalog.changed", function relist(catalog) {
 });
 ```
 
-How it works: `buildCatalog(instanceCatalog, includesDefaultMosaics, fetchOptions)` (`catalog.ts`) builds the `Catalog` from the `ResolvedInstanceCatalog`. The stage gives every session, checks included, a `readCatalog` built on it, which `catalog_methods.ts` answers from, and it builds the catalog once for the push (see the [stage module](../stage/README.md#catalog)).
+How it works: `buildCatalog(instanceCatalog, includesDefaultMosaics, userCatalog, fetchOptions)` (`catalog.ts`) builds the `Catalog` from the `ResolvedInstanceCatalog` and the user catalog's entries, and sets the marks. The stage gives every session, checks included, a `readCatalog` built on it, which `catalog_methods.ts` answers from, and it builds the catalog once for the push (see the [stage module](../stage/README.md#catalog)).
 
 ### Asking the user: links, files and confirmations
 
@@ -362,6 +384,21 @@ await engine.request("links.open", { url: tile.data.url });
 ```
 
 The request stays pending while the dialog is open, for as long as the user needs, so a mod must not rely on a quick answer.
+
+### The user catalog
+
+The `userCatalog.*` requests let a mod, such as the mosaic explorer and viewer, reach the user catalog's flows (see the [user catalog module](../../user_catalog/README.md)): `userCatalog.import` opens the import dialog, `userCatalog.update` the update dialog of a stored mosaic, `userCatalog.add` the "Add a mosaic" dialog, `userCatalog.export` the save dialog of a stored mosaic's file, and `userCatalog.remove` a confirmation that removes a user mosaic. The app draws every dialog and does every write: a mod cannot write the user catalog, so a mod cannot add mosaics whose `show` lines widen its own reach. They follow the rules of the other dialogs (see [Asking the user](#asking-the-user-links-files-and-confirmations)): only the visible mod can send them (`-32002` otherwise), one dialog is shown at a time, and a mod that leaves gets `false`. They need no permission.
+
+- `mosaic` must be a non-empty string for `userCatalog.update`, `userCatalog.export` and `userCatalog.remove`, and is resolved against the app's address as a mosaic reference. `userCatalog.add` takes an optional `mosaic` string that fills its field. Wrong params fail with `-32602`, for example `userCatalog.export: "mosaic" must be a non-empty string`.
+- `userCatalog.update` and `userCatalog.export` need a stored mosaic, and `userCatalog.remove` a user mosaic, or they fail with `-32602` and no dialog: `userCatalog.update: the mosaic "<address>" is not stored in this browser`, `userCatalog.remove: the mosaic "<address>" is not in the user catalog`.
+- Each resolves with `true` once the user confirmed and the change is done, and `false` when the user cancels, presses Escape, or nothing changes. After each change, every running mod gets `catalog.changed` (see [Reading the catalog](#reading-the-catalog)).
+
+```js
+const imported = await engine.request("userCatalog.import", {});
+await engine.request("userCatalog.remove", { mosaic: entry.source });
+```
+
+How it works: `user_catalog_methods.ts` checks the params, then the entries that `ModMethodContext.readUserCatalog()` gives. It gives `null` in checks and cases, which never change the user catalog, so their requests are not checked against entries and get the scripted answer or `false`. Each request becomes a `CatalogAction` (`catalogImport`, `catalogUpdate { address }`, `catalogAdd { suggested }`, `catalogExport { address }`, `catalogRemove { address }`), which the stage queues like the other actions, and the app's user catalog dialogs perform (see [main](../../../main/README.md)).
 
 ### Telling the user something
 
@@ -649,7 +686,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.17` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.18` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -680,6 +717,7 @@ Version notes:
 - `0.1.15` added the app's catalog: the method `catalog.list`, the event `catalog.changed`, and `answer("catalog.list", catalog)` in the test API. These are additions that no existing mod can break on, so it is a patch. The explorers' `mods`, `collections` and `mosaics` config keys were removed in the same change: that is the config of three default mods, not the mod API.
 - `0.1.16` added the run link field `sites`, a mosaic reference whose `show` lines a mod link's sandbox gets (see [Launch](#launch)). It also made `sites` a reserved link name: a link parameter named `sites` is no longer passed in `params`, and `mods.open` and `mosaics.open` refuse `params.sites` with `-32602`. That could break a mod that read or passed a `sites` parameter, which would call for a minor bump. No shipped, test or known mod does, and no mod exists outside this repository, so it was taken as a patch, as `tile` was in `0.1.12` and `mosaic` in `0.1.13`. The surface guard's `0.1.16` entry repeats `0.1.15`'s, since it records names and no name was added.
 - `0.1.17` added the mount context key `collection` (`source`, `title`, `description`, or `null`), the collection the mod's tiles were loaded from, and `options.collection` for `mount(options)` in the test API. These are additions that existing mods keep working with, so it is a patch.
+- `0.1.18` added the `userCatalog.import`, `userCatalog.update`, `userCatalog.add`, `userCatalog.export` and `userCatalog.remove` requests, the catalog entry keys `listedBy`, `place` and `provenance`, and the test API's boolean answers to the five requests and the scripted catalog's new keys. `catalog.changed` keeps its form, and is also pushed when the user catalog changes. These are additions that existing mods keep working with, so it is a patch.
 
 An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `docs/code_conventions.md`, "OpenSpec changes", asks.
 
@@ -768,7 +806,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.17"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.18"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.10` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.

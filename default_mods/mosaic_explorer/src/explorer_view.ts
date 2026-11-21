@@ -31,6 +31,20 @@ export function openMosaic(
   request.catch(showOpenError.bind(undefined, view));
 }
 
+/** "Import…": the app's import dialog. A refusal is shown in the status region. */
+export function importMosaics(view: ExplorerView): void {
+  view.status.textContent = "";
+  const request = view.engine.request("userCatalog.import", {});
+  request.catch(showOpenError.bind(undefined, view));
+}
+
+/** "Add by URL…": the app's "Add a mosaic" dialog. A refusal is shown in the status region. */
+export function addMosaicByUrl(view: ExplorerView): void {
+  view.status.textContent = "";
+  const request = view.engine.request("userCatalog.add", {});
+  request.catch(showOpenError.bind(undefined, view));
+}
+
 /** Opens the viewer for a mosaic, with the mosaic's source as the `target` parameter. */
 export function openViewer(
   view: ExplorerView,

@@ -1,4 +1,10 @@
 export {
+  BROWSER_FILE_PROTOCOL,
+  buildBrowserFileAddress,
+  isBrowserFileAddress,
+} from "./browser_files.ts";
+export type { BrowserFileReader } from "./browser_files.ts";
+export {
   FileFetchError,
   MarkdownParseError,
   YamlParseError,

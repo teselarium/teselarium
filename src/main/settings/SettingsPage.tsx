@@ -23,6 +23,8 @@ import type {
 } from "../sections/section_switches.ts";
 import { SectionIcon } from "../sidebar/SectionIcon.tsx";
 import type { AppTheme } from "../theme/app_theme.ts";
+import type { UserCatalogStore } from "../user_catalog/user_catalog_store.ts";
+import { UserCatalogRow } from "./UserCatalogRow.tsx";
 import { ThemeControl } from "../theme/ThemeControl.tsx";
 import {
   readCatalogSettingSnapshot,
@@ -52,6 +54,8 @@ interface SettingsPageProps {
   tileMedia: TileMediaSetting;
   catalogSetting: CatalogSetting;
   recentlyUsed: RecentlyUsed;
+  /** The user's own mosaics, counted in the Catalog group. */
+  userCatalog: UserCatalogStore;
   siteDecisions: SiteDecisions;
   playerSites: PlayerSites;
 }
@@ -183,7 +187,7 @@ function CatalogRow({ catalogSetting }: CatalogRowProps): ReactElement {
 /**
  * The Settings section's page: the Theme control, a switch for each optional
  * section of the sidebar, the "List the default mosaics of mods" switch and
- * the recently used count with its "Clear" button, the
+ * the user's mosaics with "Remove all", the recently used count with its "Clear" button, the
  * "Load media linked by tiles" switch, the
  * remembered site decisions with their Remove buttons, and the app's version
  * and mod API version as text to copy. A section switch only hides the
@@ -196,6 +200,7 @@ export function SettingsPage({
   tileMedia,
   catalogSetting,
   recentlyUsed,
+  userCatalog,
   siteDecisions,
   playerSites,
 }: SettingsPageProps): ReactElement {
@@ -255,11 +260,13 @@ export function SettingsPage({
             try its own mosaic next to the others. Applies at once, to open
             explorers too. The stage bar's lists also offer the mods,
             collections and mosaics you recently tried, which the app keeps only
-            on this device.
+            on this device. The mosaics you add yourself are listed after the
+            others; the ones you import are kept only in this browser.
           </CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
           <CatalogRow catalogSetting={catalogSetting} />
+          <UserCatalogRow userCatalog={userCatalog} />
           <RecentlyUsedRow recentlyUsed={recentlyUsed} />
         </CardContent>
       </Card>

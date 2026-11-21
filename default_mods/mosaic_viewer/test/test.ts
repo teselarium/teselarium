@@ -15,6 +15,14 @@ import {
   showsRefusedCheck,
 } from "./action_cases.ts";
 import {
+  exportsStoredMosaic,
+  removesStoredMosaic,
+  showsNoProvenanceForOthers,
+  showsRemoteProvenance,
+  showsStoredProvenance,
+  updatesStoredMosaicWhenCancelled,
+} from "./provenance_cases.ts";
+import {
   drawsFailureBorder,
   drawsMosaicCard,
   drawsOpenAsPrimary,
@@ -59,6 +67,18 @@ export default function registerViewerTests(t: ModTestRegistration): void {
   );
   t.test("opens the mosaic", opensMosaic);
   t.test("shows a refused check and enables it again", showsRefusedCheck);
+  t.test("shows where a stored mosaic comes from", showsStoredProvenance);
+  t.test("shows where a remote mosaic comes from", showsRemoteProvenance);
+  t.test(
+    "shows no provenance for a mosaic the user did not add",
+    showsNoProvenanceForOthers,
+  );
+  t.test("removes a stored mosaic", removesStoredMosaic);
+  t.test("exports a stored mosaic", exportsStoredMosaic);
+  t.test(
+    "updates a stored mosaic from a file",
+    updatesStoredMosaicWhenCancelled,
+  );
   t.test("makes opening the mosaic the primary action", drawsOpenAsPrimary);
   t.test("draws the mosaic on the card background", drawsMosaicCard);
   t.test("draws a failure with the destructive border", drawsFailureBorder);

@@ -9,6 +9,7 @@ export {
   changeStageFullscreen,
   changeStageTheaterMode,
   changeStageTileLinkedMedia,
+  changeStageUserCatalog,
   checkFrameLoadedAgain,
   clearNotifications,
   closeSandbox,
@@ -23,6 +24,7 @@ export {
   openStageSection,
   readStageCatalog,
   readStageSnapshot,
+  refreshStageCatalog,
   reloadTiles,
   subscribeStage,
   warnFullscreenRefused,
@@ -41,8 +43,10 @@ export type {
   StageSnapshot,
   VisibleView,
 } from "./stage_controller.ts";
+export { isCatalogAction } from "../engine/index.ts";
 export type {
   AppAction,
+  CatalogAction,
   ConfirmAction,
   LinkAction,
   PlayerAction,

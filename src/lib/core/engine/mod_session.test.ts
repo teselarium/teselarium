@@ -603,7 +603,9 @@ describe("connectModSession", function describeConnectModSession(): void {
   it("pushes catalog.changed with the catalog", async function pushesCatalogChanged(): Promise<void> {
     const played = await playSession();
     const catalog: Catalog = {
-      mods: [{ source: SAMPLE_MOD_SOURCE }],
+      mods: [
+        { source: SAMPLE_MOD_SOURCE, listedBy: "instance", place: "remote" },
+      ],
       collections: [],
       mosaics: [],
     };

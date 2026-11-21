@@ -44,7 +44,7 @@ export interface MosaicInspection {
 }
 
 /** Resolves a mosaic reference against the app's address, or raises `INVALID_PARAMS` naming `method`. */
-function resolveRequestedMosaic(
+export function resolveRequestedMosaic(
   context: ModMethodContext,
   reference: string,
   method: string,

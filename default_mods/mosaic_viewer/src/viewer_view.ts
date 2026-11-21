@@ -4,8 +4,10 @@ import { buildErrorAlert } from "./page_elements.ts";
 
 /**
  * What the viewer shows and opens: the engine, the app's mod API version,
- * the viewers of its config, the viewed mosaic's inspection, and the region
- * for errors, notices and the check report.
+ * the viewers of its config, the viewed mosaic's inspection, the region for
+ * errors, notices and the check report, the place of "Where it comes from",
+ * and what an update from a file shows again. Mutable: an update replaces
+ * the inspection.
  */
 export interface ViewerView {
   engine: ModEngine;
@@ -14,6 +16,9 @@ export interface ViewerView {
   collectionViewer: string;
   inspection: MosaicInspection;
   messages: HTMLElement;
+  provenance: HTMLElement;
+  /** Inspects the mosaic anew after an update, and shows it again. */
+  onUpdated: () => Promise<void>;
 }
 
 export function showError(view: ViewerView, error: unknown): void {

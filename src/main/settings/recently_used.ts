@@ -268,6 +268,31 @@ export function removeRecentlyUsed(
   });
 }
 
+/**
+ * Drops the mosaics at `sources`, as when user mosaics are removed, from the
+ * storage too when it allows. Mods, collections and combinations are kept.
+ * Nothing is published when no mosaic is dropped.
+ */
+export function forgetRecentlyUsedMosaics(
+  store: RecentlyUsed,
+  sources: Iterable<string>,
+): void {
+  const forgotten = new Set(sources);
+  const kept: string[] = [];
+  for (const source of store.snapshot.mosaics) {
+    if (!forgotten.has(source)) {
+      kept.push(source);
+    }
+  }
+  if (kept.length === store.snapshot.mosaics.length) {
+    return;
+  }
+  publishRecentlyUsed(store, {
+    ...store.snapshot,
+    mosaics: Object.freeze(kept),
+  });
+}
+
 /** Drops every entry of the four kinds at once, from the storage too when it allows. */
 export function clearRecentlyUsed(store: RecentlyUsed): void {
   const cleared: RecentlyUsedSnapshot = {

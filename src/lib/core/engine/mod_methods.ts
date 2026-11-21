@@ -4,6 +4,7 @@ import type { LoadedMod, ModLoadOptions } from "../../mod/index.ts";
 import type { IssueLevel } from "../../tile/index.ts";
 import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import type { ModSlot, ModStorage } from "../storage/index.ts";
+import type { UserCatalogEntry } from "../../user_catalog/index.ts";
 import type { AppAction } from "./app_actions.ts";
 import type { Catalog } from "./catalog.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
@@ -79,6 +80,12 @@ export interface ModMethodContext {
   readSiteDecisions: () => readonly SiteDecision[];
   /** The catalog as `catalog.list` answers it, read anew for each request. */
   readCatalog: () => Promise<Catalog>;
+  /**
+   * The user catalog's entries, which the `userCatalog.*` requests are
+   * checked against, or `null` in checks and cases: there they change
+   * nothing, so the entries are not checked.
+   */
+  readUserCatalog: () => readonly UserCatalogEntry[] | null;
   /**
    * Asks the stage to open a link, in a new sandbox or, with `replace`, in
    * place of the requesting one. Gives what came of it.

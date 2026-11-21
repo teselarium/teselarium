@@ -139,6 +139,23 @@ test.describe(
       expect(answer.message).toContain("tiles.delete");
     });
 
+    test("Missing mosaic", async function rejectsMissingMosaic({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "userCatalog.export",
+        {},
+      ]);
+
+      expect(answer).toEqual({
+        code: -32602,
+        message: 'userCatalog.export: "mosaic" must be a non-empty string',
+      });
+      await expect(actionDialog(page)).toBeHidden();
+    });
+
     test("Several handlers for one event", async function callsHandlersInOrder({
       page,
     }): Promise<void> {

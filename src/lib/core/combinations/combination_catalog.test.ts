@@ -104,9 +104,17 @@ function serveFixtures(): void {
 }
 
 const CATALOG: Catalog = {
-  mods: [{ source: BOOK_MOD }],
-  collections: [{ source: PEOPLE }],
-  mosaics: [{ source: MOSAIC, defaultOf: null }],
+  mods: [{ source: BOOK_MOD, listedBy: "instance", place: "remote" }],
+  collections: [{ source: PEOPLE, listedBy: "instance", place: "remote" }],
+  mosaics: [
+    {
+      source: MOSAIC,
+      listedBy: "instance",
+      place: "remote",
+      defaultOf: null,
+      provenance: null,
+    },
+  ],
 };
 
 function readTestCatalog(): Promise<Catalog> {

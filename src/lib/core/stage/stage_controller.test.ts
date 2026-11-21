@@ -44,7 +44,12 @@ import {
   TEST_NPM_HOST,
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
-import { fetchTestFile, testTexts } from "../../../test/test_files.ts";
+import {
+  fetchTestFile,
+  readRequestedUrl,
+  testTexts,
+} from "../../../test/test_files.ts";
+import { createMemoryBrowserDatabase } from "../storage/index.ts";
 import {
   attachCheckingFrame,
   closeCheckPorts,
@@ -67,6 +72,7 @@ import { buildTheme } from "../theme/index.ts";
 import type { ColorScheme } from "../theme/index.ts";
 import type { MessageLevel } from "./stage_messages.ts";
 import type { LoadedFileEntry } from "./stage_sandboxes.ts";
+import type { UserCatalogEntry } from "../../user_catalog/index.ts";
 import type { StageRouting } from "./stage_routes.ts";
 import {
   answerApiMismatch,
@@ -74,6 +80,7 @@ import {
   answerStageAction,
   attachFrame,
   changeStageCatalogDefaultMosaics,
+  changeStageUserCatalog,
   changeStageColorScheme,
   changeStageFullscreen,
   changeStageTheaterMode,
@@ -89,6 +96,7 @@ import {
   openStageLink,
   openStageSection,
   readStageCatalog,
+  refreshStageCatalog,
   readStageSnapshot,
   reloadTiles,
   requestStageAction,
@@ -1768,21 +1776,61 @@ describe("changeStageTileLinkedMedia", function describeChangeTileLinkedMedia():
   });
 });
 
+const INSTANCE_MARKS = { listedBy: "instance", place: "remote" } as const;
+
+const SAMPLE_MOSAIC_LISTING = {
+  source: SAMPLE_MOSAIC_SOURCE,
+  ...INSTANCE_MARKS,
+  defaultOf: null,
+  provenance: null,
+};
+
 /** The catalog of `TEST_INSTANCE_CATALOG` with "List the default mosaics of mods" off. */
 const CATALOG_OFF_LISTING = {
-  mods: [{ source: SAMPLE_MOD_SOURCE }],
-  collections: [{ source: SAMPLE_COLLECTION_SOURCE }],
-  mosaics: [{ source: SAMPLE_MOSAIC_SOURCE, defaultOf: null }],
+  mods: [{ source: SAMPLE_MOD_SOURCE, ...INSTANCE_MARKS }],
+  collections: [{ source: SAMPLE_COLLECTION_SOURCE, ...INSTANCE_MARKS }],
+  mosaics: [SAMPLE_MOSAIC_LISTING],
 };
 
 /** The catalog of `TEST_INSTANCE_CATALOG` with the switch on: the fixture mod's default mosaic follows. */
 const CATALOG_ON_LISTING = {
   ...CATALOG_OFF_LISTING,
   mosaics: [
-    { source: SAMPLE_MOSAIC_SOURCE, defaultOf: null },
+    SAMPLE_MOSAIC_LISTING,
     {
       source: SAMPLE_DEFAULT_MOSAIC_SOURCE,
+      listedBy: "default",
+      place: "remote",
       defaultOf: { source: SAMPLE_MOD_SOURCE, title: "Book List" },
+      provenance: null,
+    },
+  ],
+};
+
+/** A user mosaic added by URL, as the user catalog keeps it. */
+const REMOTE_USER_ENTRY: UserCatalogEntry = {
+  address: "https://mosaics.example.net/maps/laureates.yml",
+  place: "remote",
+  root: null,
+  provenance: {
+    folder: null,
+    path: null,
+    addedAt: "2026-11-20T11:00:00.000Z",
+    updatedAt: null,
+  },
+};
+
+/** The catalog of `TEST_INSTANCE_CATALOG` with the switch off and `REMOTE_USER_ENTRY` added. */
+const CATALOG_USER_LISTING = {
+  ...CATALOG_OFF_LISTING,
+  mosaics: [
+    SAMPLE_MOSAIC_LISTING,
+    {
+      source: REMOTE_USER_ENTRY.address,
+      listedBy: "user",
+      place: "remote",
+      defaultOf: null,
+      provenance: REMOTE_USER_ENTRY.provenance,
     },
   ],
 };
@@ -1887,6 +1935,41 @@ describe("catalog", function describeCatalog(): void {
     expect(readVisible(stage).id).toBe("sandbox-2");
     expect(hidden.received).toEqual([buildCatalogChanged(CATALOG_ON_LISTING)]);
     expect(visible.received).toEqual([buildCatalogChanged(CATALOG_ON_LISTING)]);
+  });
+
+  it("Mosaic removed while a mod runs", async function pushesUserCatalogToHiddenMod(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    const hidden = attachCollectingFrame(stage, "sandbox-1");
+    const visible = attachCollectingFrame(stage, "sandbox-2");
+
+    await changeStageUserCatalog(stage, [REMOTE_USER_ENTRY]);
+    await waitForCount(hidden.received, 1);
+    await changeStageUserCatalog(stage, []);
+    await waitForCount(hidden.received, 2);
+    await waitForCount(visible.received, 2);
+
+    expect(hidden.received).toEqual([
+      buildCatalogChanged(CATALOG_USER_LISTING),
+      buildCatalogChanged(CATALOG_OFF_LISTING),
+    ]);
+    expect(visible.received).toEqual(hidden.received);
+    expect(stage.runtimes.get("sandbox-1")?.session?.stopped).toBe(false);
+  });
+
+  it("refreshStageCatalog pushes the current catalog", async function refreshesCatalog(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = await openViewerFromHome(history);
+    const hidden = attachCollectingFrame(stage, "sandbox-1");
+    stage.userCatalog = [REMOTE_USER_ENTRY];
+
+    await refreshStageCatalog(stage);
+    await waitForCount(hidden.received, 1);
+
+    expect(hidden.received).toEqual([
+      buildCatalogChanged(CATALOG_USER_LISTING),
+    ]);
+    expect(await readStageCatalog(stage)).toEqual(CATALOG_USER_LISTING);
   });
 
   it("ends on the second of two quick changes", async function dropsOvertakenListing(): Promise<void> {
@@ -2403,6 +2486,115 @@ async function followFromHome(hash: string): Promise<Stage> {
   await follow(stage, history.followLink(hash));
   return stage;
 }
+
+const STORED_MOSAIC_ADDRESS =
+  "opentesela-browser:///r1/books_on_the_shelf.yaml";
+
+const STORED_USER_ENTRY: UserCatalogEntry = {
+  address: STORED_MOSAIC_ADDRESS,
+  place: "browser",
+  root: "r1",
+  provenance: {
+    folder: null,
+    path: "books_on_the_shelf.yaml",
+    addedAt: "2026-11-20T10:00:00.000Z",
+    updatedAt: null,
+  },
+};
+
+function recordTestFetch(
+  requested: string[],
+  input: RequestInfo | URL,
+): Promise<Response> {
+  requested.push(readRequestedUrl(input));
+  return fetchTestFile(input);
+}
+
+/** A stage whose browser database stores a mosaic of the sample mod and collection. */
+async function buildStoredMosaicStage(
+  history: FakeHistory,
+  requested: string[],
+): Promise<Stage> {
+  const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+  await database.apply({
+    putFiles: [
+      {
+        address: STORED_MOSAIC_ADDRESS,
+        text: [
+          "mosaic:",
+          '  title: "Stored books"',
+          `  mod: "${SAMPLE_MOD_SOURCE}"`,
+          `  collection: "${SAMPLE_COLLECTION_SOURCE}"`,
+          "",
+        ].join("\n"),
+      },
+    ],
+    putEntries: [STORED_USER_ENTRY],
+    deleteAddresses: [],
+  });
+  const siteDecisions = createMemorySiteDecisions();
+  const stage = createStage({
+    history,
+    defaults: { folder: "./default_mods/", switchedOff: [] },
+    routing: MOD_HOME_ROUTING,
+    appOrigin: APP_ORIGIN,
+    baseUrl: APP_BASE_URL,
+    npmHost: TEST_NPM_HOST,
+    storage: createMemoryStorage(),
+    fetch: recordTestFetch.bind(undefined, requested),
+    colorScheme: "light",
+    loadsTileLinkedMedia: true,
+    instanceCatalog: TEST_INSTANCE_CATALOG,
+    catalogDefaultMosaics: false,
+    userCatalog: await database.readEntries(),
+    browserFiles: database,
+    theaterMode: false,
+    readSiteDecisions: siteDecisions.read,
+    rememberSiteDecisions: siteDecisions.remember,
+  });
+  return stage;
+}
+
+describe("stored mosaics", function describeStoredMosaics(): void {
+  it("Stored mosaic opens", async function opensStoredMosaic(): Promise<void> {
+    const history = new FakeHistory("");
+    const requested: string[] = [];
+    const stage = await buildStoredMosaicStage(history, requested);
+    await follow(stage, history.readNavigation());
+
+    await follow(
+      stage,
+      history.followLink(
+        `#/run?mosaic=${encodeURIComponent(STORED_MOSAIC_ADDRESS)}`,
+      ),
+    );
+
+    expect(readVisible(stage)).toMatchObject({
+      status: "running",
+      link: {
+        mod: SAMPLE_MOD_SOURCE,
+        collection: SAMPLE_COLLECTION_SOURCE,
+        mosaic: STORED_MOSAIC_ADDRESS,
+      },
+    });
+    expect(requested).toContain(SAMPLE_MOD_SOURCE);
+    for (const url of requested) {
+      expect(url.startsWith("opentesela-browser:")).toBe(false);
+    }
+  });
+
+  it("lists the stored mosaic in the catalog", async function listsStoredMosaic(): Promise<void> {
+    const stage = await buildStoredMosaicStage(new FakeHistory(""), []);
+
+    const catalog = await readStageCatalog(stage);
+
+    expect(catalog.mosaics.at(-1)).toMatchObject({
+      source: STORED_MOSAIC_ADDRESS,
+      listedBy: "user",
+      place: "browser",
+    });
+  });
+});
 
 describe("sandbox snapshot", function describeSandboxSnapshot(): void {
   it("gives a mosaic's link, collection title, aliases and show lines", async function readsMosaic(): Promise<void> {

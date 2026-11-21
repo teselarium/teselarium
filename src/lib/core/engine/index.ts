@@ -1,5 +1,12 @@
+export { isCatalogAction } from "./app_actions.ts";
 export type {
   AppAction,
+  CatalogAction,
+  CatalogAddAction,
+  CatalogExportAction,
+  CatalogImportAction,
+  CatalogRemoveAction,
+  CatalogUpdateAction,
   ConfirmAction,
   LinkAction,
   PlayerAction,
@@ -9,8 +16,10 @@ export { buildCatalog } from "./catalog.ts";
 export type {
   Catalog,
   CatalogEntry,
+  CatalogListedBy,
   CatalogMosaicEntry,
   CatalogMosaicMod,
+  CatalogPlace,
 } from "./catalog.ts";
 export {
   findSwitchedOffMod,

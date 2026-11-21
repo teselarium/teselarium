@@ -1,7 +1,7 @@
 import type {
   CaseContext,
   CaseRequest,
-  CatalogMosaicEntry,
+  CaseCatalogMosaicEntry,
 } from "../../mod_api.d.ts";
 
 /**
@@ -34,7 +34,7 @@ const LISTED_MOD_MARK = {
 /** Answers `catalog.list` with `mosaics` as the catalog's mosaics, then mounts the explorer. */
 function mountWithCatalogMosaics(
   context: CaseContext,
-  mosaics: CatalogMosaicEntry[],
+  mosaics: CaseCatalogMosaicEntry[],
 ): Promise<void> {
   context.answer("catalog.list", { mosaics });
   const mounting = context.mount({ config: { viewer: CONFIG_VIEWER } });
@@ -46,7 +46,7 @@ export function mountWithMosaics(
   context: CaseContext,
   sources: string[],
 ): Promise<void> {
-  const mosaics: CatalogMosaicEntry[] = [];
+  const mosaics: CaseCatalogMosaicEntry[] = [];
   for (const source of sources) {
     mosaics.push({ source, defaultOf: null });
   }
@@ -62,6 +62,27 @@ export function findElement(
     throw new Error(`The explorer draws no element matching "${selector}".`);
   }
   return element;
+}
+
+/** A fixture stored mosaic's provenance, as the user catalog keeps it. */
+const STORED_PROVENANCE = {
+  folder: "my-mosaics",
+  path: "maps/listed_mosaic.yaml",
+  addedAt: "2026-11-20T10:00:00.000Z",
+  updatedAt: null,
+};
+
+/** The button whose visible text is `text`. */
+function findButtonByText(
+  context: CaseContext,
+  text: string,
+): HTMLButtonElement {
+  for (const button of context.root.querySelectorAll("button")) {
+    if (button.textContent === text) {
+      return button;
+    }
+  }
+  throw new Error(`The explorer draws no button reading "${text}".`);
 }
 
 /** The button whose accessible name is `name`. */
@@ -159,7 +180,7 @@ export async function marksDefaultMosaic(context: CaseContext): Promise<void> {
   const cards = context.root.querySelectorAll("li > article");
   context.expect(cards[0].querySelector("small")).toBe(null);
   context
-    .expect(cards[1].querySelector("h2 + small")?.textContent)
+    .expect(cards[1].querySelector("header > small")?.textContent)
     .toBe("Default mosaic of Listed mod");
   context
     .expect(cards[1].querySelector("p")?.textContent)
@@ -238,4 +259,64 @@ export async function showsRefusedOpen(context: CaseContext): Promise<void> {
   context
     .expect(findElement(context, "li > article h2").textContent)
     .toBe("Listed mosaic");
+}
+
+export async function showsWhereMosaicsLive(
+  context: CaseContext,
+): Promise<void> {
+  await mountWithCatalogMosaics(context, [
+    {
+      source: LISTED_MOSAIC_LOCATION,
+      place: "browser",
+      provenance: STORED_PROVENANCE,
+    },
+    { source: OTHER_MOSAIC_LOCATION },
+  ]);
+
+  const cards = context.root.querySelectorAll("li > article");
+  const storedBadge = cards[0].querySelector("h2 + span");
+  context.expect(storedBadge?.textContent).toBe("Browser");
+  context
+    .expect(storedBadge?.getAttribute("data-ot-variant"))
+    .toBe("secondary");
+  context
+    .expect(cards[0].querySelector("header > small")?.textContent)
+    .toBe("Added by you");
+  const remoteBadge = cards[1].querySelector("h2 + span");
+  context.expect(remoteBadge?.textContent).toBe("Remote");
+  context.expect(remoteBadge?.getAttribute("data-ot-variant")).toBe("outline");
+  context.expect(cards[1].querySelector("header > small")).toBe(null);
+}
+
+export async function importsWhenAsked(context: CaseContext): Promise<void> {
+  await mountWithMosaics(context, [LISTED_MOSAIC_LOCATION]);
+  context.answer("userCatalog.import", true);
+  const importButton = findButtonByText(context, "Import…");
+
+  importButton.click();
+
+  const importRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "userCatalog.import"),
+  );
+  context.expect(importRequest.result).toBe(true);
+  context.expect(importButton.getAttribute("data-ot-variant")).toBe("outline");
+  context.expect(readStatusText(context)).toBe("");
+}
+
+export async function addsByUrlWhenCancelled(
+  context: CaseContext,
+): Promise<void> {
+  await mountWithMosaics(context, [LISTED_MOSAIC_LOCATION]);
+  context.answer("userCatalog.add", false);
+  const addButton = findButtonByText(context, "Add by URL…");
+
+  addButton.click();
+
+  const addRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "userCatalog.add"),
+  );
+  context.expect(addRequest.params).toEqual({});
+  context.expect(addRequest.result).toBe(false);
+  context.expect(addButton.getAttribute("data-ot-variant")).toBe("outline");
+  context.expect(readStatusText(context)).toBe("");
 }

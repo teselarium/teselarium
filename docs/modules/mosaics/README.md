@@ -70,6 +70,7 @@ mosaic:
 - A mosaic file served from the app's origin is granted its lines. For a mosaic from another origin, the site consent dialog asks about its lines in a group of their own, next to the mod's, and the answers are remembered per mosaic file and listed in Settings.
 - The grants last only for the sandbox opened from that mosaic, or one whose run link names it as `sites`, and the mosaic file's origin is a content host of the sandbox opened from it (see [Permissions of a mosaic](../lib/core/sandbox/README.md#permissions-of-a-mosaic) in the sandbox module).
 - The mod a mosaic opens keeps its own trust: its mod API question and its own site consent, whatever mosaic opened it.
+- A mosaic of the user catalog is trusted like a mosaic from another site. A stored mosaic's address, `opentesela-browser:///…`, is not from the app's origin and adds no content host, and a mosaic added by URL is on its own site, so the site consent dialog asks about their `show` lines, and the answers are remembered per mosaic address. A stored mosaic keeps its address when it is updated, so its answers and the mod's storage slot stay. Only the app's dialogs write the user catalog: a mod cannot add a mosaic whose `show` lines widen its own reach (see [The user catalog](../main/README.md#the-user-catalog)).
 
 ## Components
 

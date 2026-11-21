@@ -109,7 +109,11 @@ The planning steps are functions that return new values, so their tests need no 
 
 ### 7. Start order
 
-`main.tsx` opens the database and reads the entries before creating the stage, as it reads the other stores, and passes `userCatalog` (the entries) and `browserFiles` (the reader) in `StageOptions`. Opening takes a few milliseconds, and the start screen already waits on async work. A failure gives an empty catalog part, never a start error, since the user's data must not stop the app.
+`main.tsx` starts the app synchronously, as before this change, and opens the database in parallel. Waiting for the database before rendering was tried first and rejected: anything that happens between the page's load and the render, such as a hash change, was missed, and e2e tests that act right after loading the page became flaky.
+
+- The stage starts with an empty `userCatalog` and a `browserFiles` reader that waits for the database to open, so a run link to a stored mosaic opens even at start.
+- The user catalog store starts from the same opening. Once the entries are read, it publishes them and calls `changeStageUserCatalog`, so running mods get `catalog.changed`, as for any other change of the user catalog. Its writes, the reviews and the dialogs' reads wait for the opening first.
+- A failure gives an empty, read-only catalog part, never a start error, since the user's data must not stop the app.
 
 ### 8. Export names and types
 

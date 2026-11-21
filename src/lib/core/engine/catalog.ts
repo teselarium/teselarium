@@ -1,10 +1,24 @@
+import { isBrowserFileAddress } from "../../files/index.ts";
 import { loadModFile } from "../../mod/index.ts";
 import type { ModLoadOptions } from "../../mod/index.ts";
+import { buildUserMosaicEntries } from "../../user_catalog/index.ts";
+import type {
+  UserCatalogEntry,
+  UserCatalogProvenance,
+} from "../../user_catalog/index.ts";
 import type { ResolvedInstanceCatalog } from "./instance_catalog.ts";
 
-/** A mod or collection of the catalog: the resolved address of its file. */
+/** Who listed a catalog entry: the instance catalog, a mod as its default mosaic, or the user. */
+export type CatalogListedBy = "instance" | "default" | "user";
+
+/** Where a catalog entry's file lives: stored in this browser, or anywhere else. */
+export type CatalogPlace = "remote" | "browser";
+
+/** A mod or collection of the catalog: the resolved address of its file, and its marks. */
 export interface CatalogEntry {
   source: string;
+  listedBy: CatalogListedBy;
+  place: CatalogPlace;
 }
 
 /** The mod whose default mosaic a catalog mosaic is. */
@@ -13,10 +27,16 @@ export interface CatalogMosaicMod {
   title: string;
 }
 
-/** A mosaic of the catalog, and the mod whose default mosaic it is, or `null` for the instance catalog's mosaics. */
+/**
+ * A mosaic of the catalog and its marks: the mod whose default mosaic it is,
+ * or `null`, and the provenance of a user mosaic, or `null`.
+ */
 export interface CatalogMosaicEntry {
   source: string;
+  listedBy: CatalogListedBy;
+  place: CatalogPlace;
   defaultOf: CatalogMosaicMod | null;
+  provenance: UserCatalogProvenance | null;
 }
 
 /** What `catalog.list` answers and `catalog.changed` pushes. Plain data. */
@@ -26,10 +46,22 @@ export interface Catalog {
   mosaics: CatalogMosaicEntry[];
 }
 
+/** `"browser"` for an `opentesela-browser:` address, `"remote"` for any other. */
+function readCatalogPlace(source: string): CatalogPlace {
+  if (isBrowserFileAddress(source)) {
+    return "browser";
+  }
+  return "remote";
+}
+
 function buildCatalogEntries(sources: readonly string[]): CatalogEntry[] {
   const entries: CatalogEntry[] = [];
   for (const source of sources) {
-    entries.push({ source });
+    entries.push({
+      source,
+      listedBy: "instance",
+      place: readCatalogPlace(source),
+    });
   }
   return entries;
 }
@@ -39,7 +71,29 @@ function buildInstanceMosaicEntries(
 ): CatalogMosaicEntry[] {
   const entries: CatalogMosaicEntry[] = [];
   for (const source of sources) {
-    entries.push({ source, defaultOf: null });
+    entries.push({
+      source,
+      listedBy: "instance",
+      place: readCatalogPlace(source),
+      defaultOf: null,
+      provenance: null,
+    });
+  }
+  return entries;
+}
+
+function buildUserCatalogMosaics(
+  userCatalog: readonly UserCatalogEntry[],
+): CatalogMosaicEntry[] {
+  const entries: CatalogMosaicEntry[] = [];
+  for (const userMosaic of buildUserMosaicEntries(userCatalog)) {
+    entries.push({
+      source: userMosaic.source,
+      listedBy: "user",
+      place: readCatalogPlace(userMosaic.source),
+      defaultOf: null,
+      provenance: userMosaic.provenance,
+    });
   }
   return entries;
 }
@@ -60,7 +114,10 @@ async function loadDefaultMosaicEntry(
     }
     const entry: CatalogMosaicEntry = {
       source: modFile.defaultMosaic,
+      listedBy: "default",
+      place: readCatalogPlace(modFile.defaultMosaic),
       defaultOf: { source: modFile.source, title: modFile.title },
+      provenance: null,
     };
     return entry;
   } catch {
@@ -105,32 +162,36 @@ function dedupeMosaicEntries(
 }
 
 /**
- * The catalog as `catalog.list` answers it, built from the instance catalog
- * and, while `includesDefaultMosaics` is on, the default mosaics. With it
- * off, nothing is fetched. With it on, each catalog mod's file is loaded,
- * without its entrypoint, and its default mosaic follows the instance
- * catalog's mosaics, in mod order, marked with its mod. A mosaic already
- * listed keeps its first place, and a mod that fails or declares no default
- * mosaic adds nothing.
+ * The catalog as `catalog.list` answers it, built from the instance catalog,
+ * the default mosaics while `includesDefaultMosaics` is on, and the user
+ * catalog. With the switch off, nothing is fetched. With it on, each catalog
+ * mod's file is loaded, without its entrypoint, and its default mosaic
+ * follows the instance catalog's mosaics, in mod order, marked with its mod.
+ * The user catalog's mosaics come last, in order of addition. A mosaic
+ * already listed keeps its first place and its marks, and a mod that fails
+ * or declares no default mosaic adds nothing.
  */
 export async function buildCatalog(
   instanceCatalog: ResolvedInstanceCatalog,
   includesDefaultMosaics: boolean,
+  userCatalog: readonly UserCatalogEntry[],
   fetchOptions: ModLoadOptions,
 ): Promise<Catalog> {
-  const instanceMosaics = buildInstanceMosaicEntries(instanceCatalog.mosaics);
-  let mosaics = instanceMosaics;
+  let defaultMosaics: CatalogMosaicEntry[] = [];
   if (includesDefaultMosaics) {
-    const defaultMosaics = await loadDefaultMosaicEntries(
+    defaultMosaics = await loadDefaultMosaicEntries(
       instanceCatalog.mods,
       fetchOptions,
     );
-    mosaics = dedupeMosaicEntries([...instanceMosaics, ...defaultMosaics]);
   }
   const catalog: Catalog = {
     mods: buildCatalogEntries(instanceCatalog.mods),
     collections: buildCatalogEntries(instanceCatalog.collections),
-    mosaics,
+    mosaics: dedupeMosaicEntries([
+      ...buildInstanceMosaicEntries(instanceCatalog.mosaics),
+      ...defaultMosaics,
+      ...buildUserCatalogMosaics(userCatalog),
+    ]),
   };
   return catalog;
 }

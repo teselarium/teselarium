@@ -15,6 +15,7 @@ import { SettingsPage } from "../settings/SettingsPage.tsx";
 import type { CatalogSetting } from "../settings/catalog_setting.ts";
 import type { TileMediaSetting } from "../settings/tile_media_setting.ts";
 import type { AppTheme } from "../theme/app_theme.ts";
+import type { UserCatalogStore } from "../user_catalog/user_catalog_store.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
 import { MarkdownPage } from "./MarkdownPage.tsx";
 import { buildPageFileUrl } from "./page_links.ts";
@@ -28,6 +29,7 @@ interface PageViewProps {
   tileMedia: TileMediaSetting;
   catalogSetting: CatalogSetting;
   recentlyUsed: RecentlyUsed;
+  userCatalog: UserCatalogStore;
   siteDecisions: SiteDecisions;
   playerSites: PlayerSites;
 }
@@ -57,6 +59,7 @@ export function PageView({
   tileMedia,
   catalogSetting,
   recentlyUsed,
+  userCatalog,
   siteDecisions,
   playerSites,
 }: PageViewProps): ReactElement | null {
@@ -83,6 +86,7 @@ export function PageView({
         tileMedia={tileMedia}
         catalogSetting={catalogSetting}
         recentlyUsed={recentlyUsed}
+        userCatalog={userCatalog}
         siteDecisions={siteDecisions}
         playerSites={playerSites}
       />

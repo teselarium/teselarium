@@ -81,7 +81,9 @@ describe("mod storage slots", function describeModStorage(): void {
 
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(storageModule).sort()).toEqual([
+      "createMemoryBrowserDatabase",
       "createMemoryStorage",
+      "openBrowserDatabase",
       "readModValue",
       "writeModValue",
     ]);
