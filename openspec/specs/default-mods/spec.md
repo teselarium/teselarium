@@ -36,7 +36,7 @@ Default mods SHALL run in a sandbox with the same policy, grants and engine API 
 - **THEN** its frame has the sandbox value `allow-scripts` and reading `parent.document` inside it fails with a security error
 
 ### Requirement: Mod explorer
-The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list each mod of the app's catalog, from `catalog.list`, in catalog order, with the title and description it gets from `mods.inspect`. A mod that cannot be inspected SHALL be listed with its source and the error message. A `mods` key in its config SHALL be ignored. Selecting a mod SHALL send `mods.open` for the mod in its config's `viewer`, with the selected mod's source as the `target` parameter.
+The mod explorer `mod_explorer` SHALL declare `open` for `"*"`, and SHALL list each mod of the catalog, from `catalog.list`, in catalog order, with the title and description it gets from `mods.inspect`. A mod that cannot be inspected SHALL be listed with its source and the error message. A `mods` key in its config SHALL be ignored. Selecting a mod SHALL send `mods.open` for the mod in its config's `viewer`, with the selected mod's source as the `target` parameter.
 
 #### Scenario: Vanilla explorer lists the sample
 - **WHEN** the mod explorer runs in the vanilla app
@@ -274,7 +274,7 @@ The mod viewer's cases SHALL cover showing the metadata of the mod named by its 
 - **THEN** the case's `requests` holds a `mosaics.open` with the fixture mod's `defaultMosaic` as `mosaic`
 
 ### Requirement: Collection explorer
-The collection explorer `collection_explorer` SHALL declare `open` for `"*"`, and SHALL list each collection of the app's catalog, from `catalog.list`, in catalog order, with the title, description and number of tiles it gets from `collections.inspect`. A collection that cannot be inspected SHALL be listed with its source and the error message. A `collections` key in its config SHALL be ignored. Selecting a collection SHALL send `mods.open` for the mod in its config's `viewer`, with the collection's source as the `target` parameter.
+The collection explorer `collection_explorer` SHALL declare `open` for `"*"`, and SHALL list each collection of the catalog, from `catalog.list`, in catalog order, with the title, description and number of tiles it gets from `collections.inspect`. A collection that cannot be inspected SHALL be listed with its source and the error message. A `collections` key in its config SHALL be ignored. Selecting a collection SHALL send `mods.open` for the mod in its config's `viewer`, with the collection's source as the `target` parameter.
 
 #### Scenario: Vanilla explorer lists the Nobel laureates
 - **WHEN** the collection explorer runs in the vanilla app
@@ -593,7 +593,7 @@ The tile viewer's cases SHALL cover the heading with and without `title`, the me
 - **THEN** the case's `requests` holds a `mods.open` with `mod` `tile_viewer`, the third tile's address as `tile`, the same `params.from` and `replace` `true`
 
 ### Requirement: Mosaic explorer
-The mosaic explorer `mosaic_explorer` SHALL declare `open` for `"*"`, and SHALL list each mosaic of the app's catalog, from `catalog.list`, in catalog order, as a card with the title and description it gets from `mosaics.inspect`. A mosaic that cannot be inspected SHALL be listed with its source and the error message. A `mosaics` key in its config SHALL be ignored. While the mosaics load, the list SHALL be busy. The explorer SHALL send no request that loads a mod, collection or tile.
+The mosaic explorer `mosaic_explorer` SHALL declare `open` for `"*"`, and SHALL list each mosaic of the catalog, from `catalog.list`, in catalog order, as a card with the title and description it gets from `mosaics.inspect`. A mosaic that cannot be inspected SHALL be listed with its source and the error message. A `mosaics` key in its config SHALL be ignored. While the mosaics load, the list SHALL be busy. The explorer SHALL send no request that loads a mod, collection or tile.
 
 #### Scenario: Vanilla explorer lists the sample mosaics
 - **WHEN** the mosaic explorer runs in the vanilla app, with "List the default mosaics of mods" off

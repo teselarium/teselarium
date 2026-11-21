@@ -609,7 +609,7 @@ A `mosaics.open` request whose `mosaic` is not a non-empty string, whose `params
 - **THEN** the response has an error with code `-32002` whose message says that the home mod cannot be replaced, and nothing opens
 
 ### Requirement: Read the catalog
-`catalog.list` SHALL answer the app's catalog (see `app-catalog`) as `{ mods, collections, mosaics }`, each a list in catalog order. Each mod and collection entry SHALL be `{ source }`, the resolved address of its file. Each mosaic entry SHALL be `{ source, defaultOf }`, where `defaultOf` is `{ source, title }` of the mod whose default mosaic it is, or `null`. Params SHALL be ignored.
+`catalog.list` SHALL answer the catalog (see `catalog`) as `{ mods, collections, mosaics }`, each a list in catalog order. Each mod and collection entry SHALL be `{ source }`, the resolved address of its file. Each mosaic entry SHALL be `{ source, defaultOf }`, where `defaultOf` is `{ source, title }` of the mod whose default mosaic it is, or `null`. Params SHALL be ignored.
 
 #### Scenario: Vanilla catalog
 - **WHEN** a mod of the vanilla app at `https://example.org/` sends `catalog.list`
