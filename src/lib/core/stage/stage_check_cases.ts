@@ -2,7 +2,7 @@ import type { YamlValue } from "../../files/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
 import type {
   AppAction,
-  CatalogListing,
+  Catalog,
   ModCheckFinding,
   ModSessionOptions,
   ModTestResult,
@@ -239,17 +239,17 @@ function answerCaseOpen(checkCase: CheckCase, link: RunLink): OpenLinkOutcome {
 
 /**
  * A case's `catalog.list`: the queued catalog, which the test runner checked
- * and completed, or otherwise the app's catalog, as in the app.
+ * and completed, or otherwise the live catalog, as the app answers it.
  */
 function answerCaseCatalog(
   checkCase: CheckCase,
-  readAppCatalog: () => Promise<CatalogListing>,
-): Promise<CatalogListing> {
+  readLiveCatalog: () => Promise<Catalog>,
+): Promise<Catalog> {
   const answer = takeCaseAnswer(checkCase, "catalog.list");
   if (answer === undefined) {
-    return readAppCatalog();
+    return readLiveCatalog();
   }
-  return Promise.resolve(answer as unknown as CatalogListing);
+  return Promise.resolve(answer as unknown as Catalog);
 }
 
 function readCaseReport(
@@ -269,13 +269,13 @@ function readCaseReport(
  * The hooks of a case frame's session: what the mount check records as
  * `mount` findings becomes `test` findings that name the case, requests that
  * need the user get the queued answers and add no finding, `catalog.list`
- * gets the queued catalog or else `readAppCatalog`'s, `mods.check` is
+ * gets the queued catalog or else the live catalog, `mods.check` is
  * refused, and `sandbox.caseFinished` goes to `onFinished`.
  */
 export function buildCaseFrameHooks(
   checkCase: CheckCase,
   onFinished: (status: ModTestResult["status"], message: string | null) => void,
-  readAppCatalog: () => Promise<CatalogListing>,
+  readLiveCatalog: () => Promise<Catalog>,
 ): CaseFrameHooks {
   const hooks: CaseFrameHooks = {
     onIssue: recordCaseIssue.bind(undefined, checkCase),
@@ -285,7 +285,7 @@ export function buildCaseFrameHooks(
     onNotify: ignoreNotification,
     onErrorResponse: recordCaseErrorResponse.bind(undefined, checkCase),
     onTestReport: readCaseReport.bind(undefined, checkCase, onFinished),
-    readCatalog: answerCaseCatalog.bind(undefined, checkCase, readAppCatalog),
+    readCatalog: answerCaseCatalog.bind(undefined, checkCase, readLiveCatalog),
   };
   return hooks;
 }

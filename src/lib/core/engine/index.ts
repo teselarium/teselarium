@@ -5,19 +5,13 @@ export type {
   PlayerAction,
   SaveFileAction,
 } from "./app_actions.ts";
-export { resolveAppCatalog } from "./app_catalog.ts";
+export { buildCatalog } from "./catalog.ts";
 export type {
-  AppCatalog,
-  AppCatalogResolution,
-  ResolvedAppCatalog,
-} from "./app_catalog.ts";
-export { buildCatalogListing } from "./catalog_listing.ts";
-export type {
+  Catalog,
   CatalogEntry,
-  CatalogListing,
   CatalogMosaicEntry,
   CatalogMosaicMod,
-} from "./catalog_listing.ts";
+} from "./catalog.ts";
 export {
   findSwitchedOffMod,
   resolveDefaultModSettings,
@@ -33,6 +27,12 @@ export {
   MosaicLinkConflictError,
   RunLinkConflictError,
 } from "./engine_errors.ts";
+export { resolveInstanceCatalog } from "./instance_catalog.ts";
+export type {
+  InstanceCatalog,
+  InstanceCatalogResolution,
+  ResolvedInstanceCatalog,
+} from "./instance_catalog.ts";
 export {
   describeCancelledApiMismatch,
   describeMissingApiRange,

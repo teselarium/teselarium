@@ -234,7 +234,7 @@ export function StageBar({
     readRecentlyUsedSnapshot,
   );
   const isCombination = isCombinationSandbox(sandbox.link, [
-    ...stage.catalog.mods,
+    ...stage.instanceCatalog.mods,
     ...recent.mods,
   ]);
   const isNarrow = useNarrowStageBar(

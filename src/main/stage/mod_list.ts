@@ -104,7 +104,7 @@ export async function startModListLoads(
 ): Promise<void> {
   const link = sandbox.link;
   const sources = readModListSources(
-    readCatalogSources(stage, readCombinationSnapshot(combinations).listing),
+    readCatalogSources(stage, readCombinationSnapshot(combinations).catalog),
     recent,
     link,
   );

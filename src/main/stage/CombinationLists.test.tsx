@@ -82,7 +82,7 @@ const LIST_ROUTING: StageRouting = {
 };
 
 /** Two mods, two collections and a mosaic of each collection with the book list. */
-const LIST_CATALOG = {
+const LIST_INSTANCE_CATALOG = {
   mods: [SAMPLE_MOD_SOURCE, UNTYPED_MOD_SOURCE],
   collections: [SAMPLE_COLLECTION_SOURCE, NAMED_BOOKS_SOURCE],
   mosaics: [SAMPLE_MOSAIC_SOURCE, ALIASED_MOSAIC_SOURCE],
@@ -118,7 +118,7 @@ async function startListStage(
     fetch: fetchTestFile,
     colorScheme: "light",
     loadsTileLinkedMedia: true,
-    catalog: LIST_CATALOG,
+    instanceCatalog: LIST_INSTANCE_CATALOG,
     catalogDefaultMosaics: false,
     theaterMode: false,
     readSiteDecisions: siteDecisions.read,

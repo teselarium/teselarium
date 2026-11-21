@@ -40,7 +40,7 @@ import {
   serveTestMod,
   serveTestMosaic,
   serveUntypedMod,
-  TEST_CATALOG,
+  TEST_INSTANCE_CATALOG,
   TEST_NPM_HOST,
   UNTYPED_MOD_SOURCE,
 } from "../../../test/sample_mods.ts";
@@ -160,7 +160,7 @@ function buildStage(
     fetch: fetchTestFile,
     colorScheme,
     loadsTileLinkedMedia: true,
-    catalog: TEST_CATALOG,
+    instanceCatalog: TEST_INSTANCE_CATALOG,
     catalogDefaultMosaics: false,
     theaterMode,
     readSiteDecisions: siteDecisions.read,
@@ -1768,14 +1768,14 @@ describe("changeStageTileLinkedMedia", function describeChangeTileLinkedMedia():
   });
 });
 
-/** The listing of `TEST_CATALOG` with "List the default mosaics of mods" off. */
+/** The catalog of `TEST_INSTANCE_CATALOG` with "List the default mosaics of mods" off. */
 const CATALOG_OFF_LISTING = {
   mods: [{ source: SAMPLE_MOD_SOURCE }],
   collections: [{ source: SAMPLE_COLLECTION_SOURCE }],
   mosaics: [{ source: SAMPLE_MOSAIC_SOURCE, defaultOf: null }],
 };
 
-/** The listing of `TEST_CATALOG` with the switch on: the fixture mod's default mosaic follows. */
+/** The catalog of `TEST_INSTANCE_CATALOG` with the switch on: the fixture mod's default mosaic follows. */
 const CATALOG_ON_LISTING = {
   ...CATALOG_OFF_LISTING,
   mosaics: [
@@ -1804,7 +1804,7 @@ async function waitForCount(received: unknown[], count: number): Promise<void> {
   }
 }
 
-describe("app catalog", function describeAppCatalog(): void {
+describe("catalog", function describeCatalog(): void {
   it("readStageCatalog follows the default-mosaics switch", async function readsCatalog(): Promise<void> {
     const stage = buildStage(new FakeHistory(""));
     const offListing = await readStageCatalog(stage);

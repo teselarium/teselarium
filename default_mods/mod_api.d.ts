@@ -187,19 +187,19 @@ export interface MosaicInspection {
   permissions: ModGrants;
 }
 
-/** A mod or collection of the app's catalog: the resolved address of its file. */
+/** A mod or collection of the catalog: the resolved address of its file. */
 export interface CatalogEntry {
   source: string;
 }
 
-/** A mosaic of the app's catalog. `defaultOf` is the mod whose default mosaic it is, or `null`. */
+/** A mosaic of the catalog. `defaultOf` is the mod whose default mosaic it is, or `null`. */
 export interface CatalogMosaicEntry {
   source: string;
   defaultOf: { source: string; title: string } | null;
 }
 
-/** What `catalog.list` answers and `catalog.changed` pushes: the app's catalog, each list in catalog order. */
-export interface CatalogListing {
+/** What `catalog.list` answers and `catalog.changed` pushes: the catalog, each list in catalog order. */
+export interface Catalog {
   mods: CatalogEntry[];
   collections: CatalogEntry[];
   mosaics: CatalogMosaicEntry[];
@@ -274,13 +274,13 @@ export interface ModApiMethods {
   "mosaics.inspect": { params: { mosaic: string }; result: MosaicInspection };
   "mosaics.open": { params: MosaicOpenParams; result: null };
   "mosaics.check": { params: { mosaic: string }; result: ModCheckReport };
-  "catalog.list": { params: Record<string, never>; result: CatalogListing };
+  "catalog.list": { params: Record<string, never>; result: Catalog };
 }
 
 /** The engine events this file types: the params each one pushes. */
 export interface ModApiEvents {
   "layout.changed": ModLayoutChangedParams;
-  "catalog.changed": CatalogListing;
+  "catalog.changed": Catalog;
 }
 
 /** An error the engine answers a request with. `code` is the JSON-RPC error code. */

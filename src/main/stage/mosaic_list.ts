@@ -148,7 +148,7 @@ export async function startMosaicListLoads(
   const link = sandbox.link;
   const mosaicSources = readSources(
     readMosaicListSources(
-      readCatalogSources(stage, readCombinationSnapshot(combinations).listing),
+      readCatalogSources(stage, readCombinationSnapshot(combinations).catalog),
       recent,
       link,
     ),

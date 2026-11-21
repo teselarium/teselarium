@@ -1,17 +1,13 @@
-import type {
-  CatalogListing,
-  ModEngine,
-  ModInspection,
-} from "../../mod_api.d.ts";
+import type { Catalog, ModEngine, ModInspection } from "../../mod_api.d.ts";
 import { describeError } from "./error_messages.ts";
 
-/** A mod of the app's catalog: its inspection, or why it cannot be inspected. */
+/** A mod of the catalog: its inspection, or why it cannot be inspected. */
 export type ModEntry =
   | { source: string; inspection: ModInspection; error: null }
   | { source: string; inspection: null; error: string };
 
 /** The sources of the catalog's mods, in catalog order. */
-export function readModSources(catalog: CatalogListing): string[] {
+export function readModSources(catalog: Catalog): string[] {
   const sources: string[] = [];
   for (const entry of catalog.mods) {
     sources.push(entry.source);

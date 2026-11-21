@@ -1,20 +1,20 @@
 import type { ModLoadOptions, ModPermission } from "../../mod/index.ts";
 import {
-  buildCatalogListing,
+  buildCatalog,
   MOD_API_VERSION,
   readDeclaringMosaic,
   resolveDefaultModSettings,
 } from "../engine/index.ts";
 import type {
   AppAction,
-  CatalogListing,
+  Catalog,
   DefaultModSettings,
   FrameLayout,
   ModCheckReport,
   ModCheckRequest,
   OpenLinkOptions,
   OpenLinkOutcome,
-  ResolvedAppCatalog,
+  ResolvedInstanceCatalog,
   ResolvedDefaultModSettings,
   RunLink,
 } from "../engine/index.ts";
@@ -138,8 +138,8 @@ export interface StageOptions {
   colorScheme: ColorScheme;
   /** Whether "Load media linked by tiles" is on as the app starts. */
   loadsTileLinkedMedia: boolean;
-  /** The app's catalog, resolved and checked by `resolveAppCatalog` before the stage is created. */
-  catalog: ResolvedAppCatalog;
+  /** The instance catalog, resolved and checked by `resolveInstanceCatalog` before the stage is created. */
+  instanceCatalog: ResolvedInstanceCatalog;
   /** Whether "List the default mosaics of mods" is on as the app starts. */
   catalogDefaultMosaics: boolean;
   /** Whether theater mode is on as the app starts. */
@@ -326,11 +326,11 @@ export interface Stage {
   theme: Theme;
   /** Whether mods launched from now on load the media their tiles link. Running mods keep their launch. */
   loadsTileLinkedMedia: boolean;
-  /** The app's catalog, which `catalog.list` answers. */
-  catalog: ResolvedAppCatalog;
+  /** The instance catalog, which the catalog that `catalog.list` answers is built from. */
+  instanceCatalog: ResolvedInstanceCatalog;
   /** Whether the catalog's mosaics also hold the default mosaics of its mods. */
   catalogDefaultMosaics: boolean;
-  /** Counts the switch's changes, so a `catalog.changed` whose listing a newer change overtook is dropped. */
+  /** Counts the switch's changes, so a `catalog.changed` whose catalog a newer change overtook is dropped. */
   catalogGeneration: number;
   /** Whether theater mode is on. With `fullscreenSandboxId`, it decides each frame's layout (`readSandboxLayout`). */
   theaterMode: boolean;
@@ -376,9 +376,9 @@ function readStageTheme(stage: Stage): Theme {
  * "List the default mosaics of mods". The stage bar's lists read it too, so
  * the page and the mods read one catalog.
  */
-export function readStageCatalog(stage: Stage): Promise<CatalogListing> {
-  return buildCatalogListing(
-    stage.catalog,
+export function readStageCatalog(stage: Stage): Promise<Catalog> {
+  return buildCatalog(
+    stage.instanceCatalog,
     stage.catalogDefaultMosaics,
     stage.fetchOptions,
   );
@@ -845,7 +845,7 @@ export function createStage(options: StageOptions): Stage {
     storage: options.storage,
     theme: buildTheme(options.colorScheme),
     loadsTileLinkedMedia: options.loadsTileLinkedMedia,
-    catalog: options.catalog,
+    instanceCatalog: options.instanceCatalog,
     catalogDefaultMosaics: options.catalogDefaultMosaics,
     catalogGeneration: 0,
     theaterMode: options.theaterMode,
@@ -1470,25 +1470,25 @@ export function changeStageTileLinkedMedia(stage: Stage, isOn: boolean): void {
   stage.loadsTileLinkedMedia = isOn;
 }
 
-/** Pushes the listing to every running sandbox, unless a newer change of the switch started meanwhile. */
+/** Pushes the catalog to every running sandbox, unless a newer change of the switch started meanwhile. */
 function pushStageCatalog(
   stage: Stage,
   generation: number,
-  listing: CatalogListing,
+  catalog: Catalog,
 ): void {
   if (generation !== stage.catalogGeneration) {
     return;
   }
   for (const runtime of stage.runtimes.values()) {
-    pushSandboxCatalog(runtime, listing);
+    pushSandboxCatalog(runtime, catalog);
   }
 }
 
 /**
  * Switches "List the default mosaics of mods". Every `catalog.list` from now
- * on answers with the new value. The listing is built once and pushed as
+ * on answers with the new value. The catalog is built once and pushed as
  * `catalog.changed` to every running mod, visible or hidden, with no frame
- * reloaded. A listing that a newer change overtook is dropped, so two quick
+ * reloaded. A catalog that a newer change overtook is dropped, so two quick
  * changes leave the mods on the second. Resolves once the push is done.
  */
 export async function changeStageCatalogDefaultMosaics(
@@ -1498,8 +1498,8 @@ export async function changeStageCatalogDefaultMosaics(
   stage.catalogDefaultMosaics = isOn;
   stage.catalogGeneration += 1;
   const generation = stage.catalogGeneration;
-  const listing = await readStageCatalog(stage);
-  pushStageCatalog(stage, generation, listing);
+  const catalog = await readStageCatalog(stage);
+  pushStageCatalog(stage, generation, catalog);
 }
 
 export function readStageSnapshot(stage: Stage): StageSnapshot {

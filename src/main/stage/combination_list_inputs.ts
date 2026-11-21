@@ -64,25 +64,25 @@ function listEntrySources(entries: readonly { source: string }[]): string[] {
 }
 
 /**
- * The catalog as the combination catalog last read it, or the stage's own
+ * The catalog as the combination catalog last read it, or the stage's instance
  * catalog before its first read, without the default mosaics.
  */
 export function readCatalogSources(
   stage: Stage,
-  listing: CombinationSnapshot["listing"],
+  catalog: CombinationSnapshot["catalog"],
 ): CatalogSources {
-  if (listing === null) {
+  if (catalog === null) {
     const startSources: CatalogSources = {
-      mods: [...stage.catalog.mods],
-      collections: [...stage.catalog.collections],
-      mosaics: [...stage.catalog.mosaics],
+      mods: [...stage.instanceCatalog.mods],
+      collections: [...stage.instanceCatalog.collections],
+      mosaics: [...stage.instanceCatalog.mosaics],
     };
     return startSources;
   }
   const sources: CatalogSources = {
-    mods: listEntrySources(listing.mods),
-    collections: listEntrySources(listing.collections),
-    mosaics: listEntrySources(listing.mosaics),
+    mods: listEntrySources(catalog.mods),
+    collections: listEntrySources(catalog.collections),
+    mosaics: listEntrySources(catalog.mosaics),
   };
   return sources;
 }

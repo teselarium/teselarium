@@ -1,5 +1,5 @@
 import type {
-  CatalogListing,
+  Catalog,
   CatalogMosaicEntry,
   ModEngine,
   MosaicInspection,
@@ -9,7 +9,7 @@ import { describeError } from "./error_messages.ts";
 /** The mod whose default mosaic a catalog mosaic is, or `null`. */
 type DefaultOf = CatalogMosaicEntry["defaultOf"];
 
-/** A mosaic of the app's catalog, with its mod mark: its inspection, or why it cannot be inspected. */
+/** A mosaic of the catalog, with its mod mark: its inspection, or why it cannot be inspected. */
 export type MosaicEntry =
   | {
       source: string;
@@ -44,7 +44,7 @@ async function inspectCatalogMosaic(
 /** Inspects each mosaic of the catalog, one after another, so the list keeps the catalog's order. */
 export async function inspectMosaics(
   engine: ModEngine,
-  catalog: CatalogListing,
+  catalog: Catalog,
 ): Promise<MosaicEntry[]> {
   const entries: MosaicEntry[] = [];
   for (const catalogMosaic of catalog.mosaics) {

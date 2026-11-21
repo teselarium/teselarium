@@ -2,12 +2,12 @@
 
 The mod explorer is the Explore component for mods. It ships as the default mod `mod_explorer` in `default_mods/mod_explorer/` (see the [default mods folder](../../../../default_mods/README.md)), and the vanilla app's Mods section opens it. An instantiation can also make it the Home mod, shown at `#/`, by giving the Home section its link (see the [section registry](../../main/README.md#home-a-page-or-a-mod)).
 
-It is an ordinary sandboxed mod. It uses only the engine API: `catalog.list` to read the app's catalog, `mods.inspect` to read each mod's metadata and `mods.open` to open the viewer. An instantiation can switch it off or replace it by putting another mod in its folder.
+It is an ordinary sandboxed mod. It uses only the engine API: `catalog.list` to read the catalog, `mods.inspect` to read each mod's metadata and `mods.open` to open the viewer. An instantiation can switch it off or replace it by putting another mod in its folder.
 
 ## What it does
 
 - While the mods load, its list region is busy (`aria-busy="true"`) and says "Loading mods…".
-- It reads the mods of the [app catalog](../../main/README.md#the-app-catalog) with `catalog.list`. For each of them, in catalog order, it sends `mods.inspect` and lists the mod as a card with its title, its description and a "View" button, whose accessible name is "View <title>" so a screen reader still names the mod. A mod that cannot be inspected is listed as an alert with its source, the resolved address, and the error message (for example a missing mod file and `404`).
+- It reads the mods of the [catalog](../../main/README.md#the-instance-catalog) with `catalog.list`. For each of them, in catalog order, it sends `mods.inspect` and lists the mod as a card with its title, its description and a "View" button, whose accessible name is "View <title>" so a screen reader still names the mod. A mod that cannot be inspected is listed as an alert with its source, the resolved address, and the error message (for example a missing mod file and `404`).
 - When the catalog changes (`catalog.changed`, see [Reading the catalog](../../lib/core/engine/README.md#reading-the-catalog)), it lists the new catalog's mods in place of its list, inspected again, without reloading its frame. The list is busy meanwhile, and the latest catalog wins.
 - When the user selects a mod, it sends `mods.open` for the mod in its config's `viewer`, with the selected mod's source as the `target` parameter. The stage opens the viewer in a new sandbox, and the explorer stays open behind it, so back returns to it as it was left.
 
@@ -36,12 +36,12 @@ mod:
 ```
 
 - `viewer`: the mod reference opened for a selected mod. `mod_viewer` is the default mod name of the viewer.
-- The mods it lists are the app catalog's, set by the instantiation in `src/main/app_catalog.ts`; the vanilla catalog lists the three sample mods: the book list, the flashcards mod and the country map. A `mods` key in its config is ignored.
+- The mods it lists are the catalog's, whose lists the instantiation sets in the instance catalog (`src/main/instance_catalog.ts`); the vanilla instance catalog lists the three sample mods: the book list, the flashcards mod and the country map. A `mods` key in its config is ignored.
 - `open` for `"*"`: the explorer inspects and opens mods from any site. It is granted because the explorer is served from the app's origin.
 
 ## Tests
 
-Its tests ship with it: `default_mods/mod_explorer/test/`, built into `test.js` and declared with `test_path`, so checking `mod_explorer` in the mod viewer runs them (see [Tests](../../../../default_mods/README.md#tests) in the default mods folder). They answer `catalog.list` with the fixture mods of `default_mods/mod_explorer/fixtures/` before mounting the explorer, so they never depend on the app's catalog, and check what it draws, the requests it sends and its look. `e2e/default_mods.spec.ts` tests what a case cannot see: the sandbox, the stage and the links it opens.
+Its tests ship with it: `default_mods/mod_explorer/test/`, built into `test.js` and declared with `test_path`, so checking `mod_explorer` in the mod viewer runs them (see [Tests](../../../../default_mods/README.md#tests) in the default mods folder). They answer `catalog.list` with the fixture mods of `default_mods/mod_explorer/fixtures/` before mounting the explorer, so they never depend on the catalog, and check what it draws, the requests it sends and its look. `e2e/default_mods.spec.ts` tests what a case cannot see: the sandbox, the stage and the links it opens.
 
 ## Links
 

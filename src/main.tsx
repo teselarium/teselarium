@@ -3,10 +3,10 @@ import type { ReactElement } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import {
-  resolveAppCatalog,
   resolveDefaultModSettings,
+  resolveInstanceCatalog,
 } from "./lib/core/engine/index.ts";
-import type { ResolvedAppCatalog } from "./lib/core/engine/index.ts";
+import type { ResolvedInstanceCatalog } from "./lib/core/engine/index.ts";
 import { createCombinationCatalog } from "./lib/core/combinations/index.ts";
 import {
   createStage,
@@ -15,8 +15,8 @@ import {
 } from "./lib/core/stage/index.ts";
 import type { Stage } from "./lib/core/stage/index.ts";
 import { buildThemeTokenStyles } from "./lib/core/theme/index.ts";
-import { APP_CATALOG } from "./main/app_catalog.ts";
 import { DEFAULT_MODS } from "./main/default_mods.ts";
+import { INSTANCE_CATALOG } from "./main/instance_catalog.ts";
 import { NPM_HOST } from "./main/library_host.ts";
 import {
   availableSections,
@@ -91,7 +91,7 @@ function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
  */
 function startApp(
   sections: readonly SectionDefinition[],
-  catalog: ResolvedAppCatalog,
+  instanceCatalog: ResolvedInstanceCatalog,
 ): ReactElement {
   const systemQuery = window.matchMedia("(prefers-color-scheme: dark)");
   // Before the stage, which reads and remembers the decisions through it.
@@ -109,7 +109,7 @@ function startApp(
     npmHost: NPM_HOST,
     colorScheme: readStartColorScheme(window.localStorage, systemQuery),
     loadsTileLinkedMedia: readStartTileLinkedMedia(window.localStorage),
-    catalog,
+    instanceCatalog,
     catalogDefaultMosaics: readStartCatalogDefaultMosaics(window.localStorage),
     theaterMode: readStartTheaterMode(window.localStorage),
     readSiteDecisions: readSiteDecisionsSnapshot.bind(undefined, siteDecisions),
@@ -188,22 +188,25 @@ function startApp(
 }
 
 /**
- * The app, or the errors of the registry and the catalog when either breaks
+ * The app, or the errors of the registry and the instance catalog when either breaks
  * a rule: then no stage is created.
  */
 function buildRootElement(): ReactElement {
   const defaults = resolveDefaultModSettings(DEFAULT_MODS, document.baseURI);
   const registryErrors = validateRegistry(VANILLA_SECTIONS);
-  const catalogResolution = resolveAppCatalog(
-    APP_CATALOG,
+  const instanceCatalogResolution = resolveInstanceCatalog(
+    INSTANCE_CATALOG,
     document.baseURI,
     defaults,
   );
-  if (registryErrors.length > 0 || catalogResolution.errors.length > 0) {
+  if (
+    registryErrors.length > 0 ||
+    instanceCatalogResolution.errors.length > 0
+  ) {
     return (
       <StartErrorScreen
         registryErrors={registryErrors}
-        catalogErrors={catalogResolution.errors}
+        catalogErrors={instanceCatalogResolution.errors}
       />
     );
   }
@@ -212,7 +215,7 @@ function buildRootElement(): ReactElement {
     defaults,
     document.baseURI,
   );
-  return startApp(sections, catalogResolution.catalog);
+  return startApp(sections, instanceCatalogResolution.catalog);
 }
 
 createRoot(document.getElementById("root")!).render(

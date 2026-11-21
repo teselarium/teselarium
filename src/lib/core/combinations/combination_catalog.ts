@@ -1,4 +1,4 @@
-import type { CatalogListing } from "../engine/index.ts";
+import type { Catalog } from "../engine/index.ts";
 import { loadModFile } from "../../mod/index.ts";
 import type { ModFile, ModLoadOptions } from "../../mod/index.ts";
 import { loadMosaicFile } from "../../mosaic/index.ts";
@@ -61,13 +61,13 @@ export type CombinationLoadOptions = ModLoadOptions & {
 export interface CombinationCatalogOptions {
   fetchOptions: CombinationLoadOptions;
   /** The catalog as `catalog.list` answers it now (the stage's `readStageCatalog`). */
-  readCatalog: () => Promise<CatalogListing>;
+  readCatalog: () => Promise<Catalog>;
 }
 
 /** What the stage bar's lists render. Frozen, and new after every change. */
 export interface CombinationSnapshot {
   /** The last catalog read by `refreshCatalog`, or `null` before. */
-  listing: CatalogListing | null;
+  catalog: Catalog | null;
   mods: Readonly<Record<string, Loadable<ModSummary>>>;
   collections: Readonly<Record<string, Loadable<CollectionSummary>>>;
   mosaics: Readonly<Record<string, Loadable<MosaicSummary>>>;
@@ -81,7 +81,7 @@ export interface CombinationSnapshot {
  */
 export interface CombinationCatalog {
   fetchOptions: CombinationLoadOptions;
-  readCatalog: () => Promise<CatalogListing>;
+  readCatalog: () => Promise<Catalog>;
   modFiles: Map<string, Promise<ModFile>>;
   collectionIndexes: Map<string, Promise<TileCollectionIndex>>;
   collectionLoads: Map<string, Promise<TileCollection>>;
@@ -96,7 +96,7 @@ export interface CombinationCatalog {
 const LOADING: Loadable<never> = Object.freeze({ state: "loading" });
 
 const EMPTY_SNAPSHOT: CombinationSnapshot = Object.freeze({
-  listing: null,
+  catalog: null,
   mods: Object.freeze({}),
   collections: Object.freeze({}),
   mosaics: Object.freeze({}),
@@ -422,8 +422,8 @@ export async function requestSummaries(
 export async function refreshCatalog(
   catalog: CombinationCatalog,
 ): Promise<void> {
-  const listing = await catalog.readCatalog();
-  publishCatalog(catalog, { ...catalog.snapshot, listing });
+  const catalogRead = await catalog.readCatalog();
+  publishCatalog(catalog, { ...catalog.snapshot, catalog: catalogRead });
 }
 
 /** One count to measure, and its key in `CombinationSnapshot.counts`. */

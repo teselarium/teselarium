@@ -13,7 +13,7 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "RUN_LINK_RESERVED_NAMES",
       "RunLinkConflictError",
       "THEME_CHANGED_METHOD",
-      "buildCatalogListing",
+      "buildCatalog",
       "buildModCheckReport",
       "buildModLaunch",
       "buildModTestDocument",
@@ -44,8 +44,8 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "pushTilesChanged",
       "readDeclaringMosaic",
       "readMosaicAliases",
-      "resolveAppCatalog",
       "resolveDefaultModSettings",
+      "resolveInstanceCatalog",
       "selectModTiles",
       "stopModSession",
     ]);

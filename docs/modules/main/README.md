@@ -187,12 +187,16 @@ A section whose target is a default mod that the instantiation switched off (`sw
 - **Change a section**: edit its fields. Changing an `id` changes its addresses and its folder, and resets its stored switch.
 - **Make a coming-soon section available**: set `comingSoon` to `false` and give it its real target, as Mosaics was given `mosaic_explorer`.
 
-## The app catalog
+## The instance catalog
 
-The app's catalog is the list of the mods, collections and mosaics the instantiation offers. The Mods, Tiles and Mosaics explorers list it, and any mod can read it with `catalog.list` (see the [engine module](../lib/core/engine/README.md#app-catalog)). It lives in `src/main/app_catalog.ts`, next to the default mod settings, as three ordered lists of references relative to the app's address:
+The catalog lists the things the app can open: mods, collections and mosaics, each a catalog entry of a catalog kind. The Mods, Tiles and Mosaics explorers list it, the stage bar's lists offer it, and any mod can read it with `catalog.list` (see the [engine module](../lib/core/engine/README.md#reading-the-catalog)). It is made of two parts today, the instance catalog and the default mosaics, and a later change adds the user catalog.
+
+The naming rule: "catalog" alone always means the whole. Each part is qualified (*instance catalog*, *user catalog*) or has its own name (*default mosaics*). In mod tests, the *live catalog* is the whole catalog as the app answers it, as opposed to one a case scripts.
+
+The instance catalog is the list of the mods, collections and mosaics the instantiation offers (see the [engine module](../lib/core/engine/README.md#instance-catalog)). It lives in `src/main/instance_catalog.ts`, next to the default mod settings, as three ordered lists of references relative to the app's address:
 
 ```ts
-export const APP_CATALOG: AppCatalog = {
+export const INSTANCE_CATALOG: InstanceCatalog = {
   mods: [
     "./samples/mods/book_list",
     "./samples/mods/flashcards",
@@ -209,13 +213,13 @@ export const APP_CATALOG: AppCatalog = {
 };
 ```
 
-A mod entry is a mod reference: a default mod name such as `tile_viewer`, a mod folder, or a mod file. A collection entry is a collection file or a folder holding `collection.yaml`, and a mosaic entry a mosaic file or a folder holding `mosaic.yaml`. The order of each list is the order the explorers show. The vanilla catalog lists the samples, and no default mod, fixture or default mosaic: the "List the default mosaics of mods" switch in [Settings](settings/README.md) adds the default mosaics of the catalog's mods after its mosaics.
+A mod entry is a mod reference: a default mod name such as `tile_viewer`, a mod folder, or a mod file. A collection entry is a collection file or a folder holding `collection.yaml`, and a mosaic entry a mosaic file or a folder holding `mosaic.yaml`. The order of each list is the order the explorers show. The vanilla instance catalog lists the samples, and no default mod, fixture or default mosaic: the "List the default mosaics of mods" switch in [Settings](settings/README.md) adds the default mosaics of the catalog's mods after the instance catalog's mosaics.
 
-When cloning the app, edit `APP_CATALOG` to offer other mods, collections and mosaics. The explorers' configs no longer hold lists: a `mods`, `collections` or `mosaics` key in them is ignored.
+When cloning the app, edit `INSTANCE_CATALOG` to offer other mods, collections and mosaics. The explorers' configs no longer hold lists: a `mods`, `collections` or `mosaics` key in them is ignored.
 
 ### Start errors
 
-`main.tsx` checks the catalog with `resolveAppCatalog`, next to the registry, before the stage is created. When an entry is empty, cannot be resolved, or resolves to the same file as an earlier entry of its list (for example `./samples/mods/book_list` and `./samples/mods/book_list/mod_conf.yaml`), the app does not start: `StartErrorScreen` (`StartErrorScreen.tsx`) shows the registry's errors and the catalog's, each under its own title, and each catalog error names its list and the entry as written.
+`main.tsx` checks the instance catalog with `resolveInstanceCatalog`, next to the registry, before the stage is created. When an entry is empty, cannot be resolved, or resolves to the same file as an earlier entry of its list (for example `./samples/mods/book_list` and `./samples/mods/book_list/mod_conf.yaml`), the app does not start: `StartErrorScreen` (`StartErrorScreen.tsx`) shows the registry's errors and the instance catalog's, each under its own title ("The app cannot start: the instance catalog is invalid" for the latter), and each instance catalog error starts with `Instance catalog <list>:` and names the entry as written.
 
 ### Switched-off mods
 
@@ -260,5 +264,5 @@ The frame is hidden by layout, not by `display: none` or a size of zero: it fill
 | `theme/` | The app's theme, the Settings page's Theme control and the choices both Theme controls offer (`theme_options.ts`). |
 | `catalog_icons.ts` | The icon of each catalog kind, shared by the sidebar and the stage bar. |
 | `default_mods.ts` | The default mod settings: the default mods folder and the switched-off mods. |
-| `app_catalog.ts` | The app catalog: the mods, collections and mosaics the explorers list (see [The app catalog](#the-app-catalog)). |
-| `StartErrorScreen.tsx` | What the app shows instead of itself when the registry or the catalog breaks a rule. |
+| `instance_catalog.ts` | The instance catalog: the mods, collections and mosaics the instantiation offers (see [The instance catalog](#the-instance-catalog)). |
+| `StartErrorScreen.tsx` | What the app shows instead of itself when the registry or the instance catalog breaks a rule. |

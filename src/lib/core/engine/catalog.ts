@@ -1,6 +1,6 @@
 import { loadModFile } from "../../mod/index.ts";
 import type { ModLoadOptions } from "../../mod/index.ts";
-import type { ResolvedAppCatalog } from "./app_catalog.ts";
+import type { ResolvedInstanceCatalog } from "./instance_catalog.ts";
 
 /** A mod or collection of the catalog: the resolved address of its file. */
 export interface CatalogEntry {
@@ -13,14 +13,14 @@ export interface CatalogMosaicMod {
   title: string;
 }
 
-/** A mosaic of the catalog, and the mod whose default mosaic it is, or `null` for the catalog's own mosaics. */
+/** A mosaic of the catalog, and the mod whose default mosaic it is, or `null` for the instance catalog's mosaics. */
 export interface CatalogMosaicEntry {
   source: string;
   defaultOf: CatalogMosaicMod | null;
 }
 
 /** What `catalog.list` answers and `catalog.changed` pushes. Plain data. */
-export interface CatalogListing {
+export interface Catalog {
   mods: CatalogEntry[];
   collections: CatalogEntry[];
   mosaics: CatalogMosaicEntry[];
@@ -34,7 +34,7 @@ function buildCatalogEntries(sources: readonly string[]): CatalogEntry[] {
   return entries;
 }
 
-function buildOwnMosaicEntries(
+function buildInstanceMosaicEntries(
   sources: readonly string[],
 ): CatalogMosaicEntry[] {
   const entries: CatalogMosaicEntry[] = [];
@@ -105,31 +105,32 @@ function dedupeMosaicEntries(
 }
 
 /**
- * The catalog as `catalog.list` answers it. With `includesDefaultMosaics`
+ * The catalog as `catalog.list` answers it, built from the instance catalog
+ * and, while `includesDefaultMosaics` is on, the default mosaics. With it
  * off, nothing is fetched. With it on, each catalog mod's file is loaded,
- * without its entrypoint, and its default mosaic follows the catalog's own
- * mosaics, in mod order, marked with its mod. A mosaic already listed keeps
- * its first place, and a mod that fails or declares no default mosaic adds
- * nothing.
+ * without its entrypoint, and its default mosaic follows the instance
+ * catalog's mosaics, in mod order, marked with its mod. A mosaic already
+ * listed keeps its first place, and a mod that fails or declares no default
+ * mosaic adds nothing.
  */
-export async function buildCatalogListing(
-  catalog: ResolvedAppCatalog,
+export async function buildCatalog(
+  instanceCatalog: ResolvedInstanceCatalog,
   includesDefaultMosaics: boolean,
   fetchOptions: ModLoadOptions,
-): Promise<CatalogListing> {
-  const ownMosaics = buildOwnMosaicEntries(catalog.mosaics);
-  let mosaics = ownMosaics;
+): Promise<Catalog> {
+  const instanceMosaics = buildInstanceMosaicEntries(instanceCatalog.mosaics);
+  let mosaics = instanceMosaics;
   if (includesDefaultMosaics) {
     const defaultMosaics = await loadDefaultMosaicEntries(
-      catalog.mods,
+      instanceCatalog.mods,
       fetchOptions,
     );
-    mosaics = dedupeMosaicEntries([...ownMosaics, ...defaultMosaics]);
+    mosaics = dedupeMosaicEntries([...instanceMosaics, ...defaultMosaics]);
   }
-  const listing: CatalogListing = {
-    mods: buildCatalogEntries(catalog.mods),
-    collections: buildCatalogEntries(catalog.collections),
+  const catalog: Catalog = {
+    mods: buildCatalogEntries(instanceCatalog.mods),
+    collections: buildCatalogEntries(instanceCatalog.collections),
     mosaics,
   };
-  return listing;
+  return catalog;
 }

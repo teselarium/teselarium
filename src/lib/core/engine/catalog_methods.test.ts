@@ -8,12 +8,12 @@ import {
   SAMPLE_MOSAIC_SOURCE,
 } from "../../../test/sample_mods.ts";
 import { fetchTestFile, readRequestedUrl } from "../../../test/test_files.ts";
-import type { ResolvedAppCatalog } from "./app_catalog.ts";
-import { buildCatalogListing } from "./catalog_listing.ts";
+import type { ResolvedInstanceCatalog } from "./instance_catalog.ts";
+import { buildCatalog } from "./catalog.ts";
 import { CATALOG_METHODS } from "./catalog_methods.ts";
 import type { ModMethodContext } from "./mod_methods.ts";
 
-const CATALOG: ResolvedAppCatalog = {
+const CATALOG: ResolvedInstanceCatalog = {
   mods: [SAMPLE_MOD_SOURCE],
   collections: [SAMPLE_COLLECTION_SOURCE],
   mosaics: [SAMPLE_MOSAIC_SOURCE],
@@ -37,7 +37,7 @@ function buildCatalogContext(
     ...context.fetchOptions,
     fetch: recordFetch.bind(undefined, requested),
   };
-  context.readCatalog = buildCatalogListing.bind(
+  context.readCatalog = buildCatalog.bind(
     undefined,
     CATALOG,
     includesDefaultMosaics,

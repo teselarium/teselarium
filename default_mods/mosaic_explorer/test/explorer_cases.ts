@@ -41,7 +41,7 @@ function mountWithCatalogMosaics(
   return mounting;
 }
 
-/** Answers `catalog.list` with `sources` as the catalog's own mosaics, then mounts the explorer. */
+/** Answers `catalog.list` with `sources` as catalog mosaics that are no mod's default mosaic, then mounts the explorer. */
 export function mountWithMosaics(
   context: CaseContext,
   sources: string[],

@@ -5,7 +5,7 @@ import {
   readRequestedUrl,
   testTexts,
 } from "../../../test/test_files.ts";
-import type { CatalogListing } from "../engine/index.ts";
+import type { Catalog } from "../engine/index.ts";
 import {
   buildCountKey,
   buildMosaicCountKey,
@@ -103,14 +103,14 @@ function serveFixtures(): void {
   );
 }
 
-const LISTING: CatalogListing = {
+const CATALOG: Catalog = {
   mods: [{ source: BOOK_MOD }],
   collections: [{ source: PEOPLE }],
   mosaics: [{ source: MOSAIC, defaultOf: null }],
 };
 
-function readListing(): Promise<CatalogListing> {
-  return Promise.resolve(LISTING);
+function readTestCatalog(): Promise<Catalog> {
+  return Promise.resolve(CATALOG);
 }
 
 /** Serves the fixtures and keeps each requested URL. */
@@ -132,7 +132,7 @@ function buildCatalog(): { catalog: CombinationCatalog; requested: string[] } {
       fetch: fetchRecorded.bind(undefined, requested),
       defaultModsFolder: `${BASE}default_mods/`,
     },
-    readCatalog: readListing,
+    readCatalog: readTestCatalog,
   });
   const built = { catalog, requested };
   return built;
@@ -423,7 +423,7 @@ describe("refreshCatalog", function describeRefreshCatalog(): void {
 
     await refreshCatalog(catalog);
 
-    expect(readCombinationSnapshot(catalog).listing).toEqual(LISTING);
+    expect(readCombinationSnapshot(catalog).catalog).toEqual(CATALOG);
     expect(listener).toHaveBeenCalled();
   });
 });

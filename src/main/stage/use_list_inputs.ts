@@ -61,7 +61,7 @@ export function useListInputs(
     subscribeRecentlyUsed,
     readRecentlyUsedSnapshot,
   );
-  const listing = snapshot.listing;
+  const snapshotCatalog = snapshot.catalog;
 
   useEffect(
     function readCatalogOnOpen(): void {
@@ -77,14 +77,14 @@ export function useListInputs(
         void loads(combinations, stage, sandbox, recent);
       }
     },
-    [isOpen, combinations, stage, sandbox, recent, listing, loads],
+    [isOpen, combinations, stage, sandbox, recent, snapshotCatalog, loads],
   );
 
   const catalog = useMemo(
     function readCatalog(): ListInputs["catalog"] {
-      return readCatalogSources(stage, listing);
+      return readCatalogSources(stage, snapshotCatalog);
     },
-    [stage, listing],
+    [stage, snapshotCatalog],
   );
   const inputs: ListInputs = {
     catalog,

@@ -111,7 +111,7 @@ const CATALOG_ANSWER_TEST_CODE = buildTestCode(
     '  context.answer("catalog.list", { mods: ["./listed_mod"] });',
     "}",
     "",
-    "async function listsAppCatalog(context) {",
+    "async function listsLiveCatalog(context) {",
     "  await context.mount();",
     '  const catalog = await globalThis.probe.engine.request("catalog.list", {});',
     '  context.expect(catalog.mods[0].source.endsWith("/samples/mods/book_list/mod_conf.yaml")).toBe(true);',
@@ -121,7 +121,7 @@ const CATALOG_ANSWER_TEST_CODE = buildTestCode(
   [
     ["lists a fixture catalog", "listsFixtureCatalog"],
     ["answers a wrong catalog", "answersWrongCatalog"],
-    ["lists the app's catalog", "listsAppCatalog"],
+    ["lists the live catalog", "listsLiveCatalog"],
   ],
 );
 
@@ -486,7 +486,7 @@ test.describe(
       expect(result.message).toContain("mods");
     });
 
-    test("Case without a scripted catalog", async function answersAppCatalog({
+    test("Case without a scripted catalog", async function answersLiveCatalog({
       page,
     }): Promise<void> {
       const report = await checkTestMod(
@@ -495,13 +495,13 @@ test.describe(
         "catalog_answer",
       );
 
-      expect(findCase(report, "lists the app's catalog")).toEqual({
-        name: "lists the app's catalog",
+      expect(findCase(report, "lists the live catalog")).toEqual({
+        name: "lists the live catalog",
         status: "pass",
         message: null,
       });
       for (const message of listFindingMessages(report)) {
-        expect(message).not.toContain("lists the app's catalog");
+        expect(message).not.toContain("lists the live catalog");
       }
     });
 

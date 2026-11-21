@@ -1,5 +1,5 @@
 /**
- * Default mod: lists the mods of the app's catalog and opens the viewer for
+ * Default mod: lists the mods of the catalog and opens the viewer for
  * the one the user picks. It lists the catalog again when it changes.
  *
  * It is also an example of getting the app's look without classes: the
@@ -9,7 +9,7 @@
  * app's look" in docs/modules/lib/core/theme/README.md.
  */
 
-import type { CatalogListing, ModContext, ModEngine } from "../../mod_api.d.ts";
+import type { Catalog, ModContext, ModEngine } from "../../mod_api.d.ts";
 import {
   buildExplorerPage,
   renderModList,
@@ -32,7 +32,7 @@ function startListing(view: ExplorerView): number {
 async function drawListing(
   view: ExplorerView,
   listing: number,
-  catalog: CatalogListing,
+  catalog: Catalog,
 ): Promise<void> {
   const entries = await inspectMods(view.engine, readModSources(catalog));
   if (listing !== view.listingCount) {
@@ -49,10 +49,7 @@ async function listCatalog(view: ExplorerView): Promise<void> {
 }
 
 /** `catalog.changed`: lists the new catalog in place of the list, without reloading the frame. */
-function followCatalogChange(
-  view: ExplorerView,
-  catalog: CatalogListing,
-): void {
+function followCatalogChange(view: ExplorerView, catalog: Catalog): void {
   const listing = startListing(view);
   void drawListing(view, listing, catalog);
 }

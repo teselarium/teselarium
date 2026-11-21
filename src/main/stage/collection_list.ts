@@ -116,7 +116,7 @@ export async function startCollectionListLoads(
 ): Promise<void> {
   const link = sandbox.link;
   const sources = readCollectionListSources(
-    readCatalogSources(stage, readCombinationSnapshot(combinations).listing),
+    readCatalogSources(stage, readCombinationSnapshot(combinations).catalog),
     recent,
     link,
   );

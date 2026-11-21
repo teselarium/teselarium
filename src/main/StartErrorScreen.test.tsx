@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { StartErrorScreen } from "./StartErrorScreen.tsx";
 
 const REGISTRY_TITLE = "The app cannot start: the section registry is invalid";
-const CATALOG_TITLE = "The app cannot start: the app catalog is invalid";
+const CATALOG_TITLE = "The app cannot start: the instance catalog is invalid";
 const REGISTRY_ERROR =
   'Section "run": the id "run" is reserved for run links (#/run?mod=...).';
 const CATALOG_ERROR =
-  'Catalog collections: "" is empty: an entry must be a non-empty string.';
+  'Instance catalog collections: "" is empty: an entry must be a non-empty string.';
 
 function findAlertTitled(title: string): HTMLElement {
   for (const alert of screen.getAllByRole("alert")) {
@@ -29,7 +29,7 @@ describe("StartErrorScreen", function describeStartErrorScreen(): void {
     expect(screen.queryByText(CATALOG_TITLE)).toBeNull();
   });
 
-  it("lists the catalog's errors under the catalog's title", function showsCatalogErrors(): void {
+  it("lists the instance catalog's errors under its title", function showsInstanceCatalogErrors(): void {
     render(
       <StartErrorScreen registryErrors={[]} catalogErrors={[CATALOG_ERROR]} />,
     );

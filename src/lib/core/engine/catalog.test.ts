@@ -15,8 +15,8 @@ import {
   testTexts,
 } from "../../../test/test_files.ts";
 import type { ModLoadOptions } from "../../mod/index.ts";
-import type { ResolvedAppCatalog } from "./app_catalog.ts";
-import { buildCatalogListing } from "./catalog_listing.ts";
+import { buildCatalog } from "./catalog.ts";
+import type { ResolvedInstanceCatalog } from "./instance_catalog.ts";
 
 afterEach(function clearTestTexts(): void {
   testTexts.clear();
@@ -48,24 +48,26 @@ function buildRecordingFetch(): RecordingFetch {
   return recording;
 }
 
-function buildCatalog(lists: Partial<ResolvedAppCatalog>): ResolvedAppCatalog {
-  const catalog: ResolvedAppCatalog = {
+function buildInstanceCatalog(
+  lists: Partial<ResolvedInstanceCatalog>,
+): ResolvedInstanceCatalog {
+  const instanceCatalog: ResolvedInstanceCatalog = {
     mods: [],
     collections: [],
     mosaics: [],
     ...lists,
   };
-  return catalog;
+  return instanceCatalog;
 }
 
 const BOOK_LIST_MARK = { source: SAMPLE_MOD_SOURCE, title: "Book List" };
 
-describe("buildCatalogListing", function describeBuildCatalogListing(): void {
+describe("buildCatalog", function describeBuildCatalog(): void {
   it("lists the catalog with nothing fetched while the switch is off", async function listsWithoutFetching(): Promise<void> {
     const recording = buildRecordingFetch();
 
-    const listing = await buildCatalogListing(
-      buildCatalog({
+    const catalog = await buildCatalog(
+      buildInstanceCatalog({
         mods: [SAMPLE_MOD_SOURCE],
         collections: [SAMPLE_COLLECTION_SOURCE],
         mosaics: [SAMPLE_MOSAIC_SOURCE],
@@ -74,7 +76,7 @@ describe("buildCatalogListing", function describeBuildCatalogListing(): void {
       recording.fetchOptions,
     );
 
-    expect(listing).toEqual({
+    expect(catalog).toEqual({
       mods: [{ source: SAMPLE_MOD_SOURCE }],
       collections: [{ source: SAMPLE_COLLECTION_SOURCE }],
       mosaics: [{ source: SAMPLE_MOSAIC_SOURCE, defaultOf: null }],
@@ -86,8 +88,8 @@ describe("buildCatalogListing", function describeBuildCatalogListing(): void {
     serveUntypedMod();
     const recording = buildRecordingFetch();
 
-    const listing = await buildCatalogListing(
-      buildCatalog({
+    const catalog = await buildCatalog(
+      buildInstanceCatalog({
         mods: [SAMPLE_MOD_SOURCE, UNTYPED_MOD_SOURCE],
         mosaics: [SAMPLE_MOSAIC_SOURCE],
       }),
@@ -95,7 +97,7 @@ describe("buildCatalogListing", function describeBuildCatalogListing(): void {
       recording.fetchOptions,
     );
 
-    expect(listing.mosaics).toEqual([
+    expect(catalog.mosaics).toEqual([
       { source: SAMPLE_MOSAIC_SOURCE, defaultOf: null },
       { source: SAMPLE_DEFAULT_MOSAIC_SOURCE, defaultOf: BOOK_LIST_MARK },
     ]);
@@ -107,26 +109,26 @@ describe("buildCatalogListing", function describeBuildCatalogListing(): void {
   it("Mod that cannot be loaded", async function skipsMissingMod(): Promise<void> {
     const recording = buildRecordingFetch();
 
-    const listing = await buildCatalogListing(
-      buildCatalog({ mods: [MISSING_MOD_SOURCE, SAMPLE_MOD_SOURCE] }),
+    const catalog = await buildCatalog(
+      buildInstanceCatalog({ mods: [MISSING_MOD_SOURCE, SAMPLE_MOD_SOURCE] }),
       true,
       recording.fetchOptions,
     );
 
-    expect(listing.mods).toEqual([
+    expect(catalog.mods).toEqual([
       { source: MISSING_MOD_SOURCE },
       { source: SAMPLE_MOD_SOURCE },
     ]);
-    expect(listing.mosaics).toEqual([
+    expect(catalog.mosaics).toEqual([
       { source: SAMPLE_DEFAULT_MOSAIC_SOURCE, defaultOf: BOOK_LIST_MARK },
     ]);
   });
 
-  it("Default mosaic also in the catalog", async function keepsCatalogPlace(): Promise<void> {
+  it("Default mosaic also in the instance catalog", async function keepsInstanceCatalogPlace(): Promise<void> {
     const recording = buildRecordingFetch();
 
-    const listing = await buildCatalogListing(
-      buildCatalog({
+    const catalog = await buildCatalog(
+      buildInstanceCatalog({
         mods: [SAMPLE_MOD_SOURCE],
         mosaics: [SAMPLE_DEFAULT_MOSAIC_SOURCE, SAMPLE_MOSAIC_SOURCE],
       }),
@@ -134,7 +136,7 @@ describe("buildCatalogListing", function describeBuildCatalogListing(): void {
       recording.fetchOptions,
     );
 
-    expect(listing.mosaics).toEqual([
+    expect(catalog.mosaics).toEqual([
       { source: SAMPLE_DEFAULT_MOSAIC_SOURCE, defaultOf: null },
       { source: SAMPLE_MOSAIC_SOURCE, defaultOf: null },
     ]);
@@ -155,13 +157,13 @@ describe("buildCatalogListing", function describeBuildCatalogListing(): void {
       ].join("\n"),
     );
 
-    const listing = await buildCatalogListing(
-      buildCatalog({ mods: [SAMPLE_MOD_SOURCE, otherModSource] }),
+    const catalog = await buildCatalog(
+      buildInstanceCatalog({ mods: [SAMPLE_MOD_SOURCE, otherModSource] }),
       true,
       recording.fetchOptions,
     );
 
-    expect(listing.mosaics).toEqual([
+    expect(catalog.mosaics).toEqual([
       { source: SAMPLE_DEFAULT_MOSAIC_SOURCE, defaultOf: BOOK_LIST_MARK },
     ]);
   });

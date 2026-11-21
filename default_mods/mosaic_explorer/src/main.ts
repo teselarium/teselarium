@@ -1,5 +1,5 @@
 /**
- * Default mod: lists the mosaics of the app's catalog, opens the one the
+ * Default mod: lists the mosaics of the catalog, opens the one the
  * user picks, or opens the viewer for it. It reads each mosaic with
  * `mosaics.inspect`, so neither a mod, a collection nor a tile is requested,
  * marks a mod's default mosaic with its mod, and lists the catalog again
@@ -13,7 +13,7 @@
  * app's look" in docs/modules/lib/core/theme/README.md.
  */
 
-import type { CatalogListing, ModContext, ModEngine } from "../../mod_api.d.ts";
+import type { Catalog, ModContext, ModEngine } from "../../mod_api.d.ts";
 import {
   buildExplorerPage,
   renderMosaicList,
@@ -36,7 +36,7 @@ function startListing(view: ExplorerView): number {
 async function drawListing(
   view: ExplorerView,
   listing: number,
-  catalog: CatalogListing,
+  catalog: Catalog,
 ): Promise<void> {
   const entries = await inspectMosaics(view.engine, catalog);
   if (listing !== view.listingCount) {
@@ -53,10 +53,7 @@ async function listCatalog(view: ExplorerView): Promise<void> {
 }
 
 /** `catalog.changed`: lists the new catalog in place of the list, without reloading the frame. */
-function followCatalogChange(
-  view: ExplorerView,
-  catalog: CatalogListing,
-): void {
+function followCatalogChange(view: ExplorerView, catalog: Catalog): void {
   const listing = startListing(view);
   void drawListing(view, listing, catalog);
 }

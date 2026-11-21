@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  resolveAppCatalog,
   resolveDefaultModSettings,
+  resolveInstanceCatalog,
 } from "../lib/core/engine/index.ts";
 import { loadModFile } from "../lib/mod/index.ts";
 import { APP_BASE_URL, fetchAppFile } from "../test/sample_files.ts";
-import { APP_CATALOG } from "./app_catalog.ts";
 import { DEFAULT_MODS } from "./default_mods.ts";
+import { INSTANCE_CATALOG } from "./instance_catalog.ts";
 import { NPM_HOST } from "./library_host.ts";
 
 const DEFAULTS = resolveDefaultModSettings(DEFAULT_MODS, APP_BASE_URL);
@@ -35,8 +35,12 @@ async function listDefaultMosaics(modSources: string[]): Promise<string[]> {
   return defaultMosaics;
 }
 
-describe("APP_CATALOG", function describeAppCatalog(): void {
-  const resolution = resolveAppCatalog(APP_CATALOG, APP_BASE_URL, DEFAULTS);
+describe("INSTANCE_CATALOG", function describeInstanceCatalog(): void {
+  const resolution = resolveInstanceCatalog(
+    INSTANCE_CATALOG,
+    APP_BASE_URL,
+    DEFAULTS,
+  );
 
   it("resolves with no errors", function resolvesCleanly(): void {
     expect(resolution.errors).toEqual([]);

@@ -64,7 +64,7 @@ export async function requestListSummaries(
   const link = sandbox.link;
   const catalog = readCatalogSources(
     stage,
-    readCombinationSnapshot(combinations).listing,
+    readCombinationSnapshot(combinations).catalog,
   );
   const tried = listTriedPairs(recent);
   const mosaicSources = readSources(

@@ -30,7 +30,7 @@ import {
 } from "../engine/index.ts";
 import type {
   AppAction,
-  CatalogListing,
+  Catalog,
   FrameLayout,
   LaunchMosaicGrants,
   LaunchSites,
@@ -110,8 +110,8 @@ export interface SandboxServices {
   loadsTileLinkedMedia: boolean;
   /** The remembered site decisions, read before the site consent question and when a mod starts. */
   readSiteDecisions: () => readonly SiteDecision[];
-  /** The app's catalog as `catalog.list` answers it, read anew for each request. */
-  readCatalog: () => Promise<CatalogListing>;
+  /** The catalog as `catalog.list` answers it, read anew for each request. */
+  readCatalog: () => Promise<Catalog>;
   /** Keeps the decisions of an answer whose Remember was checked. */
   rememberSiteDecisions: (decisions: readonly SiteDecision[]) => void;
   /** Told about each file a combination sandbox loaded (see `isRecordedLaunch`). */
@@ -960,12 +960,12 @@ export function pushSandboxTheme(runtime: SandboxRuntime, theme: Theme): void {
  */
 export function pushSandboxCatalog(
   runtime: SandboxRuntime,
-  listing: CatalogListing,
+  catalog: Catalog,
 ): void {
   if (runtime.status !== "running" || runtime.session === null) {
     return;
   }
-  pushCatalogChanged(runtime.session, listing);
+  pushCatalogChanged(runtime.session, catalog);
 }
 
 /**

@@ -82,7 +82,7 @@ function buildSnapshot(
   counts: Record<string, Loadable<TileCount>> = {},
 ): CombinationSnapshot {
   const snapshot: CombinationSnapshot = {
-    listing: null,
+    catalog: null,
     mods: {
       [BOOK_LIST]: buildMod(BOOK_LIST, "Book List"),
       [FLASHCARDS]: buildMod(FLASHCARDS, "Flashcards"),

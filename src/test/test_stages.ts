@@ -19,7 +19,7 @@ import { APP_BASE_URL } from "./sample_files.ts";
 import {
   APP_ORIGIN,
   SAMPLE_MOD_REFERENCE,
-  TEST_CATALOG,
+  TEST_INSTANCE_CATALOG,
   TEST_DEFAULTS,
   TEST_NPM_HOST,
 } from "./sample_mods.ts";
@@ -81,7 +81,7 @@ export function buildTestStage(
     fetch: fetchTestFile,
     colorScheme: "light",
     loadsTileLinkedMedia: true,
-    catalog: TEST_CATALOG,
+    instanceCatalog: TEST_INSTANCE_CATALOG,
     catalogDefaultMosaics: false,
     theaterMode: false,
     readSiteDecisions: siteDecisions.read,

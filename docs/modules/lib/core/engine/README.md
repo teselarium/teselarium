@@ -66,7 +66,7 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `mosaics.inspect` | `{ mosaic }`, a mosaic reference | The mosaic file's content, without opening it (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
 | `mosaics.open` | `{ mosaic, params?, replace? }` | `null`, once the stage opened the mosaic in a new sandbox. With `replace: true`, the requester is replaced and gets no answer (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
 | `mosaics.check` | `{ mosaic }`, a mosaic reference | The check report of the mosaic's mod, checked as the mosaic opens it, without the mod's tests (see [Checking a mosaic](#checking-a-mosaic)). Added in mod API `0.1.14`. |
-| `catalog.list` | none, params are ignored | The app's catalog, `{ mods, collections, mosaics }`, each list in catalog order with resolved addresses, without any permission (see [Reading the catalog](#reading-the-catalog)). Added in mod API `0.1.15`. |
+| `catalog.list` | none, params are ignored | The catalog, `{ mods, collections, mosaics }`, each list in catalog order with resolved addresses, without any permission (see [Reading the catalog](#reading-the-catalog)). Added in mod API `0.1.15`. |
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
 | `ui.confirm` | `{ message, confirmLabel?, cancelLabel? }` | `true` if the user confirmed, `false` if the user cancelled or pressed Escape. |
@@ -297,7 +297,7 @@ const report = await engine.request("mosaics.check", {
 
 ### Reading the catalog
 
-`catalog.list` answers the [app catalog](#app-catalog) as `{ mods, collections, mosaics }`, each list in catalog order. Each mod and collection entry is `{ source }`, the resolved address of its file. Each mosaic entry is `{ source, defaultOf }`, where `defaultOf` is `{ source, title }` of the mod whose default mosaic it is, or `null` for the catalog's own mosaics. It needs no permission: the addresses come from the instantiation, not from the mod, and any mod, visible or hidden, gets them. Its params are ignored.
+`catalog.list` answers the catalog as `{ mods, collections, mosaics }`, each list in catalog order. The catalog lists the things the app can open: mods, collections and mosaics, each a catalog entry of a catalog kind. It is made of the [instance catalog](#instance-catalog), the lists the instantiation sets, and of the default mosaics while "List the default mosaics of mods" is on. A later change adds the user catalog to it. "Catalog" alone always means this whole; each part is qualified (*instance catalog*, *user catalog*) or has its own name (*default mosaics*). Each mod and collection entry is `{ source }`, the resolved address of its file. Each mosaic entry is `{ source, defaultOf }`, where `defaultOf` is `{ source, title }` of the mod whose default mosaic it is, or `null` for the instance catalog's mosaics. It needs no permission: the addresses come from the instantiation, not from the mod, and any mod, visible or hidden, gets them. Its params are ignored.
 
 ```js
 const catalog = await engine.request("catalog.list", {});
@@ -305,13 +305,13 @@ const catalog = await engine.request("catalog.list", {});
 // catalog.mosaics[0] is { source: "https://example.org/samples/mosaics/nobel_books_list.yaml", defaultOf: null }
 ```
 
-While "List the default mosaics of mods" is off, nothing is fetched to answer it. While it is on, the mosaics also hold the default mosaic of each catalog mod that declares one, after the catalog's own mosaics, in the order of the mods, with `defaultOf` naming its mod:
+While "List the default mosaics of mods" is off, nothing is fetched to answer it. While it is on, the mosaics also hold the default mosaic of each catalog mod that declares one, after the instance catalog's mosaics, in the order of the mods, with `defaultOf` naming its mod:
 
 ```json
 { "source": "https://example.org/samples/mods/book_list/mosaic.yaml", "defaultOf": { "source": "https://example.org/samples/mods/book_list/mod_conf.yaml", "title": "Book List" } }
 ```
 
-To find them, each catalog mod's mod file is fetched, in parallel, and nothing else: no entrypoint, library, collection or mosaic file. A mod whose file cannot be loaded, or that declares no default mosaic, adds nothing. A default mosaic that the catalog's mosaics or an earlier mod already list appears once, at its first place, so one the catalog lists keeps `defaultOf: null`. Lookups are not cached, so a mod author who edits `default_mosaic` sees the change at the next request.
+To find them, each catalog mod's mod file is fetched, in parallel, and nothing else: no entrypoint, library, collection or mosaic file. A mod whose file cannot be loaded, or that declares no default mosaic, adds nothing. A default mosaic that the instance catalog's mosaics or an earlier mod already list appears once, at its first place, so one the instance catalog lists keeps `defaultOf: null`. Lookups are not cached, so a mod author who edits `default_mosaic` sees the change at the next request.
 
 When the switch changes, the engine pushes `catalog.changed` to every running mod, visible or hidden, with the new catalog. A mod that lists the catalog follows it without a reload:
 
@@ -321,7 +321,7 @@ engine.on("catalog.changed", function relist(catalog) {
 });
 ```
 
-How it works: `buildCatalogListing(catalog, includesDefaultMosaics, fetchOptions)` (`catalog_listing.ts`) builds the `CatalogListing` from the `ResolvedAppCatalog`. The stage gives every session, checks included, a `readCatalog` built on it, which `catalog_methods.ts` answers from, and it builds the listing once for the push (see the [stage module](../stage/README.md#app-catalog)).
+How it works: `buildCatalog(instanceCatalog, includesDefaultMosaics, fetchOptions)` (`catalog.ts`) builds the `Catalog` from the `ResolvedInstanceCatalog`. The stage gives every session, checks included, a `readCatalog` built on it, which `catalog_methods.ts` answers from, and it builds the catalog once for the push (see the [stage module](../stage/README.md#catalog)).
 
 ### Asking the user: links, files and confirmations
 
@@ -493,12 +493,12 @@ export const DEFAULT_MODS: DefaultModSettings = {
 
 The folder is resolved against the app's address, and each switched-off name to the source of its mod file, so a switched-off mod is refused whatever reference names it.
 
-### App catalog
+### Instance catalog
 
-The app has a catalog: the mods, collections and mosaics the instantiation offers, three ordered lists of references (`AppCatalog`). The explorers list it, and mods read it with [`catalog.list`](#reading-the-catalog). The vanilla app (`src/main/app_catalog.ts`) uses:
+The instance catalog is what the instantiation sets: the mods, collections and mosaics it offers, three ordered lists of references (`InstanceCatalog`). It is a part of the catalog, which the explorers list and mods read with [`catalog.list`](#reading-the-catalog). The vanilla app (`src/main/instance_catalog.ts`) uses:
 
 ```ts
-export const APP_CATALOG: AppCatalog = {
+export const INSTANCE_CATALOG: InstanceCatalog = {
   mods: [
     "./samples/mods/book_list",
     "./samples/mods/flashcards",
@@ -517,11 +517,11 @@ export const APP_CATALOG: AppCatalog = {
 
 Each entry is resolved against the app's address with the rules of its kind: a mod entry as a mod reference, so a default mod name (`tile_viewer`) means its mod file in the default mods folder and a folder means its `mod_conf.yaml`; a collection entry as a collection reference, so a folder means its `collection.yaml`; and a mosaic entry as a mosaic reference, so a folder means its `mosaic.yaml`. A mod entry that names a switched-off default mod is left out, whatever reference names it.
 
-`resolveAppCatalog(catalog, baseUrl, defaults)` (`app_catalog.ts`) resolves it once, when the app starts, and returns `{ catalog, errors }`: the `ResolvedAppCatalog`, whose entries are the addresses of their files, and the start errors. An entry that is empty, cannot be resolved, or resolves to the same file as an earlier entry of its list gives an error that names the list and the entry as written, and the app does not start, as for an invalid section registry:
+`resolveInstanceCatalog(catalog, baseUrl, defaults)` (`instance_catalog.ts`) resolves it once, when the app starts, and returns `{ catalog, errors }`: the `ResolvedInstanceCatalog`, whose entries are the addresses of their files, and the start errors. An entry that is empty, cannot be resolved, or resolves to the same file as an earlier entry of its list gives an error that names the list and the entry as written, and the app does not start, as for an invalid section registry:
 
 ```text
-Catalog mods: "./samples/mods/book_list/mod_conf.yaml" repeats an earlier entry (https://example.org/samples/mods/book_list/mod_conf.yaml).
-Catalog collections: "" is empty: an entry must be a non-empty string.
+Instance catalog mods: "./samples/mods/book_list/mod_conf.yaml" repeats an earlier entry (https://example.org/samples/mods/book_list/mod_conf.yaml).
+Instance catalog collections: "" is empty: an entry must be a non-empty string.
 ```
 
 ### npm host
@@ -912,7 +912,7 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
   - `onErrorResponse(method, error)`: called for every error response the session sends, with the request's method, or `null` for a message that is not a request (`-32600`), and the response's `error` (`ResponseError`: `code`, `message`). The mod check keeps `-32600`, `-32601` and `-32602`, the signal that a mod uses the API wrongly. Without it, nothing outside the session sees the responses.
 - `pushTilesChanged(session, tiles, issues, tileBodies)`: pushes `tiles.changed`, and replaces the session's `TileBodies` with `tileBodies`, those of the reloaded tiles, so `tiles.renderBody` and `players.open` follow them. The policy stays the launch's.
 - `pushThemeChanged(session, theme)`: pushes `theme.changed` with the `Theme`.
-- `pushCatalogChanged(session, listing)`: pushes `catalog.changed` with the `CatalogListing`.
+- `pushCatalogChanged(session, catalog)`: pushes `catalog.changed` with the `Catalog`.
 - `pushLayoutChanged(session, layout)`: pushes `layout.changed` with `{ layout }` (`LayoutChangedParams`), a `FrameLayout`.
 - `THEME_CHANGED_METHOD`: `"theme.changed"`, `LAYOUT_CHANGED_METHOD`: `"layout.changed"`, and `CATALOG_CHANGED_METHOD`: `"catalog.changed"`, shared with the frame loader. `TILES_CHANGED_METHOD`, `"tiles.changed"`, and `ENGINE_METHODS`, the merged handler table, are exported by `mod_session.ts` for the surface guard, not by `index.ts`.
 - `stopModSession(session)`: closes the channel. Later messages, pushes and answers to pending requests do nothing.

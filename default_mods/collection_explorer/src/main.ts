@@ -1,5 +1,5 @@
 /**
- * Default mod: lists the tile collections of the app's catalog and opens the
+ * Default mod: lists the tile collections of the catalog and opens the
  * viewer for the one the user picks. It reads each collection with
  * `collections.inspect`, so no tile is requested, and lists the catalog
  * again when it changes.
@@ -11,7 +11,7 @@
  * app's look" in docs/modules/lib/core/theme/README.md.
  */
 
-import type { CatalogListing, ModContext, ModEngine } from "../../mod_api.d.ts";
+import type { Catalog, ModContext, ModEngine } from "../../mod_api.d.ts";
 import {
   inspectCollections,
   readCollectionSources,
@@ -37,7 +37,7 @@ function startListing(view: ExplorerView): number {
 async function drawListing(
   view: ExplorerView,
   listing: number,
-  catalog: CatalogListing,
+  catalog: Catalog,
 ): Promise<void> {
   const entries = await inspectCollections(
     view.engine,
@@ -57,10 +57,7 @@ async function listCatalog(view: ExplorerView): Promise<void> {
 }
 
 /** `catalog.changed`: lists the new catalog in place of the list, without reloading the frame. */
-function followCatalogChange(
-  view: ExplorerView,
-  catalog: CatalogListing,
-): void {
+function followCatalogChange(view: ExplorerView, catalog: Catalog): void {
   const listing = startListing(view);
   void drawListing(view, listing, catalog);
 }

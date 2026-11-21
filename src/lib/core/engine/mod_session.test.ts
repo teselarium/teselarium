@@ -21,7 +21,7 @@ import type { Tile } from "../../tile/index.ts";
 import { buildTheme } from "../theme/index.ts";
 import type { Theme } from "../theme/index.ts";
 import type { AppAction } from "./app_actions.ts";
-import type { CatalogListing } from "./catalog_listing.ts";
+import type { Catalog } from "./catalog.ts";
 import {
   readEmptyCatalog,
   readNoSiteDecisions,
@@ -600,20 +600,20 @@ describe("connectModSession", function describeConnectModSession(): void {
     ]);
   });
 
-  it("pushes catalog.changed with the listing", async function pushesCatalogChanged(): Promise<void> {
+  it("pushes catalog.changed with the catalog", async function pushesCatalogChanged(): Promise<void> {
     const played = await playSession();
-    const listing: CatalogListing = {
+    const catalog: Catalog = {
       mods: [{ source: SAMPLE_MOD_SOURCE }],
       collections: [],
       mosaics: [],
     };
 
-    pushCatalogChanged(played.session, listing);
+    pushCatalogChanged(played.session, catalog);
     await waitForReceived(played, 1);
     await waitForMessages();
 
     expect(played.received).toEqual([
-      { jsonrpc: "2.0", method: "catalog.changed", params: listing },
+      { jsonrpc: "2.0", method: "catalog.changed", params: catalog },
     ]);
   });
 

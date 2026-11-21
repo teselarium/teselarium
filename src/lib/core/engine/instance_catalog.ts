@@ -6,31 +6,31 @@ import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { describeEngineError } from "./engine_errors.ts";
 
 /**
- * The mods, collections and mosaics an instantiation offers: three ordered
- * lists of references, relative to the app's address. A mod entry may be a
- * default mod name.
+ * The instance catalog: the mods, collections and mosaics an instantiation
+ * offers, as three ordered lists of references, relative to the app's
+ * address. A mod entry may be a default mod name.
  */
-export interface AppCatalog {
+export interface InstanceCatalog {
   mods: string[];
   collections: string[];
   mosaics: string[];
 }
 
-/** An app catalog whose entries are the resolved addresses of their files, without switched-off default mods. */
-export interface ResolvedAppCatalog {
+/** An instance catalog whose entries are the resolved addresses of their files, without switched-off default mods. */
+export interface ResolvedInstanceCatalog {
   mods: string[];
   collections: string[];
   mosaics: string[];
 }
 
-/** What `resolveAppCatalog` gives: the resolved catalog, and the start errors, each naming its list and entry. */
-export interface AppCatalogResolution {
-  catalog: ResolvedAppCatalog;
+/** What `resolveInstanceCatalog` gives: the resolved instance catalog, and the start errors, each naming its list and entry. */
+export interface InstanceCatalogResolution {
+  catalog: ResolvedInstanceCatalog;
   errors: string[];
 }
 
-/** The name of a catalog list, as errors name it. */
-type CatalogListName = keyof AppCatalog;
+/** The name of an instance catalog list, as errors name it. */
+type CatalogListName = keyof InstanceCatalog;
 
 /** Resolves one reference of a list to the address of its file. Raises when it cannot be resolved. */
 type CatalogEntryResolver = (
@@ -72,7 +72,7 @@ function describeEntryError(
   reference: unknown,
   reason: string,
 ): string {
-  const entryError = `Catalog ${listName}: ${JSON.stringify(reference)} ${reason}.`;
+  const entryError = `Instance catalog ${listName}: ${JSON.stringify(reference)} ${reason}.`;
   return entryError;
 }
 
@@ -154,17 +154,18 @@ function leaveOutSwitchedOffMods(
 }
 
 /**
- * Resolves each list of the catalog against the app's address with the rules
- * of its kind, and leaves out switched-off default mods. An entry that is
- * empty, cannot be resolved, or resolves to the same file as an earlier entry
- * of its list gives an error naming the list and the entry as written: the
- * catalog is a mistake of whoever set it, so the app does not start.
+ * Resolves each list of the instance catalog against the app's address with
+ * the rules of its kind, and leaves out switched-off default mods. An entry
+ * that is empty, cannot be resolved, or resolves to the same file as an
+ * earlier entry of its list gives an error naming the list and the entry as
+ * written: the instance catalog is a mistake of whoever set it, so the app
+ * does not start.
  */
-export function resolveAppCatalog(
-  catalog: AppCatalog,
+export function resolveInstanceCatalog(
+  catalog: InstanceCatalog,
   baseUrl: string,
   defaults: ResolvedDefaultModSettings,
-): AppCatalogResolution {
+): InstanceCatalogResolution {
   const mods = resolveCatalogList(
     "mods",
     catalog.mods,
@@ -186,7 +187,7 @@ export function resolveAppCatalog(
     baseUrl,
     defaults,
   );
-  const resolution: AppCatalogResolution = {
+  const resolution: InstanceCatalogResolution = {
     catalog: {
       mods: leaveOutSwitchedOffMods(mods.sources, defaults),
       collections: collections.sources,

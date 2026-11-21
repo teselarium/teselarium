@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { resolveAppCatalog } from "./app_catalog.ts";
-import type { AppCatalog } from "./app_catalog.ts";
+import { resolveInstanceCatalog } from "./instance_catalog.ts";
+import type { InstanceCatalog } from "./instance_catalog.ts";
 import { resolveDefaultModSettings } from "./default_mod_settings.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 
@@ -14,8 +14,10 @@ function buildDefaults(switchedOff: string[]): ResolvedDefaultModSettings {
   return defaults;
 }
 
-function buildCatalog(lists: Partial<AppCatalog>): AppCatalog {
-  const catalog: AppCatalog = {
+function buildInstanceCatalog(
+  lists: Partial<InstanceCatalog>,
+): InstanceCatalog {
+  const catalog: InstanceCatalog = {
     mods: [],
     collections: [],
     mosaics: [],
@@ -24,10 +26,10 @@ function buildCatalog(lists: Partial<AppCatalog>): AppCatalog {
   return catalog;
 }
 
-describe("resolveAppCatalog", function describeResolveAppCatalog(): void {
+describe("resolveInstanceCatalog", function describeResolveInstanceCatalog(): void {
   it("Entries are resolved by kind", function resolvesByKind(): void {
-    const resolution = resolveAppCatalog(
-      buildCatalog({
+    const resolution = resolveInstanceCatalog(
+      buildInstanceCatalog({
         mods: ["./samples/mods/book_list"],
         collections: ["./samples/tiles/literature_nobel_laureates"],
         mosaics: ["./samples/mosaics/nobel_books_list.yaml"],
@@ -47,8 +49,8 @@ describe("resolveAppCatalog", function describeResolveAppCatalog(): void {
   });
 
   it("Default mod name", function resolvesDefaultModName(): void {
-    const resolution = resolveAppCatalog(
-      buildCatalog({ mods: ["tile_viewer"] }),
+    const resolution = resolveInstanceCatalog(
+      buildInstanceCatalog({ mods: ["tile_viewer"] }),
       APP_URL,
       buildDefaults([]),
     );
@@ -59,8 +61,8 @@ describe("resolveAppCatalog", function describeResolveAppCatalog(): void {
   });
 
   it("Two references to one mod", function reportsRepeat(): void {
-    const resolution = resolveAppCatalog(
-      buildCatalog({
+    const resolution = resolveInstanceCatalog(
+      buildInstanceCatalog({
         mods: [
           "./samples/mods/book_list",
           "./samples/mods/book_list/mod_conf.yaml",
@@ -71,38 +73,38 @@ describe("resolveAppCatalog", function describeResolveAppCatalog(): void {
     );
 
     expect(resolution.errors).toEqual([
-      'Catalog mods: "./samples/mods/book_list/mod_conf.yaml" repeats an earlier entry (https://example.org/samples/mods/book_list/mod_conf.yaml).',
+      'Instance catalog mods: "./samples/mods/book_list/mod_conf.yaml" repeats an earlier entry (https://example.org/samples/mods/book_list/mod_conf.yaml).',
     ]);
   });
 
   it("Empty entry", function reportsEmptyEntry(): void {
-    const resolution = resolveAppCatalog(
-      buildCatalog({ collections: [""] }),
+    const resolution = resolveInstanceCatalog(
+      buildInstanceCatalog({ collections: [""] }),
       APP_URL,
       buildDefaults([]),
     );
 
     expect(resolution.errors).toEqual([
-      'Catalog collections: "" is empty: an entry must be a non-empty string.',
+      'Instance catalog collections: "" is empty: an entry must be a non-empty string.',
     ]);
   });
 
   it("reports an entry that cannot be resolved", function reportsUnresolved(): void {
-    const resolution = resolveAppCatalog(
-      buildCatalog({ mosaics: ["https://[broken"] }),
+    const resolution = resolveInstanceCatalog(
+      buildInstanceCatalog({ mosaics: ["https://[broken"] }),
       APP_URL,
       buildDefaults([]),
     );
 
     expect(resolution.errors).toHaveLength(1);
     expect(resolution.errors[0]).toMatch(
-      /^Catalog mosaics: "https:\/\/\[broken" cannot be resolved: /,
+      /^Instance catalog mosaics: "https:\/\/\[broken" cannot be resolved: /,
     );
   });
 
   it("compares repeats within a list only", function keepsListsApart(): void {
-    const resolution = resolveAppCatalog(
-      buildCatalog({
+    const resolution = resolveInstanceCatalog(
+      buildInstanceCatalog({
         mosaics: ["./samples/mods/book_list/mosaic.yaml"],
         collections: ["./samples/mods/book_list/mosaic.yaml"],
       }),
@@ -114,8 +116,10 @@ describe("resolveAppCatalog", function describeResolveAppCatalog(): void {
   });
 
   it("Switched-off tile viewer", function leavesOutSwitchedOff(): void {
-    const resolution = resolveAppCatalog(
-      buildCatalog({ mods: ["tile_viewer", "./samples/mods/book_list"] }),
+    const resolution = resolveInstanceCatalog(
+      buildInstanceCatalog({
+        mods: ["tile_viewer", "./samples/mods/book_list"],
+      }),
       APP_URL,
       buildDefaults(["tile_viewer"]),
     );
@@ -127,8 +131,8 @@ describe("resolveAppCatalog", function describeResolveAppCatalog(): void {
   });
 
   it("leaves out a switched-off mod whatever reference names it", function leavesOutByPath(): void {
-    const resolution = resolveAppCatalog(
-      buildCatalog({ mods: ["./default_mods/tile_viewer"] }),
+    const resolution = resolveInstanceCatalog(
+      buildInstanceCatalog({ mods: ["./default_mods/tile_viewer"] }),
       APP_URL,
       buildDefaults(["tile_viewer"]),
     );

@@ -13,7 +13,7 @@ import {
 } from "../engine/index.ts";
 import type {
   AppAction,
-  CatalogListing,
+  Catalog,
   CheckedFiles,
   ModCheckFinding,
   ModCheckReport,
@@ -135,8 +135,8 @@ export interface CheckServices {
    * allow, and nothing is asked. Its `mods.inspect` reads them too.
    */
   readSiteDecisions: () => readonly SiteDecision[];
-  /** The app's catalog, which answers a `catalog.list` that no case answered. */
-  readCatalog: () => Promise<CatalogListing>;
+  /** The catalog, which answers a `catalog.list` that no case answered. */
+  readCatalog: () => Promise<Catalog>;
 }
 
 type CheckDraft = Pick<

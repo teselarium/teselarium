@@ -1,13 +1,13 @@
-import type { AppCatalog } from "../lib/core/engine/index.ts";
+import type { InstanceCatalog } from "../lib/core/engine/index.ts";
 
 /**
- * The vanilla app's catalog: the mods, collections and mosaics the Mods,
- * Tiles and Mosaics explorers list. References are relative to the app's
+ * The vanilla instance catalog: the mods, collections and mosaics the Mods,
+ * Tiles and Mosaics explorers list, as part of the catalog. References are relative to the app's
  * address, and a mod may be a default mod name. `main.tsx` checks it with
- * `resolveAppCatalog` before the app starts. The future init options will
+ * `resolveInstanceCatalog` before the app starts. The future init options will
  * build this value; the lib only receives it.
  */
-export const APP_CATALOG: AppCatalog = {
+export const INSTANCE_CATALOG: InstanceCatalog = {
   mods: [
     "./samples/mods/book_list",
     "./samples/mods/flashcards",

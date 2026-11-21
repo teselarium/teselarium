@@ -248,7 +248,7 @@ describe("Scripted answers", function describeScriptedAnswers(): void {
     expect(report.findings).toEqual([]);
   });
 
-  it("Case without a scripted catalog", async function answersAppCatalog(): Promise<void> {
+  it("Case without a scripted catalog", async function answersLiveCatalog(): Promise<void> {
     const { caseFrame, reporting } = await startCaseCheck(["lists mods"]);
     const catalog = { mods: [], collections: [], mosaics: [] };
 

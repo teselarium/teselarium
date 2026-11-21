@@ -8,7 +8,7 @@ import {
 interface StartErrorScreenProps {
   /** The section registry's rule errors (`validateRegistry`). */
   registryErrors: readonly string[];
-  /** The app catalog's errors (`resolveAppCatalog`). */
+  /** The instance catalog's errors (`resolveInstanceCatalog`). */
   catalogErrors: readonly string[];
 }
 
@@ -44,7 +44,7 @@ function StartErrorGroup({
 }
 
 /**
- * Shown instead of the app when the section registry or the app catalog
+ * Shown instead of the app when the section registry or the instance catalog
  * breaks a rule: a mistake of whoever set them, so it fails loudly, with the
  * errors of each under its own title, each naming its section or entry.
  */
@@ -59,7 +59,7 @@ export function StartErrorScreen({
         errors={registryErrors}
       />
       <StartErrorGroup
-        title="The app cannot start: the app catalog is invalid"
+        title="The app cannot start: the instance catalog is invalid"
         errors={catalogErrors}
       />
     </main>
