@@ -32,7 +32,7 @@ While a sandbox is visible, the stage bar SHALL be one row above its frame. Its 
 - **AND** the page cannot scroll sideways and the close button is fully inside the viewport
 
 ### Requirement: Name while loading or after a failure
-Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place of the mod's name and version, in the mod capsule of a combination sandbox. When the sandbox failed before its mod file was loaded, it SHALL show "Mod not loaded". Once the mod file is loaded, it SHALL show the mod's name and version, even when the sandbox failed later.
+Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place of the mod's name, in the mod capsule of a combination sandbox. When the sandbox failed before its mod file was loaded, it SHALL show "Mod not loaded". Once the mod file is loaded, it SHALL show the mod's name, even when the sandbox failed later. The mod capsule SHALL NOT show the version, which the mod list's details page shows (see "Details page" in `combination-pickers`).
 
 #### Scenario: Missing mod file
 - **WHEN** a run link names a mod folder whose mod file answers HTTP 404
@@ -40,11 +40,11 @@ Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place
 
 #### Scenario: Missing collection
 - **WHEN** a mod is opened with a collection that answers HTTP 404
-- **THEN** the stage bar shows the mod's name and version
+- **THEN** the mod capsule shows the mod's name and no version
 
 #### Scenario: Cancelled API question
 - **WHEN** a mod with `api: "^0.2.0"` is opened and the user presses "Cancel"
-- **THEN** the stage bar shows the mod's name and version
+- **THEN** the mod capsule shows the mod's name and no version
 
 ### Requirement: Sandbox messages
 Each sandbox SHALL keep its own messages, each with a level (`error`, `warning` or `info`), a producer (the app or the mod), a source and a text. Messages SHALL be kept in the order they were found: mod file issues, collection issues, tile link issues, then the other messages as they arrive, such as permission issues, blocked requests, mount failures, a stopped mod, load failures, the app's notifications and the mod's own messages.
@@ -343,15 +343,20 @@ A combination sandbox SHALL be one opened from a mosaic, from a link with a coll
 - **THEN** the stage bar shows the mod viewer's title and version plainly and has no capsule
 
 ### Requirement: Combination capsules
-A combination sandbox's title SHALL be three capsules, in order: the mod capsule, a `+`, the collection capsule, an arrow, and the mosaic capsule. Each SHALL have an icon of its kind, its title and a chevron, and SHALL open its list (see `combination-pickers`). The `+` and the arrow SHALL be hidden from assistive technologies. Each capsule's accessible name SHALL be its kind and its full title, such as "Mod: Country Map 1.0.1".
+A combination sandbox's title SHALL be three capsules, in order: the mod capsule, a `+`, the collection capsule, an arrow, and the mosaic capsule. Each SHALL have an icon of its kind, its title and a chevron, and SHALL open its list (see `combination-pickers`). The `+` and the arrow SHALL be hidden from assistive technologies. Each capsule's accessible name SHALL be its kind and its full title, as the capsule shows it, such as "Mod: Country Map".
 
 #### Scenario: Laureates on the map
 - **WHEN** the mosaic "Nobel laureates on the map" runs
-- **THEN** the capsules show `Country Map` with `1.0.1`, `Nobel Prize in Literature laureates` and `Nobel laureates on the map`
+- **THEN** the capsules show `Country Map`, `Nobel Prize in Literature laureates` and `Nobel laureates on the map`, and no version
 - **AND** the collection capsule's accessible name is "Collection: Nobel Prize in Literature laureates"
+- **AND** the mod capsule's accessible name is "Mod: Country Map"
+
+#### Scenario: Tooltip of a cut title
+- **WHEN** the mod capsule's title of "Nobel laureates on the map" is cut with an ellipsis and the pointer rests on it
+- **THEN** its tooltip says "Mod: Country Map", with no version
 
 ### Requirement: Capsule contents
-The mod capsule SHALL show the mod's title and version. The collection capsule SHALL show the collection's title once its file is loaded, "Loading collection…" before, "Collection not loaded" after a failure, the decoded file name of the tile for a tile link, or "None". The mosaic capsule SHALL show the mosaic's title, or, for a sandbox not opened from a mosaic, "Unsaved combination" with a dashed border.
+The mod capsule SHALL show the mod's title, without its version. The collection capsule SHALL show the collection's title once its file is loaded, "Loading collection…" before, "Collection not loaded" after a failure, the decoded file name of the tile for a tile link, or "None". The mosaic capsule SHALL show the mosaic's title, or, for a sandbox not opened from a mosaic, "Unsaved combination" with a dashed border. A sandbox shown with a plain title (see "Combination sandboxes") SHALL keep the mod's name and version in that title.
 
 #### Scenario: Unsaved combination
 - **WHEN** a run link opens Book List with the laureates' collection
@@ -360,6 +365,14 @@ The mod capsule SHALL show the mod's title and version. The collection capsule S
 #### Scenario: Missing collection file
 - **WHEN** a run link names a collection that answers HTTP 404
 - **THEN** the collection capsule shows "Collection not loaded"
+
+#### Scenario: Wide bar
+- **WHEN** "Nobel laureates on the map" runs on a 2560×1080 viewport
+- **THEN** the mod capsule shows `Country Map` and no version
+
+#### Scenario: Plain title keeps its version
+- **WHEN** the mod viewer runs from a run link without a collection
+- **THEN** the stage bar shows the mod viewer's title and its version
 
 ### Requirement: Sites chip
 For a sandbox opened with `sites`, the stage bar SHALL show a chip after the mosaic capsule with a shield icon and the number of `show` lines of that mosaic, named "Sites from <mosaic title>". Pressing it SHALL open a popover that lists each line's host, reason and whether it was granted, and has a button "Stop using these sites" that opens the same combination without `sites`.
@@ -404,8 +417,7 @@ No capsule SHALL be wider than 16rem. A title that does not fit SHALL end with a
 
 ### Requirement: The bar folds as it narrows
 The stage bar SHALL be narrow when it is under 480px wide, or when its capsules, at their minimum width, do not fit beside the bar's other items; otherwise it SHALL be wide. A bar that is narrow because its capsules did not fit SHALL become wide again once they fit. The left side SHALL follow the stage bar's width:
-- at least 960px: everything shown;
-- 720px to 959px: no version in the mod capsule, which moves to the mod list's details;
+- at least 720px: everything shown;
 - 480px to 719px: the mod and collection capsules show only their icons;
 - on a narrow bar: one capsule with the mosaic's title, or the mod's for an unsaved combination, whose menu has "Mosaic", "Mod" and "Collection" rows that open their lists.
 
@@ -414,6 +426,10 @@ No capsule SHALL be narrower than its padding, its icon, its chevron and the gap
 #### Scenario: Narrow bar
 - **WHEN** the stage bar of "Nobel laureates on the map" is 600px wide
 - **THEN** the mod and collection capsules show only their icons, with their full titles in their accessible names, and the mosaic capsule shows its title
+
+#### Scenario: Titles from 720px
+- **WHEN** the stage bar of "Nobel laureates on the map" is 800px wide
+- **THEN** the three capsules show their titles
 
 #### Scenario: Phone width
 - **WHEN** the stage bar is 400px wide
