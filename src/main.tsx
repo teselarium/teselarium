@@ -53,6 +53,7 @@ import {
 } from "./main/stage/theater_setting.ts";
 import {
   changeSidebarViewport,
+  COMPACT_VIEWPORT_QUERY,
   createSidebarLayout,
   NARROW_VIEWPORT_QUERY,
 } from "./main/sidebar/sidebar_layout.ts";
@@ -182,6 +183,7 @@ function startApp(
   const layout = createSidebarLayout({
     storage: window.localStorage,
     narrowQuery: window.matchMedia(NARROW_VIEWPORT_QUERY),
+    compactQuery: window.matchMedia(COMPACT_VIEWPORT_QUERY),
     viewportWidth: window.innerWidth,
   });
   window.addEventListener(

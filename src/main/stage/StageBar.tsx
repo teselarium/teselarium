@@ -1,5 +1,5 @@
 import { Maximize, Pencil, RectangleHorizontal, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Badge } from "@/vendor/shadcn/ui/badge.tsx";
 import {
@@ -75,10 +75,6 @@ interface StageBarProps {
   theater: TheaterSetting;
   /** Shows the sandbox's frame fullscreen. Called during the click. */
   onFullscreen: (sandboxId: string) => void;
-  /** Asks the sidebar for room before the capsules fold. Returns whether it made room. */
-  onAskRoom: (sandboxId: string) => boolean;
-  /** Says which sandbox the bar shows, before the bar asks for room. */
-  onShowSandbox: (sandboxId: string) => void;
 }
 
 /** The open popover or menu, and the sandbox it was opened for, so it closes when another sandbox is shown. */
@@ -234,8 +230,6 @@ export function StageBar({
   isTheaterMode,
   theater,
   onFullscreen,
-  onAskRoom,
-  onShowSandbox,
 }: StageBarProps): ReactElement {
   const [openPanel, setOpenPanel] = useState<OpenPanel | null>(null);
   const [copyFeedback, setCopyFeedback] = useState("");
@@ -251,24 +245,10 @@ export function StageBar({
     ...recent.mods,
   ]);
   const editAction = isCombination ? readMosaicEditAction(sandbox.link) : null;
-  // Declared before the fold's measure, so the sidebar knows the sandbox shown before it asks.
-  useLayoutEffect(
-    function reportShownSandbox(): void {
-      onShowSandbox(sandbox.id);
-    },
-    [onShowSandbox, sandbox.id],
-  );
-  const askRoom = useMemo(
-    function bindAskRoom(): () => boolean {
-      return onAskRoom.bind(undefined, sandbox.id);
-    },
-    [onAskRoom, sandbox.id],
-  );
   const barForm = useNarrowStageBar(
     barRef,
     leftSideRef,
     readBarContentKey(sandbox, isCombination, editAction),
-    askRoom,
   );
   const isNarrow = barForm.isNarrow;
   // Under phone width, the bar is narrow and the edit button moves into "More actions".

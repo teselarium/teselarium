@@ -32,23 +32,15 @@ function readLeftClientWidth(): number {
   return 100;
 }
 
-function refuseRoom(): boolean {
-  return false;
-}
-
 interface HarnessProps {
   contentKey?: string;
-  onAskRoom?: () => boolean;
 }
 
 /** A bar and its left side, whose overflow the test sets, since jsdom lays nothing out. */
-function BarHarness({
-  contentKey = "sandbox-1",
-  onAskRoom = refuseRoom,
-}: HarnessProps): ReactElement {
+function BarHarness({ contentKey = "sandbox-1" }: HarnessProps): ReactElement {
   const barRef = useRef<HTMLElement>(null);
   const leftSideRef = useRef<HTMLDivElement>(null);
-  const form = useNarrowStageBar(barRef, leftSideRef, contentKey, onAskRoom);
+  const form = useNarrowStageBar(barRef, leftSideRef, contentKey);
   return (
     <section ref={barRef} aria-label="Stage bar">
       <div ref={leftSideRef} data-testid="left-side">
@@ -92,18 +84,16 @@ function showAtWidth(width: number): string {
   return readForm();
 }
 
-function renderBar(
-  onAskRoom: () => boolean = refuseRoom,
-): ReturnType<typeof render> {
+function renderBar(): ReturnType<typeof render> {
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
-  const rendered = render(<BarHarness onAskRoom={onAskRoom} />);
+  const rendered = render(<BarHarness />);
   stubLeftSideOverflow();
   return rendered;
 }
 
 describe("followBarFold", function describeFollowBarFold(): void {
   it("is narrow under 480px, wide from 480px", function foldsByWidth(): void {
-    const measure = { leftSideOverflows: false, roomGiven: false };
+    const measure = { leftSideOverflows: false };
 
     expect(followBarFold(WIDE_BAR, { ...measure, width: 479 }).isNarrow).toBe(
       true,
@@ -115,25 +105,14 @@ describe("followBarFold", function describeFollowBarFold(): void {
     const fold = followBarFold(WIDE_BAR, {
       width: 640,
       leftSideOverflows: true,
-      roomGiven: false,
     });
 
     expect(fold).toEqual({ isNarrow: true, foldedAt: 640 });
   });
 
-  it("stays wide when its left side overflows and the sidebar gave room", function staysWideWithRoom(): void {
-    const fold = followBarFold(WIDE_BAR, {
-      width: 640,
-      leftSideOverflows: true,
-      roomGiven: true,
-    });
-
-    expect(fold).toBe(WIDE_BAR);
-  });
-
   it("stays narrow up to the recorded width, and unfolds past it", function unfoldsPastRecord(): void {
     const folded: BarFold = { isNarrow: true, foldedAt: 640 };
-    const measure = { leftSideOverflows: false, roomGiven: false };
+    const measure = { leftSideOverflows: false };
 
     expect(followBarFold(folded, { ...measure, width: 640 })).toBe(folded);
     expect(followBarFold(folded, { ...measure, width: 641 })).toBe(WIDE_BAR);
@@ -199,50 +178,6 @@ describe("useNarrowStageBar", function describeUseNarrowStageBar(): void {
     leftSideOverflow = 0;
     expect(showAtWidth(641)).toBe("narrow");
     expect(showAtWidth(642)).toBe("wide");
-  });
-
-  it("asks for room once when the capsules do not fit, and stays wide when given it", function staysWideWithRoom(): void {
-    const askRoom = vi.fn<() => boolean>().mockReturnValue(true);
-    renderBar(askRoom);
-    leftSideOverflow = 30;
-
-    expect(showAtWidth(640)).toBe("wide");
-    expect(askRoom).toHaveBeenCalledOnce();
-  });
-
-  it("folds when the sidebar gives no room", function foldsWithoutRoom(): void {
-    const askRoom = vi.fn<() => boolean>().mockReturnValue(false);
-    renderBar(askRoom);
-    leftSideOverflow = 30;
-
-    expect(showAtWidth(640)).toBe("narrow");
-    expect(askRoom).toHaveBeenCalledOnce();
-  });
-
-  it("folds when the capsules still do not fit in the room given", function foldsAfterRoom(): void {
-    const askRoom = vi
-      .fn<() => boolean>()
-      .mockReturnValueOnce(true)
-      .mockReturnValue(false);
-    renderBar(askRoom);
-    leftSideOverflow = 30;
-
-    expect(showAtWidth(640)).toBe("wide");
-    expect(showAtWidth(700)).toBe("narrow");
-    expect(askRoom).toHaveBeenCalledTimes(2);
-  });
-
-  it("never asks under 480px or while narrow", function asksOnlyWhenWide(): void {
-    const askRoom = vi.fn<() => boolean>().mockReturnValue(false);
-    renderBar(askRoom);
-    leftSideOverflow = 30;
-
-    expect(showAtWidth(479)).toBe("narrow");
-    expect(askRoom).not.toHaveBeenCalled();
-    expect(showAtWidth(640)).toBe("narrow");
-    expect(askRoom).toHaveBeenCalledOnce();
-    expect(showAtWidth(620)).toBe("narrow");
-    expect(askRoom).toHaveBeenCalledOnce();
   });
 
   it("drops the recorded width when the bar's content changes", function forgetsOnContent(): void {

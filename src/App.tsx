@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { TooltipProvider } from "@/vendor/shadcn/ui/tooltip.tsx";
 import type { CombinationCatalog } from "./lib/core/combinations/index.ts";
@@ -14,9 +13,7 @@ import type { CatalogSetting } from "./main/settings/catalog_setting.ts";
 import type { TileMediaSetting } from "./main/settings/tile_media_setting.ts";
 import { Sidebar } from "./main/sidebar/Sidebar.tsx";
 import {
-  askSidebarForRoom,
   readSidebarSnapshot,
-  showSidebarSandbox,
   subscribeSidebar,
 } from "./main/sidebar/sidebar_layout.ts";
 import type {
@@ -67,7 +64,6 @@ function readSidebarColumn(snapshot: SidebarSnapshot): string {
  * The sidebar beside the main area, on the app's canvas. The main area shows the
  * page the stage shows, if any, before the stage view. The stage view stays
  * mounted in the same place whatever is shown, so no frame moves or reloads.
- * The stage bar asks the sidebar for room before its capsules fold.
  */
 function App({
   stage,
@@ -89,19 +85,6 @@ function App({
     layout,
     subscribeSidebar,
     readSidebarSnapshot,
-  );
-  // Bound once per layout, so a sidebar change does not make the stage bar measure again.
-  const askRoom = useMemo(
-    function bindAskRoom(): (sandboxId: string) => boolean {
-      return askSidebarForRoom.bind(undefined, layout);
-    },
-    [layout],
-  );
-  const showSandbox = useMemo(
-    function bindShowSandbox(): (sandboxId: string) => void {
-      return showSidebarSandbox.bind(undefined, layout);
-    },
-    [layout],
   );
   const layoutStyle = {
     "--sidebar-column": readSidebarColumn(layoutSnapshot),
@@ -143,8 +126,6 @@ function App({
             userCatalog={userCatalog}
             playerSites={playerSites}
             theater={theater}
-            onAskRoom={askRoom}
-            onShowSandbox={showSandbox}
           />
         </main>
       </div>

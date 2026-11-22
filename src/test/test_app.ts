@@ -64,6 +64,8 @@ export interface AppFixture {
   layout: SidebarLayoutStore;
   storage: MemoryStorage;
   narrowQuery: FakeColorSchemeQuery;
+  /** Never matches: the fixture's viewport is narrow or wide, never compact. */
+  compactQuery: FakeColorSchemeQuery;
 }
 
 export interface AppFixtureOptions {
@@ -107,6 +109,7 @@ export async function startTestApp(
     recordRecentlyUsed.bind(undefined, recentlyUsed),
   );
   const narrowQuery = createFakeColorSchemeQuery(isNarrow);
+  const compactQuery = createFakeColorSchemeQuery(false);
   const fixture: AppFixture = {
     history,
     stage,
@@ -137,10 +140,12 @@ export async function startTestApp(
     layout: createSidebarLayout({
       storage,
       narrowQuery,
+      compactQuery,
       viewportWidth: isNarrow ? 375 : 1280,
     }),
     storage,
     narrowQuery,
+    compactQuery,
   };
   followHistory(stage, history.hash, history.state);
   await settleStage(stage);

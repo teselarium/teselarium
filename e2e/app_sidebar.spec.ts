@@ -18,6 +18,7 @@ import {
   DESKTOP_VIEWPORT,
   isFullyShown,
   readElementBox,
+  SMALL_PHONE_VIEWPORT,
 } from "./layout_probes.ts";
 import {
   EXPLORER_OFF_PREVIEW_URL,
@@ -31,7 +32,6 @@ import {
   isFrameMarked,
   markFrame,
   requestFromProbe,
-  followLink,
   serveAppOriginMod,
   stageBar,
   waitForProbe,
@@ -707,7 +707,7 @@ test.describe("Sidebar colors", function describeColors(): void {
   });
 });
 
-/** A phone held sideways: wide enough for the expanded sidebar, but short. */
+/** A phone held sideways: a compact viewport, where the sidebar starts as its rail, and short. */
 const LANDSCAPE_PHONE_VIEWPORT = { width: 915, height: 412 };
 
 /** Runs on an element: whether its content is taller than its box, so it can scroll. */
@@ -735,6 +735,7 @@ test.describe("Sidebar fits short viewports", function describeShortViewports():
   test("Landscape phone", async function scrollsItems({ page }): Promise<void> {
     await page.setViewportSize(LANDSCAPE_PHONE_VIEWPORT);
     await page.goto("/");
+    await sidebar(page).getByRole("button", { name: "Expand sidebar" }).click();
     const collapseButton = sidebar(page).getByRole("button", {
       name: "Collapse sidebar",
     });
@@ -841,42 +842,35 @@ test.describe(
   },
 );
 
-const NOBEL_MAP_MOSAIC_HASH =
-  "#/run?mosaic=./samples/mosaics/nobel_laureates_map.yaml";
+const NOBEL_MAP_MOSAIC_LINK =
+  "/#/run?mosaic=./samples/mosaics/nobel_laureates_map.yaml";
 const MAP_MOSAIC_TITLE = "Nobel laureates on the map";
 
-/** The viewport's height in the step aside's scenarios. */
-const STEP_ASIDE_HEIGHT = 800;
+/** The viewport's height in the compact viewports' scenarios. */
+const COMPACT_HEIGHT = 800;
 
-/** Narrows the window, or widens it, to `width` in steps of 20px, as a user resizing it. */
-async function resizeWindowTo(page: Page, width: number): Promise<void> {
+/** Resizes the window to `width` in steps of `step` pixels, as a user dragging its edge. */
+async function resizeWindowTo(
+  page: Page,
+  width: number,
+  step: number = 20,
+): Promise<void> {
   const viewport = page.viewportSize();
   if (viewport === null) {
     throw new Error("Expected the page to have a viewport size");
   }
-  const step = width < viewport.width ? -20 : 20;
+  const signedStep = width < viewport.width ? -step : step;
   let current = viewport.width;
-  while (Math.abs(width - current) > Math.abs(step)) {
-    current += step;
-    await page.setViewportSize({ width: current, height: STEP_ASIDE_HEIGHT });
+  while (Math.abs(width - current) > step) {
+    current += signedStep;
+    await page.setViewportSize({ width: current, height: COMPACT_HEIGHT });
   }
-  await page.setViewportSize({ width, height: STEP_ASIDE_HEIGHT });
-}
-
-/** Resolves with the next frame's time. */
-function waitForAnimationFrame(): Promise<number> {
-  return new Promise(requestAnimationFrame.bind(window));
-}
-
-/** Waits two frames, so a sidebar that would move has moved. */
-async function waitForLayout(page: Page): Promise<void> {
-  await page.evaluate(waitForAnimationFrame);
-  await page.evaluate(waitForAnimationFrame);
+  await page.setViewportSize({ width, height: COMPACT_HEIGHT });
 }
 
 /** Opens the app on the Nobel map mosaic, and waits for its mosaic capsule. */
 async function openNobelMap(page: Page): Promise<void> {
-  await page.goto(`/${NOBEL_MAP_MOSAIC_HASH}`);
+  await page.goto(NOBEL_MAP_MOSAIC_LINK);
   await expect(
     stageBar(page).getByRole("button", { name: `Mosaic: ${MAP_MOSAIC_TITLE}` }),
   ).toBeVisible();
@@ -885,35 +879,58 @@ async function openNobelMap(page: Page): Promise<void> {
 /** The stage bar shows the mod, collection and mosaic capsules, not the folded one. */
 async function expectThreeCapsules(page: Page): Promise<void> {
   await expect(stageBar(page)).not.toHaveAttribute("data-narrow");
-  await expect(
-    stageBar(page).getByRole("button", { name: /^Mod: / }),
-  ).toBeVisible();
-  await expect(
-    stageBar(page).getByRole("button", { name: /^Collection: / }),
-  ).toBeVisible();
-  await expect(
-    stageBar(page).getByRole("button", { name: `Mosaic: ${MAP_MOSAIC_TITLE}` }),
-  ).toBeVisible();
+  for (const name of [
+    /^Mod: /,
+    /^Collection: /,
+    `Mosaic: ${MAP_MOSAIC_TITLE}`,
+  ]) {
+    await expect(stageBar(page).getByRole("button", { name })).toBeVisible();
+  }
 }
 
-async function expectSteppedAside(page: Page): Promise<void> {
-  await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
-  await expect(sidebar(page)).toHaveAttribute("data-stepped-aside");
+/** What the page records while a test watches the layout change. */
+interface LayoutWatch {
+  hasBarFolded: boolean;
+  /** The narrowest viewport at which the sidebar was expanded, or `null`. */
+  narrowestExpanded: number | null;
 }
 
-async function expectExpandedAt240(page: Page): Promise<void> {
-  await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
-  await expect(sidebar(page)).not.toHaveAttribute("data-stepped-aside");
-  await expect.poll(page.evaluate.bind(page, readSidebarWidth)).toBe(240);
+/**
+ * Runs on the app's layout: records, from now on, whether the stage bar is
+ * ever narrow (`data-narrow`, the folded capsule), and the narrowest
+ * viewport at which the sidebar is expanded.
+ */
+function watchLayout(layout: Element): void {
+  const watch = globalThis as unknown as LayoutWatch;
+  watch.hasBarFolded = false;
+  watch.narrowestExpanded = null;
+  function recordLayout(): void {
+    if (layout.querySelector("section.stage-bar[data-narrow]") !== null) {
+      watch.hasBarFolded = true;
+    }
+    const isExpanded = layout.getAttribute("data-sidebar-state") === "expanded";
+    if (isExpanded && (watch.narrowestExpanded ?? Infinity) > innerWidth) {
+      watch.narrowestExpanded = innerWidth;
+    }
+  }
+  recordLayout();
+  new MutationObserver(recordLayout).observe(layout, {
+    subtree: true,
+    attributeFilter: ["data-narrow", "data-sidebar-state"],
+  });
 }
 
-/** Opens the Nobel map on a 1280px window, then narrows it to 860px: the sidebar steps aside. */
-async function stepAsideByNarrowing(page: Page): Promise<void> {
-  await page.setViewportSize({ width: 1280, height: STEP_ASIDE_HEIGHT });
-  await openNobelMap(page);
-  await expectExpandedAt240(page);
-  await resizeWindowTo(page, 860);
-  await expectSteppedAside(page);
+function readLayoutWatch(): LayoutWatch {
+  const watch = globalThis as unknown as LayoutWatch;
+  const copy: LayoutWatch = {
+    hasBarFolded: watch.hasBarFolded,
+    narrowestExpanded: watch.narrowestExpanded,
+  };
+  return copy;
+}
+
+async function startLayoutWatch(page: Page): Promise<void> {
+  await page.locator(".app-layout").evaluate(watchLayout);
 }
 
 function blurActiveElement(): void {
@@ -922,105 +939,114 @@ function blurActiveElement(): void {
   }
 }
 
-function readStoredSidebarLayout(key: string): unknown {
-  return JSON.parse(localStorage.getItem(key) ?? "null");
-}
-
-test.describe("The sidebar steps aside for the stage bar", function describeStepAside(): void {
-  test("Narrowing the window", async function stepsAsideOnNarrowing({
+test.describe("Compact viewports", function describeCompact(): void {
+  test("Narrowing the window", async function showsRailOnNarrowing({
     page,
   }): Promise<void> {
-    await page.setViewportSize({ width: 1280, height: STEP_ASIDE_HEIGHT });
+    await page.setViewportSize({ width: 1280, height: COMPACT_HEIGHT });
+    await openNobelMap(page);
+    await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
+    const frame = await findVisibleFrame(page);
+    await markFrame(frame);
+    await startLayoutWatch(page);
+
+    await resizeWindowTo(page, 860, 10);
+
+    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
+    await expectThreeCapsules(page);
+    expect(await isFrameMarked(frame)).toBe(true);
+    expect((await page.evaluate(readLayoutWatch)).hasBarFolded).toBe(false);
+  });
+
+  test("Widening the window from a narrow viewport", async function expandsOnceWide({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 767, height: COMPACT_HEIGHT });
+    await openNobelMap(page);
+    await startLayoutWatch(page);
+
+    await resizeWindowTo(page, 984, 1);
+
+    await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
+    expect(await page.evaluate(readSidebarWidth)).toBe(200);
+    expect((await page.evaluate(readLayoutWatch)).narrowestExpanded).toBe(984);
+    await resizeWindowTo(page, 1024, 1);
+    await expect.poll(page.evaluate.bind(page, readSidebarWidth)).toBe(240);
+  });
+
+  test("Opening the app on a compact viewport", async function opensAsRail({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 860, height: COMPACT_HEIGHT });
+
+    await openNobelMap(page);
+
+    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
+    await expectThreeCapsules(page);
+  });
+
+  test("The user expands it", async function expandsInline({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 860, height: COMPACT_HEIGHT });
     await openNobelMap(page);
     const frame = await findVisibleFrame(page);
     await markFrame(frame);
-
-    await resizeWindowTo(page, 860);
-
-    await expectSteppedAside(page);
-    await expectThreeCapsules(page);
-    expect(await isFrameMarked(frame)).toBe(true);
-  });
-
-  test("Not back too early, then back when the window widens", async function comesBack({
-    page,
-  }): Promise<void> {
-    await stepAsideByNarrowing(page);
-
-    await resizeWindowTo(page, 900);
-    await waitForLayout(page);
-    await expectSteppedAside(page);
-    await resizeWindowTo(page, 1280);
-
-    await expectExpandedAt240(page);
-    await expectThreeCapsules(page);
-  });
-
-  test("The user expands it", async function expandsWithShortcut({
-    page,
-  }): Promise<void> {
-    await stepAsideByNarrowing(page);
     await page.evaluate(blurActiveElement);
 
     await page.keyboard.press("Control+b");
 
     await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
-    await expect(stageBar(page)).toHaveAttribute("data-narrow");
-    await waitForLayout(page);
-    await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
-  });
-
-  test("Reload while stepped aside", async function reloadsExpanded({
-    page,
-  }): Promise<void> {
-    await stepAsideByNarrowing(page);
-    // Nothing was stored, so the default layout, expanded at 240px, stays.
-    expect(
-      await page.evaluate(readStoredSidebarLayout, SIDEBAR_LAYOUT_KEY),
-    ).toBeNull();
-
-    await page.setViewportSize({ width: 1280, height: STEP_ASIDE_HEIGHT });
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(await page.evaluate(readSidebarWidth)).toBe(200);
+    expect(await isFrameMarked(frame)).toBe(true);
     await page.reload();
-
-    await expectExpandedAt240(page);
-  });
-
-  test("Opening another mosaic", async function staysExpandedOnOpening({
-    page,
-  }): Promise<void> {
-    // The probe's plain title fits; the Nobel map's capsules do not fit beside the expanded sidebar.
-    await page.setViewportSize({ width: 860, height: STEP_ASIDE_HEIGHT });
-    await openProbe(page);
-    await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
-
-    await followLink(page, NOBEL_MAP_MOSAIC_HASH);
-
-    await expect(stageBar(page)).toHaveAttribute("data-narrow");
-    await waitForLayout(page);
-    await expect(sidebar(page)).toHaveAttribute("data-state", "expanded");
-  });
-
-  test("Opening the app on a narrower window", async function stepsAsideOnOpening({
-    page,
-  }): Promise<void> {
-    await page.setViewportSize({ width: 860, height: STEP_ASIDE_HEIGHT });
-
-    await openNobelMap(page);
-
-    await expectSteppedAside(page);
-    await expectThreeCapsules(page);
-  });
-
-  test("Narrow viewports are unchanged", async function followsNarrowViewport({
-    page,
-  }): Promise<void> {
-    await stepAsideByNarrowing(page);
-
-    await resizeWindowTo(page, 700);
     await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
-    await expect(sidebar(page)).not.toHaveAttribute("data-stepped-aside");
+  });
+
+  test("Collapsed or hidden sidebar", async function keepsCollapsed({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: COMPACT_HEIGHT });
+    await page.goto("/");
+    await sidebar(page)
+      .getByRole("button", { name: "Collapse sidebar" })
+      .click();
+
+    await resizeWindowTo(page, 860);
+    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
+    await hamburgerButton(page).click();
     await resizeWindowTo(page, 1280);
 
-    await expectExpandedAt240(page);
+    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
+  });
+
+  test("Phone viewport", async function followsNarrowRules({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await page.goto("/");
+
+    await expect(sidebar(page)).toHaveAttribute("data-state", "collapsed");
+    await expect(resizeHandle(page)).toHaveCount(0);
+    await sidebar(page).getByRole("button", { name: "Expand sidebar" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+});
+
+test.describe("The main area keeps 784px", function describeMainArea(): void {
+  test("The main area keeps 784px", async function clampsToMainArea({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: COMPACT_HEIGHT });
+    await page.goto("/");
+    await dragHandleToWidth(page, 400);
+    await expect(resizeHandle(page)).toHaveAttribute("aria-valuenow", "400");
+
+    await page.setViewportSize({ width: 1100, height: COMPACT_HEIGHT });
+    await expect.poll(page.evaluate.bind(page, readSidebarWidth)).toBe(316);
+    await page.setViewportSize({ width: 1280, height: COMPACT_HEIGHT });
+
+    await expect.poll(page.evaluate.bind(page, readSidebarWidth)).toBe(400);
   });
 });

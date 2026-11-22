@@ -12,15 +12,25 @@ export interface SidebarLayout {
 /** The part of `Storage` the layout uses. The app passes `localStorage`. */
 export type SidebarStorage = Pick<Storage, "getItem" | "setItem">;
 
-/** The part of `matchMedia(NARROW_VIEWPORT_QUERY)` the layout uses. */
-export interface NarrowViewportQuery {
+/** The part of `matchMedia(query)` the layout uses. */
+export interface ViewportQuery {
   matches: boolean;
   addEventListener: (type: "change", listener: () => void) => void;
 }
 
+/**
+ * Narrow: under 768px, the drawer over the content. Compact: 768px to
+ * 983px, where even a 200px sidebar would leave the main area under 784px.
+ * Wide: 984px or more, the stored layout.
+ */
+export type SidebarMode = "narrow" | "compact" | "wide";
+
 export interface SidebarLayoutOptions {
   storage: SidebarStorage;
-  narrowQuery: NarrowViewportQuery;
+  /** `matchMedia(NARROW_VIEWPORT_QUERY)`. */
+  narrowQuery: ViewportQuery;
+  /** `matchMedia(COMPACT_VIEWPORT_QUERY)`. */
+  compactQuery: ViewportQuery;
   viewportWidth: number;
 }
 
@@ -29,42 +39,25 @@ export interface SidebarSnapshot {
   state: SidebarState;
   /** The expanded width, clamped to the viewport. */
   width: number;
-  /** The widest the viewport allows: 400px, or 40% of a smaller viewport. */
+  /** The widest the viewport allows: 400px, or less to keep the main area 784px wide. */
   maxWidth: number;
   /** On a narrow viewport, expanded means the drawer over the content. */
   isNarrow: boolean;
-  /** The sidebar shows its rail for the stage bar, though it is stored expanded. */
-  isSteppedAside: boolean;
-}
-
-/** The sidebar showed its rail for the stage bar: the viewport's width then, and the width the rail gave. */
-export interface SteppedAside {
-  viewportWidth: number;
-  room: number;
-}
-
-/** The sandbox whose stage bar may ask for room. `null` gives it to the next sandbox shown. */
-export interface RoomGrant {
-  sandboxId: string | null;
 }
 
 /**
- * The sidebar's layout on wide viewports, which is stored, and on narrow
- * ones, which is not. Mutable.
+ * The sidebar's layout on wide viewports, which is stored, and on narrow and
+ * compact ones, which is not. Mutable.
  */
 export interface SidebarLayoutStore {
   wide: SidebarLayout;
-  narrow: SidebarLayout;
-  isNarrow: boolean;
+  /** The layout of a narrow or compact viewport, built when the mode is entered. */
+  unstored: SidebarLayout;
+  mode: SidebarMode;
   viewportWidth: number;
   storage: SidebarStorage;
   listeners: Set<() => void>;
   snapshot: SidebarSnapshot;
-  /** Not stored: a reload starts from the wide layout. */
-  steppedAside: SteppedAside | null;
-  roomGrant: RoomGrant | null;
-  /** The sandbox the stage bar shows, or `null` before it shows one. */
-  shownSandboxId: string | null;
 }
 
 /** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
@@ -72,6 +65,10 @@ export const SIDEBAR_LAYOUT_KEY = "opentesela.sidebar";
 
 /** Viewports narrower than 768px. */
 export const NARROW_VIEWPORT_QUERY = "(max-width: 767.98px)";
+
+/** Viewports from 768px to 983px: 200px of sidebar plus 784px of main area is 984px. */
+export const COMPACT_VIEWPORT_QUERY =
+  "(min-width: 768px) and (max-width: 983.98px)";
 
 export const DEFAULT_SIDEBAR_LAYOUT: SidebarLayout = Object.freeze({
   state: "expanded",
@@ -81,11 +78,10 @@ export const DEFAULT_SIDEBAR_LAYOUT: SidebarLayout = Object.freeze({
 
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
-const MAX_VIEWPORT_SHARE = 0.4;
+/** The main area keeps at least this width beside the expanded sidebar. */
+const MIN_MAIN_WIDTH = 784;
 /** Released narrower than this, the sidebar collapses. */
 const COLLAPSE_BELOW = 160;
-/** `--sidebar-rail-width` in `app.css` (3rem), at the default font size. */
-const SIDEBAR_RAIL_WIDTH = 48;
 
 /** Replaced as soon as the store is built. */
 const DEFAULT_SNAPSHOT: SidebarSnapshot = Object.freeze({
@@ -93,20 +89,22 @@ const DEFAULT_SNAPSHOT: SidebarSnapshot = Object.freeze({
   width: 240,
   maxWidth: 400,
   isNarrow: false,
-  isSteppedAside: false,
 });
 
 const SIDEBAR_STATES: readonly string[] = ["expanded", "collapsed", "hidden"];
 const RESTORED_STATES: readonly string[] = ["expanded", "collapsed"];
 
-/** A width between 200px and the smaller of 400px and 40% of the viewport. */
+/**
+ * A width between 200px and the smaller of 400px and the viewport's width
+ * minus 784px, so the main area keeps at least 784px beside the sidebar.
+ */
 export function clampSidebarWidth(
   width: number,
   viewportWidth: number,
 ): number {
   const maxWidth = Math.max(
     MIN_WIDTH,
-    Math.min(MAX_WIDTH, Math.floor(viewportWidth * MAX_VIEWPORT_SHARE)),
+    Math.min(MAX_WIDTH, Math.floor(viewportWidth - MIN_MAIN_WIDTH)),
   );
   return Math.min(maxWidth, Math.max(MIN_WIDTH, Math.round(width)));
 }
@@ -229,32 +227,45 @@ function writeStoredLayout(
   }
 }
 
-function buildNarrowLayout(wide: SidebarLayout): SidebarLayout {
-  const narrow: SidebarLayout = {
+/**
+ * The unstored layout a mode starts from: collapsed on a narrow viewport;
+ * on a compact one, the rail for an expanded sidebar, and a collapsed or
+ * hidden one as it is.
+ */
+function buildUnstoredLayout(
+  wide: SidebarLayout,
+  mode: SidebarMode,
+): SidebarLayout {
+  const isRail = mode === "narrow" || wide.state === "expanded";
+  const unstored: SidebarLayout = {
     ...wide,
-    state: "collapsed",
+    state: isRail ? "collapsed" : wide.state,
     from: "collapsed",
   };
-  return narrow;
+  return unstored;
 }
 
-/** The wide layout the user sees: collapsed while the sidebar has stepped aside. */
-function readSeenWideLayout(store: SidebarLayoutStore): SidebarLayout {
-  return store.steppedAside === null ? store.wide : collapseLayout(store.wide);
+function readMode(
+  narrowQuery: ViewportQuery,
+  compactQuery: ViewportQuery,
+): SidebarMode {
+  if (narrowQuery.matches) {
+    return "narrow";
+  }
+  return compactQuery.matches ? "compact" : "wide";
 }
 
-/** The layout the user sees, which every user action starts from. */
-function readSeenLayout(store: SidebarLayoutStore): SidebarLayout {
-  return store.isNarrow ? store.narrow : readSeenWideLayout(store);
+function readCurrentLayout(store: SidebarLayoutStore): SidebarLayout {
+  return store.mode === "wide" ? store.wide : store.unstored;
 }
 
 function buildSnapshot(store: SidebarLayoutStore): SidebarSnapshot {
+  const layout = readCurrentLayout(store);
   const snapshot: SidebarSnapshot = {
-    state: readSeenLayout(store).state,
-    width: clampSidebarWidth(store.wide.width, store.viewportWidth),
+    state: layout.state,
+    width: clampSidebarWidth(layout.width, store.viewportWidth),
     maxWidth: clampSidebarWidth(MAX_WIDTH, store.viewportWidth),
-    isNarrow: store.isNarrow,
-    isSteppedAside: store.steppedAside !== null,
+    isNarrow: store.mode === "narrow",
   };
   return Object.freeze(snapshot);
 }
@@ -268,89 +279,74 @@ function publishSidebar(store: SidebarLayoutStore): void {
 
 /** Applies a new layout to the current mode. Only the wide layout is stored. */
 function applyLayout(store: SidebarLayoutStore, layout: SidebarLayout): void {
-  if (store.isNarrow) {
-    store.narrow = layout;
-  } else {
+  if (store.mode === "wide") {
     store.wide = layout;
     writeStoredLayout(store.storage, layout);
+  } else {
+    store.unstored = layout;
   }
   publishSidebar(store);
-}
-
-/** A user action: it ends the step aside, and no sandbox may ask for room until the window narrows. */
-function applyUserLayout(
-  store: SidebarLayoutStore,
-  layout: SidebarLayout,
-): void {
-  store.steppedAside = null;
-  store.roomGrant = null;
-  applyLayout(store, layout);
 }
 
 /**
- * Entering narrow mode collapses the sidebar without storing, and ends a
- * step aside; leaving it restores the wide layout.
+ * Entering a narrow or compact viewport builds its unstored layout from the
+ * wide one; a wide viewport shows the stored layout again.
  */
-function followNarrowQuery(
+function followViewportQueries(
   store: SidebarLayoutStore,
-  narrowQuery: NarrowViewportQuery,
+  options: SidebarLayoutOptions,
 ): void {
-  if (narrowQuery.matches === store.isNarrow) {
+  const mode = readMode(options.narrowQuery, options.compactQuery);
+  if (mode === store.mode) {
     return;
   }
-  store.isNarrow = narrowQuery.matches;
-  store.narrow = buildNarrowLayout(store.wide);
-  if (store.isNarrow) {
-    store.steppedAside = null;
-  }
+  store.mode = mode;
+  store.unstored = buildUnstoredLayout(store.wide, mode);
   publishSidebar(store);
 }
 
-/** Reads the stored layout and follows the narrow viewport query. */
+/** Reads the stored layout and follows the narrow and compact viewport queries. */
 export function createSidebarLayout(
   options: SidebarLayoutOptions,
 ): SidebarLayoutStore {
   const wide = readStoredLayout(options.storage);
+  const mode = readMode(options.narrowQuery, options.compactQuery);
   const store: SidebarLayoutStore = {
     wide,
-    narrow: buildNarrowLayout(wide),
-    isNarrow: options.narrowQuery.matches,
+    unstored: buildUnstoredLayout(wide, mode),
+    mode,
     viewportWidth: options.viewportWidth,
     storage: options.storage,
     listeners: new Set(),
     snapshot: DEFAULT_SNAPSHOT,
-    steppedAside: null,
-    roomGrant: { sandboxId: null },
-    shownSandboxId: null,
   };
   store.snapshot = buildSnapshot(store);
-  options.narrowQuery.addEventListener(
-    "change",
-    followNarrowQuery.bind(undefined, store, options.narrowQuery),
-  );
+  const follow = followViewportQueries.bind(undefined, store, options);
+  options.narrowQuery.addEventListener("change", follow);
+  options.compactQuery.addEventListener("change", follow);
   return store;
 }
 
 export function collapseSidebar(store: SidebarLayoutStore): void {
-  applyUserLayout(store, collapseLayout(readSeenLayout(store)));
+  applyLayout(store, collapseLayout(readCurrentLayout(store)));
 }
 
 export function expandSidebar(store: SidebarLayoutStore): void {
-  applyUserLayout(store, expandLayout(readSeenLayout(store)));
+  applyLayout(store, expandLayout(readCurrentLayout(store)));
 }
 
 export function pressHamburger(store: SidebarLayoutStore): void {
-  applyUserLayout(store, hideOrShowLayout(readSeenLayout(store)));
+  applyLayout(store, hideOrShowLayout(readCurrentLayout(store)));
 }
 
 export function toggleSidebar(store: SidebarLayoutStore): void {
-  applyUserLayout(store, toggleLayout(readSeenLayout(store)));
+  applyLayout(store, toggleLayout(readCurrentLayout(store)));
 }
 
 export function dragSidebar(store: SidebarLayoutStore, width: number): void {
-  applyUserLayout(
+  applyLayout(
     store,
-    dragLayout(readSeenWideLayout(store), width, store.viewportWidth),
+    dragLayout(readCurrentLayout(store), width, store.viewportWidth),
   );
 }
 
@@ -358,29 +354,13 @@ export function stepSidebarWidth(
   store: SidebarLayoutStore,
   step: number,
 ): void {
-  applyUserLayout(
+  applyLayout(
     store,
-    stepLayoutWidth(readSeenWideLayout(store), step, store.viewportWidth),
+    stepLayoutWidth(readCurrentLayout(store), step, store.viewportWidth),
   );
 }
 
-/**
- * Whether the window has widened, since the sidebar stepped aside, by the
- * room the rail gave: the expanded sidebar then leaves the stage bar no
- * narrower than it was beside the rail.
- */
-function hasRoomToComeBack(
-  steppedAside: SteppedAside,
-  viewportWidth: number,
-): boolean {
-  return viewportWidth >= steppedAside.viewportWidth + steppedAside.room;
-}
-
-/**
- * The window was resized: the width is clamped again. The stored width does
- * not change. A narrower window gives the grant to the sandbox shown, and a
- * sidebar that stepped aside comes back once there is room for it.
- */
+/** The window was resized: the width is clamped again. The stored width does not change. */
 export function changeSidebarViewport(
   store: SidebarLayoutStore,
   viewportWidth: number,
@@ -388,84 +368,8 @@ export function changeSidebarViewport(
   if (store.viewportWidth === viewportWidth) {
     return;
   }
-  if (viewportWidth < store.viewportWidth) {
-    store.roomGrant = { sandboxId: store.shownSandboxId };
-  }
-  if (
-    store.steppedAside !== null &&
-    hasRoomToComeBack(store.steppedAside, viewportWidth)
-  ) {
-    store.steppedAside = null;
-  }
   store.viewportWidth = viewportWidth;
   publishSidebar(store);
-}
-
-/**
- * An open grant goes to the sandbox shown; showing another sandbox than the
- * one it is bound to ends it.
- */
-function followShownSandbox(
-  grant: RoomGrant | null,
-  sandboxId: string,
-): RoomGrant | null {
-  if (grant === null) {
-    return null;
-  }
-  if (grant.sandboxId !== null && grant.sandboxId !== sandboxId) {
-    return null;
-  }
-  const bound: RoomGrant = { sandboxId };
-  return bound;
-}
-
-/**
- * The stage bar shows `sandboxId`. The sandbox shown when the app opened,
- * or right after the window narrowed, may ask for room; one the user opens
- * after it may not. A step aside stays: the sidebar never moves under the user.
- */
-export function showSidebarSandbox(
-  store: SidebarLayoutStore,
-  sandboxId: string,
-): void {
-  if (store.shownSandboxId === sandboxId) {
-    return;
-  }
-  store.shownSandboxId = sandboxId;
-  store.roomGrant = followShownSandbox(store.roomGrant, sandboxId);
-}
-
-function canStepAside(store: SidebarLayoutStore, sandboxId: string): boolean {
-  return (
-    !store.isNarrow &&
-    store.wide.state === "expanded" &&
-    store.steppedAside === null &&
-    store.roomGrant?.sandboxId === sandboxId
-  );
-}
-
-/**
- * The stage bar of `sandboxId` asks for room before folding its capsules.
- * An expanded sidebar on a wide viewport shows its rail, without storing it,
- * when the grant is the sandbox's. Returns whether it did.
- */
-export function askSidebarForRoom(
-  store: SidebarLayoutStore,
-  sandboxId: string,
-): boolean {
-  if (!canStepAside(store, sandboxId)) {
-    return false;
-  }
-  const expandedWidth = clampSidebarWidth(
-    store.wide.width,
-    store.viewportWidth,
-  );
-  store.steppedAside = {
-    viewportWidth: store.viewportWidth,
-    room: expandedWidth - SIDEBAR_RAIL_WIDTH,
-  };
-  publishSidebar(store);
-  return true;
 }
 
 export function readSidebarSnapshot(

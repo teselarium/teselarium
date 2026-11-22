@@ -37,10 +37,8 @@ import { FakeHistory } from "../../test/fake_history.ts";
 import {
   buildTestCombinations,
   buildTestStage,
-  ignoreShownSandbox,
   MOD_HOME_ROUTING,
   PAGE_HOME_ROUTING,
-  refuseSidebarRoom,
   settleStage,
   startTestStage,
 } from "../../test/test_stages.ts";
@@ -66,22 +64,10 @@ function createTestPlayerSites(): PlayerSites {
   return playerSites;
 }
 
-/** The stage view's answers to its stage bar: the sidebar's, in the app. */
-interface SidebarRoom {
-  onAskRoom: (sandboxId: string) => boolean;
-  onShowSandbox: (sandboxId: string) => void;
-}
-
-const NO_SIDEBAR: SidebarRoom = Object.freeze({
-  onAskRoom: refuseSidebarRoom,
-  onShowSandbox: ignoreShownSandbox,
-});
-
 /** Renders the stage view inside the tooltip provider the app gives it. */
 function renderStageView(
   stage: Stage,
   storage: MemoryStorage = createMemoryStorage(),
-  sidebarRoom: SidebarRoom = NO_SIDEBAR,
 ): RenderResult {
   const recentlyUsed = createRecentlyUsed({ storage });
   return render(
@@ -94,8 +80,6 @@ function renderStageView(
         userCatalog={createTestUserCatalog(stage, recentlyUsed)}
         playerSites={createTestPlayerSites()}
         theater={createTheaterSetting({ storage, stage })}
-        onAskRoom={sidebarRoom.onAskRoom}
-        onShowSandbox={sidebarRoom.onShowSandbox}
       />
     </TooltipProvider>,
   );
@@ -1535,59 +1519,7 @@ function readStageBarButtonNames(): string[] {
   return names;
 }
 
-function recordShownSandbox(calls: string[], sandboxId: string): void {
-  calls.push(`show ${sandboxId}`);
-}
-
-function recordRoomRequest(calls: string[], sandboxId: string): boolean {
-  calls.push(`ask ${sandboxId}`);
-  return false;
-}
-
-/** A sidebar that records what the stage bar tells it, and never makes room. */
-function buildRecordingSidebar(calls: string[]): SidebarRoom {
-  const sidebarRoom: SidebarRoom = {
-    onAskRoom: recordRoomRequest.bind(undefined, calls),
-    onShowSandbox: recordShownSandbox.bind(undefined, calls),
-  };
-  return sidebarRoom;
-}
-
-function readOverflowingScrollWidth(): number {
-  return 10_000;
-}
-
 describe("narrow stage bar", function describeNarrowStageBar(): void {
-  it("reports each sandbox shown, before it asks for room", async function reportsBeforeAsking(): Promise<void> {
-    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
-    const scrollWidth = vi
-      .spyOn(Element.prototype, "scrollWidth", "get")
-      .mockImplementation(readOverflowingScrollWidth);
-    try {
-      const stage = await startTestStage("");
-      const calls: string[] = [];
-      renderStageView(
-        stage,
-        createMemoryStorage(),
-        buildRecordingSidebar(calls),
-      );
-
-      resizeStageBar(640);
-      await openFromVisible(stage, "sandbox-1");
-
-      // The second sandbox's bar measures again as its content loads, so it may ask more than once.
-      expect(calls.slice(0, 4)).toEqual([
-        "show sandbox-1",
-        "ask sandbox-1",
-        "show sandbox-2",
-        "ask sandbox-2",
-      ]);
-      expect(new Set(calls.slice(3))).toEqual(new Set(["ask sandbox-2"]));
-    } finally {
-      scrollWidth.mockRestore();
-    }
-  });
-
   it("Phone: the messages button, then Close", async function foldsRightSide(): Promise<void> {
     vi.stubGlobal("ResizeObserver", FakeResizeObserver);
     const stage = await startTestStage(`#/run?mod=${SAMPLE_MOD_REFERENCE}`);

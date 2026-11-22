@@ -2,4 +2,4 @@
 "opentesela": patch
 ---
 
-When the window narrows, the sidebar shows its icon rail before the stage bar folds its capsules, and is expanded again once the window is wide enough.
+The expanded sidebar leaves the main area at least 784px wide, and shows its icon rail on viewports from 768px to 983px, so the stage bar's capsules no longer fold before the sidebar makes room.

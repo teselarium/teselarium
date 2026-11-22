@@ -10,7 +10,6 @@ import {
 } from "../../test/memory_storage.ts";
 import type { MemoryStorage } from "../../test/memory_storage.ts";
 import {
-  askSidebarForRoom,
   changeSidebarViewport,
   clampSidebarWidth,
   collapseLayout,
@@ -25,7 +24,6 @@ import {
   pressHamburger,
   readSidebarSnapshot,
   readStoredLayout,
-  showSidebarSandbox,
   SIDEBAR_LAYOUT_KEY,
   stepLayoutWidth,
   stepSidebarWidth,
@@ -33,9 +31,20 @@ import {
   toggleLayout,
   toggleSidebar,
 } from "./sidebar_layout.ts";
-import type { SidebarLayout, SidebarLayoutStore } from "./sidebar_layout.ts";
+import type {
+  SidebarLayout,
+  SidebarLayoutStore,
+  SidebarMode,
+} from "./sidebar_layout.ts";
 
 const WIDE_VIEWPORT = 1280;
+
+/** A viewport's width in each mode: a phone's, a compact one and a wide one. */
+const MODE_VIEWPORTS: Readonly<Record<SidebarMode, number>> = Object.freeze({
+  narrow: 375,
+  compact: 860,
+  wide: WIDE_VIEWPORT,
+});
 
 function buildLayout(
   state: SidebarLayout["state"],
@@ -50,20 +59,38 @@ interface LayoutFixture {
   store: SidebarLayoutStore;
   storage: MemoryStorage;
   narrowQuery: FakeColorSchemeQuery;
+  compactQuery: FakeColorSchemeQuery;
 }
 
 function buildFixture(
   storage: MemoryStorage = createMemoryStorage(),
-  isNarrow: boolean = false,
+  mode: SidebarMode = "wide",
 ): LayoutFixture {
-  const narrowQuery = createFakeColorSchemeQuery(isNarrow);
+  const narrowQuery = createFakeColorSchemeQuery(mode === "narrow");
+  const compactQuery = createFakeColorSchemeQuery(mode === "compact");
   const store = createSidebarLayout({
     storage,
     narrowQuery,
-    viewportWidth: isNarrow ? 375 : WIDE_VIEWPORT,
+    compactQuery,
+    viewportWidth: MODE_VIEWPORTS[mode],
   });
-  const fixture: LayoutFixture = { store, storage, narrowQuery };
+  const fixture: LayoutFixture = { store, storage, narrowQuery, compactQuery };
   return fixture;
+}
+
+/** The window is resized into `mode`: the width changes, then each query that changed fires. */
+function resizeInto(fixture: LayoutFixture, mode: SidebarMode): void {
+  changeSidebarViewport(fixture.store, MODE_VIEWPORTS[mode]);
+  if (fixture.narrowQuery.matches !== (mode === "narrow")) {
+    changeSystemPreference(fixture.narrowQuery, mode === "narrow");
+  }
+  if (fixture.compactQuery.matches !== (mode === "compact")) {
+    changeSystemPreference(fixture.compactQuery, mode === "compact");
+  }
+}
+
+function storeLayout(storage: MemoryStorage, layout: SidebarLayout): void {
+  storage.setItem(SIDEBAR_LAYOUT_KEY, JSON.stringify(layout));
 }
 
 function readStoredValue(storage: MemoryStorage): unknown {
@@ -179,10 +206,21 @@ describe("sidebar layout transitions", function describeTransitions(): void {
     expect(stepLayoutWidth(rail, -16, WIDE_VIEWPORT)).toEqual(rail);
   });
 
-  it("clamps to 40% of a smaller viewport", function clampsToViewport(): void {
-    expect(clampSidebarWidth(400, 800)).toBe(320);
-    expect(clampSidebarWidth(150, 800)).toBe(200);
+  it("keeps the main area at least 784px wide", function clampsToMainArea(): void {
+    expect(clampSidebarWidth(400, 1100)).toBe(316);
+    expect(clampSidebarWidth(400, 1184)).toBe(400);
+    expect(clampSidebarWidth(240, 1024)).toBe(240);
+    expect(clampSidebarWidth(240, 1000)).toBe(216);
+  });
+
+  it("is never narrower than 200px", function clampsToMinimum(): void {
+    expect(clampSidebarWidth(150, 1280)).toBe(200);
+    expect(clampSidebarWidth(400, 983)).toBe(200);
     expect(clampSidebarWidth(400, 400)).toBe(200);
+  });
+
+  it("stops a drag where the main area keeps 784px", function stopsDrag(): void {
+    expect(dragLayout(buildLayout("expanded"), 380, 1100).width).toBe(316);
   });
 });
 
@@ -280,13 +318,15 @@ describe("sidebar layout store", function describeStore(): void {
     const fixture = buildFixture();
     dragSidebar(fixture.store, 400);
 
-    changeSidebarViewport(fixture.store, 800);
+    changeSidebarViewport(fixture.store, 1100);
 
     expect(readSidebarSnapshot(fixture.store)).toMatchObject({
-      width: 320,
-      maxWidth: 320,
+      width: 316,
+      maxWidth: 316,
     });
     expect(readStoredValue(fixture.storage)).toMatchObject({ width: 400 });
+    changeSidebarViewport(fixture.store, 1184);
+    expect(readSidebarSnapshot(fixture.store).width).toBe(400);
   });
 });
 
@@ -298,7 +338,7 @@ describe("narrow viewports", function describeNarrow(): void {
       JSON.stringify({ state: "expanded", from: "expanded", width: 300 }),
     );
 
-    const fixture = buildFixture(storage, true);
+    const fixture = buildFixture(storage, "narrow");
 
     expect(readSidebarSnapshot(fixture.store)).toMatchObject({
       state: "collapsed",
@@ -307,7 +347,7 @@ describe("narrow viewports", function describeNarrow(): void {
   });
 
   it("stores nothing", function storesNothing(): void {
-    const fixture = buildFixture(createMemoryStorage(), true);
+    const fixture = buildFixture(createMemoryStorage(), "narrow");
 
     expandSidebar(fixture.store);
     toggleSidebar(fixture.store);
@@ -337,202 +377,91 @@ describe("narrow viewports", function describeNarrow(): void {
   });
 });
 
-function storeLayout(storage: MemoryStorage, layout: SidebarLayout): void {
-  storage.setItem(SIDEBAR_LAYOUT_KEY, JSON.stringify(layout));
-}
+describe("compact viewports", function describeCompact(): void {
+  it("shows the rail for a stored expanded sidebar", function showsRail(): void {
+    const fixture = buildFixture(createMemoryStorage(), "compact");
 
-/** A fixture whose sidebar has stepped aside for the sandbox `nobel`. */
-function buildSteppedAsideFixture(): LayoutFixture {
-  const fixture = buildFixture();
-  showSidebarSandbox(fixture.store, "nobel");
-  askSidebarForRoom(fixture.store, "nobel");
-  return fixture;
-}
-
-function dragTo300(store: SidebarLayoutStore): void {
-  dragSidebar(store, 300);
-}
-
-function stepWider(store: SidebarLayoutStore): void {
-  stepSidebarWidth(store, 16);
-}
-
-const USER_ACTIONS: readonly ((store: SidebarLayoutStore) => void)[] = [
-  collapseSidebar,
-  expandSidebar,
-  pressHamburger,
-  toggleSidebar,
-  dragTo300,
-  stepWider,
-];
-
-describe("stepping aside for the stage bar", function describeStepAside(): void {
-  it("steps aside for the first sandbox shown, and says collapsed", function stepsAside(): void {
-    const fixture = buildFixture();
-    showSidebarSandbox(fixture.store, "nobel");
-
-    expect(askSidebarForRoom(fixture.store, "nobel")).toBe(true);
     expect(readSidebarSnapshot(fixture.store)).toMatchObject({
       state: "collapsed",
-      width: 240,
-      isSteppedAside: true,
+      isNarrow: false,
     });
-    expect(askSidebarForRoom(fixture.store, "nobel")).toBe(false);
   });
 
-  it("refuses a sandbox shown after a first one that never asked", function refusesLaterSandbox(): void {
-    const fixture = buildFixture();
-    showSidebarSandbox(fixture.store, "short");
-    showSidebarSandbox(fixture.store, "long");
+  it("keeps a stored collapsed or hidden sidebar", function keepsStoredState(): void {
+    for (const state of ["collapsed", "hidden"] as const) {
+      const storage = createMemoryStorage();
+      storeLayout(storage, buildLayout(state));
 
-    expect(askSidebarForRoom(fixture.store, "long")).toBe(false);
+      const fixture = buildFixture(storage, "compact");
+
+      expect(readSidebarSnapshot(fixture.store).state).toBe(state);
+    }
+  });
+
+  it("expands inline at 200px, and stores nothing", function expandsInline(): void {
+    const fixture = buildFixture(createMemoryStorage(), "compact");
+
+    toggleSidebar(fixture.store);
     expect(readSidebarSnapshot(fixture.store)).toMatchObject({
       state: "expanded",
-      isSteppedAside: false,
+      width: 200,
+      maxWidth: 200,
+      isNarrow: false,
     });
+    dragSidebar(fixture.store, 120);
+    expect(readSidebarSnapshot(fixture.store).state).toBe("collapsed");
+    stepSidebarWidth(fixture.store, 16);
+    expect(readSidebarSnapshot(fixture.store).state).toBe("expanded");
+    pressHamburger(fixture.store);
+
+    expect(readSidebarSnapshot(fixture.store).state).toBe("hidden");
+    expect(fixture.storage.items.size).toBe(0);
   });
 
-  it("refuses another sandbox until the viewport narrows, then grants the shown one", function grantsAfterNarrowing(): void {
-    const fixture = buildFixture();
-    showSidebarSandbox(fixture.store, "short");
-    showSidebarSandbox(fixture.store, "long");
-    showSidebarSandbox(fixture.store, "short");
-
-    expect(askSidebarForRoom(fixture.store, "short")).toBe(false);
-    changeSidebarViewport(fixture.store, 1300);
-    expect(askSidebarForRoom(fixture.store, "short")).toBe(false);
-    changeSidebarViewport(fixture.store, 1200);
-    expect(askSidebarForRoom(fixture.store, "long")).toBe(false);
-    expect(askSidebarForRoom(fixture.store, "short")).toBe(true);
-  });
-
-  it("gives the grant after narrowing to the next sandbox shown when none is", function grantsNextShown(): void {
-    const fixture = buildFixture();
-    changeSidebarViewport(fixture.store, 1200);
-    showSidebarSandbox(fixture.store, "nobel");
-
-    expect(askSidebarForRoom(fixture.store, "nobel")).toBe(true);
-  });
-
-  it("refuses when collapsed, hidden or on a narrow viewport", function refusesWithoutRoom(): void {
-    const collapsed = buildFixture();
-    collapseSidebar(collapsed.store);
-    const hiddenStorage = createMemoryStorage();
-    storeLayout(hiddenStorage, buildLayout("hidden"));
-    const fixtures = [
-      collapsed,
-      buildFixture(hiddenStorage),
-      buildFixture(createMemoryStorage(), true),
-    ];
-
-    for (const fixture of fixtures) {
-      changeSidebarViewport(fixture.store, 360);
-      showSidebarSandbox(fixture.store, "nobel");
-      const before = readSidebarSnapshot(fixture.store);
-
-      expect(askSidebarForRoom(fixture.store, "nobel")).toBe(false);
-      expect(readSidebarSnapshot(fixture.store).state).toBe(before.state);
-    }
-  });
-
-  it("ends the step aside and the grant on every user action", function endsOnUserAction(): void {
-    for (const userAction of USER_ACTIONS) {
-      const fixture = buildSteppedAsideFixture();
-
-      userAction(fixture.store);
-
-      expect(readSidebarSnapshot(fixture.store).isSteppedAside).toBe(false);
-      expect(fixture.store.steppedAside).toBeNull();
-      expect(fixture.store.roomGrant).toBeNull();
-    }
-  });
-
-  it("starts a user action from the rail the user sees", function startsFromRail(): void {
-    const toggled = buildSteppedAsideFixture();
-    const expanded = buildSteppedAsideFixture();
-    const dragged = buildSteppedAsideFixture();
-
-    toggleSidebar(toggled.store);
-    expandSidebar(expanded.store);
-    dragSidebar(dragged.store, 120);
-
-    expect(readSidebarSnapshot(toggled.store).state).toBe("expanded");
-    expect(readSidebarSnapshot(expanded.store).state).toBe("expanded");
-    expect(readStoredValue(dragged.storage)).toEqual(buildLayout("collapsed"));
-  });
-
-  it("keeps the stored layout expanded at its width", function storesNothing(): void {
+  it("restores the stored layout once the viewport is wide", function restoresWide(): void {
     const storage = createMemoryStorage();
     storeLayout(storage, buildLayout("expanded", "expanded", 320));
     const fixture = buildFixture(storage);
-    showSidebarSandbox(fixture.store, "nobel");
 
-    askSidebarForRoom(fixture.store, "nobel");
+    resizeInto(fixture, "compact");
+    expect(readSidebarSnapshot(fixture.store).state).toBe("collapsed");
+    pressHamburger(fixture.store);
+    resizeInto(fixture, "wide");
 
+    expect(readSidebarSnapshot(fixture.store)).toMatchObject({
+      state: "expanded",
+      width: 320,
+    });
     expect(readStoredValue(storage)).toEqual(
       buildLayout("expanded", "expanded", 320),
     );
-    expect(readSidebarSnapshot(buildFixture(storage).store)).toMatchObject({
-      state: "expanded",
-      width: 320,
-      isSteppedAside: false,
-    });
-  });
-});
-
-/** A fixture whose 240px sidebar stepped aside when the window narrowed to 860px. */
-function buildNarrowedFixture(storage: MemoryStorage): LayoutFixture {
-  const fixture = buildFixture(storage);
-  showSidebarSandbox(fixture.store, "nobel");
-  changeSidebarViewport(fixture.store, 860);
-  askSidebarForRoom(fixture.store, "nobel");
-  return fixture;
-}
-
-describe("coming back after stepping aside", function describeComeback(): void {
-  it("is not back 40px wider, and is back wider by the room the rail gave", function comesBackByRoom(): void {
-    const fixture = buildNarrowedFixture(createMemoryStorage());
-
-    changeSidebarViewport(fixture.store, 900);
-    expect(readSidebarSnapshot(fixture.store).state).toBe("collapsed");
-    changeSidebarViewport(fixture.store, 860 + 240 - 48 - 1);
-    expect(readSidebarSnapshot(fixture.store).state).toBe("collapsed");
-    changeSidebarViewport(fixture.store, 860 + 240 - 48);
-    expect(readSidebarSnapshot(fixture.store)).toMatchObject({
-      state: "expanded",
-      width: 240,
-      isSteppedAside: false,
-    });
   });
 
-  it("counts the room from the width clamped to the viewport", function countsClampedRoom(): void {
-    const storage = createMemoryStorage();
-    storeLayout(storage, buildLayout("expanded", "expanded", 400));
-    const fixture = buildNarrowedFixture(storage);
+  it("applies the narrow rules on entering a narrow viewport", function entersNarrow(): void {
+    const fixture = buildFixture(createMemoryStorage(), "compact");
+    toggleSidebar(fixture.store);
 
-    changeSidebarViewport(fixture.store, 860 + 344 - 48 - 1);
-    expect(readSidebarSnapshot(fixture.store).isSteppedAside).toBe(true);
-    changeSidebarViewport(fixture.store, 860 + 344 - 48);
-    expect(readSidebarSnapshot(fixture.store).isSteppedAside).toBe(false);
-  });
+    resizeInto(fixture, "narrow");
 
-  it("is collapsed on a narrow viewport, and expanded after widening back", function followsNarrowViewport(): void {
-    const fixture = buildNarrowedFixture(createMemoryStorage());
-
-    changeSidebarViewport(fixture.store, 700);
-    changeSystemPreference(fixture.narrowQuery, true);
     expect(readSidebarSnapshot(fixture.store)).toMatchObject({
       state: "collapsed",
       isNarrow: true,
-      isSteppedAside: false,
     });
-    changeSidebarViewport(fixture.store, 1280);
-    changeSystemPreference(fixture.narrowQuery, false);
+  });
+
+  it("shows the rail from narrow through compact, and expands once wide", function widensThroughCompact(): void {
+    const fixture = buildFixture(createMemoryStorage(), "narrow");
+
+    resizeInto(fixture, "compact");
+    expect(readSidebarSnapshot(fixture.store)).toMatchObject({
+      state: "collapsed",
+      isNarrow: false,
+    });
+    resizeInto(fixture, "wide");
 
     expect(readSidebarSnapshot(fixture.store)).toMatchObject({
       state: "expanded",
       width: 240,
-      isNarrow: false,
     });
   });
 });
