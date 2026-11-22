@@ -90,7 +90,7 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 - **THEN** `requests` lists the `storage.get` for that key with its result, and then the `storage.set` with that key and the written value
 
 ### Requirement: Scripted answers
-`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save`, `ui.confirm`, `players.open`, `userCatalog.import`, `userCatalog.update`, `userCatalog.add`, `userCatalog.export` or `userCatalog.remove` with a boolean value, `mods.open` or `mosaics.open` with `null`, or `catalog.list` with a catalog (see "Scripted catalog"). The request SHALL resolve with the queued value without any dialog. A `mods.open` or `mosaics.open` answered this way SHALL NOT open anything, and a `userCatalog.*` request answered this way SHALL NOT change the user catalog. Requests without a queued answer SHALL be answered as in the mount check, and `mods.check` and `mosaics.check`, which cannot be answered, SHALL be answered with error code `-32002`. In cases, no request that needs the user SHALL be a finding, answered or not.
+`answer(method, value)` SHALL queue the answer to the next request for `method`, which SHALL be `links.open`, `files.save`, `ui.confirm`, `players.open`, `userCatalog.import`, `userCatalog.update`, `userCatalog.add`, `userCatalog.export`, `userCatalog.remove`, `userCatalog.history` or `userCatalog.exportFolder` with a boolean value, `userCatalog.save` with a mosaic address or `null`, `mods.open` or `mosaics.open` with `null`, or `catalog.list` with a catalog (see "Scripted catalog"). The request SHALL resolve with the queued value without any dialog. A `mods.open` or `mosaics.open` answered this way SHALL NOT open anything, and a `userCatalog.*` request answered this way SHALL NOT change the user catalog. Requests without a queued answer SHALL be answered as in the mount check, and `mods.check` and `mosaics.check`, which cannot be answered, SHALL be answered with error code `-32002`. In cases, no request that needs the user SHALL be a finding, answered or not.
 
 #### Scenario: Confirm answered yes
 - **WHEN** a case calls `answer("ui.confirm", true)` and the mod then sends `ui.confirm`
@@ -123,6 +123,14 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 #### Scenario: Unanswered removal
 - **WHEN** the mod sends `userCatalog.remove` for a fixture mosaic in a case that queued no answer
 - **THEN** the request resolves with `false`, and the user catalog is unchanged
+
+#### Scenario: Save answered
+- **WHEN** a case calls `answer("userCatalog.save", "opentesela-browser:///fixture/laureates_my_way.yaml")` and the mod then sends `userCatalog.save` with a draft
+- **THEN** the request resolves with that address, no dialog is shown, nothing is saved, and the case's `requests` holds the `userCatalog.save` with its `content`
+
+#### Scenario: Wrong save answer
+- **WHEN** a case calls `answer("userCatalog.save", true)`
+- **THEN** the call throws an error that says the answer to `userCatalog.save` must be a mosaic address or `null`
 
 ### Requirement: What a case records
 While a case runs, the check SHALL record as `test` findings what the mount check records as `mount` findings, with the same level and source and a message that also names the case: blocked requests and blocked browser dialogs as warnings, and each request answered with `-32600`, `-32601` or `-32602` as an error. A mount that throws or rejects SHALL NOT be a finding, since it rejects the case's `mount` call.
@@ -204,7 +212,7 @@ A `ui.notify` sent while a case runs SHALL resolve with `null` and SHALL NOT be 
 - **THEN** the request resolves with `null`, the report has no finding whose message includes `No books found`, and `requests` lists `ui.notify` with those params and result `null`
 
 ### Requirement: Scripted catalog
-The answer to `catalog.list` SHALL be a mapping whose optional `mods`, `collections` and `mosaics` are lists of entries with a non-empty string `source`, an optional `listedBy` that is `"instance"`, `"default"` or `"user"`, and an optional `place` that is `"remote"` or `"browser"`. A mosaic entry may also have an optional `defaultOf` that is `null` or `{ source, title }` with non-empty strings, and an optional `provenance` that is `null` or `{ folder, path, addedAt, updatedAt }` with strings or `null`, `addedAt` a non-empty string. A missing list SHALL be empty. A missing `listedBy` SHALL be `"default"` for a mosaic with a `defaultOf`, `"user"` for one with a `provenance`, and `"instance"` otherwise. A missing `place` SHALL be `"browser"` for an `opentesela-browser:` source and `"remote"` otherwise. A missing `defaultOf` or `provenance` SHALL be `null`. The request SHALL resolve with the catalog in that complete form. Any other value SHALL make `answer` throw.
+The answer to `catalog.list` SHALL be a mapping whose optional `mods`, `collections` and `mosaics` are lists of entries with a non-empty string `source`, an optional `listedBy` that is `"instance"`, `"default"` or `"user"`, and an optional `place` that is `"remote"` or `"browser"`. A mosaic entry may also have an optional `defaultOf` that is `null` or `{ source, title }` with non-empty strings, and an optional `provenance` that is `null` or a mapping with a non-empty string `addedAt`, `folder`, `path`, `updatedAt` and `copiedFrom` each a string or `null`, `null` when missing, and an optional boolean `changedSinceExport`, `false` when missing. A missing list SHALL be empty. A missing `listedBy` SHALL be `"default"` for a mosaic with a `defaultOf`, `"user"` for one with a `provenance`, and `"instance"` otherwise. A missing `place` SHALL be `"browser"` for an `opentesela-browser:` source and `"remote"` otherwise. A missing `defaultOf` or `provenance` SHALL be `null`. The request SHALL resolve with the catalog in that complete form. Any other value SHALL make `answer` throw.
 
 #### Scenario: Fixture catalog
 - **WHEN** a case calls `answer("catalog.list", { "mods": [{ "source": "./default_mods/mod_explorer/fixtures/listed_mod" }] })` and the mod then sends `catalog.list`
@@ -216,7 +224,7 @@ The answer to `catalog.list` SHALL be a mapping whose optional `mods`, `collecti
 
 #### Scenario: Fixture user mosaic
 - **WHEN** a case answers `catalog.list` with a mosaic whose `source` is `opentesela-browser:///fixture/nobel_map.yaml` and whose `provenance` has the folder `my-mosaics`
-- **THEN** the request resolves with that mosaic, with `listedBy` `"user"`, `place` `"browser"` and `defaultOf` `null`
+- **THEN** the request resolves with that mosaic, with `listedBy` `"user"`, `place` `"browser"` and `defaultOf` `null`, and its `provenance` has `changedSinceExport` `false` and `copiedFrom` `null`
 
 #### Scenario: Wrong mark
 - **WHEN** a case answers `catalog.list` with a mosaic whose `place` is `"disk"`
