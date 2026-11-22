@@ -10,6 +10,7 @@ import {
   mountWithTarget,
   readResultSource,
 } from "./case_helpers.ts";
+import { readMosaicFileName } from "../src/mosaic_file_name.ts";
 
 /** The viewers of the mosaic viewer's own config. */
 const CONFIG_MOD_VIEWER = "mod_viewer";
@@ -96,4 +97,60 @@ export async function showsRefusedCheck(context: CaseContext): Promise<void> {
   const alert = await context.waitFor(findAlert.bind(undefined, context));
   context.expect(alert.textContent).toBe(checkRequest.error?.message);
   context.expect(button?.disabled).toBe(false);
+}
+
+/** The text the viewer inspected its target with, from its `mosaics.inspect` result. */
+function readInspectedContent(context: CaseContext): string {
+  const [request] = findRequests(context, "mosaics.inspect");
+  const result = request?.result as { content?: unknown } | undefined;
+  if (typeof result?.content !== "string") {
+    throw new Error(
+      "The viewer's mosaics.inspect has no content in its result.",
+    );
+  }
+  return result.content;
+}
+
+export async function downloadsMosaic(context: CaseContext): Promise<void> {
+  await mountWithTarget(context, FIXTURE_REFERENCES.shownMosaic);
+  context.answer("files.save", true);
+
+  clickButton(context, "Download");
+
+  const saveRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "files.save"),
+  );
+  context.expect(saveRequest.params).toEqual({
+    name: "shown_mosaic.yaml",
+    content: readInspectedContent(context),
+    type: "application/yaml",
+  });
+  context.expect(findAlert(context)).toBe(null);
+}
+
+export async function showsCancelledDownload(
+  context: CaseContext,
+): Promise<void> {
+  await mountWithTarget(context, FIXTURE_REFERENCES.shownMosaic);
+  context.answer("files.save", false);
+
+  clickButton(context, "Download");
+
+  const saveRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "files.save"),
+  );
+  context.expect(saveRequest.result).toBe(false);
+  context.expect(findAlert(context)).toBe(null);
+}
+
+export function namesDownloadedFiles(context: CaseContext): void {
+  context
+    .expect(readMosaicFileName("https://example.org/mosaics/nobel%20map.yaml"))
+    .toBe("nobel map.yaml");
+  context
+    .expect(readMosaicFileName("https://example.org/mosaics/"))
+    .toBe("mosaic.yaml");
+  context
+    .expect(readMosaicFileName("https://example.org/mosaics/a%2Fb.yaml"))
+    .toBe("mosaic.yaml");
 }

@@ -13,6 +13,9 @@ import {
   opensModViewer,
   opensMosaic,
   showsRefusedCheck,
+  downloadsMosaic,
+  namesDownloadedFiles,
+  showsCancelledDownload,
 } from "./action_cases.ts";
 import {
   aliasesFromSuggestion,
@@ -88,6 +91,9 @@ export default function registerViewerTests(t: ModTestRegistration): void {
     opensCollectionViewer,
   );
   t.test("opens the mosaic", opensMosaic);
+  t.test("downloads a mosaic that is not stored", downloadsMosaic);
+  t.test("shows nothing for a cancelled download", showsCancelledDownload);
+  t.test("names downloaded files after their address", namesDownloadedFiles);
   t.test("shows a refused check and enables it again", showsRefusedCheck);
   t.test("shows where a stored mosaic comes from", showsStoredProvenance);
   t.test("shows where a remote mosaic comes from", showsRemoteProvenance);
@@ -101,7 +107,10 @@ export default function registerViewerTests(t: ModTestRegistration): void {
     "updates a stored mosaic from a file",
     updatesStoredMosaicWhenCancelled,
   );
-  t.test("says a stored mosaic changed since export", showsChangedSinceExport);
+  t.test(
+    "says a stored mosaic has unexported changes",
+    showsChangedSinceExport,
+  );
   t.test("exports the folder of a stored mosaic", exportsFolderOfStoredMosaic);
   t.test("shows the history of a stored mosaic", showsHistoryOfStoredMosaic);
   t.test(

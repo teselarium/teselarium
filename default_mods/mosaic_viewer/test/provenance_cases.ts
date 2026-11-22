@@ -175,7 +175,7 @@ export async function showsChangedSinceExport(
 
   const section = findSection(context, "Where it comes from");
   const badge = section.querySelector("[data-ot-variant]");
-  context.expect(badge?.textContent).toBe("Changed since export");
+  context.expect(badge?.textContent).toBe("Unexported changes");
   context.expect(badge?.getAttribute("data-ot-variant")).toBe("warning");
   context.expect(findButton(context, "Export folder")).toBeTruthy();
   context.expect(findButton(context, "History…")).toBeTruthy();
@@ -228,5 +228,5 @@ export async function hasNoFolderExportForSingleFile(
   context.expect(findButton(context, "History…")).toBeTruthy();
   context.expect(findButton(context, "Export folder")).toBe(null);
   const section = findSection(context, "Where it comes from");
-  context.expect(section.textContent).not.toContain("Changed since export");
+  context.expect(section.textContent).not.toContain("Unexported changes");
 }

@@ -9,6 +9,10 @@
 import type { ModTestRegistration } from "../../mod_api.d.ts";
 import {
   addsByUrlWhenCancelled,
+  downloadsRemoteMosaic,
+  exportsStoredMosaics,
+  namesDownloadedFiles,
+  showsCancelledDownload,
   importsWhenAsked,
   marksChangedMosaics,
   listsFailureAsAlert,
@@ -44,7 +48,11 @@ export default function registerExplorerTests(t: ModTestRegistration): void {
     "shows where each mosaic lives and marks the user's",
     showsWhereMosaicsLive,
   );
-  t.test("marks a mosaic changed since export", marksChangedMosaics);
+  t.test("marks a mosaic with unexported changes", marksChangedMosaics);
+  t.test("exports a stored mosaic from its card", exportsStoredMosaics);
+  t.test("downloads a remote mosaic from its card", downloadsRemoteMosaic);
+  t.test("shows nothing for a cancelled download", showsCancelledDownload);
+  t.test("names downloaded files after their address", namesDownloadedFiles);
   t.test("imports mosaics when asked", importsWhenAsked);
   t.test("adds a mosaic by URL when asked", addsByUrlWhenCancelled);
   t.test("says the list is busy while it loads", drawsBusyListWhileLoading);

@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import type {
   FrameLocator,
@@ -654,7 +655,11 @@ const MOSAIC_EXPLORER_CASES = [
   "opens the viewer for the selected mosaic",
   "shows a refused open",
   "shows where each mosaic lives and marks the user's",
-  "marks a mosaic changed since export",
+  "marks a mosaic with unexported changes",
+  "exports a stored mosaic from its card",
+  "downloads a remote mosaic from its card",
+  "shows nothing for a cancelled download",
+  "names downloaded files after their address",
   "imports mosaics when asked",
   "adds a mosaic by URL when asked",
   "says the list is busy while it loads",
@@ -680,6 +685,9 @@ const MOSAIC_VIEWER_CASES = [
   "opens the mod viewer from the mod's title",
   "opens the collection viewer from the collection's title",
   "opens the mosaic",
+  "downloads a mosaic that is not stored",
+  "shows nothing for a cancelled download",
+  "names downloaded files after their address",
   "shows a refused check and enables it again",
   "shows where a stored mosaic comes from",
   "shows where a remote mosaic comes from",
@@ -687,7 +695,7 @@ const MOSAIC_VIEWER_CASES = [
   "removes a stored mosaic",
   "exports a stored mosaic",
   "updates a stored mosaic from a file",
-  "says a stored mosaic changed since export",
+  "says a stored mosaic has unexported changes",
   "exports the folder of a stored mosaic",
   "shows the history of a stored mosaic",
   "offers no folder export for a single file",
@@ -2604,7 +2612,7 @@ async function openMapCopy(page: Page): Promise<FrameLocator> {
   return viewer;
 }
 
-/** Runs in the explorer's frame: the "Changed since export" badges' text color and the fill behind them. */
+/** Runs in the explorer's frame: the "Unexported changes" badges' text color and the fill behind them. */
 function readChangedBadgeColors(): { color: string; fill: string }[] {
   const badges: { color: string; fill: string }[] = [];
   for (const badge of document.querySelectorAll(
@@ -2655,15 +2663,38 @@ test.describe("Editing mosaics in the viewer", function describeEditing(): void 
       mosaicViewerFrame(page).getByRole("region", {
         name: "Where it comes from",
       }),
-    ).toContainText("Changed since export");
+    ).toContainText("Unexported changes");
+    await expect(
+      mosaicViewerFrame(page).getByRole("button", {
+        name: "Download",
+        exact: true,
+      }),
+    ).toHaveCount(0);
     await openSection(page, "Mosaics");
     await waitForMosaicList(page);
     const copy = mosaicExplorerCards(page).filter({
-      hasText: "Changed since export",
+      hasText: "Unexported changes",
     });
     await expect(copy.getByRole("heading")).toHaveText(MAP_MOSAIC_TITLE);
     await expect(copy.getByText("Added by you")).toBeVisible();
     await expect(copy.getByText("Browser", { exact: true })).toBeVisible();
+    await expect(copy.getByRole("button", { name: /^Download / })).toHaveCount(
+      0,
+    );
+
+    // Export from the list: the app's confirmation, the download, and no badge after it.
+    await copy
+      .getByRole("button", { name: `Export ${MAP_MOSAIC_TITLE}` })
+      .click();
+    const exportDialog = page.locator("dialog[open]");
+    const downloading = page.waitForEvent("download");
+    await exportDialog.getByRole("button", { name: "Save" }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(/\.yaml$/);
+    const exported = mosaicCard(page, MAP_MOSAIC_TITLE).filter({
+      hasText: "Added by you",
+    });
+    await expect(exported).not.toContainText("Unexported changes");
   });
 
   test("Form on a phone", async function laysOutFormOnPhone({
@@ -2723,7 +2754,7 @@ test.describe("Editing mosaics in the viewer", function describeEditing(): void 
     await waitForMosaicList(page);
 
     const card = mosaicCard(page, "Edited books");
-    const badge = card.getByText("Changed since export");
+    const badge = card.getByText("Unexported changes");
     await expect(badge).toHaveAttribute("data-ot-variant", "warning");
     await expect
       .poll(readChangedBadgeContrast.bind(undefined, page))
@@ -2732,5 +2763,113 @@ test.describe("Editing mosaics in the viewer", function describeEditing(): void 
     await expect
       .poll(readChangedBadgeContrast.bind(undefined, page))
       .toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
+  });
+});
+
+/** Expects each of the card's buttons inside it, and at least 32px tall. */
+async function expectButtonsInsideCard(card: Locator): Promise<void> {
+  const cardBox = await card.evaluate(readElementBox);
+  for (const button of await card.getByRole("button").all()) {
+    const box = await button.evaluate(readElementBox);
+    expect(box.height).toBeGreaterThanOrEqual(32);
+    expect(box.left).toBeGreaterThanOrEqual(cardBox.left);
+    expect(box.right).toBeLessThanOrEqual(cardBox.right);
+  }
+}
+
+/** The text the app serves at the sample map's address. */
+async function readServedMapText(page: Page): Promise<string> {
+  const response = await page.request.get(
+    new URL(MAP_MOSAIC_REFERENCE, page.url()).href,
+  );
+  return response.text();
+}
+
+/** Presses Save in the app's save confirmation, and reads the downloaded file. */
+async function saveDownload(
+  page: Page,
+): Promise<{ name: string; text: string }> {
+  const downloading = page.waitForEvent("download");
+  await page
+    .locator("dialog[open]")
+    .getByRole("button", { name: "Save" })
+    .click();
+  const download = await downloading;
+  const saved = {
+    name: download.suggestedFilename(),
+    text: await readFile(await download.path(), "utf8"),
+  };
+  return saved;
+}
+
+test.describe("Exporting and downloading mosaics", function describeExplorerExport(): void {
+  test("Download a sample from the explorer", async function downloadsFromCard({
+    page,
+  }): Promise<void> {
+    await page.goto("/#/");
+    await openSection(page, "Mosaics");
+    await waitForMosaicList(page);
+    const card = mosaicCard(page, MAP_MOSAIC_TITLE);
+    await expect(card.getByRole("button")).toHaveText([
+      "Open",
+      "View",
+      "Download",
+    ]);
+
+    await card
+      .getByRole("button", { name: `Download ${MAP_MOSAIC_TITLE}` })
+      .click();
+
+    const saved = await saveDownload(page);
+    expect(saved.name).toBe("nobel_laureates_map.yaml");
+    expect(saved.text).toBe(await readServedMapText(page));
+  });
+
+  test("Download from the viewer", async function downloadsFromViewer({
+    page,
+  }): Promise<void> {
+    await page.goto(
+      `/#/run?mod=mosaic_viewer&target=${encodeURIComponent(MAP_MOSAIC_REFERENCE)}`,
+    );
+    const viewer = mosaicViewerFrame(page);
+
+    await viewer.getByRole("button", { name: "Download", exact: true }).click();
+
+    const saved = await saveDownload(page);
+    expect(saved.name).toBe("nobel_laureates_map.yaml");
+    expect(saved.text).toBe(await readServedMapText(page));
+  });
+
+  test("Card buttons on a phone", async function laysOutCardButtons({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await page.goto("/#/");
+    await seedUserCatalog(
+      page,
+      buildStoredBookListSeed(page, "Edited books", "edited_books.yaml"),
+    );
+    await openSection(page, "Mosaics");
+    await waitForMosaicList(page);
+
+    const stored = mosaicCard(page, "Edited books");
+    const sample = mosaicCard(page, MAP_MOSAIC_TITLE);
+    await expect(stored.getByRole("button")).toHaveText([
+      "Open",
+      "View",
+      "Export",
+    ]);
+    await expect(sample.getByRole("button")).toHaveText([
+      "Open",
+      "View",
+      "Download",
+    ]);
+    await expectButtonsInsideCard(stored);
+    await expectButtonsInsideCard(sample);
+    expect(
+      await mosaicExplorerFrame(page)
+        .locator("body")
+        .evaluate(canFrameScrollSideways),
+    ).toBe(false);
   });
 });

@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Mosaic explorer and viewer cases
-The cases of the mosaic explorer SHALL answer `catalog.list` with a catalog of fixture mosaics before mounting, and SHALL cover listing the catalog's mosaics, a mosaic that cannot be inspected, a default mosaic's mark, the place badges, the "Added by you" and "Changed since export" marks, both card buttons, answering `mosaics.open` and `mods.open` with `null`, and "Import…" and "Add by URL…", answering their requests with `true` and `false`. The cases of the mosaic viewer SHALL cover the metadata, its mod and collection, a failing mod or collection, a missing, empty or failing `target`, the links to the mod and collection viewers, "Open mosaic", "Check mosaic", whose `mosaics.check` a case cannot answer and the check refuses with `-32002`, the provenance section of a stored and of a remote user mosaic, "Update from file…", "Export", "History…", "Export folder" and "Remove", answering their requests, and edit mode: each `mode`, the form, the YAML tab, the hints, the kept draft, and saving, answering `userCatalog.save`.
+The cases of the mosaic explorer SHALL answer `catalog.list` with a catalog of fixture mosaics before mounting, and SHALL cover listing the catalog's mosaics, a mosaic that cannot be inspected, a default mosaic's mark, the place badges, the "Added by you" and "Unexported changes" marks, the card buttons, "Export" answering `userCatalog.export`, "Download" answering `files.save`, answering `mosaics.open` and `mods.open` with `null`, and "Import…" and "Add by URL…", answering their requests with `true` and `false`. The cases of the mosaic viewer SHALL cover the metadata, its mod and collection, a failing mod or collection, a missing, empty or failing `target`, the links to the mod and collection viewers, "Open mosaic", "Check mosaic", whose `mosaics.check` a case cannot answer and the check refuses with `-32002`, the provenance section of a stored and of a remote user mosaic, "Update from file…", "Export", "History…", "Export folder" and "Remove", answering their requests, "Download" answering `files.save`, and edit mode: each `mode`, the form, the YAML tab, the hints, the kept draft, and saving, answering `userCatalog.save`.
 
 #### Scenario: Open in an explorer case
 - **WHEN** a case answers `catalog.list` with a catalog whose `mosaics` holds a fixture mosaic, mounts the explorer, answers `mosaics.open` with `null`, and presses "Open"
@@ -31,7 +31,7 @@ The cases of the mosaic explorer SHALL answer `catalog.list` with a catalog of f
 - **THEN** the case's `requests` holds a `mosaics.edit` with the new title, and a `userCatalog.save` whose `copiedFrom` is the fixture mosaic's source
 
 ### Requirement: Mosaic viewer updates, exports and removes user mosaics
-For a stored mosaic, the "Where it comes from" section SHALL have "Update from file…", "Export", "History…" and "Remove" buttons, which send `userCatalog.update`, `userCatalog.export`, `userCatalog.history` and `userCatalog.remove` with the target's source, and, when it came from a folder, "Export folder", which sends `userCatalog.exportFolder` with the folder's name. It SHALL say "Changed since export" while the mosaic is. For a remote user mosaic it SHALL have "Remove" only. After a removal, the viewer SHALL say in a `role="status"` region that the mosaic was removed from your catalog, and SHALL hide these buttons. After an update or a restore, it SHALL show the mosaic again, inspected anew.
+For a stored mosaic, the "Where it comes from" section SHALL have "Update from file…", "Export", "History…" and "Remove" buttons, which send `userCatalog.update`, `userCatalog.export`, `userCatalog.history` and `userCatalog.remove` with the target's source, and, when it came from a folder, "Export folder", which sends `userCatalog.exportFolder` with the folder's name. It SHALL say "Unexported changes" while the mosaic is changed since export (see "Changed since export" in `user-catalog`). "Export" SHALL be there whether or not the mosaic has unexported changes, so a copy of the file can always be downloaded. For a remote user mosaic it SHALL have "Remove" only. After a removal, the viewer SHALL say in a `role="status"` region that the mosaic was removed from your catalog, and SHALL hide these buttons. After an update or a restore, it SHALL show the mosaic again, inspected anew.
 
 #### Scenario: Removed from the viewer
 - **WHEN** the viewer shows a stored mosaic and the user presses "Remove" and confirms
@@ -43,7 +43,7 @@ For a stored mosaic, the "Where it comes from" section SHALL have "Update from f
 
 #### Scenario: Edited and not exported
 - **WHEN** the viewer shows a stored mosaic of the folder `my-mosaics` that was saved after its import
-- **THEN** its section says "Changed since export" and has "Export folder"
+- **THEN** its section says "Unexported changes" and has "Export" and "Export folder"
 
 ## ADDED Requirements
 
@@ -108,8 +108,49 @@ On a 360×740 viewport, edit mode SHALL be one column: the tabs on one row, the 
 - **THEN** every row fits the width, labels sit above their fields, and the page does not scroll sideways
 
 ### Requirement: Mosaic explorer marks changed mosaics
-A card of the mosaic explorer for a stored mosaic that is changed since export SHALL say "Changed since export" after `Added by you`, as a warning badge, whose text has a contrast of at least 4.5:1 with its fill in the light and in the dark color scheme.
+A card of the mosaic explorer for a stored mosaic that is changed since export (see "Changed since export" in `user-catalog`) SHALL say "Unexported changes" after `Added by you`, as a warning badge, whose text has a contrast of at least 4.5:1 with its fill in the light and in the dark color scheme.
 
 #### Scenario: Saved mosaic in both schemes
 - **WHEN** the explorer lists a mosaic saved in the app and never exported, in the light color scheme and then in the dark one
-- **THEN** its card shows "Changed since export" as a warning badge, with text at a contrast of at least 4.5:1
+- **THEN** its card shows "Unexported changes" as a warning badge, with text at a contrast of at least 4.5:1
+
+### Requirement: Mosaic explorer exports stored mosaics
+A card of the mosaic explorer for a stored mosaic SHALL have an "Export" outline button after "Open" and "View", whether or not the mosaic has unexported changes. It SHALL send `userCatalog.export` with the mosaic's source. A card of a remote, instance or default mosaic SHALL have no "Export". Once the export is confirmed, the card SHALL follow the catalog's change (see "Explorers follow catalog changes"), so its "Unexported changes" badge goes away.
+
+#### Scenario: Export from the list
+- **WHEN** the explorer lists a mosaic saved in the app and never exported, and the user presses its card's "Export" and confirms the download
+- **THEN** the browser downloads the mosaic's file, and its card no longer says "Unexported changes"
+
+#### Scenario: Remote mosaic
+- **WHEN** the explorer lists a sample mosaic
+- **THEN** its card has "Open" and "View", and no "Export"
+
+#### Scenario: Card buttons on a phone
+- **WHEN** the explorer lists a stored mosaic on a 360×740 viewport
+- **THEN** its card's "Open", "View" and "Export" are inside the card, at least 32px tall, and the page does not scroll sideways
+
+### Requirement: Mosaics that are not stored can be downloaded
+A card of the mosaic explorer for a remote, instance or default mosaic SHALL have a "Download" outline button after "Open" and "View", and the mosaic viewer SHALL have "Download" after "Edit a copy" and "Check mosaic" for any mosaic not stored in this browser. A stored mosaic SHALL have "Export" instead.
+
+#### Scenario: Stored mosaics export
+- **WHEN** the explorer lists a mosaic stored in this browser, and the viewer shows it
+- **THEN** its card and the viewer have "Export" and no "Download"
+
+#### Scenario: Download on a phone
+- **WHEN** the explorer lists a sample mosaic on a 360×740 viewport
+- **THEN** its card's "Open", "View" and "Download" are inside the card, at least 32px tall, and the page does not scroll sideways
+
+### Requirement: What "Download" saves
+"Download" SHALL send `files.save` with the text `mosaics.inspect` answered as `content`, unchanged, typed `application/yaml`, named after the last segment of the mosaic's address, decoded, or `mosaic.yaml` when that segment is not a file name. A refusal SHALL be shown in the mod's status region; "Cancel" SHALL show nothing.
+
+#### Scenario: Download a sample from the explorer
+- **WHEN** the explorer lists "Nobel laureates on the map", and the user presses its card's "Download" and presses "Save"
+- **THEN** the browser downloads `nobel_laureates_map.yaml`, with exactly the text the sample's address serves
+
+#### Scenario: Download from the viewer
+- **WHEN** the viewer shows "Nobel laureates on the map" and the user presses "Download" and presses "Save"
+- **THEN** the browser downloads `nobel_laureates_map.yaml`
+
+#### Scenario: No file name in the address
+- **WHEN** the user downloads a mosaic whose address ends with `/`
+- **THEN** the save confirmation names the file `mosaic.yaml`

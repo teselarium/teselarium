@@ -1,6 +1,7 @@
 import type { ModCheckReport } from "../../mod_api.d.ts";
 import { buildCheckReport } from "./check_report.ts";
 import { isStoredMosaic, startViewerEditing } from "./edit_start.ts";
+import { readMosaicFileName } from "./mosaic_file_name.ts";
 import { buildButton, buildStatusMessage } from "./page_elements.ts";
 import { showError } from "./viewer_view.ts";
 import type { ViewerView } from "./viewer_view.ts";
@@ -49,6 +50,21 @@ function checkMosaic(view: ViewerView, event: MouseEvent): void {
     );
 }
 
+/**
+ * "Download": the app's save confirmation for the mosaic's file, exactly the
+ * text `mosaics.inspect` read. "Cancel" shows nothing, a refusal its alert.
+ */
+function downloadMosaic(view: ViewerView): void {
+  view.messages.replaceChildren();
+  view.engine
+    .request("files.save", {
+      name: readMosaicFileName(view.inspection.source),
+      content: view.inspection.content,
+      type: "application/yaml",
+    })
+    .catch(showError.bind(undefined, view));
+}
+
 function editMosaic(view: ViewerView, kind: "edit" | "copy"): void {
   view.messages.replaceChildren();
   void startViewerEditing(view, kind);
@@ -56,8 +72,9 @@ function editMosaic(view: ViewerView, kind: "edit" | "copy"): void {
 
 /**
  * "Open mosaic", the page's one primary action, a submit button, "Edit" for
- * a mosaic stored in this browser or "Edit a copy" for any other, and
- * "Check mosaic", outline buttons.
+ * a mosaic stored in this browser or "Edit a copy" for any other, "Check
+ * mosaic", and "Download" for a mosaic that is not stored, outline buttons.
+ * A stored mosaic is exported from "Where it comes from" instead.
  */
 export function buildMosaicActions(view: ViewerView): HTMLElement {
   const form = document.createElement("form");
@@ -76,5 +93,8 @@ export function buildMosaicActions(view: ViewerView): HTMLElement {
     editButton,
     buildButton("Check mosaic", checkMosaic.bind(undefined, view)),
   );
+  if (kind === "copy") {
+    form.append(buildButton("Download", downloadMosaic.bind(undefined, view)));
+  }
   return form;
 }

@@ -57,7 +57,7 @@ A picked file that matches a stored entry SHALL be compared with the entry's sto
 - **THEN** the review lists the file as "Unchanged"
 
 ### Requirement: Changed since export
-A stored entry SHALL be changed since export when its text differs from the text it was last imported, updated from a file or exported with. An entry saved in the app and never exported SHALL be changed since export. Exporting it, alone or with its folder, SHALL make it unchanged.
+A stored entry SHALL be changed since export when its text differs from the text it was last imported, updated from a file or exported with. An entry saved in the app and never exported SHALL be changed since export. Exporting it, alone or with its folder, SHALL make it unchanged. The app and the default mods SHALL show this status as "Unexported changes", which holds whether or not the entry was ever exported.
 
 #### Scenario: Saved, then exported
 - **WHEN** the user saves an edited mosaic, and then exports it

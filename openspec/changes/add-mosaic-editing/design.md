@@ -64,7 +64,9 @@ See proposal.md, "Why". This change starts from the code as `rename-catalog-voca
 ### 4. Sync state: the synced text's version
 
 - Each stored entry gains `syncedAt`: the `savedAt` of the version it was last imported, updated from a file or exported with. A new mosaic saved in the app has `null`.
-- `changedSinceExport` is computed: the entry's current text differs from that version's text, or `syncedAt` is `null`.
+- `changedSinceExport` is computed: the entry's current text differs from that version's text, or `syncedAt` is `null`. The UI says "Unexported changes": "Changed since export" read wrong for a mosaic saved in the app and never exported. The provenance key keeps its name, so the mod API doesn't change.
+- **"Download" for mosaics that are not stored.** The explorer and the viewer already inspect each mosaic, and `mosaics.inspect` answers its `content`. "Download" sends that text to `files.save`, which shows the app's save confirmation. There is no new engine method, and no change to the mod API. It is not "Export": nothing is synced and no badge changes, since a remote file can't have unexported changes. Each of the two mods has its own small function for the file name, as default mods share no code.
+  - Alternative: let `userCatalog.export` accept remote addresses. Rejected: it would mix two meanings, and add an engine change for what `files.save` already does.
 - `planImport`'s statuses (`user-catalog`, "Status of a matching file") compare the file, the stored text and the synced text. They are pure functions of these three texts, tested at the unit level.
 - Exporting one entry or a folder sets `syncedAt` to the entry's current version. There is no new version, since the text didn't change.
 - Alternative: store a hash of the synced text. Rejected: the version history already keeps the text, and a hash couldn't show the user what they'd lose.

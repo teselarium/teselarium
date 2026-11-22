@@ -1,10 +1,11 @@
 import type { ModEngine, MosaicInspection } from "../../mod_api.d.ts";
 import { describeError } from "./error_messages.ts";
+import { readMosaicFileName } from "./mosaic_file_name.ts";
 
 /**
  * What the explorer draws in and opens with: the engine, the viewer's mod
  * reference, the list region, the status region for errors from opening a
- * mosaic or the viewer, and the count of listings started, so only the
+ * mosaic or the viewer, or exporting or downloading a mosaic, and the count of listings started, so only the
  * latest one is drawn. Mutable.
  */
 export interface ExplorerView {
@@ -42,6 +43,32 @@ export function importMosaics(view: ExplorerView): void {
 export function addMosaicByUrl(view: ExplorerView): void {
   view.status.textContent = "";
   const request = view.engine.request("userCatalog.add", {});
+  request.catch(showOpenError.bind(undefined, view));
+}
+
+/** "Export": the app downloads the stored mosaic's file, after its confirmation. A refusal is shown in the status region. */
+export function exportMosaic(
+  view: ExplorerView,
+  inspection: MosaicInspection,
+): void {
+  view.status.textContent = "";
+  const request = view.engine.request("userCatalog.export", {
+    mosaic: inspection.source,
+  });
+  request.catch(showOpenError.bind(undefined, view));
+}
+
+/** "Download": the app's save confirmation for a mosaic's file, exactly the text it was inspected with. A refusal is shown in the status region. */
+export function downloadMosaic(
+  view: ExplorerView,
+  inspection: MosaicInspection,
+): void {
+  view.status.textContent = "";
+  const request = view.engine.request("files.save", {
+    name: readMosaicFileName(inspection.source),
+    content: inspection.content,
+    type: "application/yaml",
+  });
   request.catch(showOpenError.bind(undefined, view));
 }
 

@@ -1,6 +1,11 @@
 import type { CatalogMosaicEntry, MosaicInspection } from "../../mod_api.d.ts";
 import type { MosaicEntry } from "./mosaic_entries.ts";
-import { openMosaic, openViewer } from "./explorer_view.ts";
+import {
+  downloadMosaic,
+  exportMosaic,
+  openMosaic,
+  openViewer,
+} from "./explorer_view.ts";
 import type { ExplorerView } from "./explorer_view.ts";
 
 /**
@@ -21,10 +26,15 @@ function buildCardButton(
   return button;
 }
 
-/** The card's actions: "Open", its primary action, then "View", an outline button. */
+/**
+ * The card's actions: "Open", its primary action, then "View" and "Export"
+ * for a mosaic stored in this browser, whether or not it has unexported
+ * changes, as in the viewer, or "Download" for any other, outline buttons.
+ */
 function buildCardActions(
   view: ExplorerView,
   inspection: MosaicInspection,
+  catalogEntry: CatalogMosaicEntry,
 ): HTMLElement {
   const actions = document.createElement("p");
   const openButton = buildCardButton(
@@ -39,6 +49,18 @@ function buildCardActions(
     openViewer.bind(undefined, view, inspection),
   );
   actions.append(openButton, viewButton);
+  const isStored = catalogEntry.place === "browser";
+  actions.append(
+    buildCardButton(
+      isStored ? "Export" : "Download",
+      inspection.title,
+      (isStored ? exportMosaic : downloadMosaic).bind(
+        undefined,
+        view,
+        inspection,
+      ),
+    ),
+  );
   return actions;
 }
 
@@ -75,17 +97,17 @@ function buildPlaceBadge(catalogEntry: CatalogMosaicEntry): HTMLElement {
   return badge;
 }
 
-/** "Changed since export", a warning badge, for a stored mosaic whose text changed since it was last imported or exported. */
+/** "Unexported changes", a warning badge, for a stored mosaic whose text no exported or imported file holds (`changedSinceExport`). */
 function buildChangedBadge(): HTMLElement {
   const badge = document.createElement("span");
-  badge.textContent = "Changed since export";
+  badge.textContent = "Unexported changes";
   badge.dataset.otVariant = "warning";
   return badge;
 }
 
 /**
  * A mosaic as a card: an `<article>` with its title and where its file
- * lives, the mark of who listed it and whether it changed since export, its
+ * lives, the mark of who listed it and whether it has unexported changes, its
  * description and its actions.
  */
 function buildMosaicCard(
@@ -107,7 +129,11 @@ function buildMosaicCard(
   }
   const description = document.createElement("p");
   description.textContent = inspection.description;
-  card.append(heading, description, buildCardActions(view, inspection));
+  card.append(
+    heading,
+    description,
+    buildCardActions(view, inspection, catalogEntry),
+  );
   return card;
 }
 

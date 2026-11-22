@@ -35,7 +35,7 @@ This change makes the mosaic viewer the place where a mosaic is viewed and edite
 - A "History…" dialog lists them with their time and kind. Restoring one saves it as a new version, through the same confirmation.
 
 **Files and export, now that a stored mosaic can change**
-- Each stored entry knows whether it changed since it was last imported or exported. The mosaic explorer and the viewer say "Changed since export".
+- Each stored entry knows whether it changed since it was last imported or exported. The mosaic explorer and the viewer say "Unexported changes", which is true even for a mosaic that was never exported. Every stored mosaic's card in the explorer gets "Export", as the viewer has it. A mosaic that is not stored gets "Download" instead, in the explorer and the viewer, which saves its file as its address serves it.
 - **Conflicts**: the import review gets a "Changed here and in the file" status, for entries changed in the browser while their file changed too. The choices are keep mine, take the file, or keep both, which imports the file as a new entry.
 - **Folder export**: "Export folder" downloads a `.zip` with every stored entry of one imported folder at its path, so unzipping it over the folder updates it. It needs a small zip dependency (`fflate`).
 
@@ -57,7 +57,7 @@ All of these are additions that existing mods keep working with.
   - the folded capsule keeps the mosaic capsule's look for an unsaved combination ("Unsaved combination", dashed, the mosaic icon), instead of turning into the mod capsule, and its menu rows say the mod's and the collection's titles.
 - The viewer's edit mode follows the viewer's layout on a phone: one column, the form's rows stacking, the textarea at full width, buttons at least 32px.
 - The save confirmation and the history dialog are app dialogs that fit a 360×740 viewport.
-- The highlighted new hosts and the "Changed since export" mark use theme badge variants, checked in the light and the dark color scheme.
+- The highlighted new hosts and the "Unexported changes" mark use theme badge variants, checked in the light and the dark color scheme.
 
 ## Capabilities
 
@@ -72,7 +72,7 @@ All of these are additions that existing mods keep working with.
 - `mod-app-actions`: "Only the visible mod asks" covers the new dialog requests.
 - `mod-tests`: `answer` accepts the new dialog requests, and the scripted catalog accepts the new provenance keys.
 - `mod-api-version`: the version is `0.1.19`.
-- `default-mods`: the mosaic viewer's edit mode, its entry points, "Changed since export" in the explorer and the viewer, folder export, and their cases.
+- `default-mods`: the mosaic viewer's edit mode, its entry points, "Unexported changes" in the explorer and the viewer, "Export" on the explorer's stored mosaics, "Download" for the others, folder export, and their cases.
 - `stage-bar`: the edit button between the mosaic capsule and "More actions", and in "More actions" under 288px; aligned "More actions" items; the folded capsule keeps the mosaic's look; the fold widths that move with the button.
 - `site-consent`: lines confirmed at save are remembered as allowed for that mosaic.
 

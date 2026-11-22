@@ -68,7 +68,7 @@ function buildStoredDetails(entry: CatalogMosaicEntry): HTMLElement[] {
     return [details, note];
   }
   const changed = document.createElement("p");
-  changed.append(buildBadge("Changed since export", "warning"));
+  changed.append(buildBadge("Unexported changes", "warning"));
   return [details, changed, note];
 }
 

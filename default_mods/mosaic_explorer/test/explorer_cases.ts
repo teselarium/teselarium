@@ -3,6 +3,7 @@ import type {
   CaseRequest,
   CaseCatalogMosaicEntry,
 } from "../../mod_api.d.ts";
+import { readMosaicFileName } from "../src/mosaic_file_name.ts";
 
 /**
  * The fixture mosaics the cases list, by their address in the default mods
@@ -21,6 +22,9 @@ export const MISSING_MOSAIC_LOCATION =
 /** The end of the listed mosaic's source, whatever the app's address. */
 const LISTED_MOSAIC_PATH =
   "/default_mods/mosaic_explorer/fixtures/listed_mosaic.yaml";
+
+/** The file name of the other mosaic, the end of its source. */
+const OTHER_MOSAIC_FILE_NAME = "other_mosaic.yaml";
 
 /** The viewer of the explorer's own config. */
 const CONFIG_VIEWER = "mosaic_viewer";
@@ -300,9 +304,50 @@ export async function marksChangedMosaics(context: CaseContext): Promise<void> {
 
   const cards = context.root.querySelectorAll("li > article");
   const changed = cards[0].querySelector("header > small + span");
-  context.expect(changed?.textContent).toBe("Changed since export");
+  context.expect(changed?.textContent).toBe("Unexported changes");
   context.expect(changed?.getAttribute("data-ot-variant")).toBe("warning");
-  context.expect(cards[1].textContent).not.toContain("Changed since export");
+  context.expect(cards[1].textContent).not.toContain("Unexported changes");
+}
+
+/** The text of each of a card's buttons, in order. */
+function readCardButtonTexts(card: Element): string[] {
+  const texts: string[] = [];
+  for (const button of card.querySelectorAll("button")) {
+    texts.push(button.textContent ?? "");
+  }
+  return texts;
+}
+
+export async function exportsStoredMosaics(
+  context: CaseContext,
+): Promise<void> {
+  await mountWithCatalogMosaics(context, [
+    {
+      source: LISTED_MOSAIC_LOCATION,
+      place: "browser",
+      provenance: STORED_PROVENANCE,
+    },
+    { source: OTHER_MOSAIC_LOCATION },
+  ]);
+  context.answer("userCatalog.export", true);
+  const cards = context.root.querySelectorAll("li > article");
+  context
+    .expect(readCardButtonTexts(cards[0]))
+    .toEqual(["Open", "View", "Export"]);
+  context
+    .expect(readCardButtonTexts(cards[1]))
+    .toEqual(["Open", "View", "Download"]);
+  const exportButton = cards[0].querySelectorAll("button")[2];
+
+  exportButton.click();
+
+  const exportRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "userCatalog.export"),
+  );
+  const inspectedSource = readInspectedSource(context);
+  context.expect(inspectedSource.endsWith(LISTED_MOSAIC_PATH)).toBe(true);
+  context.expect(exportRequest.params).toEqual({ mosaic: inspectedSource });
+  context.expect(readStatusText(context)).toBe("");
 }
 
 export async function importsWhenAsked(context: CaseContext): Promise<void> {
@@ -336,4 +381,77 @@ export async function addsByUrlWhenCancelled(
   context.expect(addRequest.result).toBe(false);
   context.expect(addButton.getAttribute("data-ot-variant")).toBe("outline");
   context.expect(readStatusText(context)).toBe("");
+}
+
+/** The text the explorer inspected the mosaic `path` with, from its `mosaics.inspect` result. */
+function readInspectedContent(context: CaseContext, path: string): string {
+  for (const request of findRequests(context, "mosaics.inspect")) {
+    const result = request.result as
+      { source?: unknown; content?: unknown } | undefined;
+    if (
+      typeof result?.source === "string" &&
+      result.source.endsWith(path) &&
+      typeof result.content === "string"
+    ) {
+      return result.content;
+    }
+  }
+  throw new Error(`The explorer did not inspect a mosaic ending with ${path}.`);
+}
+
+async function clickDownloadOfRemoteCard(context: CaseContext): Promise<void> {
+  await mountWithCatalogMosaics(context, [
+    {
+      source: LISTED_MOSAIC_LOCATION,
+      place: "browser",
+      provenance: STORED_PROVENANCE,
+    },
+    { source: OTHER_MOSAIC_LOCATION },
+  ]);
+  const cards = context.root.querySelectorAll("li > article");
+  const download = cards[1].querySelectorAll("button")[2];
+  download.click();
+}
+
+export async function downloadsRemoteMosaic(
+  context: CaseContext,
+): Promise<void> {
+  context.answer("files.save", true);
+
+  await clickDownloadOfRemoteCard(context);
+
+  const saveRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "files.save"),
+  );
+  context.expect(saveRequest.params).toEqual({
+    name: OTHER_MOSAIC_FILE_NAME,
+    content: readInspectedContent(context, OTHER_MOSAIC_FILE_NAME),
+    type: "application/yaml",
+  });
+  context.expect(readStatusText(context)).toBe("");
+}
+
+export async function showsCancelledDownload(
+  context: CaseContext,
+): Promise<void> {
+  context.answer("files.save", false);
+
+  await clickDownloadOfRemoteCard(context);
+
+  await context.waitFor(
+    findSettledRequest.bind(undefined, context, "files.save"),
+  );
+  context.expect(readStatusText(context)).toBe("");
+}
+
+export function namesDownloadedFiles(context: CaseContext): void {
+  context
+    .expect(readMosaicFileName("https://example.org/mosaics/nobel%20map.yaml"))
+    .toBe("nobel map.yaml");
+  context
+    .expect(readMosaicFileName("https://example.org/mosaics/"))
+    .toBe("mosaic.yaml");
+  context
+    .expect(readMosaicFileName("https://example.org/mosaics/a%2Fb.yaml"))
+    .toBe("mosaic.yaml");
 }
