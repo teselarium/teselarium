@@ -2,7 +2,7 @@
 
 ## Why
 
-After `add-user-catalog`, users can keep mosaics in the browser, but cannot make one: they can't name an unsaved combination, give it aliases or `show` permissions, or change a mosaic they imported. This is what started the plan: an edit button for the mosaic the user is looking at.
+After `add-user-catalog`, users can keep mosaics in the browser, but cannot make one: they can't name an unsaved combination, give it aliases or `show` permissions, or change a mosaic they imported. This is what started the plan: an edit button for the mosaic the user is looking at. A new combination is often broken at first, for example missing aliases, so the user fixes it in the editor and saves it only then.
 
 This change makes the mosaic viewer the place where a mosaic is viewed and edited.
 
@@ -18,10 +18,10 @@ This change makes the mosaic viewer the place where a mosaic is viewed and edite
 - **Draft kept while away**: the draft is kept in the viewer's storage slot until it is saved or discarded, so leaving the page loses nothing.
 
 **Where editing starts**
-- In the stage bar's mosaic list, a row pinned at the top:
+- In the stage bar, an edit button with a pencil icon, between the mosaic capsule and "More actions", one click away at every width:
   - **"Edit mosaic"** for a stored mosaic;
   - **"Edit a copy"** for a remote, instance or default mosaic;
-  - **"Save as mosaic"** for an unsaved combination with a collection or none. Its draft is titled after the combination (`<mod> + <collection>`), and gets the combination's mod and collection, and the `show` lines of its `sites` mosaic, if any.
+  - **"Edit as a new mosaic"** for an unsaved combination with a collection or none. Nothing is stored until the user saves. Its draft is titled after the combination (`<mod> + <collection>`), and gets the combination's mod and collection, and the `show` lines of its `sites` mosaic, if any.
 - In the mosaic viewer: "Edit" for a stored mosaic, "Edit a copy" for any other.
 - A copy's relative `mod` and `collection` references are rewritten as absolute addresses, so the copy opens from the browser.
 
@@ -69,7 +69,7 @@ All of these are additions that existing mods keep working with.
 - `mod-tests`: `answer` accepts the new dialog requests, and the scripted catalog accepts the new provenance keys.
 - `mod-api-version`: the version is `0.1.19`.
 - `default-mods`: the mosaic viewer's edit mode, its entry points, "Changed since export" in the explorer and the viewer, folder export, and their cases.
-- `combination-pickers`: the edit row pinned at the top of the mosaic list.
+- `stage-bar`: the edit button between the mosaic capsule and "More actions".
 - `site-consent`: lines confirmed at save are remembered as allowed for that mosaic.
 
 ## Impact
@@ -79,7 +79,7 @@ All of these are additions that existing mods keep working with.
   - `src/lib/user_catalog/` gets versions, the sync state, conflicts and folder export.
   - `src/lib/core/storage/` raises the database to version 2, with a `versions` store.
   - The engine gets the new handlers, app actions and the API version.
-  - `src/main/` gets the save confirmation and history dialogs, and the stage bar's edit row.
+  - `src/main/` gets the save confirmation and history dialogs, and the stage bar's edit button.
 - **Default mods**: `mosaic_viewer` (edit mode, form, YAML, hints, draft), `mosaic_explorer` (the mark), `default_mods/mod_api.d.ts`, and their tests and fixtures.
 - **Dependencies**:
   - `yaml`, for comment-keeping edits in the app. Loading keeps `js-yaml`, so what a mosaic file may hold doesn't change.

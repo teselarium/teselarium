@@ -55,7 +55,7 @@ The mosaic viewer SHALL show an "Edit" button for a stored mosaic, and an "Edit 
 - **THEN** the viewer is in edit mode with the copy's draft, whose `mod` and `collection` are absolute addresses
 
 ### Requirement: Mosaic viewer modes from the link
-The mosaic viewer SHALL start in edit mode from its `mode` parameter: `edit` for the stored `target`, `copy` for a copy of `target`, and `new` for a new draft from `draft_mod`, `draft_collection` and `draft_sites` (see `combination-pickers`). A `mode` it cannot use, such as `edit` for a remote mosaic, SHALL show an alert that says why, and the mosaic in view mode.
+The mosaic viewer SHALL start in edit mode from its `mode` parameter: `edit` for the stored `target`, `copy` for a copy of `target`, and `new` for a new draft from `draft_mod`, `draft_collection` and `draft_sites` (see `stage-bar`, "Edit button links"). A `mode` it cannot use, such as `edit` for a remote mosaic, SHALL show an alert that says why, and the mosaic in view mode.
 
 #### Scenario: New from a combination
 - **WHEN** the viewer opens with `mode=new` and `draft_mod` and `draft_collection` set

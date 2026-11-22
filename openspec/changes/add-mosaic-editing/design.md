@@ -108,11 +108,13 @@ See proposal.md, "Why". This change starts from the code as `rename-catalog-voca
 - **Stored or not.** The viewer knows its target is stored from its `opentesela-browser:` address and a `mosaics.inspect` that succeeds, since the reader of browser files waits for the database. It never decides from a `catalog.list` read at start, which can be empty until the database is open. "Edit" versus "Edit a copy", `mode=edit`, and dropping a kept draft all follow this rule. The provenance section's buttons follow `catalog.changed`, as they already do.
 - **Keys.** Ctrl+S or Cmd+S is handled in the frame, so it only acts while the viewer has focus, which is when the user is editing.
 
-### 9. The stage bar's edit row
+### 9. The stage bar's edit button
 
-- `mosaic_list.ts` builds the pinned edit row from the sandbox's link and the catalog entry's `place`, and the row opens its link with the stage's open path, as a viewer link does.
-- It reuses the pinned-row rules: always kept by filters, hidden while searching.
-- No new component: it is a `CombinationRow` with an action instead of an entry, and a pencil icon from lucide.
+- `StageBar.tsx` renders a `StageBarIconButton` with lucide's pencil, after `SitesChip` and before `MoreActionsMenu`, with its name as its tooltip.
+- A pure helper in `src/main/stage/` gives the button's name and link, or none, from the sandbox's link and the catalog entry's `place`. It takes over the logic of the former pinned row in `mosaic_list.ts`. The button opens its link with the stage's open path, as a viewer link does.
+- It stays on the bar on a narrow bar too, since one click is its point. If the 360×740 check finds the capsule under 120px, the fallback is to move it into the "More actions" menu on a narrow bar only, as theater mode is.
+- Alternative: a row pinned at the top of the mosaic list, which was built first. Rejected after manual testing: it was hidden behind the capsule's chevron and read as one of the mosaics to switch to. Keeping both was rejected too, as two entry points to one action invite confusion.
+- "Edit as a new mosaic" rather than "Save as mosaic": the viewer opens in edit mode, and a broken combination is fixed before it is saved.
 
 ## Risks / Trade-offs
 

@@ -72,11 +72,11 @@ The tasks use the names of `add-user-catalog` (`BrowserDatabase`, `planImport`, 
   Verify with `npm run test:e2e -- user_catalog`.
 - [x] 6.5 Document the save confirmation, consent at save, history and conflicts in `docs/modules/main/README.md`. Add consent at save to `docs/modules/mosaics/README.md`'s "Trust" and `docs/modules/lib/core/sandbox/README.md`'s "Permissions of a mosaic". Verify that every label the docs name matches the UI.
 
-## 7. The stage bar's edit row
+## 7. The stage bar's edit button
 
-- [x] 7.1 In `src/main/stage/mosaic_list.ts`, add the pinned edit row (design, decision 9) with its label from the sandbox's link and the current entry's `place`, its pencil icon, no row for a tile link, and the links of `combination-pickers`, "Edit row links". First write the tests in `list_rows.test.ts` and `CombinationList.test.tsx`: the three labels, the tile link, the filters keeping it, the search hiding it, and the links with `draft_sites`. Verify with `npm run test -- src/main/stage`.
-- [x] 7.2 Add to `e2e/stage_bar.spec.ts`: "Save as mosaic" from Flashcards with the laureates opens the mosaic viewer in edit mode, and back returns to Flashcards; at 360×740, the row is as tall as the others and a tap opens the viewer. Verify with `npm run test:e2e -- stage_bar`.
-- [x] 7.3 Document the edit row in `docs/modules/main/README.md`'s stage bar section. Verify that the documented labels match the list.
+- [ ] 7.1 Replace the pinned edit row with the stage bar's edit button (design, decision 9). Remove the row from `src/main/stage/mosaic_list.ts`, `combination_rows.ts` and `CombinationList.tsx`, and its tests from `list_rows.test.ts`, `CombinationList.test.tsx` and `CombinationLists.test.tsx`. Move its name and link logic into a pure helper, and render the button in `StageBar.tsx` between `SitesChip` and `MoreActionsMenu`. First write the tests: the three names ("Edit mosaic", "Edit a copy", "Edit as a new mosaic"), no button for a tile link or a plain title, the links of `stage-bar`, "Edit button links", with `draft_sites`, and the button's place in the bar. Verify with `npm run test -- src/main/stage`.
+- [ ] 7.2 Update `e2e/stage_bar.spec.ts`: "Edit as a new mosaic" from Flashcards with the laureates opens the mosaic viewer in edit mode, and back returns to Flashcards; the mosaic list has no edit row; at 360×740, the button is at least 32px and inside the bar, the capsule is at least 120px wide, and a tap opens the viewer. If the capsule does not fit, apply the fallback of design, decision 9. Verify with `npm run test:e2e -- stage_bar`.
+- [ ] 7.3 Replace the edit row and "Save as mosaic" with the edit button and its names in `docs/modules/main/README.md`'s stage bar section, `docs/modules/mosaics/viewer/README.md` and `docs/modules/mosaics/maker/README.md`. Verify with a search that no doc names "Save as mosaic" or the edit row, and that the documented names match the bar.
 
 ## 8. Mosaic viewer edit mode and the explorer's mark
 
