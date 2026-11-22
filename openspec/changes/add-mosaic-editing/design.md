@@ -2,15 +2,16 @@
 
 ## Context
 
-See proposal.md, "Why". This change starts from the code as `rename-catalog-vocabulary` and `add-user-catalog` leave it. Both must be applied first, and archived before this one, since the `user-catalog`, `default-mods` and `mod-engine-api` deltas modify requirements they create. What it builds on:
+See proposal.md, "Why". This change starts from the code as `rename-catalog-vocabulary` and `add-user-catalog` left it. What it builds on:
 
 - **Loading.** `loadMosaicFile` fetches a file, then `buildLoadedMosaic(parseYaml(file))` reads it (`src/lib/mosaic/mosaic_loader.ts`). The YAML parser is `js-yaml`, under the plain-data rules of `parseYaml`, and keeps no comments.
 - **Checks.** `checkMosaicAliases` and `checkMosaicConfig` (`src/lib/core/engine/mosaic_findings.ts`) give the mosaic warnings of `mosaics.check`. `countMatchingTiles` (`src/lib/core/combinations/tile_counts.ts`) counts the tiles that validate as a tile type, as the stage bar's scores do. `applyMosaicAliases` renames fields.
 - **User catalog** (from `add-user-catalog`):
   - the `BrowserDatabase` (IndexedDB `opentesela`, version 1, stores `files` and `user-catalog`);
   - the pure planning functions of `src/lib/user_catalog/`;
-  - the dialogs of `src/main/user_catalog/`, rendered by `ActionDialog`;
-  - the `userCatalog.*` handlers, which turn requests into app actions.
+  - the dialogs of `src/main/user_catalog/`, rendered by `UserCatalogDialog`, which `StageView` shows next to `ActionDialog`;
+  - the `userCatalog.*` handlers, which turn requests into app actions;
+  - the start order: `main.tsx` opens the database in parallel with the start. The stage's `browserFiles` reader waits for the opening, but the catalog lists no user mosaic until the entries are read, and then running mods get `catalog.changed`. A database that cannot be opened gives an empty, read-only user catalog (`openBrowserDatabase` resolves to `null`).
 - **Consent.** Site decisions are remembered per mosaic address and line (`site-consent`), read by the stage before each start, and listed in Settings.
 - **Mods.** A default mod can bundle npm packages (`default_mods/README.md`), and has a storage slot per context through `storage.*`. `mods.open` with `replace: true` replaces the requester.
 
@@ -103,6 +104,7 @@ See proposal.md, "Why". This change starts from the code as `rename-catalog-voca
   - a copy: the remote text read the same way, then `mosaics.edit` with the resolved `mod` and `collection`;
   - a new mosaic: the skeleton `mosaic:\n  title: "Untitled mosaic"\n`, then `mosaics.edit` with `draft_mod`, `draft_collection`, and the `show` lines of `draft_sites`, read with `mosaics.inspect`.
 - `mosaics.inspect` gains `content`, the mosaic file's text, for every mosaic. It is an addition to its answer. The file is already fetched to inspect it, so it costs nothing more.
+- **Stored or not.** The viewer knows its target is stored from its `opentesela-browser:` address and a `mosaics.inspect` that succeeds, since the reader of browser files waits for the database. It never decides from a `catalog.list` read at start, which can be empty until the database is open. "Edit" versus "Edit a copy", `mode=edit`, and dropping a kept draft all follow this rule. The provenance section's buttons follow `catalog.changed`, as they already do.
 - **Keys.** Ctrl+S or Cmd+S is handled in the frame, so it only acts while the viewer has focus, which is when the user is editing.
 
 ### 9. The stage bar's edit row
@@ -116,12 +118,12 @@ See proposal.md, "Why". This change starts from the code as `rename-catalog-voca
 - [Two YAML libraries in the app: `js-yaml` decides validity and `yaml` writes edits. They could disagree on a corner case, such as a date-like string or an anchor.] → Every edited text goes back through `parseYaml` and `buildLoadedMosaic` before it is answered (decision 1). The unit tests cover comments, quoted and unquoted strings, flow and block lists, anchors left untouched, and date-like values.
 - [Validation loads whole collections, which can be large.] → Debounced by the viewer, cached for 30 seconds per session in the engine, and limited to the files a launch would load anyway. The count is a hint: a timeout or failure shows "count unavailable" and blocks nothing.
 - [Consent at save remembers Allow for lines the user may not have read closely.] → The dialog lists each added host as a warning badge, and the decisions appear in Settings under the mosaic, where they can be removed. Imported lines are never allowed this way.
-- [The draft in the viewer's storage slot outlives the mosaic, for example after "Remove".] → The viewer drops a draft whose target is no longer a stored entry when it opens.
-- [The database migration from version 1 runs in a tab while another tab still has version 1 open.] → The older tab's connection gets `versionchange` and closes. The user catalog store then asks for a reload, as `add-user-catalog` accepts for other tabs.
+- [The draft in the viewer's storage slot outlives the mosaic, for example after "Remove".] → When it opens, the viewer drops a draft whose stored target no longer inspects (decision 8, "Stored or not"). An early catalog that lacks the target is not a reason, so a run link opened at start keeps its draft.
+- [The upgrade to version 2 runs in a tab while another tab still has version 1 open.] → The version 1 build has no `versionchange` handler, so the new tab's opening is blocked until the older tab is closed or reloaded, and until then its stored mosaics don't open. On `blocked`, the user catalog store says that another tab of the app must be closed or reloaded. From version 2 on, a connection closes on `versionchange`, and the store asks for a reload of its tab, so later upgrades aren't blocked.
 
 ## Migration Plan
 
-- Database version 1 to 2: add `versions`, write one `"imported"` version per stored entry, and set each entry's `syncedAt` to it. A failed upgrade leaves version 1. The app then treats editing as unavailable and says so in the viewer, and everything from `add-user-catalog` keeps working.
+- Database version 1 to 2: add `versions`, write one `"imported"` version per stored entry, and set each entry's `syncedAt` to it. A failed upgrade aborts and leaves the data at version 1. `openBrowserDatabase` then resolves to `null`, as for any opening that fails, so the app starts with the empty, read-only user catalog of `add-user-catalog`, and the next load tries the upgrade again.
 - No rollback path is needed for users: the app is not shared yet. A downgrade to the previous build would fail to open a version 2 database. That build's existing `null` path (empty, read-only user catalog) applies, and the data stays in place.
 
 ## Open Questions

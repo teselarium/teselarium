@@ -40,6 +40,13 @@ Each entry SHALL keep its provenance. A stored entry keeps the picked folder's n
 - **WHEN** the user saves a copy of `https://example.org/samples/mosaics/nobel_laureates_map.yaml`
 - **THEN** the new entry's provenance has no folder, its file name as path, changed since export, and that address as the copy address
 
+### Requirement: User catalog dialog colors
+The statuses of the review SHALL be badges of the theme: "New" the success variant, "Changed" and "Changed here and in the file" the warning variant, "Unchanged", "Changed here only" and "Not in the folder" the outline variant, and "Not a mosaic" the destructive variant. Their text SHALL have a contrast of at least 4.5:1 with their fill, in the light and in the dark color scheme.
+
+#### Scenario: Statuses in both schemes
+- **WHEN** the review lists a file of each status, in the light color scheme and then in the dark one
+- **THEN** each status badge has its variant, and its text has a contrast of at least 4.5:1 with its fill
+
 ## ADDED Requirements
 
 ### Requirement: Status of a matching file

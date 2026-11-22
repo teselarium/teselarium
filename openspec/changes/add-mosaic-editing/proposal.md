@@ -4,7 +4,7 @@
 
 After `add-user-catalog`, users can keep mosaics in the browser, but cannot make one: they can't name an unsaved combination, give it aliases or `show` permissions, or change a mosaic they imported. This is what started the plan: an edit button for the mosaic the user is looking at.
 
-This change makes the mosaic viewer the place where a mosaic is viewed and edited. It builds on `rename-catalog-vocabulary` and `add-user-catalog`, which must be applied first, and archived first, since several deltas modify specs they create.
+This change makes the mosaic viewer the place where a mosaic is viewed and edited.
 
 ## What Changes
 
@@ -63,7 +63,7 @@ All of these are additions that existing mods keep working with.
 
 ### Modified Capabilities
 
-- `user-catalog`: "Changed since export", the conflict status and its choices in the import review, folder export, and copies in provenance. (Created by `add-user-catalog`.)
+- `user-catalog`: "Changed since export", the conflict status and its choices in the import review, folder export, copies in provenance, and the colors of the new statuses.
 - `mod-engine-api`: `mosaics.validate`, `mosaics.edit`, `userCatalog.save`, `userCatalog.history` and `userCatalog.exportFolder`; `mosaics.inspect` answers `content`; provenance with `changedSinceExport` and `copiedFrom`.
 - `mod-app-actions`: "Only the visible mod asks" covers the new dialog requests.
 - `mod-tests`: `answer` accepts the new dialog requests, and the scripted catalog accepts the new provenance keys.
