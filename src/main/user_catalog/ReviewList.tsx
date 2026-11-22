@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { Checkbox } from "@/vendor/shadcn/ui/checkbox.tsx";
 import { isCheckableRow } from "../../lib/user_catalog/index.ts";
 import type {
+  ConflictChoice,
   ImportReview,
   ImportReviewRow,
 } from "../../lib/user_catalog/index.ts";
@@ -12,16 +13,81 @@ interface ReviewListProps {
   review: ImportReview;
   /** The checked rows, by index. */
   checked: ReadonlySet<number>;
+  /** The choice of each conflict, by index. */
+  choices: ReadonlyMap<number, ConflictChoice>;
   isDisabled: boolean;
   onToggle: (index: number, isChecked: boolean) => void;
+  onChoose: (index: number, choice: ConflictChoice) => void;
 }
 
 interface ReviewRowProps {
   row: ImportReviewRow;
   index: number;
   isChecked: boolean;
+  choice: ConflictChoice | null;
   isDisabled: boolean;
   onToggle: (index: number, isChecked: boolean) => void;
+  onChoose: (index: number, choice: ConflictChoice) => void;
+}
+
+/** The choices of a conflict, in the order the review offers them (`user-catalog`, "Conflict choices"). */
+const CONFLICT_CHOICE_LABELS: Record<ConflictChoice, string> = {
+  "keep-mine": "Keep mine",
+  "take-file": "Take the file",
+  "keep-both": "Keep both",
+};
+
+/** What an update says when it replaces changes made here since export. */
+const REPLACES_LOCAL_CHANGES_MESSAGE =
+  "The changes made here since the last export are replaced. They stay in the history.";
+
+interface ConflictChoicesProps {
+  path: string;
+  index: number;
+  choice: ConflictChoice | null;
+  isDisabled: boolean;
+  onChoose: (index: number, choice: ConflictChoice) => void;
+}
+
+/**
+ * A conflict's choices: native radio buttons, which keep the radio group's
+ * keyboard and screen reader behavior, 32px tall on a phone. None is chosen
+ * at first.
+ */
+function ConflictChoices({
+  path,
+  index,
+  choice,
+  isDisabled,
+  onChoose,
+}: ConflictChoicesProps): ReactElement {
+  const options: ReactElement[] = [];
+  for (const [value, label] of Object.entries(CONFLICT_CHOICE_LABELS)) {
+    const conflictChoice = value as ConflictChoice;
+    options.push(
+      <label
+        key={value}
+        className="flex min-h-8 cursor-pointer items-center gap-2 text-sm"
+      >
+        <input
+          type="radio"
+          name={`conflict-${index}`}
+          value={value}
+          className="size-5 accent-primary"
+          checked={choice === conflictChoice}
+          disabled={isDisabled}
+          onChange={onChoose.bind(undefined, index, conflictChoice)}
+        />
+        {label}
+      </label>,
+    );
+  }
+  return (
+    <fieldset className="m-0 flex flex-wrap gap-x-4 border-0 p-0">
+      <legend className="sr-only">What to do with {path}</legend>
+      {options}
+    </fieldset>
+  );
 }
 
 function describeCheckbox(row: ImportReviewRow): string {
@@ -42,8 +108,10 @@ function ReviewRow({
   row,
   index,
   isChecked,
+  choice,
   isDisabled,
   onToggle,
+  onChoose,
 }: ReviewRowProps): ReactElement {
   const view = STATUS_VIEWS[row.status];
   const isCheckable = isCheckableRow(row);
@@ -93,6 +161,23 @@ function ReviewRow({
             Check it to remove it from your catalog.
           </p>
         ) : null}
+        {row.status === "conflict" ? (
+          <ConflictChoices
+            path={row.path}
+            index={index}
+            choice={choice}
+            isDisabled={isDisabled}
+            onChoose={onChoose}
+          />
+        ) : null}
+        {row.replacesLocalChanges ? (
+          <p
+            className="m-0 text-sm text-warning"
+            data-replaces-local-changes=""
+          >
+            {REPLACES_LOCAL_CHANGES_MESSAGE}
+          </p>
+        ) : null}
       </div>
     </li>
   );
@@ -102,8 +187,10 @@ function ReviewRow({
 export function ReviewList({
   review,
   checked,
+  choices,
   isDisabled,
   onToggle,
+  onChoose,
 }: ReviewListProps): ReactElement {
   const rows: ReactElement[] = [];
   for (const [index, row] of review.rows.entries()) {
@@ -113,8 +200,10 @@ export function ReviewList({
         row={row}
         index={index}
         isChecked={checked.has(index)}
+        choice={choices.get(index) ?? null}
         isDisabled={isDisabled}
         onToggle={onToggle}
+        onChoose={onChoose}
       />,
     );
   }

@@ -185,6 +185,68 @@ export interface MosaicInspection {
   aliases: Record<string, string[]>;
   /** What the mosaic's `show` lines would get if it were opened without asking. */
   permissions: ModGrants;
+  /** The mosaic file's text, as read, comments included. */
+  content: string;
+}
+
+/** An error or a warning of a draft, at its 1-based line, or `null`. */
+export interface MosaicDraftProblem {
+  message: string;
+  line: number | null;
+}
+
+/** What `mosaics.validate` answers: a draft's problems, and the hints for its aliases. */
+export interface MosaicDraftValidation {
+  errors: MosaicDraftProblem[];
+  warnings: MosaicDraftProblem[];
+  /** The mod's tile type's fields, in the type's order. */
+  typeFields: { name: string; required: boolean }[];
+  /** The metadata keys the collection's tiles use, sorted. */
+  collectionFields: string[];
+  /** How many tiles match after the draft's aliases, or `null` without a collection or with errors. */
+  tiles: { matching: number; total: number } | null;
+  /** The fields the draft holds as written, or `null` when its text cannot be read. */
+  draft: MosaicDraftFields | null;
+}
+
+/** The fields a draft holds as written. A text is `null` when it is missing or not a string. */
+export interface MosaicDraftFields {
+  title: string | null;
+  description: string | null;
+  mod: string | null;
+  collection: string | null;
+  /** The draft's own config, `{}` when it has none. */
+  config: ModYamlMapping;
+  aliases: Record<string, string[]>;
+  show: MosaicShowLine[];
+}
+
+/** The params of `mosaics.validate`: a draft's text, and the address it will be saved at, absent for a new mosaic. */
+export interface MosaicValidateParams {
+  content: string;
+  mosaic?: string;
+}
+
+/** A `show` line of a draft. */
+export interface MosaicShowLine {
+  host: string;
+  reason: string;
+}
+
+/** The form's edits of a draft. `null` removes a key, as do an empty `aliases` and an empty `show`. */
+export interface MosaicDraftEdits {
+  title?: string;
+  description?: string | null;
+  mod?: string;
+  collection?: string | null;
+  aliases?: Record<string, string[]>;
+  show?: MosaicShowLine[];
+}
+
+/** The params of `mosaics.edit`. */
+export interface MosaicEditParams {
+  content: string;
+  edits: MosaicDraftEdits;
 }
 
 /** Who listed a catalog entry: the instance catalog, a mod as its default mosaic, or the user. */
@@ -203,6 +265,10 @@ export interface CatalogProvenance {
   path: string | null;
   addedAt: string;
   updatedAt: string | null;
+  /** Whether a stored mosaic's text differs from the text it was last imported, updated from a file or exported with. `false` for a remote one. */
+  changedSinceExport: boolean;
+  /** The address a saved copy was copied from, or `null`. */
+  copiedFrom: string | null;
 }
 
 /** A mod or collection of the catalog: the resolved address of its file, who listed it and where it lives. */
@@ -300,12 +366,23 @@ export interface ModApiMethods {
   "mosaics.inspect": { params: { mosaic: string }; result: MosaicInspection };
   "mosaics.open": { params: MosaicOpenParams; result: null };
   "mosaics.check": { params: { mosaic: string }; result: ModCheckReport };
+  "mosaics.validate": {
+    params: MosaicValidateParams;
+    result: MosaicDraftValidation;
+  };
+  "mosaics.edit": { params: MosaicEditParams; result: { content: string } };
   "catalog.list": { params: Record<string, never>; result: Catalog };
   "userCatalog.import": { params: Record<string, never>; result: boolean };
   "userCatalog.update": { params: { mosaic: string }; result: boolean };
   "userCatalog.add": { params: { mosaic?: string }; result: boolean };
   "userCatalog.export": { params: { mosaic: string }; result: boolean };
   "userCatalog.remove": { params: { mosaic: string }; result: boolean };
+  "userCatalog.save": {
+    params: { content: string; mosaic?: string; copiedFrom?: string };
+    result: string | null;
+  };
+  "userCatalog.history": { params: { mosaic: string }; result: boolean };
+  "userCatalog.exportFolder": { params: { folder: string }; result: boolean };
 }
 
 /** The engine events this file types: the params each one pushes. */
@@ -387,7 +464,9 @@ export type CaseBooleanAnswerMethod =
   | "userCatalog.update"
   | "userCatalog.add"
   | "userCatalog.export"
-  | "userCatalog.remove";
+  | "userCatalog.remove"
+  | "userCatalog.history"
+  | "userCatalog.exportFolder";
 
 /** A catalog entry a case answers with: a missing mark is completed. */
 export interface CaseCatalogEntry {
@@ -396,10 +475,23 @@ export interface CaseCatalogEntry {
   place?: CatalogPlace;
 }
 
+/**
+ * A provenance a case answers with: a missing `folder`, `path`, `updatedAt`
+ * or `copiedFrom` is `null`, and a missing `changedSinceExport` is `false`.
+ */
+export interface CaseCatalogProvenance {
+  addedAt: string;
+  folder?: string | null;
+  path?: string | null;
+  updatedAt?: string | null;
+  changedSinceExport?: boolean;
+  copiedFrom?: string | null;
+}
+
 /** A catalog mosaic a case answers with: a missing mark is completed. */
 export interface CaseCatalogMosaicEntry extends CaseCatalogEntry {
   defaultOf?: CatalogMosaicEntry["defaultOf"];
-  provenance?: CatalogProvenance | null;
+  provenance?: CaseCatalogProvenance | null;
 }
 
 /**
@@ -407,7 +499,8 @@ export interface CaseCatalogMosaicEntry extends CaseCatalogEntry {
  * missing `listedBy` is `"default"` for a mosaic with a `defaultOf`, `"user"`
  * for one with a `provenance`, and `"instance"` otherwise. A missing `place`
  * is `"browser"` for an `opentesela-browser:` source and `"remote"`
- * otherwise. A missing `defaultOf` or `provenance` is `null`.
+ * otherwise. A missing `defaultOf` or `provenance` is `null`, and a
+ * provenance is completed as `CaseCatalogProvenance` says.
  */
 export interface CaseCatalogAnswer {
   mods?: CaseCatalogEntry[];
@@ -431,6 +524,8 @@ export interface CaseContext {
   requests: readonly CaseRequest[];
   answer(method: CaseBooleanAnswerMethod, value: boolean): void;
   answer(method: "mods.open" | "mosaics.open", value: null): void;
+  /** The saved mosaic's address, or `null` for a save the user cancelled. */
+  answer(method: "userCatalog.save", value: string | null): void;
   answer(method: "catalog.list", value: CaseCatalogAnswer): void;
   expect(actual: unknown): CaseExpectation;
   /** Resolves with the first truthy value `fn` returns. */

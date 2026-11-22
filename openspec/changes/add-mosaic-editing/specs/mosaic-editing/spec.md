@@ -28,6 +28,13 @@ Validating a draft SHALL report, without asking the user or opening anything, th
 - **WHEN** a draft's line 4 has a tab where YAML needs spaces
 - **THEN** validating it reports one error at line 4, and no hints
 
+### Requirement: Fields of a draft
+Validating a draft SHALL also report the fields it holds as written, so a form can show them without reading YAML: its title, description, mod and collection as text, its aliases, and its `show` lines. A value that is missing or has the wrong type SHALL be reported as none, and the fields of a draft that cannot be read SHALL be none at all.
+
+#### Scenario: After a YAML edit
+- **WHEN** the user changes the title in the YAML tab and the draft is validated
+- **THEN** the validation reports the new title, and the form shows it
+
 ### Requirement: Hints of a draft
 Validating a draft SHALL also report the hints for its aliases: the tile type's fields, each marked required or optional, the field names the collection's tiles use, and how many of the collection's tiles match the tile type after the draft's aliases, out of how many. Without a collection, or when the draft does not parse, there SHALL be no count.
 

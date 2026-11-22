@@ -1,6 +1,7 @@
 import type { Catalog, CatalogMosaicEntry } from "../../mod_api.d.ts";
 import {
   addDefinition,
+  buildBadge,
   buildButton,
   buildStatusMessage,
   buildTitledSection,
@@ -55,10 +56,20 @@ function buildStoredDetails(entry: CatalogMosaicEntry): HTMLElement[] {
     "Updated",
     provenance.updatedAt === null ? "Never" : buildTime(provenance.updatedAt),
   );
+  if (provenance.copiedFrom !== null) {
+    const copiedFrom = document.createElement("code");
+    copiedFrom.textContent = provenance.copiedFrom;
+    addDefinition(details, "Copied from", copiedFrom);
+  }
   const note = document.createElement("p");
   note.textContent =
     "It is kept only in this browser. Export it to keep a copy as a backup.";
-  return [details, note];
+  if (!provenance.changedSinceExport) {
+    return [details, note];
+  }
+  const changed = document.createElement("p");
+  changed.append(buildBadge("Changed since export", "warning"));
+  return [details, changed, note];
 }
 
 function buildRemoteDetails(entry: CatalogMosaicEntry): HTMLElement[] {
@@ -101,6 +112,29 @@ function showUpdated(view: ViewerView, isUpdated: boolean): void {
   }
 }
 
+function showHistory(view: ViewerView): void {
+  view.messages.replaceChildren();
+  view.engine
+    .request("userCatalog.history", { mosaic: view.inspection.source })
+    .then(showUpdated.bind(undefined, view), showError.bind(undefined, view));
+}
+
+function exportFolder(view: ViewerView, folder: string): void {
+  view.messages.replaceChildren();
+  view.engine
+    .request("userCatalog.exportFolder", { folder })
+    .catch(showError.bind(undefined, view));
+}
+
+function buildOutlineButton(
+  label: string,
+  handleClick: (event: MouseEvent) => void,
+): HTMLButtonElement {
+  const button = buildButton(label, handleClick);
+  button.dataset.otVariant = "outline";
+  return button;
+}
+
 function updateMosaic(view: ViewerView): void {
   view.messages.replaceChildren();
   view.engine
@@ -109,9 +143,10 @@ function updateMosaic(view: ViewerView): void {
 }
 
 /**
- * The section's actions: "Update from file…", "Export" and "Remove" for a
- * stored mosaic, "Remove" only for a remote one. "Remove" is destructive,
- * the others outline buttons.
+ * The section's actions: "Update from file…", "Export", "History…",
+ * "Export folder" when it came from a folder, and "Remove" for a stored
+ * mosaic, "Remove" only for a remote one. "Remove" is destructive, the
+ * others outline buttons.
  */
 function buildProvenanceActions(
   view: ViewerView,
@@ -120,17 +155,23 @@ function buildProvenanceActions(
   const form = document.createElement("form");
   form.setAttribute("aria-label", "Your mosaic");
   if (entry.place === "browser") {
-    const updateButton = buildButton(
-      "Update from file…",
-      updateMosaic.bind(undefined, view),
+    form.append(
+      buildOutlineButton(
+        "Update from file…",
+        updateMosaic.bind(undefined, view),
+      ),
+      buildOutlineButton("Export", exportMosaic.bind(undefined, view)),
+      buildOutlineButton("History…", showHistory.bind(undefined, view)),
     );
-    updateButton.dataset.otVariant = "outline";
-    const exportButton = buildButton(
-      "Export",
-      exportMosaic.bind(undefined, view),
-    );
-    exportButton.dataset.otVariant = "outline";
-    form.append(updateButton, exportButton);
+    const folder = entry.provenance?.folder ?? null;
+    if (folder !== null) {
+      form.append(
+        buildOutlineButton(
+          "Export folder",
+          exportFolder.bind(undefined, view, folder),
+        ),
+      );
+    }
   }
   const removeButton = buildButton(
     "Remove",

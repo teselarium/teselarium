@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import type { ActionMod, SaveFileAction } from "../../lib/core/stage/index.ts";
+import type { ActionAnswer } from "../../lib/core/engine/index.ts";
+import type { BrowserDatabaseChanges } from "../../lib/core/storage/index.ts";
 import {
   findStoredEntry,
+  planExportSync,
   readExportFileName,
 } from "../../lib/user_catalog/index.ts";
 import type { UserCatalogEntry } from "../../lib/user_catalog/index.ts";
 import { ActionDialog } from "../stage/ActionDialog.tsx";
 import { CatalogDialogFrame } from "./CatalogDialogFrame.tsx";
+import { applyExportSync } from "./export_syncs.ts";
 import {
   cancelTicket,
   createReadTicket,
@@ -16,6 +20,7 @@ import {
 import { GONE_ENTRY_MESSAGE } from "./UpdateDialog.tsx";
 import {
   readUserCatalogText,
+  readUserCatalogVersions,
   waitForUserCatalogStart,
 } from "./user_catalog_store.ts";
 import type { UserCatalogStore } from "./user_catalog_store.ts";
@@ -29,13 +34,17 @@ interface ExportMosaicDialogProps {
   /** The stored entry's address. */
   address: string;
   userCatalog: UserCatalogStore;
-  onAnswer: (id: number, accepted: boolean) => void;
+  onAnswer: (id: number, answer: ActionAnswer) => void;
 }
 
-/** What the export shows: the file being read, the save question, or the entry gone. */
+/** What the export shows: the file being read, the save question with the sync it makes, or the entry gone. */
 type ExportState =
   | { kind: "reading" }
-  | { kind: "ready"; action: SaveFileAction }
+  | {
+      kind: "ready";
+      action: SaveFileAction;
+      changes: BrowserDatabaseChanges<UserCatalogEntry>;
+    }
   | { kind: "gone" };
 
 /** The save action of a stored entry's file: its exact text, under its provenance file name. */
@@ -64,17 +73,20 @@ async function readExportState(
     const gone: ExportState = { kind: "gone" };
     return gone;
   }
+  const versions = await readUserCatalogVersions(store, address);
   const ready: ExportState = {
     kind: "ready",
     action: buildExportAction(entry, text),
+    changes: planExportSync(entry, versions[0]?.savedAt ?? null),
   };
   return ready;
 }
 
 /**
  * `userCatalog.export`: the save dialog of `files.save` for a stored entry's
- * file, once its text is read. Save downloads exactly the stored text and
- * answers `true`. Cancel and Escape answer `false`.
+ * file, once its text is read. Save downloads exactly the stored text, makes
+ * the entry unchanged since export, and answers `true`. Cancel and Escape
+ * answer `false`.
  */
 export function ExportMosaicDialog({
   shownId,
@@ -104,7 +116,12 @@ export function ExportMosaicDialog({
     return (
       <ActionDialog
         shown={{ id: shownId, mod, action: state.action }}
-        onAnswer={onAnswer}
+        onAnswer={applyExportSync.bind(
+          undefined,
+          userCatalog,
+          state.changes,
+          onAnswer,
+        )}
       />
     );
   }

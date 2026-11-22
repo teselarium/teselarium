@@ -594,11 +594,21 @@ describe("format specification", function describeFormatSpecification(): void {
 describe("mosaic module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(mosaicModule).sort()).toEqual([
+      "DRAFT_ADDRESS",
+      "MosaicEditError",
       "MosaicFormatError",
       "aliasCollectionTiles",
       "applyMosaicAliases",
+      "applyMosaicEdits",
+      "buildLoadedMosaic",
+      "buildNewDraft",
+      "listRelativeReferences",
       "loadMosaicFile",
+      "loadMosaicWithText",
+      "makeCopyDraft",
       "mergeMosaicConfig",
+      "readDraftFields",
+      "readMosaicEdits",
       "resolveMosaicReference",
     ]);
   });

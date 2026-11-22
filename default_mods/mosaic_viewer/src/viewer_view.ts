@@ -19,6 +19,10 @@ export interface ViewerView {
   provenance: HTMLElement;
   /** Inspects the mosaic anew after an update, and shows it again. */
   onUpdated: () => Promise<void>;
+  /** Shows the mosaic in view mode again, as inspected last, after leaving edit mode. */
+  onShow: () => Promise<void>;
+  /** The viewer's own mod file, which a saved copy is opened with. */
+  viewerSource: string;
 }
 
 export function showError(view: ViewerView, error: unknown): void {

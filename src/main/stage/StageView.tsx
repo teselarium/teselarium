@@ -12,6 +12,7 @@ import {
   subscribeStage,
 } from "../../lib/core/stage/index.ts";
 import type {
+  ActionAnswer,
   ActionSnapshot,
   CheckSnapshot,
   SandboxSnapshot,
@@ -233,8 +234,8 @@ export function StageView({
     void showSandboxFullscreen(stage, frame, sandboxId);
   }
 
-  function handleActionAnswer(id: number, accepted: boolean): void {
-    answerStageAction(stage, id, accepted);
+  function handleActionAnswer(id: number, answer: ActionAnswer): void {
+    answerStageAction(stage, id, answer);
   }
 
   const handlePlay = useCallback(

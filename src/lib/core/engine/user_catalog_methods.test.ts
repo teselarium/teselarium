@@ -8,6 +8,7 @@ import { APP_BASE_URL } from "../../../test/sample_files.ts";
 import type { UserCatalogEntry } from "../../user_catalog/index.ts";
 import { createMemoryBrowserDatabase } from "../storage/index.ts";
 import { INVALID_PARAMS, PERMISSION_DENIED } from "./mod_messages.ts";
+import type { ActionAnswer } from "./app_actions.ts";
 import type { ModMethodContext } from "./mod_methods.ts";
 import { USER_CATALOG_METHODS } from "./user_catalog_methods.ts";
 
@@ -24,7 +25,10 @@ const STORED_ENTRY: UserCatalogEntry = {
     path: "maps/nobel_map.yaml",
     addedAt: "2026-11-20T10:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: "2026-11-20T10:00:00.000Z",
 };
 
 const REMOTE_ENTRY: UserCatalogEntry = {
@@ -36,7 +40,10 @@ const REMOTE_ENTRY: UserCatalogEntry = {
     path: null,
     addedAt: "2026-11-20T11:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: null,
 };
 
 interface UserCatalogContext {
@@ -56,7 +63,7 @@ function returnNoEntries(): null {
 
 /** A context whose user catalog holds the stored and the remote entry, read from a memory database. */
 async function buildUserCatalogContext(
-  answer: boolean | null,
+  answer: ActionAnswer | null,
 ): Promise<UserCatalogContext> {
   const database = createMemoryBrowserDatabase<UserCatalogEntry>();
   await database.apply({
@@ -294,5 +301,201 @@ describe("user catalog requests in a check", function describeInCheck(): void {
       kind: "catalogRemove",
       address: SAMPLE_MOSAIC,
     });
+  });
+});
+
+const DRAFT = 'mosaic:\n  title: "Laureates, my way"\n  mod: "mod_viewer"\n';
+const SAVED_ADDRESS = "opentesela-browser:///r9/laureates_my_way.yaml";
+
+describe("userCatalog.save", function describeSave(): void {
+  it("New mosaic saved", async function savesNewMosaic(): Promise<void> {
+    const { context, requestSpy } =
+      await buildUserCatalogContext(SAVED_ADDRESS);
+
+    const result = await sendRequest(context, "userCatalog.save", {
+      content: DRAFT,
+      copiedFrom: SAMPLE_MOSAIC,
+    });
+
+    expect(result).toBe(SAVED_ADDRESS);
+    expect(requestSpy).toHaveBeenCalledExactlyOnceWith({
+      kind: "catalogSave",
+      content: DRAFT,
+      address: null,
+      copiedFrom: SAMPLE_MOSAIC,
+    });
+  });
+
+  it("saves a stored mosaic", async function savesStoredMosaic(): Promise<void> {
+    const { context, requestSpy } =
+      await buildUserCatalogContext(STORED_ADDRESS);
+
+    const result = await sendRequest(context, "userCatalog.save", {
+      content: DRAFT,
+      mosaic: STORED_ADDRESS,
+    });
+
+    expect(result).toBe(STORED_ADDRESS);
+    expect(requestSpy).toHaveBeenCalledExactlyOnceWith({
+      kind: "catalogSave",
+      content: DRAFT,
+      address: STORED_ADDRESS,
+      copiedFrom: null,
+    });
+  });
+
+  it("answers null when nothing was saved", async function answersNull(): Promise<void> {
+    const { context } = await buildUserCatalogContext(false);
+
+    const result = await sendRequest(context, "userCatalog.save", {
+      content: DRAFT,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("Missing content", async function refusesMissingContent(): Promise<void> {
+    const { context, requestSpy } = await buildUserCatalogContext(true);
+
+    const error = await catchMethodError(
+      sendRequest.bind(undefined, context, "userCatalog.save", {
+        mosaic: "opentesela-browser:///r1/a.yaml",
+      }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'userCatalog.save: "content" must be a non-empty string',
+    );
+    expect(requestSpy).not.toHaveBeenCalled();
+  });
+
+  it("refuses a mosaic that is not stored", async function refusesRemoteMosaic(): Promise<void> {
+    const { context } = await buildUserCatalogContext(true);
+
+    const error = await catchMethodError(
+      sendRequest.bind(undefined, context, "userCatalog.save", {
+        content: DRAFT,
+        mosaic: REMOTE_ADDRESS,
+      }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      `userCatalog.save: the mosaic "${REMOTE_ADDRESS}" is not stored in this browser`,
+    );
+  });
+
+  it("refuses a copiedFrom that is not a string", async function refusesWrongCopy(): Promise<void> {
+    const { context } = await buildUserCatalogContext(true);
+
+    const error = await catchMethodError(
+      sendRequest.bind(undefined, context, "userCatalog.save", {
+        content: DRAFT,
+        copiedFrom: 3,
+      }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'userCatalog.save: "copiedFrom" must be a non-empty string',
+    );
+  });
+
+  it("Hidden mod asks to save", async function refusesHiddenSave(): Promise<void> {
+    const { context } = await buildUserCatalogContext(null);
+
+    const error = await catchMethodError(
+      sendRequest.bind(undefined, context, "userCatalog.save", {
+        content: DRAFT,
+      }),
+    );
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toBe(
+      "userCatalog.save: only the visible mod can ask the user",
+    );
+  });
+});
+
+describe("userCatalog.history", function describeHistory(): void {
+  it("asks for the history of a stored entry", async function asksHistory(): Promise<void> {
+    const { context, requestSpy } = await buildUserCatalogContext(true);
+
+    const result = await sendRequest(context, "userCatalog.history", {
+      mosaic: STORED_ADDRESS,
+    });
+
+    expect(result).toBe(true);
+    expect(requestSpy).toHaveBeenCalledExactlyOnceWith({
+      kind: "catalogHistory",
+      address: STORED_ADDRESS,
+    });
+  });
+
+  it("refuses a remote entry", async function refusesRemoteHistory(): Promise<void> {
+    const { context } = await buildUserCatalogContext(true);
+
+    const error = await catchMethodError(
+      sendRequest.bind(undefined, context, "userCatalog.history", {
+        mosaic: REMOTE_ADDRESS,
+      }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+  });
+});
+
+describe("userCatalog.exportFolder", function describeExportFolder(): void {
+  it("asks to export an imported folder", async function asksExportFolder(): Promise<void> {
+    const { context, requestSpy } = await buildUserCatalogContext(true);
+
+    const result = await sendRequest(context, "userCatalog.exportFolder", {
+      folder: "my-mosaics",
+    });
+
+    expect(result).toBe(true);
+    expect(requestSpy).toHaveBeenCalledExactlyOnceWith({
+      kind: "catalogExportFolder",
+      folder: "my-mosaics",
+    });
+  });
+
+  it("Unknown folder", async function refusesUnknownFolder(): Promise<void> {
+    const { context, requestSpy } = await buildUserCatalogContext(true);
+
+    const error = await catchMethodError(
+      sendRequest.bind(undefined, context, "userCatalog.exportFolder", {
+        folder: "nowhere",
+      }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'userCatalog.exportFolder: no stored mosaic comes from the folder "nowhere"',
+    );
+    expect(requestSpy).not.toHaveBeenCalled();
+  });
+
+  it("refuses a missing folder", async function refusesMissingFolder(): Promise<void> {
+    const { context } = await buildUserCatalogContext(true);
+
+    const error = await catchMethodError(
+      sendRequest.bind(undefined, context, "userCatalog.exportFolder", {}),
+    );
+
+    expect(error.message).toBe(
+      'userCatalog.exportFolder: "folder" must be a non-empty string',
+    );
+  });
+
+  it("answers false when the zip was not saved", async function answersFalse(): Promise<void> {
+    const { context } = await buildUserCatalogContext(false);
+
+    const result = await sendRequest(context, "userCatalog.exportFolder", {
+      folder: "my-mosaics",
+    });
+
+    expect(result).toBe(false);
   });
 });

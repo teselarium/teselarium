@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import type { Mock } from "vitest";
-import type { CatalogAction } from "../lib/core/stage/index.ts";
+import type { ActionAnswer, CatalogAction } from "../lib/core/stage/index.ts";
 import { createMemoryBrowserDatabase } from "../lib/core/storage/index.ts";
+import type { StoredVersion } from "../lib/core/storage/index.ts";
 import type { UserCatalogEntry } from "../lib/user_catalog/index.ts";
 import { createRecentlyUsed } from "../main/settings/recently_used.ts";
 import { UserCatalogDialog } from "../main/user_catalog/UserCatalogDialog.tsx";
@@ -37,7 +38,27 @@ export function writeTestMosaic(title: string, collection: string): string {
 export interface DialogFixture {
   store: UserCatalogStore;
   database: UserCatalogDatabase;
-  onAnswer: Mock<(id: number, accepted: boolean) => void>;
+  onAnswer: Mock<(id: number, answer: ActionAnswer) => void>;
+}
+
+/** The "imported" version of each entry synced with a stored file, as an import puts it. */
+function listImportedVersions(
+  entries: readonly UserCatalogEntry[],
+  files: ReadonlyMap<string, string>,
+): StoredVersion[] {
+  const versions: StoredVersion[] = [];
+  for (const entry of entries) {
+    const text = files.get(entry.address);
+    if (text !== undefined && entry.syncedAt !== null) {
+      versions.push({
+        address: entry.address,
+        savedAt: entry.syncedAt,
+        kind: "imported",
+        text,
+      });
+    }
+  }
+  return versions;
 }
 
 /** A user catalog store on a memory database holding `entries` and `files`, on a test stage. */
@@ -54,6 +75,7 @@ export async function buildDialogFixture(
   await filled.apply({
     putFiles,
     putEntries: [...entries],
+    putVersions: listImportedVersions(entries, files),
     deleteAddresses: [],
   });
   const stage = buildTestStage(new FakeHistory(""));
@@ -65,7 +87,7 @@ export async function buildDialogFixture(
   const fixture: DialogFixture = {
     store,
     database: filled,
-    onAnswer: vi.fn<(id: number, accepted: boolean) => void>(),
+    onAnswer: vi.fn<(id: number, answer: ActionAnswer) => void>(),
   };
   return fixture;
 }

@@ -8,8 +8,12 @@ import type {
   ModLayoutChangedParams as DeclaredLayoutChangedParams,
   ModOpenParams as DeclaredModOpenParams,
   MosaicInspection as DeclaredMosaicInspection,
+  MosaicDraftEdits as DeclaredMosaicDraftEdits,
+  MosaicDraftValidation as DeclaredMosaicDraftValidation,
   MosaicOpenParams as DeclaredMosaicOpenParams,
 } from "../../../../default_mods/mod_api.d.ts";
+import type { MosaicEdits } from "../../mosaic/index.ts";
+import type { DraftValidation } from "./mosaic_draft.ts";
 import type { TileCollectionIndex } from "../../tile/index.ts";
 import type { Catalog } from "./catalog.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
@@ -91,5 +95,13 @@ describe("default_mods/mod_api.d.ts", function describeModApiTypes(): void {
     expectTypeOf<DeclaredMosaicOpenParams["params"]>().toEqualTypeOf<
       RunLink["params"] | undefined
     >();
+  });
+
+  it("declares a draft validation the engine's fits", function checksDraftValidation(): void {
+    expectTypeOf<DraftValidation>().toExtend<DeclaredMosaicDraftValidation>();
+  });
+
+  it("declares the draft edits the engine reads", function checksDraftEdits(): void {
+    expectTypeOf<DeclaredMosaicDraftEdits>().toEqualTypeOf<MosaicEdits>();
   });
 });

@@ -14,7 +14,9 @@ import {
 import type { RecentlyUsed } from "../settings/recently_used.ts";
 import {
   applyUserCatalogChanges,
+  createUserCatalogNotices,
   createUserCatalogStore,
+  raiseUserCatalogNotice,
   readStartingText,
   readStartUserCatalog,
   readUserCatalogSnapshot,
@@ -43,7 +45,10 @@ const STORED_ENTRY: UserCatalogEntry = {
     path: "nobel_map.yaml",
     addedAt: "2026-11-20T10:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: "2026-11-20T10:00:00.000Z",
 };
 
 const REMOTE_ENTRY: UserCatalogEntry = {
@@ -55,7 +60,10 @@ const REMOTE_ENTRY: UserCatalogEntry = {
     path: null,
     addedAt: "2026-11-20T11:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: null,
 };
 
 interface FakePersistentStorage extends PersistentStorage {
@@ -387,5 +395,45 @@ describe("removeAllUserMosaics", function describeRemoveAll(): void {
     expect(store.stage.userCatalog).toEqual([]);
     expect(await database.readText(STORED_ADDRESS)).toBeNull();
     expect(readRecentlyUsedSnapshot(recentlyUsed).mosaics).toEqual([]);
+  });
+});
+
+describe("user catalog notices", function describeNotices(): void {
+  it("says another tab blocks the opening, until it opens", async function followsBlocked(): Promise<void> {
+    const pending = createPendingStart();
+    const notices = createUserCatalogNotices();
+    const store = createUserCatalogStore({
+      start: pending.start,
+      stage: buildTestStage(new FakeHistory("")),
+      recentlyUsed: createRecentlyUsed({ storage: createMemoryStorage() }),
+      persistentStorage: createFakePersistentStorage(true),
+      notices,
+    });
+
+    raiseUserCatalogNotice(notices, "blocked");
+
+    expect(readUserCatalogSnapshot(store).notice).toBe("blocked");
+    pending.finish({ database: createMemoryBrowserDatabase(), entries: [] });
+    await waitForUserCatalogStart(store);
+    expect(readUserCatalogSnapshot(store).notice).toBeNull();
+  });
+
+  it("asks for a reload after another tab upgraded the database", async function followsReload(): Promise<void> {
+    const notices = createUserCatalogNotices();
+    const store = createUserCatalogStore({
+      start: Promise.resolve({
+        database: createMemoryBrowserDatabase(),
+        entries: [],
+      }),
+      stage: buildTestStage(new FakeHistory("")),
+      recentlyUsed: createRecentlyUsed({ storage: createMemoryStorage() }),
+      persistentStorage: createFakePersistentStorage(true),
+      notices,
+    });
+    await waitForUserCatalogStart(store);
+
+    raiseUserCatalogNotice(notices, "reload");
+
+    expect(readUserCatalogSnapshot(store).notice).toBe("reload");
   });
 });

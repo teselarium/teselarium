@@ -1724,6 +1724,24 @@ describe("subscribeStage", function describeSubscribeStage(): void {
       "https://images.example.net",
     );
   });
+
+  it("knows the frame is connected only once its loader says so", async function waitsForConnectedFrame(): Promise<void> {
+    const history = new FakeHistory("");
+    const stage = buildStage(history);
+    await follow(stage, history.readNavigation());
+    const { modPort } = attachCollectingFrame(stage, "sandbox-1");
+    await waitForMessages();
+    expect(readVisible(stage).isFrameConnected).toBe(false);
+
+    modPort.postMessage({
+      jsonrpc: "2.0",
+      method: "sandbox.connected",
+      params: {},
+    });
+    await waitForMessages();
+
+    expect(readVisible(stage).isFrameConnected).toBe(true);
+  });
 });
 
 describe("changeStageTileLinkedMedia", function describeChangeTileLinkedMedia(): void {
@@ -1817,7 +1835,10 @@ const REMOTE_USER_ENTRY: UserCatalogEntry = {
     path: null,
     addedAt: "2026-11-20T11:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: null,
 };
 
 /** The catalog of `TEST_INSTANCE_CATALOG` with the switch off and `REMOTE_USER_ENTRY` added. */
@@ -2499,7 +2520,10 @@ const STORED_USER_ENTRY: UserCatalogEntry = {
     path: "books_on_the_shelf.yaml",
     addedAt: "2026-11-20T10:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: "2026-11-20T10:00:00.000Z",
 };
 
 function recordTestFetch(

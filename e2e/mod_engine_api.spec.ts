@@ -156,6 +156,78 @@ test.describe(
       await expect(actionDialog(page)).toBeHidden();
     });
 
+    test("Unknown edit", async function rejectsUnknownEdit({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "mosaics.edit",
+        {
+          content: 'mosaic:\n  title: "Clock"\n  mod: "mod_viewer"\n',
+          edits: { colour: "red" },
+        },
+      ]);
+
+      expect(answer).toEqual({
+        code: -32602,
+        message: 'mosaics.edit: "edits.colour" is not a draft edit',
+      });
+    });
+
+    test("Not allowed to open the mod's site", async function rejectsValidateWithoutOpen({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "mosaics.validate",
+        {
+          content:
+            'mosaic:\n  title: "Map"\n  mod: "https://mods.example.net/map/"\n',
+        },
+      ]);
+
+      expect(answer.code).toBe(-32002);
+      expect(answer.message).toContain("https://mods.example.net");
+      expect(answer.message).toContain("permissions.open");
+    });
+
+    test("Missing content", async function rejectsSaveWithoutContent({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "userCatalog.save",
+        { mosaic: "opentesela-browser:///r1/a.yaml" },
+      ]);
+
+      expect(answer).toEqual({
+        code: -32602,
+        message: 'userCatalog.save: "content" must be a non-empty string',
+      });
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    });
+
+    test("Unknown folder", async function rejectsUnknownFolder({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "userCatalog.exportFolder",
+        { folder: "nowhere" },
+      ]);
+
+      expect(answer).toEqual({
+        code: -32602,
+        message:
+          'userCatalog.exportFolder: no stored mosaic comes from the folder "nowhere"',
+      });
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    });
+
     test("Several handlers for one event", async function callsHandlersInOrder({
       page,
     }): Promise<void> {

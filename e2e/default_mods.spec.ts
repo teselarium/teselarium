@@ -654,6 +654,7 @@ const MOSAIC_EXPLORER_CASES = [
   "opens the viewer for the selected mosaic",
   "shows a refused open",
   "shows where each mosaic lives and marks the user's",
+  "marks a mosaic changed since export",
   "imports mosaics when asked",
   "adds a mosaic by URL when asked",
   "says the list is busy while it loads",
@@ -686,6 +687,24 @@ const MOSAIC_VIEWER_CASES = [
   "removes a stored mosaic",
   "exports a stored mosaic",
   "updates a stored mosaic from a file",
+  "says a stored mosaic changed since export",
+  "exports the folder of a stored mosaic",
+  "shows the history of a stored mosaic",
+  "offers no folder export for a single file",
+  "edits a copy of the viewed mosaic",
+  "starts a copy from its link",
+  "refuses to edit a mosaic not stored in this browser",
+  "says a mode it cannot use",
+  "starts a new mosaic from a combination",
+  "shows the hints of a draft",
+  "adds an alias from a suggestion",
+  "shows broken YAML and disables the form",
+  "ignores a stale validation answer",
+  "restores a kept draft",
+  "asks before cancelling changes",
+  "leaves edit mode without changes",
+  "saves a copy",
+  "keeps edit mode when nothing is saved",
   "makes opening the mosaic the primary action",
   "draws the mosaic on the card background",
   "draws a failure with the destructive border",
@@ -857,6 +876,8 @@ test.describe(
     test("Cases without the samples", async function checksWithoutSamples({
       page,
     }): Promise<void> {
+      // Checks every default mod in turn, each running all its cases.
+      test.slow();
       await page.route("**/samples/**", answerNotFound);
 
       const viewerReport = await checkDefaultMod(page, "mod_viewer");
@@ -2564,6 +2585,150 @@ test.describe("Mosaic explorer and viewer of user mosaics", function describeUse
     await page.emulateMedia({ colorScheme: "dark" });
     await expect
       .poll(readLowestPlaceBadgeContrast.bind(undefined, page))
+      .toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
+  });
+});
+
+/** Opens the mosaic viewer in edit mode for a copy of the sample map, and waits for its form. */
+async function openMapCopy(page: Page): Promise<FrameLocator> {
+  await page.goto(
+    `/#/run?mod=mosaic_viewer&target=${encodeURIComponent(MAP_MOSAIC_REFERENCE)}&mode=copy`,
+  );
+  const viewer = mosaicViewerFrame(page);
+  await expect(viewer.getByRole("heading", { level: 1 })).toHaveText(
+    `Copy of "${MAP_MOSAIC_TITLE}"`,
+  );
+  await expect(viewer.locator('input[name="alias-country"]')).toBeVisible();
+  return viewer;
+}
+
+/** Runs in the explorer's frame: the "Changed since export" badges' text color and the fill behind them. */
+function readChangedBadgeColors(): { color: string; fill: string }[] {
+  const badges: { color: string; fill: string }[] = [];
+  for (const badge of document.querySelectorAll(
+    "article header > small + span",
+  )) {
+    const card = badge.closest("article") as Element;
+    const badgeFill = getComputedStyle(badge).backgroundColor;
+    badges.push({
+      color: getComputedStyle(badge).color,
+      fill:
+        badgeFill === "rgba(0, 0, 0, 0)"
+          ? getComputedStyle(card).backgroundColor
+          : badgeFill,
+    });
+  }
+  return badges;
+}
+
+async function readChangedBadgeContrast(page: Page): Promise<number> {
+  const frame = await findModFrame(page, "Mosaics");
+  let lowest = Number.POSITIVE_INFINITY;
+  for (const badge of await frame.evaluate(readChangedBadgeColors)) {
+    lowest = Math.min(lowest, readContrastRatio(badge.color, badge.fill));
+  }
+  return lowest;
+}
+
+test.describe("Editing mosaics in the viewer", function describeEditing(): void {
+  test("Edit a copy of a sample", async function savesEditedCopy({
+    page,
+  }): Promise<void> {
+    const viewer = await openMapCopy(page);
+    const aliasRow = viewer.locator('input[name="alias-country"]');
+
+    await aliasRow.fill("birth_country, country_of_birth");
+    await aliasRow.blur();
+    await expect(viewer.locator('textarea[name="content"]')).toHaveValue(
+      /country: \["birth_country", "country_of_birth"\]/,
+    );
+    await viewer.getByRole("button", { name: "Save", exact: true }).click();
+    const dialog = page.locator("dialog[open]");
+    await expect(
+      dialog.getByRole("heading", { name: "Save mosaic" }),
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "Save" }).click();
+
+    await expect(
+      mosaicViewerFrame(page).getByRole("region", {
+        name: "Where it comes from",
+      }),
+    ).toContainText("Changed since export");
+    await openSection(page, "Mosaics");
+    await waitForMosaicList(page);
+    const copy = mosaicExplorerCards(page).filter({
+      hasText: "Changed since export",
+    });
+    await expect(copy.getByRole("heading")).toHaveText(MAP_MOSAIC_TITLE);
+    await expect(copy.getByText("Added by you")).toBeVisible();
+    await expect(copy.getByText("Browser", { exact: true })).toBeVisible();
+  });
+
+  test("Form on a phone", async function laysOutFormOnPhone({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    const viewer = await openMapCopy(page);
+    await viewer.getByRole("button", { name: "Add a site" }).click();
+
+    const frame = await findModFrame(page, "Mosaic Viewer");
+    expect(await frame.evaluate(canFrameScrollSideways)).toBe(false);
+    const titleLabel = viewer.locator("label", {
+      has: viewer.locator('input[name="title"]'),
+    });
+    const labelText = await titleLabel.locator("span").boundingBox();
+    const titleInput = await viewer
+      .locator('input[name="title"]')
+      .boundingBox();
+    expect((labelText?.y ?? 0) + (labelText?.height ?? 0)).toBeLessThanOrEqual(
+      titleInput?.y ?? 0,
+    );
+    expect((titleInput?.x ?? 0) + (titleInput?.width ?? 0)).toBeLessThanOrEqual(
+      SMALL_PHONE_VIEWPORT.width,
+    );
+    for (const name of ["Save", "Cancel", "Form", "YAML"]) {
+      const box = await viewer
+        .getByRole(name === "Form" || name === "YAML" ? "tab" : "button", {
+          name,
+          exact: true,
+        })
+        .boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(32);
+    }
+    await viewer.getByRole("tab", { name: "YAML" }).click();
+    const textarea = await viewer
+      .locator('textarea[name="content"]')
+      .boundingBox();
+    expect((textarea?.x ?? 0) + (textarea?.width ?? 0)).toBeLessThanOrEqual(
+      SMALL_PHONE_VIEWPORT.width,
+    );
+    expect(await frame.evaluate(canFrameScrollSideways)).toBe(false);
+  });
+
+  test("Saved mosaic in both schemes", async function checksChangedBadge({
+    page,
+  }): Promise<void> {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/#/");
+    const seed = buildStoredBookListSeed(
+      page,
+      "Edited books",
+      "edited_books.yaml",
+    );
+    seed.entries[0].provenance.changedSinceExport = true;
+    await seedUserCatalog(page, seed);
+    await openSection(page, "Mosaics");
+    await waitForMosaicList(page);
+
+    const card = mosaicCard(page, "Edited books");
+    const badge = card.getByText("Changed since export");
+    await expect(badge).toHaveAttribute("data-ot-variant", "warning");
+    await expect
+      .poll(readChangedBadgeContrast.bind(undefined, page))
+      .toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect
+      .poll(readChangedBadgeContrast.bind(undefined, page))
       .toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);
   });
 });

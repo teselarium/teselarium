@@ -27,6 +27,9 @@ const BADGE_VARIANTS = [
   "warning",
 ];
 
+/** The variants of a `<textarea>`. */
+const TEXTAREA_VARIANTS = ["code"];
+
 const LIGHT_SELECTOR = ':root,\n  [data-ot-color-scheme="light"] {';
 const DARK_SELECTOR = '[data-ot-color-scheme="dark"] {';
 
@@ -205,6 +208,8 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       "details",
       "summary",
       '[aria-busy="true"]',
+      '[role="tab"][aria-selected="true"]',
+      'textarea[data-ot-variant="code"]',
       "button[data-ot-player]",
       'aside[data-ot-alert="note"]',
       'aside[data-ot-alert="tip"]',
@@ -246,7 +251,11 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
 
   it("names only the spec's variant values", function checksVariantValues(): void {
     const css = removeComments(BASE_STYLESHEET);
-    const knownValues = new Set([...BUTTON_VARIANTS, ...BADGE_VARIANTS]);
+    const knownValues = new Set([
+      ...BUTTON_VARIANTS,
+      ...BADGE_VARIANTS,
+      ...TEXTAREA_VARIANTS,
+    ]);
 
     const attributes = [...css.matchAll(/\[data-ot-variant([^\]]*)\]/g)];
     expect(attributes.length).toBeGreaterThan(0);
@@ -265,6 +274,8 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       const [, element, value] = match;
       if (element.endsWith("button")) {
         expect(BUTTON_VARIANTS).toContain(value);
+      } else if (element.endsWith("textarea")) {
+        expect(TEXTAREA_VARIANTS).toContain(value);
       } else {
         expect(element).toMatch(/span$/);
         expect(BADGE_VARIANTS).toContain(value);

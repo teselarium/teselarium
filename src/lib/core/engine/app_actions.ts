@@ -74,13 +74,41 @@ export interface CatalogRemoveAction {
   address: string;
 }
 
+/** `userCatalog.save`: the save confirmation of a draft. Answered with the saved mosaic's address, or `false`. */
+export interface CatalogSaveAction {
+  kind: "catalogSave";
+  /** The draft's text. */
+  content: string;
+  /** The stored entry it replaces, or `null` for a new mosaic. */
+  address: string | null;
+  /** For a new mosaic, the address it is a copy of, or `null`. */
+  copiedFrom: string | null;
+}
+
+/** `userCatalog.history`: the history dialog of one stored entry. */
+export interface CatalogHistoryAction {
+  kind: "catalogHistory";
+  /** The stored entry's `opentesela-browser:` address. */
+  address: string;
+}
+
+/** `userCatalog.exportFolder`: the save dialog of the `.zip` of one imported folder. */
+export interface CatalogExportFolderAction {
+  kind: "catalogExportFolder";
+  /** The imported folder's name, which at least one stored entry has. */
+  folder: string;
+}
+
 /** The actions of the `userCatalog.*` requests, which the app's user catalog store applies. */
 export type CatalogAction =
   | CatalogImportAction
   | CatalogUpdateAction
   | CatalogAddAction
   | CatalogExportAction
-  | CatalogRemoveAction;
+  | CatalogRemoveAction
+  | CatalogSaveAction
+  | CatalogHistoryAction
+  | CatalogExportFolderAction;
 
 const CATALOG_ACTION_KINDS: ReadonlySet<string> = new Set<
   CatalogAction["kind"]
@@ -90,12 +118,21 @@ const CATALOG_ACTION_KINDS: ReadonlySet<string> = new Set<
   "catalogAdd",
   "catalogExport",
   "catalogRemove",
+  "catalogSave",
+  "catalogHistory",
+  "catalogExportFolder",
 ]);
 
 /** Whether the action is one of the `userCatalog.*` requests'. */
 export function isCatalogAction(action: AppAction): action is CatalogAction {
   return CATALOG_ACTION_KINDS.has(action.kind);
 }
+
+/**
+ * The user's answer to an action: whether they accepted it, or, for a save
+ * confirmation that saved, the saved mosaic's address.
+ */
+export type ActionAnswer = boolean | string;
 
 /**
  * Something a mod asks the app to do for the user, checked and decoded, so

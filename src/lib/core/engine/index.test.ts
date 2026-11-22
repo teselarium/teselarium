@@ -5,7 +5,9 @@ describe("engine module entry point", function describeEntryPoint(): void {
   it("exports the public API", function exportsPublicApi(): void {
     expect(Object.keys(engineModule).sort()).toEqual([
       "CATALOG_CHANGED_METHOD",
+      "DRAFT_LOAD_LIFETIME",
       "LAYOUT_CHANGED_METHOD",
+      "MAX_SAVE_BYTES",
       "MOD_API_VERSION",
       "ModMethodError",
       "ModSwitchedOffError",
@@ -21,6 +23,7 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "checkModBundle",
       "collectModTileLinks",
       "connectModSession",
+      "createDraftLoadCache",
       "describeCancelledApiMismatch",
       "describeMissingApiRange",
       "expandMosaicRequest",
@@ -49,6 +52,7 @@ describe("engine module entry point", function describeEntryPoint(): void {
       "resolveInstanceCatalog",
       "selectModTiles",
       "stopModSession",
+      "validateMosaicDraft",
     ]);
   });
 });

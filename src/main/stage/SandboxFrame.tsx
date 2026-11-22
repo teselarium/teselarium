@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { ReactElement, SyntheticEvent } from "react";
 import { attachFrame, frameLoadedAgain } from "../../lib/core/stage/index.ts";
 import type { SandboxSnapshot, Stage } from "../../lib/core/stage/index.ts";
@@ -19,11 +19,11 @@ interface SandboxFrameProps {
  * sandbox's opaque origin. Firefox and WebKit then refuse (design.md, D8). The first `load` connects the mod's session;
  * any later `load` means the mod navigated its frame, so it is stopped.
  *
- * The frame stays hidden until one animation frame after it is connected:
- * before the frame loader handles `sandbox.connect`, the frame's document has
- * no color scheme yet, and a dark app would show it light for a moment.
- * Showing it right at connect still let one light frame through (design.md,
- * task 7.3).
+ * The frame stays hidden until its loader says `sandbox.connected`
+ * (`isFrameConnected`): before the loader handles `sandbox.connect`, the
+ * frame's document has no color scheme yet, and a dark app would show it
+ * light for a moment. A fixed wait, such as one animation frame after
+ * connect, still lets a light frame through when the browser is busy.
  */
 export function SandboxFrame({
   stage,
@@ -31,18 +31,12 @@ export function SandboxFrame({
   sandboxDocument,
 }: SandboxFrameProps): ReactElement {
   const loadCount = useRef(0);
-  const [isShown, setIsShown] = useState(false);
-
-  function showConnectedFrame(): void {
-    setIsShown(true);
-  }
 
   function handleFrameLoad(event: SyntheticEvent<HTMLIFrameElement>): void {
     loadCount.current += 1;
     const frameWindow = event.currentTarget.contentWindow;
     if (loadCount.current === 1 && frameWindow !== null) {
       attachFrame(stage, sandbox.id, frameWindow);
-      requestAnimationFrame(showConnectedFrame);
       return;
     }
     frameLoadedAgain(stage, sandbox.id);
@@ -51,7 +45,7 @@ export function SandboxFrame({
   return (
     <iframe
       className={
-        isShown
+        sandbox.isFrameConnected
           ? "sandbox-frame rounded-lg border shadow-panel"
           : "sandbox-frame sandbox-frame-loading rounded-lg border shadow-panel"
       }

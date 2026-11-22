@@ -20,6 +20,9 @@ const ANSWER_KINDS = {
   "userCatalog.add": "boolean",
   "userCatalog.export": "boolean",
   "userCatalog.remove": "boolean",
+  "userCatalog.history": "boolean",
+  "userCatalog.exportFolder": "boolean",
+  "userCatalog.save": "address",
   "mods.open": "null",
   "mosaics.open": "null",
   "catalog.list": "catalog",
@@ -32,7 +35,16 @@ const CATALOG_LISTS = { mods: false, collections: false, mosaics: true };
 const CATALOG_LISTED_BY = ["instance", "default", "user"];
 const CATALOG_PLACES = ["remote", "browser"];
 const BROWSER_FILE_PROTOCOL = "opentesela-browser:";
-const PROVENANCE_KEYS = ["folder", "path", "addedAt", "updatedAt"];
+// The keys of a scripted provenance: `addedAt` is required, and a missing
+// one of the others is completed with its value here.
+const PROVENANCE_DEFAULTS = {
+  folder: null,
+  path: null,
+  updatedAt: null,
+  changedSinceExport: false,
+  copiedFrom: null,
+};
+const PROVENANCE_KEYS = ["addedAt", ...Object.keys(PROVENANCE_DEFAULTS)];
 
 function isPlainMapping(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -262,43 +274,54 @@ function isTextOrNull(value) {
   return value === null || typeof value === "string";
 }
 
-function hasEveryKey(mapping, keys) {
-  for (const key of keys) {
-    if (!Object.hasOwn(mapping, key)) {
+function hasKnownKeys(mapping, keys) {
+  for (const key of Object.keys(mapping)) {
+    if (!keys.includes(key)) {
       return false;
     }
   }
   return true;
 }
 
+// A scripted provenance, completed with `PROVENANCE_DEFAULTS`.
+function completeProvenance(provenance) {
+  const completed = { addedAt: provenance.addedAt };
+  for (const [key, defaultValue] of Object.entries(PROVENANCE_DEFAULTS)) {
+    completed[key] = Object.hasOwn(provenance, key)
+      ? provenance[key]
+      : defaultValue;
+  }
+  return completed;
+}
+
 function hasProvenanceShape(provenance) {
-  const keys = Object.keys(provenance);
   const hasShape =
-    keys.length === PROVENANCE_KEYS.length &&
-    hasEveryKey(provenance, PROVENANCE_KEYS) &&
+    isNonEmptyText(provenance.addedAt) &&
     isTextOrNull(provenance.folder) &&
     isTextOrNull(provenance.path) &&
-    isNonEmptyText(provenance.addedAt) &&
-    isTextOrNull(provenance.updatedAt);
+    isTextOrNull(provenance.updatedAt) &&
+    isTextOrNull(provenance.copiedFrom) &&
+    typeof provenance.changedSinceExport === "boolean";
   return hasShape;
 }
 
-// A mosaic entry's `provenance`: `null`, or `{ folder, path, addedAt, updatedAt }`.
+// A mosaic entry's `provenance`: `null`, or `{ folder, path, addedAt,
+// updatedAt, changedSinceExport, copiedFrom }`, completed from the keys the
+// case gave.
 function readCatalogProvenance(provenance, label) {
   if (provenance === undefined || provenance === null) {
     return null;
   }
-  if (!isPlainMapping(provenance) || !hasProvenanceShape(provenance)) {
+  if (
+    !isPlainMapping(provenance) ||
+    !hasKnownKeys(provenance, PROVENANCE_KEYS) ||
+    !hasProvenanceShape(completeProvenance(provenance))
+  ) {
     throwNotCatalog(
-      `"${label}.provenance" must be null or { folder, path, addedAt, updatedAt } with strings or null, and a non-empty "addedAt"`,
+      `"${label}.provenance" must be null or a mapping with a non-empty "addedAt", "folder", "path", "updatedAt" and "copiedFrom" strings or null, and a boolean "changedSinceExport"`,
     );
   }
-  const readProvenance = {
-    folder: provenance.folder,
-    path: provenance.path,
-    addedAt: provenance.addedAt,
-    updatedAt: provenance.updatedAt,
-  };
+  const readProvenance = completeProvenance(provenance);
   return readProvenance;
 }
 
@@ -416,6 +439,10 @@ function readCatalogAnswer(value) {
   return catalog;
 }
 
+function isAddressOrNull(value) {
+  return value === null || isNonEmptyText(value);
+}
+
 // Checks an answer, and returns the value the engine queues.
 function checkAnswer(method, value) {
   if (typeof method !== "string" || !Object.hasOwn(ANSWER_KINDS, method)) {
@@ -431,6 +458,9 @@ function checkAnswer(method, value) {
   }
   if (ANSWER_KINDS[method] === "boolean" && typeof value !== "boolean") {
     throw new Error(`the answer to ${method} must be a boolean`);
+  }
+  if (ANSWER_KINDS[method] === "address" && !isAddressOrNull(value)) {
+    throw new Error(`the answer to ${method} must be a mosaic address or null`);
   }
   return value;
 }

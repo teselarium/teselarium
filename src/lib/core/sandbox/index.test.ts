@@ -7,6 +7,7 @@ describe("sandbox module entry point", function describeEntryPoint(): void {
       "SANDBOX_ANSWER_QUEUED_METHOD",
       "SANDBOX_BLOCKED_METHOD",
       "SANDBOX_CASE_FINISHED_METHOD",
+      "SANDBOX_CONNECTED_METHOD",
       "SANDBOX_CONNECT_METHOD",
       "SANDBOX_DIALOG_BLOCKED_METHOD",
       "SANDBOX_MOUNTED_METHOD",

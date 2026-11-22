@@ -9,9 +9,12 @@ import {
 } from "../../../test/method_contexts.ts";
 import { APP_BASE_URL, FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
 import {
+  ALIASED_MOSAIC_REFERENCE,
   APP_ORIGIN,
+  NAMED_BOOKS_SOURCE,
   SAMPLE_COLLECTION_SOURCE,
   SAMPLE_MOD_SOURCE,
+  serveNamedBooks,
   serveTestMosaic,
 } from "../../../test/sample_mods.ts";
 import {
@@ -138,8 +141,21 @@ describe("mosaics.inspect", function describeMosaicsInspect(): void {
       config: { show_covers: false },
       aliases: { title: ["name"] },
       permissions: { granted: [COVERS_LINE], denied: [] },
+      content: testTexts.get(MAP_MOSAIC_SOURCE),
     });
     expect(readRequestedUrls(fetchSpy)).toEqual([MAP_MOSAIC_SOURCE]);
+  });
+
+  it("Text of the file", async function answersContent(): Promise<void> {
+    const commentedText = `# My own map.\nmosaic:\n  title: "Map"\n  mod: "${SAMPLE_MOD_SOURCE}"\n`;
+    testTexts.set(MAP_MOSAIC_SOURCE, commentedText);
+    const { context } = buildSpiedContext(["*"]);
+
+    const inspection = await callMosaicMethod("mosaics.inspect", context, {
+      mosaic: MAP_MOSAIC_REFERENCE,
+    });
+
+    expect(inspection).toMatchObject({ content: commentedText });
   });
 
   it("Same mosaic from two references", async function sharesSource(): Promise<void> {
@@ -519,5 +535,175 @@ describe("Mosaic check requests follow the open rules", function describeMosaicC
       expect(error.code).toBe(INVALID_PARAMS);
     }
     expect(checkSpy).not.toHaveBeenCalled();
+  });
+});
+
+const NAMED_BOOKS_DRAFT = [
+  "mosaic:",
+  '  title: "Named books"',
+  `  mod: "${SAMPLE_MOD_SOURCE}"`,
+  `  collection: "${NAMED_BOOKS_SOURCE}"`,
+  "  aliases:",
+  '    title: ["name"]',
+  '    country: ["origin"]',
+  "",
+].join("\n");
+
+describe("mosaics.validate", function describeMosaicsValidate(): void {
+  it("Valid draft", async function validatesDraft(): Promise<void> {
+    serveNamedBooks();
+    const { context } = buildSpiedContext(["*"]);
+
+    const validation = await callMosaicMethod("mosaics.validate", context, {
+      content: NAMED_BOOKS_DRAFT,
+      mosaic: ALIASED_MOSAIC_REFERENCE,
+    });
+
+    expect(validation).toMatchObject({
+      errors: [],
+      warnings: [],
+      tiles: { matching: 1, total: 1 },
+    });
+    expect(validation).toHaveProperty(
+      "typeFields",
+      expect.arrayContaining([{ name: "title", required: true }]),
+    );
+  });
+
+  it("caches the loads of the session", async function cachesLoads(): Promise<void> {
+    serveNamedBooks();
+    const { context, fetchSpy } = buildSpiedContext(["*"]);
+    const params = { content: NAMED_BOOKS_DRAFT };
+
+    await callMosaicMethod("mosaics.validate", context, params);
+    const firstCount = fetchSpy.mock.calls.length;
+    await callMosaicMethod("mosaics.validate", context, params);
+
+    expect(firstCount).toBeGreaterThan(0);
+    expect(fetchSpy).toHaveBeenCalledTimes(firstCount);
+  });
+
+  it("Not allowed to open the mod's site", async function refusesModSite(): Promise<void> {
+    const { context, fetchSpy } = buildSpiedContext([APP_ORIGIN]);
+    const draft = NAMED_BOOKS_DRAFT.replace(
+      SAMPLE_MOD_SOURCE,
+      "https://mods.example.net/map/mod_conf.yaml",
+    );
+
+    const error = await catchMethodError(function validateForeignMod() {
+      return callMosaicMethod("mosaics.validate", context, { content: draft });
+    });
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toContain("https://mods.example.net");
+    expect(error.message).toContain("permissions.open");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("refuses the collection's site without open", async function refusesCollectionSite(): Promise<void> {
+    const { context, fetchSpy } = buildSpiedContext([APP_ORIGIN]);
+    const draft = NAMED_BOOKS_DRAFT.replace(
+      NAMED_BOOKS_SOURCE,
+      "https://tiles.example.net/books/collection.yaml",
+    );
+
+    const error = await catchMethodError(function validateForeignCollection() {
+      return callMosaicMethod("mosaics.validate", context, { content: draft });
+    });
+
+    expect(error.code).toBe(PERMISSION_DENIED);
+    expect(error.message).toContain("https://tiles.example.net");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("refuses a missing content", async function refusesMissingContent(): Promise<void> {
+    const { context } = buildSpiedContext(["*"]);
+
+    const error = await catchMethodError(function validateNothing() {
+      return callMosaicMethod("mosaics.validate", context, { content: "" });
+    });
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'mosaics.validate: "content" must be a non-empty string',
+    );
+  });
+
+  it("refuses a mosaic that is not a string", async function refusesWrongMosaic(): Promise<void> {
+    const { context } = buildSpiedContext(["*"]);
+
+    const error = await catchMethodError(function validateWrongMosaic() {
+      return callMosaicMethod("mosaics.validate", context, {
+        content: NAMED_BOOKS_DRAFT,
+        mosaic: 3,
+      });
+    });
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'mosaics.validate: "mosaic" must be a non-empty string',
+    );
+  });
+});
+
+describe("mosaics.edit", function describeMosaicsEdit(): void {
+  it("Title edit", async function editsTitle(): Promise<void> {
+    const { context, fetchSpy } = buildSpiedContext([]);
+
+    const result = await callMosaicMethod("mosaics.edit", context, {
+      content: NAMED_BOOKS_DRAFT,
+      edits: { title: "Laureates, my way" },
+    });
+
+    expect(result).toEqual({
+      content: NAMED_BOOKS_DRAFT.replace(
+        '"Named books"',
+        '"Laureates, my way"',
+      ),
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("Unknown edit", async function refusesUnknownEdit(): Promise<void> {
+    const { context } = buildSpiedContext([]);
+
+    const error = await catchMethodError(function editColour() {
+      return callMosaicMethod("mosaics.edit", context, {
+        content: NAMED_BOOKS_DRAFT,
+        edits: { colour: "red" },
+      });
+    });
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe(
+      'mosaics.edit: "edits.colour" is not a draft edit',
+    );
+  });
+
+  it("refuses a draft that does not parse", async function refusesBrokenDraft(): Promise<void> {
+    const { context } = buildSpiedContext([]);
+
+    const error = await catchMethodError(function editBroken() {
+      return callMosaicMethod("mosaics.edit", context, {
+        content: 'mosaic:\n  title: "Clock\n',
+        edits: { title: "Clock" },
+      });
+    });
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toMatch(/^mosaics\.edit: the draft cannot be read: /);
+  });
+
+  it("refuses missing edits", async function refusesMissingEdits(): Promise<void> {
+    const { context } = buildSpiedContext([]);
+
+    const error = await catchMethodError(function editWithoutEdits() {
+      return callMosaicMethod("mosaics.edit", context, {
+        content: NAMED_BOOKS_DRAFT,
+      });
+    });
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe('mosaics.edit: "edits" must be a mapping');
   });
 });

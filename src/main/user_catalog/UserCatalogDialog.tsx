@@ -1,9 +1,16 @@
 import type { ReactElement } from "react";
-import type { ActionMod, CatalogAction } from "../../lib/core/stage/index.ts";
+import type {
+  ActionAnswer,
+  ActionMod,
+  CatalogAction,
+} from "../../lib/core/stage/index.ts";
 import { AddMosaicDialog } from "./AddMosaicDialog.tsx";
+import { ExportFolderDialog } from "./ExportFolderDialog.tsx";
 import { ExportMosaicDialog } from "./ExportMosaicDialog.tsx";
+import { HistoryDialog } from "./HistoryDialog.tsx";
 import { ImportDialog } from "./ImportDialog.tsx";
 import { RemoveMosaicDialog } from "./RemoveMosaicDialog.tsx";
+import { SaveMosaicDialog } from "./SaveMosaicDialog.tsx";
 import { UpdateDialog } from "./UpdateDialog.tsx";
 import type { UserCatalogStore } from "./user_catalog_store.ts";
 
@@ -17,12 +24,12 @@ export interface CatalogActionSnapshot {
 interface UserCatalogDialogProps {
   shown: CatalogActionSnapshot;
   userCatalog: UserCatalogStore;
-  onAnswer: (id: number, accepted: boolean) => void;
+  onAnswer: (id: number, answer: ActionAnswer) => void;
 }
 
 /**
- * The dialog of a `userCatalog.*` request: import, update, add, export or
- * remove. Each is a `StageDialog`, modal and out of every frame's reach, and
+ * The dialog of a `userCatalog.*` request: import, update, add, export,
+ * remove, save, history or folder export. Each is a `StageDialog`, modal and out of every frame's reach, and
  * the app, not the mod, performs the change. Keyed by the action, so a new
  * request starts with a fresh dialog.
  */
@@ -74,6 +81,45 @@ export function UserCatalogDialog({
         shownId={id}
         mod={mod}
         address={action.address}
+        userCatalog={userCatalog}
+        onAnswer={onAnswer}
+      />
+    );
+  }
+  if (action.kind === "catalogSave") {
+    return (
+      <SaveMosaicDialog
+        key={id}
+        shownId={id}
+        mod={mod}
+        content={action.content}
+        address={action.address}
+        copiedFrom={action.copiedFrom}
+        kind="saved"
+        userCatalog={userCatalog}
+        onAnswer={onAnswer}
+      />
+    );
+  }
+  if (action.kind === "catalogHistory") {
+    return (
+      <HistoryDialog
+        key={id}
+        shownId={id}
+        mod={mod}
+        address={action.address}
+        userCatalog={userCatalog}
+        onAnswer={onAnswer}
+      />
+    );
+  }
+  if (action.kind === "catalogExportFolder") {
+    return (
+      <ExportFolderDialog
+        key={id}
+        shownId={id}
+        mod={mod}
+        folder={action.folder}
         userCatalog={userCatalog}
         onAnswer={onAnswer}
       />

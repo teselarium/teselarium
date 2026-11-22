@@ -1,11 +1,15 @@
-export { isCatalogAction } from "./app_actions.ts";
+export { isCatalogAction, MAX_SAVE_BYTES } from "./app_actions.ts";
 export type {
+  ActionAnswer,
   AppAction,
   CatalogAction,
   CatalogAddAction,
   CatalogExportAction,
+  CatalogExportFolderAction,
+  CatalogHistoryAction,
   CatalogImportAction,
   CatalogRemoveAction,
+  CatalogSaveAction,
   CatalogUpdateAction,
   ConfirmAction,
   LinkAction,
@@ -128,3 +132,16 @@ export type {
   ModSession,
   ModSessionOptions,
 } from "./mod_session.ts";
+export {
+  createDraftLoadCache,
+  DRAFT_LOAD_LIFETIME,
+} from "./draft_load_cache.ts";
+export type { DraftLoadCache } from "./draft_load_cache.ts";
+export { validateMosaicDraft } from "./mosaic_draft.ts";
+export type {
+  DraftProblem,
+  DraftTileCount,
+  DraftTypeField,
+  DraftValidation,
+  DraftValidationOptions,
+} from "./mosaic_draft.ts";

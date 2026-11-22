@@ -1,10 +1,13 @@
 import { useState } from "react";
 import {
   applyReview,
-  isCheckableRow,
+  canApplyReview,
   listDefaultChecked,
 } from "../../lib/user_catalog/index.ts";
-import type { ImportReview } from "../../lib/user_catalog/index.ts";
+import type {
+  ConflictChoice,
+  ImportReview,
+} from "../../lib/user_catalog/index.ts";
 import { applyUserCatalogChanges } from "./user_catalog_store.ts";
 import type { UserCatalogStore } from "./user_catalog_store.ts";
 
@@ -16,12 +19,15 @@ export interface CatalogReview {
   phase: ReviewPhase;
   review: ImportReview | null;
   checked: ReadonlySet<number>;
+  /** The choice of each conflict, by row index. */
+  choices: ReadonlyMap<number, ConflictChoice>;
   error: string | null;
-  /** Whether a checked row would change something, so the apply button is enabled. */
+  /** Whether a checked row or the conflicts' choices can be applied, so the apply button is enabled. */
   canApply: boolean;
   /** Reads picked files into a review with `plan`. */
   startReview: (plan: () => Promise<ImportReview>) => void;
   toggle: (index: number, isChecked: boolean) => void;
+  choose: (index: number, choice: ConflictChoice) => void;
   showError: (message: string) => void;
   /** Applies the checked rows. Resolves with whether the store changed. */
   apply: () => Promise<boolean>;
@@ -31,20 +37,15 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function hasCheckedRow(
+function canApplyChoices(
   review: ImportReview | null,
   checked: ReadonlySet<number>,
+  choices: ReadonlyMap<number, ConflictChoice>,
 ): boolean {
   if (review === null) {
     return false;
   }
-  for (const index of checked) {
-    const row = review.rows[index];
-    if (row !== undefined && isCheckableRow(row)) {
-      return true;
-    }
-  }
-  return false;
+  return canApplyReview(review, checked, choices);
 }
 
 /**
@@ -56,6 +57,9 @@ export function useCatalogReview(store: UserCatalogStore): CatalogReview {
   const [phase, setPhase] = useState<ReviewPhase>("pick");
   const [review, setReview] = useState<ImportReview | null>(null);
   const [checked, setChecked] = useState<ReadonlySet<number>>(new Set());
+  const [choices, setChoices] = useState<ReadonlyMap<number, ConflictChoice>>(
+    new Map(),
+  );
   const [error, setError] = useState<string | null>(null);
 
   async function readReview(plan: () => Promise<ImportReview>): Promise<void> {
@@ -65,6 +69,7 @@ export function useCatalogReview(store: UserCatalogStore): CatalogReview {
       const planned = await plan();
       setReview(planned);
       setChecked(listDefaultChecked(planned));
+      setChoices(new Map());
     } catch (planError) {
       setError(describeError(planError));
     }
@@ -85,6 +90,12 @@ export function useCatalogReview(store: UserCatalogStore): CatalogReview {
     setChecked(nextChecked);
   }
 
+  function choose(index: number, choice: ConflictChoice): void {
+    const nextChoices = new Map(choices);
+    nextChoices.set(index, choice);
+    setChoices(nextChoices);
+  }
+
   function showError(message: string): void {
     setError(message);
   }
@@ -98,7 +109,7 @@ export function useCatalogReview(store: UserCatalogStore): CatalogReview {
     try {
       await applyUserCatalogChanges(
         store,
-        applyReview(review, checked, new Date()),
+        applyReview(review, checked, new Date(), choices),
       );
       return true;
     } catch (applyError) {
@@ -112,10 +123,12 @@ export function useCatalogReview(store: UserCatalogStore): CatalogReview {
     phase,
     review,
     checked,
+    choices,
     error,
-    canApply: phase === "review" && hasCheckedRow(review, checked),
+    canApply: phase === "review" && canApplyChoices(review, checked, choices),
     startReview,
     toggle,
+    choose,
     showError,
     apply,
   };

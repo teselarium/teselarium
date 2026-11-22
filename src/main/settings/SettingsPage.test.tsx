@@ -80,7 +80,10 @@ function buildUserEntry(
       path: place === "browser" ? "a.yaml" : null,
       addedAt: "2026-11-20T10:00:00.000Z",
       updatedAt: null,
+      changedSinceExport: false,
+      copiedFrom: null,
     },
+    syncedAt: null,
   };
   return entry;
 }

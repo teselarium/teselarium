@@ -149,7 +149,11 @@ function resolveMosaicCollection(
   }
 }
 
-function buildLoadedMosaic(
+/**
+ * Reads a parsed mosaic file and resolves its `mod` and `collection` against
+ * its source, requesting nothing. Raises `MosaicFormatError`.
+ */
+export function buildLoadedMosaic(
   parsedYaml: ParsedYaml,
   options: MosaicLoadOptions,
 ): LoadedMosaic {
@@ -171,6 +175,29 @@ function buildLoadedMosaic(
   return loadedMosaic;
 }
 
+/** A loaded mosaic with the text of its file, as it was read. */
+export interface MosaicWithText {
+  mosaic: LoadedMosaic;
+  content: string;
+}
+
+/**
+ * Loads a mosaic file as `loadMosaicFile` does, and also gives the file's
+ * text, comments included.
+ */
+export async function loadMosaicWithText(
+  reference: string,
+  options: MosaicLoadOptions = {},
+): Promise<MosaicWithText> {
+  const source = resolveMosaicReference(reference, options.baseUrl);
+  const fetchedFile = await fetchFile(source, options);
+  const mosaicWithText: MosaicWithText = {
+    mosaic: buildLoadedMosaic(parseYaml(fetchedFile), options),
+    content: fetchedFile.content,
+  };
+  return mosaicWithText;
+}
+
 /**
  * Loads a mosaic file from a mosaic reference (the file or its folder),
  * requesting neither its mod nor its collection. Raises `FileFetchError` or
@@ -180,8 +207,6 @@ export async function loadMosaicFile(
   reference: string,
   options: MosaicLoadOptions = {},
 ): Promise<LoadedMosaic> {
-  const source = resolveMosaicReference(reference, options.baseUrl);
-  const fetchedFile = await fetchFile(source, options);
-  const loadedMosaic = buildLoadedMosaic(parseYaml(fetchedFile), options);
-  return loadedMosaic;
+  const mosaicWithText = await loadMosaicWithText(reference, options);
+  return mosaicWithText.mosaic;
 }

@@ -17,7 +17,10 @@ const STORED_ENTRY: UserCatalogEntry = {
     path: "maps/nobel_map.yaml",
     addedAt: "2026-11-20T10:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: "2026-11-20T10:00:00.000Z",
 };
 
 const REMOTE_ENTRY: UserCatalogEntry = {
@@ -29,7 +32,10 @@ const REMOTE_ENTRY: UserCatalogEntry = {
     path: null,
     addedAt: "2026-11-20T11:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: null,
 };
 
 describe("buildUserMosaicEntries", function describeUserMosaics(): void {

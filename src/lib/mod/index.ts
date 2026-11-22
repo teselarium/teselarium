@@ -21,4 +21,4 @@ export {
   permissionHostCovers,
 } from "./mod_permissions.ts";
 export type { ModPermission, PermissionCategory } from "./mod_permissions.ts";
-export { resolveModReference } from "./mod_reference.ts";
+export { isDefaultModName, resolveModReference } from "./mod_reference.ts";

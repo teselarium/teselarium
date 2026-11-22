@@ -1,3 +1,4 @@
+import { createDraftLoadCache } from "./draft_load_cache.ts";
 import type { ModIssue, ModLoadOptions } from "../../mod/index.ts";
 import type { Tile, TileIssue } from "../../tile/index.ts";
 import {
@@ -9,6 +10,7 @@ import {
   readMountFailure,
   readSandboxTestReport,
   SANDBOX_BLOCKED_METHOD,
+  SANDBOX_CONNECTED_METHOD,
   SANDBOX_DIALOG_BLOCKED_METHOD,
   SANDBOX_MOUNT_FAILED_METHOD,
   SANDBOX_MOUNTED_METHOD,
@@ -23,7 +25,7 @@ import type { LoadedMosaic } from "../../mosaic/index.ts";
 import type { ModStorage } from "../storage/index.ts";
 import type { UserCatalogEntry } from "../../user_catalog/index.ts";
 import type { Theme } from "../theme/index.ts";
-import type { AppAction } from "./app_actions.ts";
+import type { ActionAnswer, AppAction } from "./app_actions.ts";
 import { CATALOG_METHODS } from "./catalog_methods.ts";
 import type { Catalog } from "./catalog.ts";
 import { COLLECTIONS_METHODS } from "./collections_methods.ts";
@@ -98,7 +100,7 @@ export interface ModSessionOptions {
    * Asks the stage to show an action to the user. Resolves with the user's
    * answer, or is `null` when the sandbox is not the visible one.
    */
-  onRequestAction: (action: AppAction) => Promise<boolean> | null;
+  onRequestAction: (action: AppAction) => Promise<ActionAnswer> | null;
   /** Asks the stage to check a mod. `null` when the sandbox is not the visible one. */
   onCheckMod: (request: ModCheckRequest) => Promise<ModCheckReport> | null;
   /** Gives the stage each message the mod sends the user with `ui.notify`. Not deduped. */
@@ -107,6 +109,11 @@ export interface ModSessionOptions {
   theme: Theme;
   /** The layout the mod mounts with: the frame's layout when it connects. */
   layout: FrameLayout;
+  /**
+   * Called for `sandbox.connected`: the frame's document has its color scheme
+   * and layout, so the stage can show the frame. Checks pass none.
+   */
+  onConnected?: () => void;
   /**
    * Called when the mod's `mount` finished: for `sandbox.mounted`, and for
    * `sandbox.mountFailed` after its issue is reported. Running sandboxes pass none.
@@ -136,6 +143,7 @@ export interface ModSession {
   onIssue: (issue: ModIssue) => void;
   /** Keys of the issues already reported, so each is reported once. */
   reportedIssueKeys: Set<string>;
+  onConnected: (() => void) | null;
   onMounted: (() => void) | null;
   onErrorResponse:
     ((method: string | null, error: ResponseError) => void) | null;
@@ -302,6 +310,12 @@ function reportMountFailure(session: ModSession, params: unknown): void {
   });
 }
 
+function reportConnected(session: ModSession): void {
+  if (session.onConnected !== null) {
+    session.onConnected();
+  }
+}
+
 function reportMounted(session: ModSession): void {
   if (session.onMounted !== null) {
     session.onMounted();
@@ -325,8 +339,9 @@ function reportTestNotification(
 }
 
 /**
- * The frame loader's notifications become issues, a finished mount is told
- * to `onMounted`, and the test runner's to `onTestReport`. Any other
+ * The frame loader's notifications become issues, a connected frame is told
+ * to `onConnected`, a finished mount to `onMounted`, and the test runner's
+ * to `onTestReport`. Any other
  * notification is ignored.
  */
 function handleModNotification(
@@ -334,6 +349,9 @@ function handleModNotification(
   notification: ModNotification,
 ): void {
   reportTestNotification(session, notification);
+  if (notification.method === SANDBOX_CONNECTED_METHOD) {
+    reportConnected(session);
+  }
   if (notification.method === SANDBOX_BLOCKED_METHOD) {
     reportBlockedRequest(session, notification.params);
   }
@@ -425,6 +443,7 @@ export function connectModSession(
       defaults: options.defaults,
       fetchOptions: options.fetchOptions,
       tileBodies: launch.tileBodies,
+      draftLoads: createDraftLoadCache(),
       readSiteDecisions: options.readSiteDecisions,
       readCatalog: options.readCatalog,
       readUserCatalog: options.readUserCatalog ?? readNoUserCatalog,
@@ -435,6 +454,7 @@ export function connectModSession(
     },
     onIssue: options.onIssue,
     reportedIssueKeys: new Set(),
+    onConnected: options.onConnected ?? null,
     onMounted: options.onMounted ?? null,
     onErrorResponse: options.onErrorResponse ?? null,
     onTestReport: options.onTestReport ?? null,

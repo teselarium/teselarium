@@ -288,6 +288,23 @@ export async function showsWhereMosaicsLive(
   context.expect(cards[1].querySelector("header > small")).toBe(null);
 }
 
+export async function marksChangedMosaics(context: CaseContext): Promise<void> {
+  await mountWithCatalogMosaics(context, [
+    {
+      source: LISTED_MOSAIC_LOCATION,
+      place: "browser",
+      provenance: { ...STORED_PROVENANCE, changedSinceExport: true },
+    },
+    { source: OTHER_MOSAIC_LOCATION },
+  ]);
+
+  const cards = context.root.querySelectorAll("li > article");
+  const changed = cards[0].querySelector("header > small + span");
+  context.expect(changed?.textContent).toBe("Changed since export");
+  context.expect(changed?.getAttribute("data-ot-variant")).toBe("warning");
+  context.expect(cards[1].textContent).not.toContain("Changed since export");
+}
+
 export async function importsWhenAsked(context: CaseContext): Promise<void> {
   await mountWithMosaics(context, [LISTED_MOSAIC_LOCATION]);
   context.answer("userCatalog.import", true);

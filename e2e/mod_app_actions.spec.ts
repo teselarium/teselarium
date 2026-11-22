@@ -362,6 +362,31 @@ test.describe(
       );
       await expect(page.getByRole("dialog")).toHaveCount(0);
     });
+
+    test("Hidden mod asks to save", async function refusesHiddenSave({
+      page,
+    }): Promise<void> {
+      const opener = await openProbe(page, OPEN_ANY_SITE_LINES);
+      await ask(opener, "mods.open", { mod: "./test-mods/probe/" });
+      const opened = await findSandboxFrame(page, "sandbox-2");
+      await waitForProbe(opened);
+
+      const answer = await opener.evaluate(requestFromProbe, [
+        "userCatalog.save",
+        { content: 'mosaic:\n  title: "Clock"\n  mod: "mod_viewer"\n' },
+      ]);
+
+      expect(answer.code).toBe(-32002);
+      expect(answer.message).toBe(
+        "userCatalog.save: only the visible mod can ask the user",
+      );
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      const catalog = await opened.evaluate(requestFromProbe, [
+        "catalog.list",
+        {},
+      ]);
+      expect(JSON.stringify(catalog)).not.toContain("opentesela-browser:");
+    });
   },
 );
 

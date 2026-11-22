@@ -1,4 +1,4 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, PencilIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type {
@@ -222,10 +222,22 @@ function describeMosaicBadge(badge: MosaicBadge): string {
   return count;
 }
 
-/** The badge column: the mosaic icon with a number, the icon alone, or an empty column. */
+/** The badge column: the mosaic icon with a number, the icon alone, the edit row's pencil, or an empty column. */
 function renderBadge(mosaics: CombinationRow["mosaics"]): ReactElement {
   if (mosaics === null) {
     return <span aria-hidden="true" className={BADGE_COLUMN_CLASSES} />;
+  }
+  if (mosaics === "edit") {
+    return (
+      <span
+        aria-hidden="true"
+        data-column="badge"
+        data-edit-icon=""
+        className={BADGE_COLUMN_CLASSES}
+      >
+        <PencilIcon className="size-3.5" />
+      </span>
+    );
   }
   const name = mosaics === "icon" ? "Mosaic" : describeMosaicBadge(mosaics);
   const number =

@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import type { Frame, Locator, Page, Request } from "@playwright/test";
+import type {
+  Frame,
+  FrameLocator,
+  Locator,
+  Page,
+  Request,
+} from "@playwright/test";
 import {
   buildProbeFiles,
   COVER_HOST,
@@ -2162,3 +2168,106 @@ test.describe(
     });
   },
 );
+
+/** The mosaic viewer's frame, wherever the stage shows it. */
+function mosaicViewerFrame(page: Page): FrameLocator {
+  return page.frameLocator('iframe[title="Mosaic Viewer"]');
+}
+
+async function openMosaicList(page: Page): Promise<void> {
+  await stageBar(page)
+    .getByRole("button", { name: /^Mosaic: / })
+    .click();
+  await expect(page.getByRole("combobox")).toBeFocused();
+}
+
+test.describe("Edit row of the mosaic list", function describeEditRow(): void {
+  test("Save the combination", async function savesCombination({
+    page,
+  }): Promise<void> {
+    await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
+    await openMosaicList(page);
+    expect((await readOptionTitles(page)).slice(0, 2)).toEqual([
+      "Save as mosaic",
+      "Unsaved combination",
+    ]);
+
+    await listOption(page, "Save as mosaic").click();
+
+    await expect(
+      mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
+    ).toHaveText("New mosaic");
+    const params = readRunParams(page);
+    expect(params.get("mod")).toBe("mosaic_viewer");
+    expect(params.get("mode")).toBe("new");
+    expect(params.get("draft_mod")).toMatch(
+      /\/samples\/mods\/flashcards\/mod_conf\.yaml$/,
+    );
+    expect(params.get("draft_collection")).toMatch(
+      /\/samples\/tiles\/literature_nobel_laureates\/collection\.yaml$/,
+    );
+    await expect(
+      mosaicViewerFrame(page).locator('textarea[name="content"]'),
+    ).toHaveValue(/flashcards/);
+    await page.goBack();
+    await expect(
+      stageBar(page).getByRole("button", { name: "Mod: Flashcards" }),
+    ).toBeVisible();
+  });
+
+  test("Back to the mosaic", async function goesBackToMosaic({
+    page,
+  }): Promise<void> {
+    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    await openMosaicList(page);
+
+    await listOption(page, "Edit a copy").click();
+
+    await expect(
+      mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
+    ).toHaveText(`Copy of "${MAP_MOSAIC_TITLE}"`);
+    await page.goBack();
+    await expect(
+      stageBar(page).getByRole("button", {
+        name: `Mosaic: ${MAP_MOSAIC_TITLE}`,
+      }),
+    ).toBeVisible();
+  });
+
+  test("Edit row on a phone", async function laysOutEditRow({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await page.goto(FLASHCARDS_LAUREATES_LINK);
+    // On a phone the capsules fold into one, whose menu opens each list.
+    await capsule(page, /^Combination: /).click();
+    await page.getByRole("menuitem", { name: "Mosaic" }).click();
+    await openList(page).evaluate(finishAnimations);
+
+    const editRow = listOption(page, "Save as mosaic");
+    const editBox = await readBox(editRow);
+    const pairBox = await readBox(
+      listOption(page, "Unsaved combination").first(),
+    );
+    expect(editBox.height).toBe(pairBox.height);
+    expect(editBox.height).toBeGreaterThanOrEqual(32);
+    expect(editBox.x + editBox.width).toBeLessThanOrEqual(
+      SMALL_PHONE_VIEWPORT.width,
+    );
+    await expect(
+      editRow.locator("[data-column=title] > span").first(),
+    ).toHaveText("Save as mosaic");
+    expect(
+      await editRow
+        .locator("[data-column=title] > span")
+        .first()
+        .evaluate(isCut),
+    ).toBe(false);
+
+    await editRow.click();
+
+    await expect(
+      mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
+    ).toHaveText("New mosaic");
+  });
+});

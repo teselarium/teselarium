@@ -1,6 +1,10 @@
+import { createDraftLoadCache } from "../lib/core/engine/draft_load_cache.ts";
 import { vi } from "vitest";
 import type { Mock } from "vitest";
-import type { AppAction } from "../lib/core/engine/app_actions.ts";
+import type {
+  ActionAnswer,
+  AppAction,
+} from "../lib/core/engine/app_actions.ts";
 import type { Catalog } from "../lib/core/engine/catalog.ts";
 import { ModMethodError } from "../lib/core/engine/engine_errors.ts";
 import { checkModBundle } from "../lib/core/engine/mod_bundle_check.ts";
@@ -166,6 +170,7 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
       npmHost: TEST_NPM_HOST,
     },
     tileBodies: buildTileBodies([]),
+    draftLoads: createDraftLoadCache(),
     readSiteDecisions: readNoSiteDecisions,
     readCatalog: readEmptyCatalog,
     readUserCatalog: readEmptyUserCatalog,
@@ -178,20 +183,20 @@ export function buildMethodContext(granted: ModPermission[]): ModMethodContext {
 }
 
 export type RequestActionSpy = Mock<
-  (action: AppAction) => Promise<boolean> | null
+  (action: AppAction) => Promise<ActionAnswer> | null
 >;
 
 /**
  * A method context whose `onRequestAction` is a spy: the user answers
  * `answer`, or `null` plays a mod whose sandbox is not the visible one.
  */
-export function buildAskingContext(answer: boolean | null): {
+export function buildAskingContext(answer: ActionAnswer | null): {
   context: ModMethodContext;
   requestSpy: RequestActionSpy;
 } {
   const context = buildMethodContext([]);
   const requestSpy: RequestActionSpy =
-    vi.fn<(action: AppAction) => Promise<boolean> | null>();
+    vi.fn<(action: AppAction) => Promise<ActionAnswer> | null>();
   requestSpy.mockReturnValue(answer === null ? null : Promise.resolve(answer));
   context.onRequestAction = requestSpy;
   const askingContext = { context, requestSpy };

@@ -5,8 +5,9 @@ import type { IssueLevel } from "../../tile/index.ts";
 import type { ModGrants, SiteDecision } from "../permissions/index.ts";
 import type { ModSlot, ModStorage } from "../storage/index.ts";
 import type { UserCatalogEntry } from "../../user_catalog/index.ts";
-import type { AppAction } from "./app_actions.ts";
+import type { ActionAnswer, AppAction } from "./app_actions.ts";
 import type { Catalog } from "./catalog.ts";
+import type { DraftLoadCache } from "./draft_load_cache.ts";
 import type { ResolvedDefaultModSettings } from "./default_mod_settings.ts";
 import { ModMethodError } from "./engine_errors.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
@@ -76,6 +77,8 @@ export interface ModMethodContext {
   fetchOptions: ModLoadOptions;
   /** The bodies of the tiles the mod currently receives, replaced by "Reload tiles". */
   tileBodies: TileBodies;
+  /** The session's loads for `mosaics.validate`, reused for 30 seconds. */
+  draftLoads: DraftLoadCache;
   /** The remembered site decisions, read when `mods.inspect` grants a mod's permissions. */
   readSiteDecisions: () => readonly SiteDecision[];
   /** The catalog as `catalog.list` answers it, read anew for each request. */
@@ -95,7 +98,7 @@ export interface ModMethodContext {
    * Asks the stage to show an action to the user. Resolves with the user's
    * answer, or is `null` when the sandbox is not the visible one.
    */
-  onRequestAction: (action: AppAction) => Promise<boolean> | null;
+  onRequestAction: (action: AppAction) => Promise<ActionAnswer> | null;
   /**
    * Asks the stage to check a mod. Resolves with the report, or is `null`
    * when the sandbox is not the visible one.
@@ -175,21 +178,48 @@ export function readOpenReplace(params: YamlMapping, method: string): boolean {
   return replace;
 }
 
-/**
- * Asks the user to accept an action, and resolves with the answer. Raises
- * `PERMISSION_DENIED` when the mod's sandbox is not the visible one.
- */
-export function askUser(
+/** The user's answer, or raises `PERMISSION_DENIED` when the mod's sandbox is not the visible one. */
+function requestAnswer(
   context: ModMethodContext,
   method: string,
   action: AppAction,
-): Promise<boolean> {
+): Promise<ActionAnswer> {
   const answer = context.onRequestAction(action);
   if (answer === null) {
     throw new ModMethodError(
       PERMISSION_DENIED,
       `${method}: only the visible mod can ask the user`,
     );
+  }
+  return answer;
+}
+
+/**
+ * Asks the user to accept an action, and resolves with whether they did.
+ * Raises `PERMISSION_DENIED` when the mod's sandbox is not the visible one.
+ */
+export async function askUser(
+  context: ModMethodContext,
+  method: string,
+  action: AppAction,
+): Promise<boolean> {
+  const answer = await requestAnswer(context, method, action);
+  return answer === true;
+}
+
+/**
+ * Asks the user to save, and resolves with the saved mosaic's address, or
+ * `null` when nothing was saved. Raises `PERMISSION_DENIED` when the mod's
+ * sandbox is not the visible one.
+ */
+export async function askUserForAddress(
+  context: ModMethodContext,
+  method: string,
+  action: AppAction,
+): Promise<string | null> {
+  const answer = await requestAnswer(context, method, action);
+  if (typeof answer !== "string") {
+    return null;
   }
   return answer;
 }

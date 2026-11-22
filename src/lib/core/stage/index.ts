@@ -45,6 +45,7 @@ export type {
 } from "./stage_controller.ts";
 export { isCatalogAction } from "../engine/index.ts";
 export type {
+  ActionAnswer,
   AppAction,
   CatalogAction,
   ConfirmAction,

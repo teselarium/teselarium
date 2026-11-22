@@ -1,6 +1,17 @@
 import type { YamlMapping } from "../../files/index.ts";
-import { loadMosaicFile, resolveMosaicReference } from "../../mosaic/index.ts";
-import type { LoadedMosaic, MosaicAliases } from "../../mosaic/index.ts";
+import { isYamlMapping } from "../../files/index.ts";
+import {
+  applyMosaicEdits,
+  loadMosaicWithText,
+  MosaicEditError,
+  readMosaicEdits,
+  resolveMosaicReference,
+} from "../../mosaic/index.ts";
+import type {
+  LoadedMosaic,
+  MosaicAliases,
+  MosaicWithText,
+} from "../../mosaic/index.ts";
 import {
   checkOpenGrant,
   grantMosaicPermissions,
@@ -8,6 +19,8 @@ import {
 import type { ModGrants } from "../permissions/index.ts";
 import { describeEngineError, ModMethodError } from "./engine_errors.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
+import { validateMosaicDraft } from "./mosaic_draft.ts";
+import type { DraftSourceKind, DraftValidation } from "./mosaic_draft.ts";
 import type { RunLink } from "./mod_launch.ts";
 import { LOAD_FAILED, PERMISSION_DENIED } from "./mod_messages.ts";
 import {
@@ -25,6 +38,8 @@ import type {
 const INSPECT_METHOD = "mosaics.inspect";
 const OPEN_METHOD = "mosaics.open";
 const CHECK_METHOD = "mosaics.check";
+const VALIDATE_METHOD = "mosaics.validate";
+const EDIT_METHOD = "mosaics.edit";
 
 /**
  * A mosaic file's content, without opening it. `mod` and `collection` are
@@ -41,6 +56,13 @@ export interface MosaicInspection {
   config: YamlMapping;
   aliases: MosaicAliases;
   permissions: ModGrants;
+  /** The mosaic file's text, as read. */
+  content: string;
+}
+
+/** What `mosaics.edit` answers: the draft's new text. */
+export interface MosaicEditResult {
+  content: string;
 }
 
 /** Resolves a mosaic reference against the app's address, or raises `INVALID_PARAMS` naming `method`. */
@@ -71,8 +93,9 @@ function checkMosaicAccess(context: ModMethodContext, source: string): void {
 
 function buildMosaicInspection(
   context: ModMethodContext,
-  mosaic: LoadedMosaic,
+  mosaicWithText: MosaicWithText,
 ): MosaicInspection {
+  const mosaic: LoadedMosaic = mosaicWithText.mosaic;
   const inspection: MosaicInspection = {
     source: mosaic.source,
     title: mosaic.title,
@@ -86,6 +109,7 @@ function buildMosaicInspection(
       context.appOrigin,
       context.readSiteDecisions(),
     ),
+    content: mosaicWithText.content,
   };
   return inspection;
 }
@@ -102,11 +126,11 @@ async function inspectRequestedMosaic(
   const source = resolveRequestedMosaic(context, reference, INSPECT_METHOD);
   checkMosaicAccess(context, source);
   try {
-    const mosaic = await loadMosaicFile(source, {
+    const mosaicWithText = await loadMosaicWithText(source, {
       ...context.fetchOptions,
       defaultModsFolder: context.defaults.folder,
     });
-    return buildMosaicInspection(context, mosaic);
+    return buildMosaicInspection(context, mosaicWithText);
   } catch (error) {
     throw new ModMethodError(LOAD_FAILED, describeEngineError(error), {
       cause: error,
@@ -173,9 +197,103 @@ async function checkRequestedMosaic(
   return report;
 }
 
-/** The `mosaics.*` requests: reading, opening and checking mosaic files. */
+/**
+ * Refuses a draft's mod or collection at `source` when the requester has no
+ * granted `open` permission for its origin, as `mods.inspect` and
+ * `collections.inspect` do.
+ */
+function checkDraftAccess(
+  context: ModMethodContext,
+  subject: "mods" | "collections",
+  source: string,
+): void {
+  const denial = checkOpenGrant(context.grants, source, subject);
+  if (denial !== null) {
+    throw new ModMethodError(
+      PERMISSION_DENIED,
+      `${VALIDATE_METHOD}: ${denial}`,
+    );
+  }
+}
+
+/** The `checkAccess` of a requested validation: `open` for the origin of the draft's mod or collection. */
+function checkDraftSource(
+  context: ModMethodContext,
+  source: string,
+  kind: DraftSourceKind,
+): void {
+  checkDraftAccess(context, kind === "mod" ? "mods" : "collections", source);
+}
+
+/** The optional `mosaic` of `mosaics.validate`: the address a draft will be saved at, resolved, or `null`. */
+function readDraftAddress(
+  context: ModMethodContext,
+  params: YamlMapping,
+): string | null {
+  if (params.mosaic === undefined || params.mosaic === null) {
+    return null;
+  }
+  const reference = readRequiredText(params, "mosaic", VALIDATE_METHOD);
+  return resolveRequestedMosaic(context, reference, VALIDATE_METHOD);
+}
+
+/**
+ * `mosaics.validate { content, mosaic? }`: the errors, warnings and alias
+ * hints of a draft, after checking `open` for its mod's and collection's
+ * origins. Asks the user nothing.
+ */
+async function validateRequestedDraft(
+  context: ModMethodContext,
+  params: YamlMapping,
+): Promise<DraftValidation> {
+  const content = readRequiredText(params, "content", VALIDATE_METHOD);
+  const address = readDraftAddress(context, params);
+  return validateMosaicDraft(content, address, {
+    fetchOptions: {
+      ...context.fetchOptions,
+      defaultModsFolder: context.defaults.folder,
+    },
+    loads: context.draftLoads,
+    checkAccess: checkDraftSource.bind(undefined, context),
+  });
+}
+
+/** Raises `INVALID_PARAMS` naming `mosaics.edit` for a refused edit. Rethrows any other error. */
+function throwEditError(error: unknown): never {
+  if (error instanceof MosaicEditError) {
+    throwInvalidParams(EDIT_METHOD, error.reason);
+  }
+  throw error;
+}
+
+/**
+ * `mosaics.edit { content, edits }`: the draft with the form's edits applied,
+ * keeping its comments. Needs no permission and requests no file.
+ */
+async function editRequestedDraft(
+  _context: ModMethodContext,
+  params: YamlMapping,
+): Promise<MosaicEditResult> {
+  const content = readRequiredText(params, "content", EDIT_METHOD);
+  if (!isYamlMapping(params.edits)) {
+    throwInvalidParams(EDIT_METHOD, '"edits" must be a mapping');
+  }
+  try {
+    const edits = readMosaicEdits(params.edits);
+    const result: MosaicEditResult = {
+      content: applyMosaicEdits(content, edits),
+    };
+    return result;
+  } catch (error) {
+    throwEditError(error);
+  }
+}
+
+/** The `mosaics.*` requests: reading, opening, checking, validating and editing mosaic files. */
 export const MOSAICS_METHODS: ModMethodTable = {
   "mosaics.inspect": inspectRequestedMosaic,
   "mosaics.open": openRequestedMosaic,
   "mosaics.check": checkRequestedMosaic,
+  "mosaics.validate": validateRequestedDraft,
+  "mosaics.edit": editRequestedDraft,
 };

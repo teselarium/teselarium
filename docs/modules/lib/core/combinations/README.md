@@ -25,6 +25,8 @@ Implemented in `src/lib/core/combinations/`. Other modules import only from the 
 - `readCombinationSnapshot(catalog)` and `subscribeCombinations(catalog, listener)`: a frozen `CombinationSnapshot`, new after every change, for React's `useSyncExternalStore` (through `use_store_snapshot.ts`). `subscribeCombinations` returns the function that unsubscribes. The snapshot holds `catalog`, and `mods`, `collections`, `mosaics` and `counts`, records of `Loadable` entries: `{ state: "loading" }`, `{ state: "loaded", value }` or `{ state: "failed", reason }`. Pairs' counts are keyed by `buildCountKey(modSource, targetSource)`, and mosaics' counts by `buildMosaicCountKey(mosaicSource)`.
 - Types: `CombinationCatalog`, `CombinationCatalogOptions`, `CombinationLoadOptions`, `CombinationSnapshot`, `Loadable`, `ModSummary`, `CollectionSummary`, `MosaicSummary`, `SummaryRequest`, `CountTarget`, `TileCount` and `EntryScore`.
 
+- `countMatchingTiles(collection, validator)`: the count of a loaded collection's tiles that validate as the validator's type, with `isUntyped` `false`. It is pure. The counts above use it, and so does the engine's [draft validation](../engine/README.md#validating-and-editing-a-mosaic-draft), on tiles renamed by the draft's aliases.
+
 ### Score order
 
 `score_order.ts` is the one comparison of scores, used by the lists' "Match ratio" and "Matching tiles" sorts, by the order of a page's options and by an entry's best score. An `EntryScore` is a `Loadable<TileCount>`, or `null` for an entry with no score.

@@ -1,6 +1,7 @@
 import type { YamlValue } from "../../files/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
 import type {
+  ActionAnswer,
   AppAction,
   Catalog,
   ModCheckFinding,
@@ -39,6 +40,9 @@ export const ACTION_METHODS: Record<AppAction["kind"], AnswerMethod> = {
   catalogAdd: "userCatalog.add",
   catalogExport: "userCatalog.export",
   catalogRemove: "userCatalog.remove",
+  catalogSave: "userCatalog.save",
+  catalogHistory: "userCatalog.history",
+  catalogExportFolder: "userCatalog.exportFolder",
 };
 
 /** The callbacks of a check frame's session, which the check passes to `connectModSession`. */
@@ -225,13 +229,17 @@ function takeCaseAnswer(
 /**
  * A request of a case that asks the user (`links.open`, `files.save`,
  * `ui.confirm`, `players.open` and the `userCatalog.*` requests): the queued
- * answer, or `false`, with no dialog and no change.
+ * answer, a saved address for `userCatalog.save`, or `false`, with no dialog
+ * and no change.
  */
 function answerCaseAction(
   checkCase: CheckCase,
   action: AppAction,
-): Promise<boolean> {
+): Promise<ActionAnswer> {
   const answer = takeCaseAnswer(checkCase, ACTION_METHODS[action.kind]);
+  if (typeof answer === "string") {
+    return Promise.resolve(answer);
+  }
   return Promise.resolve(answer === true);
 }
 

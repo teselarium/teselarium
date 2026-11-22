@@ -21,6 +21,7 @@ export type {
   MosaicSummary,
   SummaryRequest,
 } from "./combination_catalog.ts";
+export { countMatchingTiles } from "./tile_counts.ts";
 export type { CountTarget, TileCount } from "./tile_counts.ts";
 export {
   compareByRatio,

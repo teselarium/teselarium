@@ -66,6 +66,8 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `mosaics.inspect` | `{ mosaic }`, a mosaic reference | The mosaic file's content, without opening it (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
 | `mosaics.open` | `{ mosaic, params?, replace? }` | `null`, once the stage opened the mosaic in a new sandbox. With `replace: true`, the requester is replaced and gets no answer (see [Inspecting and opening mosaics](#inspecting-and-opening-mosaics)). Added in mod API `0.1.13`. |
 | `mosaics.check` | `{ mosaic }`, a mosaic reference | The check report of the mosaic's mod, checked as the mosaic opens it, without the mod's tests (see [Checking a mosaic](#checking-a-mosaic)). Added in mod API `0.1.14`. |
+| `mosaics.validate` | `{ content, mosaic? }`, a draft's text and the address it will be saved at | `{ errors, warnings, typeFields, collectionFields, tiles, draft }`, the draft's problems, alias hints and fields, asking nothing (see [Validating and editing a mosaic draft](#validating-and-editing-a-mosaic-draft)). Added in mod API `0.1.19`. |
+| `mosaics.edit` | `{ content, edits }` | `{ content }`, the draft with the form's edits applied, comments kept (see [Validating and editing a mosaic draft](#validating-and-editing-a-mosaic-draft)). Added in mod API `0.1.19`. |
 | `catalog.list` | none, params are ignored | The catalog, `{ mods, collections, mosaics }`, each list in catalog order with resolved addresses, without any permission (see [Reading the catalog](#reading-the-catalog)). Added in mod API `0.1.15`; `listedBy`, `place` and `provenance` since `0.1.18`. |
 | `links.open` | `{ url }`, an absolute `http:` or `https:` address | `true` once the user opened it in a new tab, `false` if the user cancelled (see below). |
 | `files.save` | `{ name, content, encoding?, type? }` | `true` once the user saved the file, `false` if the user cancelled. |
@@ -75,6 +77,9 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | `userCatalog.add` | `{ mosaic? }`, an address that fills the dialog's field | `true` once the user added a mosaic by URL, `false` otherwise. Added in mod API `0.1.18`. |
 | `userCatalog.export` | `{ mosaic }`, the address of a stored user mosaic | `true` once the user saved its file, `false` otherwise. Added in mod API `0.1.18`. |
 | `userCatalog.remove` | `{ mosaic }`, the address of a user mosaic, stored or remote | `true` once the user confirmed and it is removed, `false` otherwise. Added in mod API `0.1.18`. |
+| `userCatalog.save` | `{ content, mosaic?, copiedFrom? }`: a draft's text, the stored mosaic it replaces, and the address a copy came from | The saved mosaic's address once the user confirmed the save, `null` otherwise (see [The user catalog](#the-user-catalog)). Added in mod API `0.1.19`. |
+| `userCatalog.history` | `{ mosaic }`, the address of a stored user mosaic | `true` once the user restored a version, `false` otherwise. Added in mod API `0.1.19`. |
+| `userCatalog.exportFolder` | `{ folder }`, the name of an imported folder | `true` once the user saved the folder's `.zip`, `false` otherwise. Added in mod API `0.1.19`. |
 | `ui.notify` | `{ message, level?, source? }` | `null`, once the message is in the mod's stage bar (see [Telling the user something](#telling-the-user-something)). Added in mod API `0.1.8`. |
 | `tiles.renderBody` | `{ source }`, the `source` of one of the mod's tiles | `{ html }`: the tile's body rendered to safe HTML (see [Tile bodies](#tile-bodies)). Added in mod API `0.1.5`; formulas as MathML, highlighted code and emoji since `0.1.7`. |
 | `players.open` | `{ url }`, a player address of the mod's tiles | `true` once the player was shown and closed, `false` if the user cancelled (see [Players](#players)). Added in mod API `0.1.5`. |
@@ -108,7 +113,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | `mod` | `source`, `title`, `version`, `description`. `name` was removed in mod API `0.1.14`. |
 | `mosaic` | `source`, `title`, `description` of the mosaic the mod was opened from (see the [mosaic module](../../mosaic/README.md)), or `null` for a mod opened from a mod link. It never holds the mosaic's `config`, `aliases` or `permissions`: the mod receives their effect in `config`, `tiles` and `permissions`. Added in mod API `0.1.13`. |
 | `collection` | `source`, `title`, `description` of the collection the mod's tiles were loaded from, or `null` for a mod opened with a tile or without a collection. A collection without a `description` gives `""`. A mod opened from a mosaic gets the mosaic's collection. It does not change when the tiles are reloaded, so `tiles.changed` does not carry it. Added in mod API `0.1.17`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.18"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.1.19"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. For a mod opened from a mosaic, the mod's config merged with the mosaic's: mappings are merged key by key, and any other mosaic value, `null` included, replaces the mod's (see [Config merge](../../mosaic/README.md#config-merge)). `mods.inspect` still gives the mod's own config. |
 | `params` | The link's parameters other than `mod`, `collection`, `tile` and `mosaic`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection, or its one tile, that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -256,7 +261,8 @@ Before any file is requested, the engine checks:
 - `title` and `description`;
 - `mod`: the resolved address of the mosaic's mod file, and `collection`: the resolved address of its collection file, or `null`;
 - `config` and `aliases`: the mosaic's own, not merged with the mod's;
-- `permissions`: the `granted` and `denied` lists the mosaic's `show` lines would get if it were opened without asking: every line for a mosaic from the app's origin, and for one from another origin, the lines with a remembered allow for that mosaic file granted and every other line denied. Inspecting a mosaic never shows the site consent dialog.
+- `permissions`: the `granted` and `denied` lists the mosaic's `show` lines would get if it were opened without asking: every line for a mosaic from the app's origin, and for one from another origin, the lines with a remembered allow for that mosaic file granted and every other line denied. Inspecting a mosaic never shows the site consent dialog;
+- `content`: the mosaic file's text, exactly as read, comments included, so an editor can start a draft from it. The file is fetched to inspect it anyway, so it costs nothing more. Added in mod API `0.1.19`.
 
 A mosaic file that cannot be fetched or read, is not plain YAML or does not follow the mosaic file format is `-32001`, with the load error's message, which names the mosaic file, such as `Cannot load file "https://example.org/samples/mosaics/missing.yaml": HTTP 404 Not Found`.
 
@@ -275,6 +281,46 @@ await engine.request("mosaics.open", { mosaic: inspection.source });
 ```
 
 A mod opened from a mosaic reads it in `context.mosaic` (`source`, `title`, `description`), and `null` otherwise (see [Mount context](#mount-context)).
+
+#### Validating and editing a mosaic draft
+
+A draft is the full text of a mosaic file, which the mosaic viewer's edit mode keeps (see [the mosaic module](../../mosaic/README.md#editing-a-mosaic-file)). The app is the only place that reads and writes mosaic YAML: a mod sends text and fields, and these two requests tell it what they mean.
+
+`mosaics.validate { content, mosaic? }` validates a draft without asking the user or opening anything:
+
+1. The params: `content` must be a non-empty string, and `mosaic`, when given, a non-empty string, resolved as `mosaics.inspect` resolves it (`-32602`, `mosaics.validate: "content" must be a non-empty string`). `mosaic` is the address the draft will be saved at, a stored mosaic's address. Without it, the draft is a new mosaic.
+2. The text is read as the loader reads a mosaic file (`parseYaml`, then `buildLoadedMosaic`), from `mosaic`, or from `opentesela-draft:///mosaic.yaml` for a new draft. A YAML error is one error at its line, such as `YAML: tab characters must not be used in indentation` at line 4, and a format error is one error without a line. Either ends the validation, with no hints.
+3. In a new draft, a relative `mod` or `collection` is an error, `"collection" must be an absolute address in a new mosaic`: there is no address to resolve it against. A default mod name is not relative.
+4. The requester needs a granted `open` permission for `"*"` or the origin of the draft's mod, then of its collection, as `mods.inspect` and `collections.inspect` do (`-32002`, `mosaics.validate: Opening mods from <origin> is not allowed. …`, or `Inspecting collections from <origin> …`). This is checked before any request.
+5. The mod file and its tile type, and the collection with its tiles, are loaded through the stage's fetch options. A load that fails is an error that names its address, such as `Cannot load file "<collection>": HTTP 404 Not Found`, and the rest is still reported.
+
+It answers `{ errors, warnings, typeFields, collectionFields, tiles, draft }`:
+
+- `errors` and `warnings`: lists of `{ message, line }`, with `line` 1-based or `null`. The warnings are the mosaic warnings of a check (see [Checking a mosaic](#checking-a-mosaic)): an alias for a field the tile type does not declare, and a config key the mod's config does not have;
+- `typeFields`: the tile type's fields, `{ name, required }`, in the type's order, or `[]` for a mod without a tile type;
+- `collectionFields`: the metadata keys the collection's tiles use, sorted, before the draft's aliases rename them;
+- `tiles`: `{ matching, total }`, how many tiles validate as the tile type after the draft's aliases, every tile for a mod without a tile type, or `null` without a collection or with errors;
+- `draft`: the fields the draft holds as written, `{ title, description, mod, collection, config, aliases, show }` (`readDraftFields` of the mosaic module): each text `null` when it is missing or not a string, `aliases` the fields that have a list of names, and `show` the lines with a string `host` and `reason`. It is `null` when the text cannot be read: a YAML error, or no `mosaic` mapping. A draft without a title still has its other fields, so a form shows them, and an editor never reads YAML itself.
+
+The loads of a session are kept for 30 seconds (`DraftLoadCache`, `draft_load_cache.ts`), failed ones too, so a burst of validations while the user types requests each file once. "Reload tiles" does not clear them.
+
+`mosaics.edit { content, edits }` applies the form's edits to a draft's text and answers `{ content }`, the new text, keeping its comments, key order and quoting. It needs no permission and requests no file. `edits` is a mapping whose optional keys are `title` (a string), `description` (a string, or `null` to remove it), `mod` (a string), `collection` (a string, or `null` for none), `aliases` (a mapping of field names to lists of names) and `show` (a list of `{ host, reason }`). Each fails with `-32602` naming the method and the key:
+
+- `mosaics.edit: "edits" must be a mapping`, `mosaics.edit: "edits.colour" is not a draft edit`, or `mosaics.edit: "edits.aliases.country" must be a list of strings`;
+- `mosaics.edit: the draft cannot be read: <parse error>`, for a draft that is not plain YAML or has no `mosaic` mapping;
+- `mosaics.edit: the edits make the mosaic invalid: <format error>`, for edits after which the loader would refuse the text, such as a `show` host that is not an origin. A draft the loader already refused, for example one without `mod`, can still be edited.
+
+```js
+const { content } = await engine.request("mosaics.edit", {
+  content: draft,
+  edits: { aliases: { country: ["birth_country"] } },
+});
+const hints = await engine.request("mosaics.validate", {
+  content,
+  mosaic: "opentesela-browser:///r1/nobel_map.yaml",
+});
+// hints.tiles is { matching: 17, total: 17 } once every laureate has a country
+```
 
 #### Checking a mosaic
 
@@ -313,7 +359,7 @@ const report = await engine.request("mosaics.check", {
 - `listedBy`: who listed it: `"instance"` for an entry of the instance catalog, `"default"` for a default mosaic, `"user"` for a user catalog entry. Added in mod API `0.1.18`.
 - `place`: where its file lives: `"browser"` for an `opentesela-browser:` address, a file stored in this browser, or `"remote"` for any other address. Added in mod API `0.1.18`.
 - `defaultOf`: `{ source, title }` of the mod whose default mosaic it is, or `null`.
-- `provenance`: where a user mosaic came from, `{ folder, path, addedAt, updatedAt }`, or `null` unless `listedBy` is `"user"`. For a stored mosaic, `folder` is the picked folder's name or `null` for a single file, `path` its path inside the folder or its file name, `addedAt` when it was first imported, and `updatedAt` when it was last updated, or `null`. For a mosaic added by URL, `folder`, `path` and `updatedAt` are `null` and `addedAt` is when it was added. Times are ISO 8601 strings in UTC. Added in mod API `0.1.18`.
+- `provenance`: where a user mosaic came from, `{ folder, path, addedAt, updatedAt, changedSinceExport, copiedFrom }`, or `null` unless `listedBy` is `"user"`. For a stored mosaic, `folder` is the picked folder's name or `null` for a single file or a mosaic saved in the app, `path` its path inside the folder or its file name, `addedAt` when it was first imported or saved, `updatedAt` when it was last updated, or `null`, `changedSinceExport` whether its text differs from the text it was last imported, updated from a file or exported with (see the [user catalog module](../../user_catalog/README.md#sync-state)), and `copiedFrom` the address it was copied from, or `null`. For a mosaic added by URL, `folder`, `path`, `updatedAt` and `copiedFrom` are `null`, `addedAt` is when it was added, and `changedSinceExport` is `false`. Times are ISO 8601 strings in UTC. Added in mod API `0.1.18`; `changedSinceExport` and `copiedFrom` since `0.1.19`.
 
 ```js
 const catalog = await engine.request("catalog.list", {});
@@ -387,18 +433,20 @@ The request stays pending while the dialog is open, for as long as the user need
 
 ### The user catalog
 
-The `userCatalog.*` requests let a mod, such as the mosaic explorer and viewer, reach the user catalog's flows (see the [user catalog module](../../user_catalog/README.md)): `userCatalog.import` opens the import dialog, `userCatalog.update` the update dialog of a stored mosaic, `userCatalog.add` the "Add a mosaic" dialog, `userCatalog.export` the save dialog of a stored mosaic's file, and `userCatalog.remove` a confirmation that removes a user mosaic. The app draws every dialog and does every write: a mod cannot write the user catalog, so a mod cannot add mosaics whose `show` lines widen its own reach. They follow the rules of the other dialogs (see [Asking the user](#asking-the-user-links-files-and-confirmations)): only the visible mod can send them (`-32002` otherwise), one dialog is shown at a time, and a mod that leaves gets `false`. They need no permission.
+The `userCatalog.*` requests let a mod, such as the mosaic explorer and viewer, reach the user catalog's flows (see the [user catalog module](../../user_catalog/README.md)): `userCatalog.import` opens the import dialog, `userCatalog.update` the update dialog of a stored mosaic, `userCatalog.add` the "Add a mosaic" dialog, `userCatalog.export` the save dialog of a stored mosaic's file, `userCatalog.remove` a confirmation that removes a user mosaic, `userCatalog.save` the save confirmation of a draft, `userCatalog.history` the history of a stored mosaic, and `userCatalog.exportFolder` the save dialog of an imported folder's `.zip`. The app draws every dialog and does every write: a mod cannot write the user catalog, so a mod cannot add mosaics whose `show` lines widen its own reach. They follow the rules of the other dialogs (see [Asking the user](#asking-the-user-links-files-and-confirmations)): only the visible mod can send them (`-32002` otherwise), one dialog is shown at a time, and a mod that leaves gets `false`. They need no permission.
 
 - `mosaic` must be a non-empty string for `userCatalog.update`, `userCatalog.export` and `userCatalog.remove`, and is resolved against the app's address as a mosaic reference. `userCatalog.add` takes an optional `mosaic` string that fills its field. Wrong params fail with `-32602`, for example `userCatalog.export: "mosaic" must be a non-empty string`.
-- `userCatalog.update` and `userCatalog.export` need a stored mosaic, and `userCatalog.remove` a user mosaic, or they fail with `-32602` and no dialog: `userCatalog.update: the mosaic "<address>" is not stored in this browser`, `userCatalog.remove: the mosaic "<address>" is not in the user catalog`.
-- Each resolves with `true` once the user confirmed and the change is done, and `false` when the user cancels, presses Escape, or nothing changes. After each change, every running mod gets `catalog.changed` (see [Reading the catalog](#reading-the-catalog)).
+- `userCatalog.update`, `userCatalog.export` and `userCatalog.history` need a stored mosaic, and `userCatalog.remove` a user mosaic, or they fail with `-32602` and no dialog: `userCatalog.update: the mosaic "<address>" is not stored in this browser`, `userCatalog.remove: the mosaic "<address>" is not in the user catalog`.
+- `userCatalog.save`: `content` must be a non-empty string (`userCatalog.save: "content" must be a non-empty string`). `mosaic`, when given, must be a stored mosaic, resolved as above: the save replaces its file. Without it, the draft is saved as a new mosaic. `copiedFrom`, when given, must be a non-empty string: the address a copy came from, which its provenance keeps. The dialog validates the draft itself, so a draft with errors is refused there, not with an error code (see [main](../../../main/README.md#the-user-catalog)).
+- `userCatalog.exportFolder`: `folder` must be a non-empty string that a stored mosaic has as its folder, or it fails with `-32602` and no dialog: `userCatalog.exportFolder: no stored mosaic comes from the folder "nowhere"`.
+- Each resolves with `true` once the user confirmed and the change is done, and `false` when the user cancels, presses Escape, or nothing changes, except `userCatalog.save`, which resolves with the saved mosaic's `opentesela-browser:` address, or `null`. After each change, every running mod gets `catalog.changed` (see [Reading the catalog](#reading-the-catalog)).
 
 ```js
 const imported = await engine.request("userCatalog.import", {});
 await engine.request("userCatalog.remove", { mosaic: entry.source });
 ```
 
-How it works: `user_catalog_methods.ts` checks the params, then the entries that `ModMethodContext.readUserCatalog()` gives. It gives `null` in checks and cases, which never change the user catalog, so their requests are not checked against entries and get the scripted answer or `false`. Each request becomes a `CatalogAction` (`catalogImport`, `catalogUpdate { address }`, `catalogAdd { suggested }`, `catalogExport { address }`, `catalogRemove { address }`), which the stage queues like the other actions, and the app's user catalog dialogs perform (see [main](../../../main/README.md)).
+How it works: `user_catalog_methods.ts` checks the params, then the entries that `ModMethodContext.readUserCatalog()` gives. It gives `null` in checks and cases, which never change the user catalog, so their requests are not checked against entries and get the scripted answer or `false`. Each request becomes a `CatalogAction` (`catalogImport`, `catalogUpdate { address }`, `catalogAdd { suggested }`, `catalogExport { address }`, `catalogRemove { address }`, `catalogSave { content, address, copiedFrom }`, `catalogHistory { address }`, `catalogExportFolder { folder }`), which the stage queues like the other actions, and the app's user catalog dialogs perform (see [main](../../../main/README.md)). The user's answer to an action is an `ActionAnswer`: a boolean, or, for `catalogSave`, the saved address, which `askUserForAddress` gives the handler, and anything else becomes `null`.
 
 ### Telling the user something
 
@@ -686,7 +734,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.18` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.19` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -718,6 +766,7 @@ Version notes:
 - `0.1.16` added the run link field `sites`, a mosaic reference whose `show` lines a mod link's sandbox gets (see [Launch](#launch)). It also made `sites` a reserved link name: a link parameter named `sites` is no longer passed in `params`, and `mods.open` and `mosaics.open` refuse `params.sites` with `-32602`. That could break a mod that read or passed a `sites` parameter, which would call for a minor bump. No shipped, test or known mod does, and no mod exists outside this repository, so it was taken as a patch, as `tile` was in `0.1.12` and `mosaic` in `0.1.13`. The surface guard's `0.1.16` entry repeats `0.1.15`'s, since it records names and no name was added.
 - `0.1.17` added the mount context key `collection` (`source`, `title`, `description`, or `null`), the collection the mod's tiles were loaded from, and `options.collection` for `mount(options)` in the test API. These are additions that existing mods keep working with, so it is a patch.
 - `0.1.18` added the `userCatalog.import`, `userCatalog.update`, `userCatalog.add`, `userCatalog.export` and `userCatalog.remove` requests, the catalog entry keys `listedBy`, `place` and `provenance`, and the test API's boolean answers to the five requests and the scripted catalog's new keys. `catalog.changed` keeps its form, and is also pushed when the user catalog changes. These are additions that existing mods keep working with, so it is a patch.
+- `0.1.19` added mosaic editing: the methods `mosaics.validate` and `mosaics.edit`, `content` in `mosaics.inspect`'s answer, the requests `userCatalog.save`, `userCatalog.history` and `userCatalog.exportFolder`, the provenance keys `changedSinceExport` and `copiedFrom`, and the test API's answers to the three requests (a boolean, and a mosaic address or `null` for `userCatalog.save`), with the scripted catalog completing the new provenance keys. Every key and method a mod used before is kept, and a scripted provenance without the new keys is still accepted, so these are additions that existing mods keep working with: a patch.
 
 An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `docs/code_conventions.md`, "OpenSpec changes", asks.
 
@@ -806,7 +855,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.18"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.1.19"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.10` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.
@@ -922,7 +971,7 @@ Implemented in `library_files.ts`, and used by `libs.load` and the bundle check,
 
 ### Request handlers
 
-Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `collections_methods.ts` (`COLLECTIONS_METHODS`), `mosaics_methods.ts` (`MOSAICS_METHODS`), `catalog_methods.ts` (`CATALOG_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`), `ui_methods.ts` (`UI_METHODS`), `tiles_methods.ts` (`TILES_METHODS`), `players_methods.ts` (`PLAYERS_METHODS`) and `libs_methods.ts` (`LIBS_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `tileBodies`, `readSiteDecisions`, `readCatalog`, `onOpenLink`, `onRequestAction`, `onCheckMod`). `tileBodies` is the session's current `TileBodies`, which `pushTilesChanged` replaces.
+Each request namespace has its own module with one table of handlers: `storage_methods.ts` (`STORAGE_METHODS`), `mods_methods.ts` (`MODS_METHODS`), `collections_methods.ts` (`COLLECTIONS_METHODS`), `mosaics_methods.ts` (`MOSAICS_METHODS`), `catalog_methods.ts` (`CATALOG_METHODS`), `links_methods.ts` (`LINKS_METHODS`), `files_methods.ts` (`FILES_METHODS`), `ui_methods.ts` (`UI_METHODS`), `tiles_methods.ts` (`TILES_METHODS`), `players_methods.ts` (`PLAYERS_METHODS`) and `libs_methods.ts` (`LIBS_METHODS`). A handler is a `ModMethod`: `(context: ModMethodContext, params) => Promise<result>`. It resolves with the `result`, or throws `ModMethodError(code, message)`, which the session sends as the error response. Handlers know nothing about ports or messages, so they are tested by calling them with a plain `ModMethodContext` (`mod`, `grants`, `storage`, `appOrigin`, `defaults`, `fetchOptions`, `tileBodies`, `draftLoads`, `readSiteDecisions`, `readCatalog`, `onOpenLink`, `onRequestAction`, `onCheckMod`). `tileBodies` is the session's current `TileBodies`, which `pushTilesChanged` replaces, and `draftLoads` the session's `DraftLoadCache` for `mosaics.validate`.
 
 The `links.*`, `files.*`, `ui.*` and `players.*` handlers check their params into an `AppAction` (`app_actions.ts`), data the app can perform with no more checks:
 
@@ -944,6 +993,7 @@ The session does not grow, and names starting with `sandbox.` stay reserved.
 ### Session
 
 - `connectModSession(frameTarget, launch, options)`: opens the private channel to the frame (`sandbox.connect` with the mod's code and its mount context: `launch.context` with `theme` set to `options.theme` and `layout` to `options.layout`), and answers the mod's requests from the handler tables. `options` are `ModSessionOptions` (`storage`, `appOrigin`, `defaults`, `fetchOptions`, `readSiteDecisions`, `readCatalog`, `onIssue`, `onOpenLink`, `onRequestAction`, `onCheckMod`, `theme`, `layout`, and the optional `onMounted`, `onErrorResponse`, `test` and `onTestReport`). Returns a `ModSession`, whose `hintsTileLinks` is `launch.tileLinks !== null`: blocked image and media reports then end with the redirect hint for tile authors (see the [sandbox module](../sandbox/README.md#blocked-request-reports)).
+  - `onConnected()`: called for `sandbox.connected`, once the frame loader handled `sandbox.connect`, so the frame's document has its color scheme and layout. The stage uses it to show the frame. Checks pass none.
   - `onMounted()`: called when the mod's `mount` finished: for `sandbox.mounted`, and for `sandbox.mountFailed` after its issue is reported. The mod check uses it to start its settle time. Running sandboxes pass none, and ignore `sandbox.mounted`.
   - `test`: `{ code, caseName }` (`SandboxTestParams`), sent in `sandbox.connect` so the frame lists the cases of the test file (`caseName` `null`) or runs one. Only the frames of a check's tests, built with `buildModTestDocument`, pass it.
   - `onTestReport(report)`: called with each test notification of the frame, read as a `SandboxTestReport` (`listed`, `listFailed`, `answerQueued` or `caseFinished`, see the [sandbox module](../sandbox/README.md#frame-loader-messages)). Notifications of the wrong shape are ignored. Running sandboxes pass none, so a mod that sends them outside a check changes nothing.
@@ -959,7 +1009,7 @@ Lifecycle:
 
 1. The stage loads the mod with `loadLaunchMod` and `loadLaunchTiles`, asks the user what it needs to, builds the launch with `buildModLaunch` and renders its frame with `launch.sandboxDocument`.
 2. On the frame's first `load`, the stage calls `connectModSession` with the frame's window.
-3. The session answers each request once with the same `id`. `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked` from the frame loader become issues through `onIssue`, each reported once. `sandbox.mounted` and `sandbox.mountFailed` call `onMounted`, and the test runner's notifications `onTestReport`, when given.
+3. The session answers each request once with the same `id`. `sandbox.blocked`, `sandbox.mountFailed` and `sandbox.dialogBlocked` from the frame loader become issues through `onIssue`, each reported once. `sandbox.connected` calls `onConnected`, `sandbox.mounted` and `sandbox.mountFailed` call `onMounted`, and the test runner's notifications `onTestReport`, when given.
 4. "Reload tiles" calls `loadModTiles`, `buildTileBodies` and `pushTilesChanged`. A color scheme change calls `pushThemeChanged` for every running session.
 5. Closing the sandbox, or the frame loading another document, calls `stopModSession`.
 

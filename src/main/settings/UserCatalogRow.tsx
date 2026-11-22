@@ -8,6 +8,7 @@ import {
   removeAllUserMosaics,
   STORE_REFUSED_MESSAGE,
   subscribeUserCatalog,
+  USER_CATALOG_NOTICE_MESSAGES,
 } from "../user_catalog/user_catalog_store.ts";
 import type {
   UserCatalogSnapshot,
@@ -119,6 +120,9 @@ export function UserCatalogRow({
         <p className="m-0 min-w-0 flex-1 text-sm [overflow-wrap:anywhere]">
           {describeUserMosaics(snapshot)}
           {snapshot.isAvailable ? null : ` ${STORE_REFUSED_MESSAGE}`}
+          {snapshot.notice === null
+            ? null
+            : ` ${USER_CATALOG_NOTICE_MESSAGES[snapshot.notice]}`}
         </p>
         {hasMosaics && !isConfirming ? (
           <Button

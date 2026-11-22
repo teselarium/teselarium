@@ -164,3 +164,69 @@ export async function updatesStoredMosaicWhenCancelled(
   context.expect(updateRequest.result).toBe(false);
   context.expect(findButton(context, "Update from file…")).toBeTruthy();
 }
+
+export async function showsChangedSinceExport(
+  context: CaseContext,
+): Promise<void> {
+  await mountAsUserMosaic(context, {
+    place: "browser",
+    provenance: { ...STORED_PROVENANCE, changedSinceExport: true },
+  });
+
+  const section = findSection(context, "Where it comes from");
+  const badge = section.querySelector("[data-ot-variant]");
+  context.expect(badge?.textContent).toBe("Changed since export");
+  context.expect(badge?.getAttribute("data-ot-variant")).toBe("warning");
+  context.expect(findButton(context, "Export folder")).toBeTruthy();
+  context.expect(findButton(context, "History…")).toBeTruthy();
+}
+
+export async function exportsFolderOfStoredMosaic(
+  context: CaseContext,
+): Promise<void> {
+  await mountAsStoredMosaic(context);
+  context.answer("userCatalog.exportFolder", true);
+
+  clickButton(context, "Export folder");
+
+  const exportRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "userCatalog.exportFolder"),
+  );
+  context.expect(exportRequest.params).toEqual({ folder: "my-mosaics" });
+  context.expect(exportRequest.result).toBe(true);
+}
+
+export async function showsHistoryOfStoredMosaic(
+  context: CaseContext,
+): Promise<void> {
+  await mountAsStoredMosaic(context);
+  context.answer("userCatalog.history", false);
+
+  clickButton(context, "History…");
+
+  const historyRequest = await context.waitFor(
+    findSettledRequest.bind(undefined, context, "userCatalog.history"),
+  );
+  context
+    .expect(historyRequest.params)
+    .toEqual({ mosaic: readShownMosaicSource() });
+  context.expect(historyRequest.result).toBe(false);
+}
+
+export async function hasNoFolderExportForSingleFile(
+  context: CaseContext,
+): Promise<void> {
+  await mountAsUserMosaic(context, {
+    place: "browser",
+    provenance: {
+      ...STORED_PROVENANCE,
+      folder: null,
+      path: "shown_mosaic.yaml",
+    },
+  });
+
+  context.expect(findButton(context, "History…")).toBeTruthy();
+  context.expect(findButton(context, "Export folder")).toBe(null);
+  const section = findSection(context, "Where it comes from");
+  context.expect(section.textContent).not.toContain("Changed since export");
+}

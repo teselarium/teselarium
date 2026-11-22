@@ -15,7 +15,27 @@ import {
   showsRefusedCheck,
 } from "./action_cases.ts";
 import {
+  aliasesFromSuggestion,
+  asksBeforeCancel,
+  editsCopyOfMosaic,
+  ignoresStaleValidation,
+  keepsEditModeWhenNotSaved,
+  leavesWithoutChanges,
+  refusesEditOfRemoteMosaic,
+  refusesUnknownMode,
+  restoresKeptDraft,
+  savesCopy,
+  showsBrokenYaml,
+  showsHints,
+  startsCopyFromLink,
+  startsNewMosaic,
+} from "./edit_cases.ts";
+import {
+  exportsFolderOfStoredMosaic,
   exportsStoredMosaic,
+  hasNoFolderExportForSingleFile,
+  showsChangedSinceExport,
+  showsHistoryOfStoredMosaic,
   removesStoredMosaic,
   showsNoProvenanceForOthers,
   showsRemoteProvenance,
@@ -79,6 +99,30 @@ export default function registerViewerTests(t: ModTestRegistration): void {
     "updates a stored mosaic from a file",
     updatesStoredMosaicWhenCancelled,
   );
+  t.test("says a stored mosaic changed since export", showsChangedSinceExport);
+  t.test("exports the folder of a stored mosaic", exportsFolderOfStoredMosaic);
+  t.test("shows the history of a stored mosaic", showsHistoryOfStoredMosaic);
+  t.test(
+    "offers no folder export for a single file",
+    hasNoFolderExportForSingleFile,
+  );
+  t.test("edits a copy of the viewed mosaic", editsCopyOfMosaic);
+  t.test("starts a copy from its link", startsCopyFromLink);
+  t.test(
+    "refuses to edit a mosaic not stored in this browser",
+    refusesEditOfRemoteMosaic,
+  );
+  t.test("says a mode it cannot use", refusesUnknownMode);
+  t.test("starts a new mosaic from a combination", startsNewMosaic);
+  t.test("shows the hints of a draft", showsHints);
+  t.test("adds an alias from a suggestion", aliasesFromSuggestion);
+  t.test("shows broken YAML and disables the form", showsBrokenYaml);
+  t.test("ignores a stale validation answer", ignoresStaleValidation);
+  t.test("restores a kept draft", restoresKeptDraft);
+  t.test("asks before cancelling changes", asksBeforeCancel);
+  t.test("leaves edit mode without changes", leavesWithoutChanges);
+  t.test("saves a copy", savesCopy);
+  t.test("keeps edit mode when nothing is saved", keepsEditModeWhenNotSaved);
   t.test("makes opening the mosaic the primary action", drawsOpenAsPrimary);
   t.test("draws the mosaic on the card background", drawsMosaicCard);
   t.test("draws a failure with the destructive border", drawsFailureBorder);

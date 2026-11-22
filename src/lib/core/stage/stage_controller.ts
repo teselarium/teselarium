@@ -8,6 +8,7 @@ import {
   resolveDefaultModSettings,
 } from "../engine/index.ts";
 import type {
+  ActionAnswer,
   AppAction,
   Catalog,
   DefaultModSettings,
@@ -213,6 +214,11 @@ export interface SandboxSnapshot {
   id: string;
   hash: string;
   isVisible: boolean;
+  /**
+   * Whether the frame loader handled `sandbox.connect`, so the frame's
+   * document has its color scheme. The page hides the frame until then.
+   */
+  isFrameConnected: boolean;
   /** Every sandbox but the Home mod at `#/` has a close button. */
   canClose: boolean;
   status: SandboxStatus;
@@ -684,6 +690,7 @@ function buildSandboxSnapshot(
     id: sandbox.id,
     hash: sandbox.hash,
     isVisible: sandbox.id === visibleId,
+    isFrameConnected: runtime?.isFrameConnected ?? false,
     canClose: !sandbox.isHomeMod,
     status,
     mod: buildModSummary(runtime),
@@ -1218,7 +1225,7 @@ export function requestStageAction(
   stage: Stage,
   sandboxId: string,
   action: AppAction,
-): Promise<boolean> | null {
+): Promise<ActionAnswer> | null {
   const mod = readRunningMod(stage, sandboxId);
   if (readVisibleSandbox(stage.state)?.id !== sandboxId || mod === null) {
     return null;
@@ -1235,9 +1242,9 @@ export function requestStageAction(
 export function answerStageAction(
   stage: Stage,
   id: number,
-  accepted: boolean,
+  answer: ActionAnswer,
 ): void {
-  if (!answerAction(stage.actions, id, accepted)) {
+  if (!answerAction(stage.actions, id, answer)) {
     return;
   }
   publishStage(stage);

@@ -172,6 +172,9 @@ An empty `role="status"` or `role="alert"` element draws nothing, so a live regi
 
 - on a `<button>`: `primary`, `secondary`, `outline`, `ghost` or `destructive`. `secondary` is a secondary action, drawn as an outline in `secondary`. `outline` also turns a submit button back into an outline button, so a page can keep one primary action;
 - on a `<span>`, which makes it a badge: `primary`, `secondary`, `outline`, `destructive`, `success` or `warning`. `primary` is filled with `primary`, `secondary` is a tag filled with `highlight`, and the others are statuses, drawn as outlines in their role.
+- on a `<textarea>`: `code`, a field for code, such as a mosaic file's text, in `--ot-font-mono`.
+
+A tab, an element with `role="tab"`, gets the pressed button's outline while it has `aria-selected="true"`, so a tab list of buttons shows its selected tab.
 
 ```html
 <button type="button" data-ot-variant="primary">Run</button>
@@ -182,6 +185,8 @@ An empty `role="status"` or `role="alert"` element draws nothing, so a live regi
 <span data-ot-variant="success">granted</span>
 <span data-ot-variant="outline">not granted</span>
 <span data-ot-variant="secondary">1.0.0</span>
+
+<textarea data-ot-variant="code" aria-label="Mosaic file"></textarea>
 ```
 
 Any other value leaves the element's plain look, and so does an unprefixed `data-variant`, which shadcn/ui and other libraries use for their own components.

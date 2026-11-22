@@ -11,12 +11,18 @@ import type {
   PickedFile,
   YamlMapping,
 } from "../files/index.ts";
-import type { BrowserDatabaseChanges } from "../core/storage/index.ts";
+import type {
+  BrowserDatabaseChanges,
+  StoredVersion,
+  StoredVersionKey,
+  StoredVersionKind,
+} from "../core/storage/index.ts";
 import { resolveModReference } from "../mod/index.ts";
 import type { LoadedMosaic } from "../mosaic/index.ts";
 import { resolveCollectionReference } from "../tile/index.ts";
 import { findStoredEntry } from "./user_catalog_entries.ts";
 import type { UserCatalogEntry } from "./user_catalog_entries.ts";
+import { buildVersion, pruneVersions, readSyncedText } from "./versions.ts";
 
 /** The largest mosaic file the review reads, in bytes: 1 MB. */
 export const MAX_MOSAIC_BYTES = 1024 * 1024;
@@ -26,12 +32,27 @@ const LOCAL_FILES_ROOT = "file:///";
 const MOSAIC_FILE_EXTENSIONS = [".yaml", ".yml"];
 
 /**
- * The status of a row of the review: a picked mosaic file that is `new`,
- * `changed` or `unchanged` against its entry, a picked file that is `invalid`
- * (not a mosaic), or an entry of the picked folder that is `missing` from it.
+ * The status of a row of the review: a picked mosaic file that is `new`, or
+ * against its entry `changed` (only the file changed since the text it was
+ * last synced with), `unchanged`, `changed-here` (only the stored text
+ * changed) or a `conflict` (both changed, differently); a picked file that
+ * is `invalid` (not a mosaic); or an entry of the picked folder that is
+ * `missing` from it.
  */
 export type ImportStatus =
-  "new" | "changed" | "unchanged" | "invalid" | "missing";
+  | "new"
+  | "changed"
+  | "unchanged"
+  | "changed-here"
+  | "conflict"
+  | "invalid"
+  | "missing";
+
+/**
+ * What to do with a conflict: keep the stored text, replace it with the
+ * file's, or keep it and import the file as a new single-file entry.
+ */
+export type ConflictChoice = "keep-mine" | "take-file" | "keep-both";
 
 /** A row of the review. */
 export interface ImportReviewRow {
@@ -51,6 +72,12 @@ export interface ImportReviewRow {
   text: string | null;
   /** The entry the row updates or removes, or `null` for a new file. */
   entry: UserCatalogEntry | null;
+  /** The entry's versions, newest first, which a write prunes. Empty without an entry. */
+  versions: StoredVersionKey[];
+  /** For a conflict, the root of the entry "Keep both" imports the file as, otherwise `null`. */
+  keepBothRoot: string | null;
+  /** Whether applying an update replaces changes made here since export, which stay in the history. */
+  replacesLocalChanges: boolean;
 }
 
 /** What an import or an update would change, before the user applies it. */
@@ -62,12 +89,19 @@ export interface ImportReview {
   ignoredCount: number;
 }
 
+/** Reads the versions of stored files, newest first. */
+export interface StoredVersionReader {
+  readVersions(address: string): Promise<StoredVersion[]>;
+}
+
 /** What a review reads besides the picked files. */
 export interface ReviewSources {
   /** The current entries of the user catalog. */
   entries: readonly UserCatalogEntry[];
   /** The stored texts, to tell changed files from unchanged ones. */
   storedFiles: BrowserFileReader;
+  /** The stored versions, to tell what changed since the text an entry was last synced with. */
+  storedVersions: StoredVersionReader;
   /** Loads a picked file through its `file:///` address, with the real mosaic loader. */
   readMosaic: (
     address: string,
@@ -252,22 +286,75 @@ function listReferenceWarnings(
   return warnings;
 }
 
-async function readPickedStatus(
-  picked: ReadPickedFile,
+/**
+ * The status of a picked file that matches a stored entry, from the file's
+ * text, the stored text, and the text the entry was last imported, updated
+ * from a file or exported with, `null` when there is none.
+ */
+export function classifyMatchingFile(
+  fileText: string,
+  storedText: string | null,
+  syncedText: string | null,
+): ImportStatus {
+  if (fileText === storedText) {
+    return "unchanged";
+  }
+  if (storedText === syncedText) {
+    return "changed";
+  }
+  if (fileText === syncedText) {
+    return "changed-here";
+  }
+  return "conflict";
+}
+
+/** What the review knows of a picked file's entry: its stored text and its versions, newest first. */
+interface EntryHistory {
+  storedText: string | null;
+  versions: StoredVersion[];
+}
+
+async function readEntryHistory(
   entry: UserCatalogEntry | null,
   sources: ReviewSources,
-): Promise<ImportStatus> {
-  if (picked.error !== null) {
+): Promise<EntryHistory> {
+  if (entry === null) {
+    const noHistory: EntryHistory = { storedText: null, versions: [] };
+    return noHistory;
+  }
+  const history: EntryHistory = {
+    storedText: await sources.storedFiles.readText(entry.address),
+    versions: await sources.storedVersions.readVersions(entry.address),
+  };
+  return history;
+}
+
+function readPickedStatus(
+  picked: ReadPickedFile,
+  entry: UserCatalogEntry | null,
+  history: EntryHistory,
+): ImportStatus {
+  if (picked.error !== null || picked.text === null) {
     return "invalid";
   }
   if (entry === null) {
     return "new";
   }
-  const storedText = await sources.storedFiles.readText(entry.address);
-  if (storedText === picked.text) {
-    return "unchanged";
+  return classifyMatchingFile(
+    picked.text,
+    history.storedText,
+    readSyncedText(history.versions, entry.syncedAt),
+  );
+}
+
+function listVersionKeys(
+  versions: readonly StoredVersion[],
+): StoredVersionKey[] {
+  const keys: StoredVersionKey[] = [];
+  for (const version of versions) {
+    keys.push({ address: version.address, savedAt: version.savedAt });
   }
-  return "changed";
+  return keys;
 }
 
 async function buildPickedRow(
@@ -280,9 +367,12 @@ async function buildPickedRow(
   const picked = await readPickedFile(path, content, localFiles, sources);
   const address =
     target.entry?.address ?? buildBrowserFileAddress(target.root, path);
+  const history = await readEntryHistory(target.entry, sources);
+  const status = readPickedStatus(picked, target.entry, history);
+  const createRoot = sources.createRoot ?? createRandomRoot;
   const row: ImportReviewRow = {
     path,
-    status: await readPickedStatus(picked, target.entry, sources),
+    status,
     title: picked.title,
     error: picked.error,
     warnings: listReferenceWarnings(
@@ -296,6 +386,9 @@ async function buildPickedRow(
     root: target.root,
     text: picked.text,
     entry: target.entry,
+    versions: listVersionKeys(history.versions),
+    keepBothRoot: status === "conflict" ? createRoot() : null,
+    replacesLocalChanges: false,
   };
   return row;
 }
@@ -342,6 +435,9 @@ function buildMissingRow(entry: UserCatalogEntry): ImportReviewRow {
     root: entry.root ?? "",
     text: null,
     entry,
+    versions: [],
+    keepBothRoot: null,
+    replacesLocalChanges: false,
   };
   return row;
 }
@@ -452,7 +548,9 @@ export async function planImport(
  * The review of one picked file as the update of a stored entry, whatever
  * the file's name: `changed`, `unchanged` or `invalid`. The file is read at
  * the entry's path, so its relative references resolve as they will once
- * stored.
+ * stored. The user picked it to replace the entry, so a file that differs is
+ * `changed` even when the entry changed here too, and the row then says it
+ * replaces the changes made here.
  */
 export async function planUpdate(
   picked: PickedFile,
@@ -469,9 +567,16 @@ export async function planUpdate(
     localFiles,
     sources,
   );
-  if (row.status === "new") {
+  const isReplacing =
+    row.status === "new" ||
+    row.status === "changed-here" ||
+    row.status === "conflict";
+  if (isReplacing) {
     row.status = "changed";
   }
+  row.keepBothRoot = null;
+  row.replacesLocalChanges =
+    row.status === "changed" && entry.provenance.changedSinceExport;
   const review: ImportReview = {
     folder: entry.provenance.folder,
     rows: [row],
@@ -506,7 +611,12 @@ function buildStoredEntry(
   if (row.entry !== null) {
     const updatedEntry: UserCatalogEntry = {
       ...row.entry,
-      provenance: { ...row.entry.provenance, updatedAt: now },
+      provenance: {
+        ...row.entry.provenance,
+        updatedAt: now,
+        changedSinceExport: false,
+      },
+      syncedAt: now,
     };
     return updatedEntry;
   }
@@ -514,38 +624,172 @@ function buildStoredEntry(
     address: row.address,
     place: "browser",
     root: row.root,
-    provenance: { folder, path: row.path, addedAt: now, updatedAt: null },
+    provenance: {
+      folder,
+      path: row.path,
+      addedAt: now,
+      updatedAt: null,
+      changedSinceExport: false,
+      copiedFrom: null,
+    },
+    syncedAt: now,
   };
   return newEntry;
 }
 
+/** The name of the single file "Keep both" imports a conflicting file as: `<name> (from file).yaml`. */
+function buildKeepBothPath(path: string): string {
+  const segments = path.split("/");
+  const fileName = segments[segments.length - 1];
+  let name = fileName;
+  for (const extension of MOSAIC_FILE_EXTENSIONS) {
+    if (fileName.toLowerCase().endsWith(extension)) {
+      name = fileName.slice(0, -extension.length);
+    }
+  }
+  const keepBothPath = `${name} (from file).yaml`;
+  return keepBothPath;
+}
+
 /**
- * The database changes of the checked rows, by index: new and changed files
- * are put with their entries, checked missing entries are deleted with their
- * files. An update keeps the entry's address and `addedAt`, and sets
- * `updatedAt` to `now`. Rows that cannot be checked change nothing.
+ * Puts a row's file, its entry and its new version, and prunes the entry's
+ * versions. The entry is synced with the new version, so it is not changed
+ * since export.
+ */
+function writePickedFile(
+  changes: Required<BrowserDatabaseChanges<UserCatalogEntry>>,
+  row: ImportReviewRow,
+  entry: UserCatalogEntry,
+  kind: StoredVersionKind,
+  time: string,
+): void {
+  if (row.text === null) {
+    return;
+  }
+  const version = buildVersion(entry.address, time, kind, row.text);
+  changes.putFiles.push({ address: entry.address, text: row.text });
+  changes.putEntries.push(entry);
+  changes.putVersions.push(version);
+  changes.deleteVersions.push(
+    ...pruneVersions([version, ...row.versions], time),
+  );
+}
+
+/** "Keep both": the conflicting file as a new single-file entry of its own root. */
+function writeKeepBoth(
+  changes: Required<BrowserDatabaseChanges<UserCatalogEntry>>,
+  row: ImportReviewRow,
+  time: string,
+): void {
+  if (row.keepBothRoot === null) {
+    return;
+  }
+  const path = buildKeepBothPath(row.path);
+  const keptRow: ImportReviewRow = {
+    ...row,
+    path,
+    address: buildBrowserFileAddress(row.keepBothRoot, path),
+    root: row.keepBothRoot,
+    entry: null,
+    versions: [],
+  };
+  const entry = buildStoredEntry(keptRow, null, time);
+  writePickedFile(changes, keptRow, entry, "imported", time);
+}
+
+function applyConflictChoice(
+  changes: Required<BrowserDatabaseChanges<UserCatalogEntry>>,
+  row: ImportReviewRow,
+  folder: string | null,
+  choice: ConflictChoice | undefined,
+  time: string,
+): void {
+  if (choice === "take-file") {
+    const entry = buildStoredEntry(row, folder, time);
+    writePickedFile(changes, row, entry, "updated", time);
+  } else if (choice === "keep-both") {
+    writeKeepBoth(changes, row, time);
+  }
+}
+
+function applyCheckedRow(
+  changes: Required<BrowserDatabaseChanges<UserCatalogEntry>>,
+  row: ImportReviewRow,
+  folder: string | null,
+  time: string,
+): void {
+  if (row.status === "missing") {
+    changes.deleteAddresses.push(row.address);
+    return;
+  }
+  const kind: StoredVersionKind = row.entry === null ? "imported" : "updated";
+  writePickedFile(
+    changes,
+    row,
+    buildStoredEntry(row, folder, time),
+    kind,
+    time,
+  );
+}
+
+/**
+ * The database changes of the checked rows and of the conflict choices, by
+ * index: new and changed files are put with their entries and a version,
+ * checked missing entries are deleted with their files and versions, and
+ * each conflict follows its choice, none changing nothing. An update keeps
+ * the entry's address and `addedAt`, sets `updatedAt` to `now`, and keeps
+ * the replaced text in the history, which is pruned. Rows that cannot be
+ * checked change nothing.
  */
 export function applyReview(
   review: ImportReview,
   checked: ReadonlySet<number>,
   now: Date,
+  choices: ReadonlyMap<number, ConflictChoice> = new Map(),
 ): BrowserDatabaseChanges<UserCatalogEntry> {
   const time = now.toISOString();
-  const changes: BrowserDatabaseChanges<UserCatalogEntry> = {
+  const changes: Required<BrowserDatabaseChanges<UserCatalogEntry>> = {
     putFiles: [],
     putEntries: [],
+    putVersions: [],
+    deleteVersions: [],
     deleteAddresses: [],
   };
   for (const [index, row] of review.rows.entries()) {
-    if (!checked.has(index) || !isCheckableRow(row)) {
-      continue;
-    }
-    if (row.status === "missing") {
-      changes.deleteAddresses.push(row.address);
-    } else if (row.text !== null) {
-      changes.putFiles.push({ address: row.address, text: row.text });
-      changes.putEntries.push(buildStoredEntry(row, review.folder, time));
+    if (row.status === "conflict") {
+      applyConflictChoice(
+        changes,
+        row,
+        review.folder,
+        choices.get(index),
+        time,
+      );
+    } else if (checked.has(index) && isCheckableRow(row)) {
+      applyCheckedRow(changes, row, review.folder, time);
     }
   }
   return changes;
+}
+
+/**
+ * Whether "Import" can apply the review: a checkable row is checked, or
+ * every conflict has a choice.
+ */
+export function canApplyReview(
+  review: ImportReview,
+  checked: ReadonlySet<number>,
+  choices: ReadonlyMap<number, ConflictChoice>,
+): boolean {
+  let conflictCount = 0;
+  let isEveryConflictChosen = true;
+  for (const [index, row] of review.rows.entries()) {
+    if (checked.has(index) && isCheckableRow(row)) {
+      return true;
+    }
+    if (row.status === "conflict") {
+      conflictCount += 1;
+      isEveryConflictChosen &&= choices.has(index);
+    }
+  }
+  return conflictCount > 0 && isEveryConflictChosen;
 }

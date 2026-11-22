@@ -39,11 +39,23 @@ A user mosaic entry's `provenance` SHALL be `{ folder, path, addedAt, updatedAt,
 - **THEN** the response has an error with code `-32002` that says which `open` permission is missing
 
 ### Requirement: Validation result
-`mosaics.validate` SHALL answer `{ errors, warnings, typeFields, collectionFields, tiles }`: `errors` and `warnings` lists of `{ message, line }`, with `line` a 1-based number or `null`; `typeFields` a list of `{ name, required }`; `collectionFields` a sorted list of names; and `tiles` `{ matching, total }`, or `null` without a collection or with errors.
+`mosaics.validate` SHALL answer `{ errors, warnings, typeFields, collectionFields, tiles, draft }`: `errors` and `warnings` lists of `{ message, line }`, with `line` a 1-based number or `null`; `typeFields` a list of `{ name, required }`; `collectionFields` a sorted list of names; `tiles` `{ matching, total }`, or `null` without a collection or with errors; and `draft` (see "Draft fields in the validation").
 
 #### Scenario: Valid draft
 - **WHEN** the mosaic viewer sends `mosaics.validate` with the text of `nobel_laureates_map.yaml` and its address
 - **THEN** the result has no errors, `typeFields` holding `{ "name": "title", "required": true }`, and `tiles` with `matching` equal to `total`
+- **AND** its `draft` has the file's `title`, and its `mod` as written, `"../mods/country_map"`
+
+### Requirement: Draft fields in the validation
+The `draft` of `mosaics.validate`'s answer SHALL be the fields the draft holds as written, `{ title, description, mod, collection, config, aliases, show }`, each text `null` when it is missing or not a string, `config` the draft's own config or `{}`, `aliases` the fields that have a list of names, and `show` the lines with a string `host` and `reason`. It SHALL be `null` when the text cannot be read: a YAML error, or no `mosaic` mapping.
+
+#### Scenario: Fields of a draft without a title
+- **WHEN** a mod validates a draft whose `mosaic` mapping has a `mod` and no `title`
+- **THEN** the result has an error for `title`, and its `draft` has `title` `null` and that `mod`
+
+#### Scenario: Fields of a draft that does not parse
+- **WHEN** a mod validates a draft with a YAML error
+- **THEN** the result's `draft` is `null`
 
 ### Requirement: Edit a mosaic draft
 `mosaics.edit` with `{ content, edits }` SHALL apply `edits` to `content` as `mosaic-editing`'s "Form edits keep the YAML" says, and answer `{ content }`, the new text. It SHALL need no permission and request no file. A draft that does not parse SHALL fail with `-32602` and the parse error.

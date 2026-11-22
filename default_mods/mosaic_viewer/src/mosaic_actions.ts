@@ -1,5 +1,6 @@
 import type { ModCheckReport } from "../../mod_api.d.ts";
 import { buildCheckReport } from "./check_report.ts";
+import { isStoredMosaic, startViewerEditing } from "./edit_start.ts";
 import { buildButton, buildStatusMessage } from "./page_elements.ts";
 import { showError } from "./viewer_view.ts";
 import type { ViewerView } from "./viewer_view.ts";
@@ -48,9 +49,15 @@ function checkMosaic(view: ViewerView, event: MouseEvent): void {
     );
 }
 
+function editMosaic(view: ViewerView, kind: "edit" | "copy"): void {
+  view.messages.replaceChildren();
+  void startViewerEditing(view, kind);
+}
+
 /**
- * "Open mosaic", the page's one primary action, a submit button, and
- * "Check mosaic", an outline button.
+ * "Open mosaic", the page's one primary action, a submit button, "Edit" for
+ * a mosaic stored in this browser or "Edit a copy" for any other, and
+ * "Check mosaic", outline buttons.
  */
 export function buildMosaicActions(view: ViewerView): HTMLElement {
   const form = document.createElement("form");
@@ -59,8 +66,14 @@ export function buildMosaicActions(view: ViewerView): HTMLElement {
   openButton.type = "submit";
   openButton.textContent = "Open mosaic";
   openButton.addEventListener("click", openMosaic.bind(undefined, view));
+  const kind = isStoredMosaic(view.inspection) ? "edit" : "copy";
+  const editButton = buildButton(
+    kind === "edit" ? "Edit" : "Edit a copy",
+    editMosaic.bind(undefined, view, kind),
+  );
   form.append(
     openButton,
+    editButton,
     buildButton("Check mosaic", checkMosaic.bind(undefined, view)),
   );
   return form;

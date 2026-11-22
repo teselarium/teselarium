@@ -6,6 +6,7 @@ import type {
   DecisionDeclarer,
   SiteDecision,
 } from "../../lib/core/permissions/index.ts";
+import { isBrowserFileAddress } from "../../lib/files/index.ts";
 import { PERMISSION_CATEGORIES } from "../../lib/mod/index.ts";
 import { readStoredJson, writeStoredJson } from "./stored_json.ts";
 import type { SettingsStorage } from "./stored_json.ts";
@@ -49,9 +50,18 @@ function isPermissionCategory(value: unknown): boolean {
   return (PERMISSION_CATEGORIES as readonly unknown[]).includes(value);
 }
 
+/** A mosaic is on a site, or stored in this browser, whose lines the save confirmation allows. */
+function isMosaicAddress(value: unknown): boolean {
+  return (
+    isWebAddress(value) ||
+    (typeof value === "string" && isBrowserFileAddress(value))
+  );
+}
+
 /**
- * Whether the entry names exactly one declarer: a `mod` or a `mosaic` web
- * address, never both. An older app reads a mosaic entry as invalid.
+ * Whether the entry names exactly one declarer: a `mod` web address or a
+ * `mosaic` address, web or stored in this browser, never both. An older app
+ * reads a mosaic entry as invalid.
  */
 function hasOneDeclarer(fields: Record<string, unknown>): boolean {
   const hasMod = fields.mod !== undefined;
@@ -59,7 +69,10 @@ function hasOneDeclarer(fields: Record<string, unknown>): boolean {
   if (hasMod === hasMosaic) {
     return false;
   }
-  return isWebAddress(hasMod ? fields.mod : fields.mosaic);
+  if (hasMod) {
+    return isWebAddress(fields.mod);
+  }
+  return isMosaicAddress(fields.mosaic);
 }
 
 function isSiteDecision(entry: unknown): entry is SiteDecision {

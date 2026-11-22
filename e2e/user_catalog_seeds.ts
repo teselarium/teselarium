@@ -10,7 +10,11 @@ export interface SeededEntry {
     path: string | null;
     addedAt: string;
     updatedAt: string | null;
+    changedSinceExport: boolean;
+    copiedFrom: string | null;
   };
+  /** The `savedAt` of the version it was imported with, or `null` for a remote entry. */
+  syncedAt: string | null;
 }
 
 export interface UserCatalogSeed {
@@ -30,7 +34,10 @@ export function buildStoredSeedEntry(path: string): SeededEntry {
       path,
       addedAt: "2026-11-20T10:00:00.000Z",
       updatedAt: null,
+      changedSinceExport: false,
+      copiedFrom: null,
     },
+    syncedAt: "2026-11-20T10:00:00.000Z",
   };
   return entry;
 }
@@ -46,14 +53,18 @@ export function buildRemoteSeedEntry(address: string): SeededEntry {
       path: null,
       addedAt: "2026-11-20T11:00:00.000Z",
       updatedAt: null,
+      changedSinceExport: false,
+      copiedFrom: null,
     },
+    syncedAt: null,
   };
   return entry;
 }
 
 /**
  * Runs in the page: writes the entries and files into the app's database
- * `opentesela`, version 1, as its stores keep them, and resolves once written.
+ * `opentesela`, version 2, as its stores keep them, with the "imported"
+ * version each stored entry is synced with, and resolves once written.
  */
 function writeSeed(seed: UserCatalogSeed): Promise<void> {
   function writeStores(
@@ -62,11 +73,22 @@ function writeSeed(seed: UserCatalogSeed): Promise<void> {
     reject: (error: unknown) => void,
   ): void {
     const transaction = database.transaction(
-      ["files", "user-catalog"],
+      ["files", "user-catalog", "versions"],
       "readwrite",
     );
     for (const [address, text] of Object.entries(seed.files)) {
       transaction.objectStore("files").put({ address, text });
+    }
+    for (const entry of seed.entries) {
+      const text = seed.files[entry.address];
+      if (entry.syncedAt !== null && text !== undefined) {
+        transaction.objectStore("versions").put({
+          address: entry.address,
+          savedAt: entry.syncedAt,
+          kind: "imported",
+          text,
+        });
+      }
     }
     for (const [position, entry] of seed.entries.entries()) {
       transaction
@@ -85,10 +107,14 @@ function writeSeed(seed: UserCatalogSeed): Promise<void> {
     resolve: () => void,
     reject: (error: unknown) => void,
   ): void {
-    const request = indexedDB.open("opentesela", 1);
+    const request = indexedDB.open("opentesela", 2);
     request.onupgradeneeded = function createStores(): void {
       request.result.createObjectStore("files", { keyPath: "address" });
       request.result.createObjectStore("user-catalog");
+      const versions = request.result.createObjectStore("versions", {
+        keyPath: ["address", "savedAt"],
+      });
+      versions.createIndex("address", "address");
     };
     request.onsuccess = function writeOpened(): void {
       writeStores(request.result, resolve, reject);

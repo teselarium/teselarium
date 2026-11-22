@@ -4,6 +4,13 @@ import type { BlockedDialogName, BlockedRequest } from "./sandbox_reports.ts";
 /** Engine to frame, on `window`: carries the port and the mod's code and context. */
 export const SANDBOX_CONNECT_METHOD = "sandbox.connect";
 
+/**
+ * Frame to engine: the loader handled `sandbox.connect`, so the frame's
+ * document has its color scheme and layout. Part of the loader's protocol,
+ * not of the mod API. Sent once, before the mod is imported.
+ */
+export const SANDBOX_CONNECTED_METHOD = "sandbox.connected";
+
 /** Frame to engine: a request the frame's policy blocked. */
 export const SANDBOX_BLOCKED_METHOD = "sandbox.blocked";
 
@@ -68,6 +75,9 @@ export type AnswerMethod =
   | "userCatalog.add"
   | "userCatalog.export"
   | "userCatalog.remove"
+  | "userCatalog.save"
+  | "userCatalog.history"
+  | "userCatalog.exportFolder"
   | "mods.open"
   | "mosaics.open"
   | "catalog.list";
@@ -82,6 +92,9 @@ const ANSWER_METHODS: ReadonlySet<string> = new Set<AnswerMethod>([
   "userCatalog.add",
   "userCatalog.export",
   "userCatalog.remove",
+  "userCatalog.save",
+  "userCatalog.history",
+  "userCatalog.exportFolder",
   "mods.open",
   "mosaics.open",
   "catalog.list",
@@ -172,11 +185,15 @@ function readTestsFailed(params: unknown): SandboxTestReport | null {
 /**
  * Whether `value` is an answer `method` accepts: `null` for `mods.open` and
  * `mosaics.open`, a mapping for `catalog.list`, whose catalog the test runner
- * checked, and a boolean for the others.
+ * checked, a mosaic address or `null` for `userCatalog.save`, and a boolean
+ * for the others.
  */
 function isAnswerValue(method: AnswerMethod, value: unknown): boolean {
   if (method === "mods.open" || method === "mosaics.open") {
     return value === null;
+  }
+  if (method === "userCatalog.save") {
+    return value === null || (typeof value === "string" && value !== "");
   }
   if (method === "catalog.list") {
     return isParamsMapping(value);

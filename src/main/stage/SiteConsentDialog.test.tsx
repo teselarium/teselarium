@@ -49,6 +49,7 @@ function buildAskingSandbox(lines: SiteConsentLine[]): SandboxSnapshot {
     id: "sandbox-2",
     hash: "#/run",
     isVisible: true,
+    isFrameConnected: false,
     canClose: true,
     status: "asking",
     mod: { title: "Probe", version: "1.0.0", source: PROBE_MOD_SOURCE },

@@ -13,6 +13,12 @@ const DEFAULT_MOD_NAME = /^[a-z][a-z0-9_]*$/;
 /** The mod file of a mod folder. */
 const MOD_FILE_NAME = "mod_conf.yaml";
 
+/** Whether a mod reference is a default mod name, such as `mod_viewer`, rather than a location. */
+export function isDefaultModName(reference: string): boolean {
+  const isName = DEFAULT_MOD_NAME.test(reference);
+  return isName;
+}
+
 function resolveDefaultModName(
   name: string,
   defaultModsFolder: string | undefined,
@@ -38,7 +44,7 @@ export function resolveModReference(
   reference: string,
   options: ModReferenceOptions,
 ): string {
-  if (DEFAULT_MOD_NAME.test(reference)) {
+  if (isDefaultModName(reference)) {
     return resolveDefaultModName(reference, options.defaultModsFolder);
   }
   return resolveFileReference(reference, MOD_FILE_NAME, options.baseUrl);

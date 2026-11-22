@@ -16,6 +16,7 @@ import {
 import type { Stage } from "./lib/core/stage/index.ts";
 import { openBrowserDatabase } from "./lib/core/storage/index.ts";
 import { buildThemeTokenStyles } from "./lib/core/theme/index.ts";
+import { upgradeStoredEntry } from "./lib/user_catalog/index.ts";
 import type { UserCatalogEntry } from "./lib/user_catalog/index.ts";
 import { DEFAULT_MODS } from "./main/default_mods.ts";
 import { INSTANCE_CATALOG } from "./main/instance_catalog.ts";
@@ -59,11 +60,16 @@ import type { SidebarLayoutStore } from "./main/sidebar/sidebar_layout.ts";
 import { createListChoices } from "./main/stage/list_choices.ts";
 import { StartErrorScreen } from "./main/StartErrorScreen.tsx";
 import {
+  createUserCatalogNotices,
   createUserCatalogStore,
+  raiseUserCatalogNotice,
   readStartingText,
   readStartUserCatalog,
 } from "./main/user_catalog/user_catalog_store.ts";
-import type { UserCatalogDatabase } from "./main/user_catalog/user_catalog_store.ts";
+import type {
+  UserCatalogDatabase,
+  UserCatalogNotices,
+} from "./main/user_catalog/user_catalog_store.ts";
 import {
   createAppTheme,
   readStartColorScheme,
@@ -92,8 +98,14 @@ function listOptionalIds(sections: readonly SectionDefinition[]): string[] {
   return optionalIds;
 }
 
-function openUserCatalogDatabase(): Promise<UserCatalogDatabase | null> {
-  return openBrowserDatabase<UserCatalogEntry>();
+function openUserCatalogDatabase(
+  notices: UserCatalogNotices,
+): Promise<UserCatalogDatabase | null> {
+  return openBrowserDatabase<UserCatalogEntry>({
+    upgradeEntry: upgradeStoredEntry,
+    onBlocked: raiseUserCatalogNotice.bind(undefined, notices, "blocked"),
+    onVersionChange: raiseUserCatalogNotice.bind(undefined, notices, "reload"),
+  });
 }
 
 /**
@@ -108,7 +120,10 @@ function startApp(
   instanceCatalog: ResolvedInstanceCatalog,
 ): ReactElement {
   // Opened in parallel: the app does not wait for it to start.
-  const startUserCatalog = readStartUserCatalog(openUserCatalogDatabase);
+  const userCatalogNotices = createUserCatalogNotices();
+  const startUserCatalog = readStartUserCatalog(
+    openUserCatalogDatabase.bind(undefined, userCatalogNotices),
+  );
   const systemQuery = window.matchMedia("(prefers-color-scheme: dark)");
   // Before the stage, which reads and remembers the decisions through it.
   const siteDecisions = createSiteDecisions({ storage: window.localStorage });
@@ -143,6 +158,8 @@ function startApp(
     stage,
     recentlyUsed,
     persistentStorage: navigator.storage ?? null,
+    notices: userCatalogNotices,
+    siteDecisions,
   });
   // The stage bar's lists measure what they show, cached for the page.
   const combinations = createCombinationCatalog({

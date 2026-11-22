@@ -47,7 +47,8 @@ See proposal.md, "Why". This change starts from the code as `rename-catalog-voca
   1. builds a `FetchedFile` `{ source: address ?? DRAFT_ADDRESS, content }` and reads it with `parseYaml` and `buildLoadedMosaic`, mapping a `js-yaml` mark to its line;
   2. for a new draft, refuses relative `mod` and `collection`;
   3. loads the mod file and its tile type (`loadModFile`, the validator), and the collection (`loadTileCollection`), through the stage's `fetchOptions`;
-  4. returns `checkMosaicAliases`, `checkMosaicConfig`, the type's fields, the collection's field names, and `countMatchingTiles` after `applyMosaicAliases`.
+  4. returns `checkMosaicAliases`, `checkMosaicConfig`, the type's fields, the collection's field names, and `countMatchingTiles` after `applyMosaicAliases`;
+  5. returns the draft's fields as written (`readDraftFields` of `mosaic_document.ts`): title, description, mod, collection, config, aliases and `show` lines, or `null` when the text cannot be read. The viewer fills its form from them, so it never reads YAML itself, also after an edit in the YAML tab.
 - **Load caching.** Loads of the same mod and collection are cached per session for 30 seconds, so a burst of validations after typing pauses fetches each file once. "Reload tiles" semantics don't apply here. The viewer waits half a second after typing, and ignores an answer older than its latest request.
 - **Permission.** `open` is checked for the mod's and the collection's origins before any load, as `mods.inspect` and `collections.inspect` do. Browser addresses need no `open` grant beyond what `"*"` gives, as for `mosaics.inspect`.
 - Alternative: run `mosaics.check` on the draft. Rejected: it mounts the mod in hidden frames, takes seconds, and reports what a mount sees rather than hints for aliases.

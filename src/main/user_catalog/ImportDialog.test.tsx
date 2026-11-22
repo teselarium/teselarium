@@ -9,6 +9,7 @@ import {
   SHOWN_ID,
   writeTestMosaic,
 } from "../../test/user_catalog_dialogs.tsx";
+import type { DialogFixture } from "../../test/user_catalog_dialogs.tsx";
 import type { UserCatalogEntry } from "../../lib/user_catalog/index.ts";
 import { readUserCatalogSnapshot } from "./user_catalog_store.ts";
 
@@ -25,7 +26,10 @@ const STORED_NOBEL: UserCatalogEntry = {
     path: "nobel_map.yaml",
     addedAt: "2026-11-20T10:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: "2026-11-20T10:00:00.000Z",
 };
 
 function findReviewRow(path: string): HTMLElement {
@@ -216,4 +220,104 @@ describe("ImportDialog", function describeImportDialog(): void {
     ).toBeDisabled();
     expect(readImportButton()).toBeDisabled();
   });
+
+  it("Edited here, file untouched", async function showsChangedHere(): Promise<void> {
+    const fixture = await buildEditedFixture();
+    renderCatalogDialog(fixture, IMPORT);
+
+    pickWithInput("Mosaic folder", [
+      buildPickedFile(
+        "nobel_map.yaml",
+        NOBEL_TEXT,
+        "my-mosaics/nobel_map.yaml",
+      ),
+    ]);
+    await waitForReview();
+
+    const row = findReviewRow("nobel_map.yaml");
+    expect(within(row).getByText("Changed here only")).toHaveAttribute(
+      "data-variant",
+      "outline",
+    );
+    expect(within(row).getByRole("checkbox")).toBeDisabled();
+    expect(readImportButton()).toBeDisabled();
+  });
+
+  it("Edited on both sides", async function choosesConflict(): Promise<void> {
+    const fixture = await buildEditedFixture();
+    renderCatalogDialog(fixture, IMPORT);
+
+    pickWithInput("Mosaic folder", [
+      buildPickedFile(
+        "nobel_map.yaml",
+        POETS_TEXT,
+        "my-mosaics/nobel_map.yaml",
+      ),
+    ]);
+    await waitForReview();
+
+    const row = findReviewRow("nobel_map.yaml");
+    expect(
+      within(row).getByText("Changed here and in the file"),
+    ).toHaveAttribute("data-variant", "warning");
+    const choices = within(row).getAllByRole("radio");
+    expect(choices.map(readLabel)).toEqual([
+      "Keep mine",
+      "Take the file",
+      "Keep both",
+    ]);
+    for (const choice of choices) {
+      expect(choice).not.toBeChecked();
+    }
+    expect(readImportButton()).toBeDisabled();
+
+    fireEvent.click(within(row).getByRole("radio", { name: "Keep both" }));
+    expect(readImportButton()).toBeEnabled();
+    fireEvent.click(readImportButton());
+
+    await waitFor(function answered(): void {
+      expect(fixture.onAnswer).toHaveBeenCalledExactlyOnceWith(SHOWN_ID, true);
+    });
+    const entries = readUserCatalogSnapshot(fixture.store).entries;
+    expect(entries).toHaveLength(2);
+    expect(entries[1].provenance.path).toBe("nobel_map (from file).yaml");
+    expect(await fixture.database.readText(STORED_NOBEL.address)).toBe(
+      EDITED_TEXT,
+    );
+  });
 });
+
+const EDITED_TEXT = writeTestMosaic(
+  "Nobel map, mine",
+  "https://tiles.example.net/a/",
+);
+
+/** The stored Nobel map, edited here after its import: its synced version keeps the imported text. */
+async function buildEditedFixture(): Promise<DialogFixture> {
+  const edited: UserCatalogEntry = {
+    ...STORED_NOBEL,
+    provenance: { ...STORED_NOBEL.provenance, changedSinceExport: true },
+  };
+  const fixture = await buildDialogFixture(
+    [edited],
+    new Map([[STORED_NOBEL.address, EDITED_TEXT]]),
+  );
+  await fixture.database.apply({
+    putFiles: [],
+    putEntries: [],
+    putVersions: [
+      {
+        address: STORED_NOBEL.address,
+        savedAt: STORED_NOBEL.syncedAt as string,
+        kind: "imported",
+        text: NOBEL_TEXT,
+      },
+    ],
+    deleteAddresses: [],
+  });
+  return fixture;
+}
+
+function readLabel(element: HTMLElement): string {
+  return element.closest("label")?.textContent ?? "";
+}

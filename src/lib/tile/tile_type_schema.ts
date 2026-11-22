@@ -8,6 +8,8 @@ export interface TileTypeSchema {
   typeName: string;
   /** The top-level fields of the `ref` definition: its `properties`, then its `optionalProperties`. */
   fieldNames: string[];
+  /** The fields of `fieldNames` that the definition's `properties` require. */
+  requiredFieldNames: string[];
   /** With `additionalProperties: true` added wherever it is omitted. */
   schema: YamlMapping;
 }
@@ -64,14 +66,22 @@ function listSchemaMapNames(schemaMap: YamlValue | undefined): string[] {
   return Object.keys(schemaMap);
 }
 
-/** The names of the `properties` and `optionalProperties` of the definition `typeName`, which `readTypeName` found. */
-function readTypeFieldNames(schema: YamlMapping, typeName: string): string[] {
+/** The definition `typeName`, which `readTypeName` found, or an empty mapping when it is not one. */
+function readTypeDefinition(
+  schema: YamlMapping,
+  typeName: string,
+): YamlMapping {
   const definitions = schema.definitions as YamlMapping;
   const definition = definitions[typeName];
   if (!isYamlMapping(definition)) {
-    const noNames: string[] = [];
-    return noNames;
+    const noDefinition: YamlMapping = {};
+    return noDefinition;
   }
+  return definition;
+}
+
+/** The names of the `properties` and `optionalProperties` of a type definition. */
+function readTypeFieldNames(definition: YamlMapping): string[] {
   const fieldNames = [
     ...listSchemaMapNames(definition.properties),
     ...listSchemaMapNames(definition.optionalProperties),
@@ -90,9 +100,11 @@ export function readTileTypeSchema(
 ): TileTypeSchema {
   const schema = readSchemaMapping(parsedMarkdown);
   const typeName = readTypeName(schema, parsedMarkdown.source);
+  const definition = readTypeDefinition(schema, typeName);
   const tileTypeSchema: TileTypeSchema = {
     typeName,
-    fieldNames: readTypeFieldNames(schema, typeName),
+    fieldNames: readTypeFieldNames(definition),
+    requiredFieldNames: listSchemaMapNames(definition.properties),
     schema: applyStructuralTyping(schema),
   };
   return tileTypeSchema;

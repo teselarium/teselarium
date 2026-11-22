@@ -254,6 +254,7 @@
 
   /* After the focus rings, so a pressed button keeps its outline when focused. */
   button[aria-pressed="true"],
+  [role="tab"][aria-selected="true"],
   [aria-current]:not([aria-current="false"]) {
     outline: 3px solid var(--ot-primary);
     outline-offset: 1px;
@@ -492,6 +493,11 @@
     border: 0;
     background: none;
     color: var(--ot-foreground);
+  }
+
+  /* A field for code, such as a YAML file's text: the monospace font. */
+  textarea[data-ot-variant="code"] {
+    font-family: var(--ot-font-mono);
   }
 
   button[data-ot-variant="primary"]:hover:not(:disabled) {

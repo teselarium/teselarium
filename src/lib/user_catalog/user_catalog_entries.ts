@@ -1,3 +1,5 @@
+import type { UpgradedEntry } from "../core/storage/index.ts";
+
 /** Where an entry's mosaic file lives: stored in this browser, or on a site. */
 export type UserCatalogPlace = "browser" | "remote";
 
@@ -9,10 +11,17 @@ export type UserCatalogPlace = "browser" | "remote";
 export interface UserCatalogProvenance {
   folder: string | null;
   path: string | null;
-  /** When it was first imported, or added by URL. */
+  /** When it was first imported or saved, or added by URL. */
   addedAt: string;
-  /** When it was last updated from a file, or `null`. */
+  /** When it was last updated, from a file or by a save, or `null`. */
   updatedAt: string | null;
+  /**
+   * Whether its text differs from the text it was last imported, updated
+   * from a file or exported with. Always `false` for a remote entry.
+   */
+  changedSinceExport: boolean;
+  /** The address a copy was copied from, or `null`. */
+  copiedFrom: string | null;
 }
 
 /**
@@ -25,6 +34,12 @@ export interface UserCatalogEntry {
   place: UserCatalogPlace;
   root: string | null;
   provenance: UserCatalogProvenance;
+  /**
+   * The `savedAt` of the version it was last imported, updated from a file
+   * or exported with, or `null`: a remote entry, or a mosaic saved in the
+   * app and never exported.
+   */
+  syncedAt: string | null;
 }
 
 /** A user mosaic as the catalog lists it. */
@@ -60,9 +75,36 @@ export function buildRemoteEntry(address: string, now: Date): UserCatalogEntry {
       path: null,
       addedAt: now.toISOString(),
       updatedAt: null,
+      changedSinceExport: false,
+      copiedFrom: null,
     },
+    syncedAt: null,
   };
   return entry;
+}
+
+/**
+ * An entry of a version 1 database in its version 2 form. A stored entry is
+ * synced with its "imported" version, whose time is its last update or its
+ * import, since its text is the one it was imported or updated with.
+ */
+export function upgradeStoredEntry(
+  entry: UserCatalogEntry,
+): UpgradedEntry<UserCatalogEntry> {
+  const savedAt = entry.provenance.updatedAt ?? entry.provenance.addedAt;
+  const upgraded: UpgradedEntry<UserCatalogEntry> = {
+    savedAt,
+    entry: {
+      ...entry,
+      provenance: {
+        ...entry.provenance,
+        changedSinceExport: false,
+        copiedFrom: null,
+      },
+      syncedAt: entry.place === "browser" ? savedAt : null,
+    },
+  };
+  return upgraded;
 }
 
 /** The entry at `address`, stored or remote, or `null`. */

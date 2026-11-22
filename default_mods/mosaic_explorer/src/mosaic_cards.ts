@@ -75,9 +75,18 @@ function buildPlaceBadge(catalogEntry: CatalogMosaicEntry): HTMLElement {
   return badge;
 }
 
+/** "Changed since export", a warning badge, for a stored mosaic whose text changed since it was last imported or exported. */
+function buildChangedBadge(): HTMLElement {
+  const badge = document.createElement("span");
+  badge.textContent = "Changed since export";
+  badge.dataset.otVariant = "warning";
+  return badge;
+}
+
 /**
  * A mosaic as a card: an `<article>` with its title and where its file
- * lives, the mark of who listed it, its description and its actions.
+ * lives, the mark of who listed it and whether it changed since export, its
+ * description and its actions.
  */
 function buildMosaicCard(
   view: ExplorerView,
@@ -92,6 +101,9 @@ function buildMosaicCard(
   const listedBy = describeListedBy(catalogEntry);
   if (listedBy !== null) {
     heading.append(buildListedByMark(listedBy));
+  }
+  if (catalogEntry.provenance?.changedSinceExport === true) {
+    heading.append(buildChangedBadge());
   }
   const description = document.createElement("p");
   description.textContent = inspection.description;

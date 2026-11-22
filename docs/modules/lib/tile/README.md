@@ -155,7 +155,7 @@ const folderIndex = await readTileCollectionIndex(
 
 Also exported from `src/lib/tile/index.ts`:
 
-- `buildTileValidator(location, options?)`: fetches and parses a tile type file, reads its `schema` and compiles it. Takes the same `FileFetchOptions` as `loadTile`. Returns a `TileValidator` (`source`, `typeName`, `validateMetadata`). Use `validateTile` rather than calling `validateMetadata` directly.
+- `buildTileValidator(location, options?)`: fetches and parses a tile type file, reads its `schema` and compiles it. Takes the same `FileFetchOptions` as `loadTile`. Returns a `TileValidator` (`source`, `typeName`, `fieldNames`, the top-level fields of the type's definition, `requiredFieldNames`, those of them its `properties` require, and `validateMetadata`). Use `validateTile` rather than calling `validateMetadata` directly.
 - `validateTile(tile, tileValidator)`: checks the tile's metadata and returns the tile type name. The README pseudo-code `tile_validator(tile)` is this call.
 - Errors: `TileTypeError` (the type file has no `schema` mapping, no `ref` naming one of its definitions, or a schema that is not valid JTD; Ajv's own error is kept as `cause`) and `TileValidationError` (the tile does not match the type). Both expose the failing `source`: the type file for `TileTypeError`, the tile for `TileValidationError`. A type file that cannot be fetched or parsed raises `FileFetchError` or `MarkdownParseError`.
 - Types: `TileValidator`.

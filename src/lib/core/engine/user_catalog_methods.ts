@@ -3,6 +3,7 @@ import { findStoredEntry, findUserEntry } from "../../user_catalog/index.ts";
 import type { CatalogAction } from "./app_actions.ts";
 import {
   askUser,
+  askUserForAddress,
   readRequiredText,
   throwInvalidParams,
 } from "./mod_methods.ts";
@@ -125,10 +126,104 @@ async function removeMosaic(
   return askCatalogAction(context, method, { kind: "catalogRemove", address });
 }
 
+/** An optional param that is a non-empty string when given, or `null` when absent or `null`. Raises `INVALID_PARAMS`. */
+function readOptionalText(
+  params: YamlMapping,
+  fieldName: string,
+  method: string,
+): string | null {
+  if (params[fieldName] === undefined || params[fieldName] === null) {
+    return null;
+  }
+  return readRequiredText(params, fieldName, method);
+}
+
+/** The optional `mosaic` of `userCatalog.save`: a stored entry's address, resolved, or `null` for a new mosaic. */
+function readSavedMosaic(
+  context: ModMethodContext,
+  params: YamlMapping,
+  method: string,
+): string | null {
+  if (params.mosaic === undefined || params.mosaic === null) {
+    return null;
+  }
+  const address = readRequestedMosaic(context, params, method);
+  checkStoredEntry(context, address, method);
+  return address;
+}
+
+/**
+ * `userCatalog.save { content, mosaic?, copiedFrom? }`: the save
+ * confirmation of a draft, for a stored entry or a new mosaic. Answers the
+ * saved mosaic's address, or `null` when nothing was saved.
+ */
+async function saveMosaic(
+  context: ModMethodContext,
+  params: YamlMapping,
+): Promise<string | null> {
+  const method = "userCatalog.save";
+  const content = readRequiredText(params, "content", method);
+  const address = readSavedMosaic(context, params, method);
+  const copiedFrom = readOptionalText(params, "copiedFrom", method);
+  return askUserForAddress(context, method, {
+    kind: "catalogSave",
+    content,
+    address,
+    copiedFrom,
+  });
+}
+
+/** `userCatalog.history { mosaic }`: the history dialog of a stored entry. Answers `true` once a version was restored. */
+async function showHistory(
+  context: ModMethodContext,
+  params: YamlMapping,
+): Promise<boolean> {
+  const method = "userCatalog.history";
+  const address = readRequestedMosaic(context, params, method);
+  checkStoredEntry(context, address, method);
+  return askCatalogAction(context, method, { kind: "catalogHistory", address });
+}
+
+/** Raises `INVALID_PARAMS` unless a stored entry comes from `folder`. Checks skip it. */
+function checkImportedFolder(
+  context: ModMethodContext,
+  folder: string,
+  method: string,
+): void {
+  const entries = context.readUserCatalog();
+  if (entries === null) {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.place === "browser" && entry.provenance.folder === folder) {
+      return;
+    }
+  }
+  throwInvalidParams(
+    method,
+    `no stored mosaic comes from the folder "${folder}"`,
+  );
+}
+
+/** `userCatalog.exportFolder { folder }`: the save dialog of the folder's `.zip`. Answers `true` once it was saved. */
+async function exportFolder(
+  context: ModMethodContext,
+  params: YamlMapping,
+): Promise<boolean> {
+  const method = "userCatalog.exportFolder";
+  const folder = readRequiredText(params, "folder", method);
+  checkImportedFolder(context, folder, method);
+  return askCatalogAction(context, method, {
+    kind: "catalogExportFolder",
+    folder,
+  });
+}
+
 /**
  * The `userCatalog.*` requests: dialogs of the app that change the user
  * catalog, only for the visible mod, without any permission. Each answers
- * `true` once the user confirmed and the change is done, `false` otherwise.
+ * `true` once the user confirmed and the change is done, `false` otherwise,
+ * except `userCatalog.save`, which answers the saved address or `null`.
  */
 export const USER_CATALOG_METHODS: ModMethodTable = {
   "userCatalog.import": importMosaics,
@@ -136,4 +231,7 @@ export const USER_CATALOG_METHODS: ModMethodTable = {
   "userCatalog.add": addMosaic,
   "userCatalog.export": exportMosaic,
   "userCatalog.remove": removeMosaic,
+  "userCatalog.save": saveMosaic,
+  "userCatalog.history": showHistory,
+  "userCatalog.exportFolder": exportFolder,
 };

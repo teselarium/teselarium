@@ -430,6 +430,47 @@ describe("toolbar", function describeToolbar(): void {
     );
   });
 
+  it("Edit row: first, with the pencil, kept by the filters and hidden by the search", async function showsEditRow(): Promise<void> {
+    const rows = buildRows(
+      [
+        buildTestRow("Flashcards", { score: buildTestScore(0, 17) }),
+        buildTestRow("Book List", { score: buildTestScore(3, 17) }),
+      ],
+      {
+        pinnedRows: [
+          buildTestRow("Save as mosaic", {
+            id: "edit-mosaic",
+            mosaics: "edit",
+          }),
+        ],
+      },
+    );
+    render(<ListHarness rows={rows} listChoices={createListChoices()} />);
+    openList();
+
+    expect(listOptionIds()[0]).toBe("edit-mosaic");
+    expect(
+      findOption("edit-mosaic").querySelector("[data-edit-icon] svg"),
+    ).not.toBeNull();
+    openMenu("Filter");
+    const menu = await screen.findByRole("menu");
+    fireEvent.pointerDown(
+      within(menu).getByRole("menuitemcheckbox", { name: "Compatible only" }),
+    );
+    fireEvent.click(
+      within(menu).getByRole("menuitemcheckbox", { name: "Compatible only" }),
+    );
+    await flushTurns();
+    expect(listOptionIds()).toEqual(["edit-mosaic", "Book List"]);
+
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "Book" },
+    });
+    await flushTurns();
+    expect(listOptionIds()).toEqual(["Book List"]);
+  });
+
   it("keeps the choices of each list kind apart", async function keepsKindsApart(): Promise<void> {
     const listChoices = createListChoices();
     render(

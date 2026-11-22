@@ -14,7 +14,7 @@ import { fetchTestFile } from "../../../test/test_files.ts";
 import { MOD_FILE_KEYS, PERMISSION_CATEGORIES } from "../../mod/index.ts";
 import type { ModIssue } from "../../mod/index.ts";
 import { buildTheme } from "../theme/index.ts";
-import type { AppAction } from "./app_actions.ts";
+import type { ActionAnswer, AppAction } from "./app_actions.ts";
 import { MOD_API_VERSION } from "./mod_api_version.ts";
 import type { ModCheckReport } from "./mod_check_report.ts";
 import {
@@ -1039,6 +1039,79 @@ const SURFACE_BY_VERSION: Record<string, ModApiSurface> = {
     ],
     permissionCategories: ["code", "connect", "embed", "open", "show"],
   },
+  "0.1.19": {
+    methods: [
+      "catalog.list",
+      "collections.inspect",
+      "files.save",
+      "libs.load",
+      "links.open",
+      "mods.check",
+      "mods.inspect",
+      "mods.open",
+      "mosaics.check",
+      "mosaics.edit",
+      "mosaics.inspect",
+      "mosaics.open",
+      "mosaics.validate",
+      "players.open",
+      "storage.get",
+      "storage.set",
+      "tiles.renderBody",
+      "ui.confirm",
+      "ui.notify",
+      "userCatalog.add",
+      "userCatalog.export",
+      "userCatalog.exportFolder",
+      "userCatalog.history",
+      "userCatalog.import",
+      "userCatalog.remove",
+      "userCatalog.save",
+      "userCatalog.update",
+    ],
+    events: [
+      "catalog.changed",
+      "layout.changed",
+      "theme.changed",
+      "tiles.changed",
+    ],
+    contextKeys: [
+      "api",
+      "collection",
+      "config",
+      "issues",
+      "layout",
+      "mod",
+      "mosaic",
+      "params",
+      "permissions",
+      "theme",
+      "tiles",
+    ],
+    contextMappingKeys: {
+      mod: ["description", "source", "title", "version"],
+      mosaic: ["description", "source", "title"],
+      collection: ["description", "source", "title"],
+      api: ["version"],
+      permissions: ["denied", "granted"],
+      theme: ["colorScheme", "tokens"],
+    },
+    modFileKeys: [
+      "api",
+      "config",
+      "default_mosaic",
+      "description",
+      "entrypoint",
+      "libraries",
+      "permissions",
+      "test_path",
+      "theme",
+      "title",
+      "type_path",
+      "version",
+    ],
+    permissionCategories: ["code", "connect", "embed", "open", "show"],
+  },
 };
 
 const BUMP_RULE = `The mod API surface does not match the entry of MOD_API_VERSION (${MOD_API_VERSION}). Bump MOD_API_VERSION in mod_api_version.ts as "Mod API version" in docs/modules/lib/core/engine/README.md says (while it is 0.x, a breaking change bumps the minor version, an addition or a fix the patch version), and add an entry for the new version to SURFACE_BY_VERSION`;
@@ -1088,7 +1161,8 @@ async function readSampleMountContext(
     onIssue: vi.fn<(issue: ModIssue) => void>(),
     onOpenLink:
       vi.fn<(link: RunLink, options: OpenLinkOptions) => OpenLinkOutcome>(),
-    onRequestAction: vi.fn<(action: AppAction) => Promise<boolean> | null>(),
+    onRequestAction:
+      vi.fn<(action: AppAction) => Promise<ActionAnswer> | null>(),
     onCheckMod:
       vi.fn<(request: ModCheckRequest) => Promise<ModCheckReport> | null>(),
     onNotify: vi.fn<(notification: UserNotification) => void>(),

@@ -10,6 +10,10 @@ export const FIXTURE_REFERENCES = {
     "./default_mods/mosaic_viewer/fixtures/missing_collection.yaml",
   noCollection: "./default_mods/mosaic_viewer/fixtures/no_collection.yaml",
   untitledMosaic: "./default_mods/mosaic_viewer/fixtures/untitled_mosaic.yaml",
+  /** A mod with a tile type whose `title` the fixture tiles name `name`. */
+  typedMod: "./default_mods/mosaic_viewer/fixtures/typed_mod",
+  fixtureCollection:
+    "./default_mods/mosaic_viewer/fixtures/fixture_collection.yaml",
   /** A fixture path with no mosaic, which `mosaics.inspect` answers with an error. */
   missingMosaic: "./default_mods/mosaic_viewer/fixtures/missing_mosaic.yaml",
 };

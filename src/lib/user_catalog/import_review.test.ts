@@ -6,6 +6,9 @@ import { loadMosaicFile } from "../mosaic/index.ts";
 import type { LoadedMosaic } from "../mosaic/index.ts";
 import {
   applyReview,
+  canApplyReview,
+  classifyMatchingFile,
+  isCheckableRow,
   listDefaultChecked,
   planImport,
   planUpdate,
@@ -19,6 +22,7 @@ import type {
 
 const DEFAULT_MODS_FOLDER = "https://example.org/default_mods/";
 const IMPORT_TIME = new Date("2026-11-20T10:00:00.000Z");
+const SAVE_TIME = new Date("2026-11-20T18:00:00.000Z");
 const UPDATE_TIME = new Date("2026-11-21T09:30:00.000Z");
 
 function writeMosaic(title: string, collection: string): string {
@@ -71,6 +75,7 @@ async function readSources(
   const sources: ReviewSources = {
     entries: await database.readEntries(),
     storedFiles: database,
+    storedVersions: database,
     readMosaic: readPickedMosaic,
     createRoot: roots.createRoot.bind(roots),
   };
@@ -107,6 +112,50 @@ async function importMyMosaics(
   await database.apply(
     applyReview(review, listDefaultChecked(review), IMPORT_TIME),
   );
+}
+
+/** Saves `text` over the stored entry in the app, as a save would. */
+async function saveInApp(
+  database: BrowserDatabase<UserCatalogEntry>,
+  entry: UserCatalogEntry,
+  text: string,
+): Promise<UserCatalogEntry> {
+  const savedEntry: UserCatalogEntry = {
+    ...entry,
+    provenance: {
+      ...entry.provenance,
+      updatedAt: SAVE_TIME.toISOString(),
+      changedSinceExport: true,
+    },
+  };
+  await database.apply({
+    putFiles: [{ address: entry.address, text }],
+    putEntries: [savedEntry],
+    putVersions: [
+      {
+        address: entry.address,
+        savedAt: SAVE_TIME.toISOString(),
+        kind: "saved",
+        text,
+      },
+    ],
+    deleteAddresses: [],
+  });
+  return savedEntry;
+}
+
+/** Imports `nobel_map.yaml` in `my-mosaics`, then saves `editedText` over it in the app. */
+async function importAndEdit(
+  database: BrowserDatabase<UserCatalogEntry>,
+  editedText: string,
+): Promise<UserCatalogEntry> {
+  await importMyMosaics(database, [pickFile("nobel_map.yaml", NOBEL_TEXT)]);
+  const [entry] = await database.readEntries();
+  return saveInApp(database, entry, editedText);
+}
+
+function readKind(version: { kind: string }): string {
+  return version.kind;
 }
 
 describe("planImport", function describePlanImport(): void {
@@ -147,6 +196,9 @@ describe("planImport", function describePlanImport(): void {
         root: "root-1",
         text: NOBEL_TEXT,
         entry: null,
+        versions: [],
+        keepBothRoot: null,
+        replacesLocalChanges: false,
       },
     ]);
   });
@@ -349,6 +401,214 @@ describe("planImport", function describePlanImport(): void {
   });
 });
 
+describe("Status of a matching file", function describeMatchingStatus(): void {
+  const EDITED_TEXT = writeMosaic(
+    "Nobel map, mine",
+    "https://tiles.example.net/laureates/",
+  );
+  const FILE_TEXT = writeMosaic(
+    "Nobel map, theirs",
+    "https://tiles.example.net/laureates/",
+  );
+
+  it("Edited here, file untouched", async function plansChangedHere(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    await importAndEdit(database, EDITED_TEXT);
+
+    const review = await planImport(
+      [pickFile("nobel_map.yaml", NOBEL_TEXT)],
+      "my-mosaics",
+      await readSources(database),
+    );
+    await database.apply(
+      applyReview(review, listDefaultChecked(review), UPDATE_TIME),
+    );
+
+    expect(listRowSummaries(review)).toEqual(["nobel_map.yaml: changed-here"]);
+    expect(isCheckableRow(review.rows[0])).toBe(false);
+    const [entry] = await database.readEntries();
+    expect(await database.readText(entry.address)).toBe(EDITED_TEXT);
+  });
+
+  it("Edited on both sides", async function plansConflict(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    await importAndEdit(database, EDITED_TEXT);
+
+    const review = await planImport(
+      [pickFile("nobel_map.yaml", FILE_TEXT)],
+      "my-mosaics",
+      await readSources(database),
+    );
+
+    expect(listRowSummaries(review)).toEqual(["nobel_map.yaml: conflict"]);
+    expect(listDefaultChecked(review)).toEqual(new Set());
+    expect(review.rows[0].keepBothRoot).toEqual(expect.any(String));
+  });
+
+  it("Both changed the same way", async function plansSameEdit(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    await importAndEdit(database, EDITED_TEXT);
+
+    const review = await planImport(
+      [pickFile("nobel_map.yaml", EDITED_TEXT)],
+      "my-mosaics",
+      await readSources(database),
+    );
+
+    expect(listRowSummaries(review)).toEqual(["nobel_map.yaml: unchanged"]);
+  });
+
+  it("Take the file", async function takesFile(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    const edited = await importAndEdit(database, EDITED_TEXT);
+    const review = await planImport(
+      [pickFile("nobel_map.yaml", FILE_TEXT)],
+      "my-mosaics",
+      await readSources(database),
+    );
+
+    await database.apply(
+      applyReview(review, new Set(), UPDATE_TIME, new Map([[0, "take-file"]])),
+    );
+
+    expect(await database.readText(edited.address)).toBe(FILE_TEXT);
+    const versions = await database.readVersions(edited.address);
+    expect(versions.map(readKind)).toEqual(["updated", "saved", "imported"]);
+    expect(versions[1].text).toBe(EDITED_TEXT);
+    const [entry] = await database.readEntries();
+    expect(entry.syncedAt).toBe(UPDATE_TIME.toISOString());
+    expect(entry.provenance.changedSinceExport).toBe(false);
+  });
+
+  it("Keep both", async function keepsBoth(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    const edited = await importAndEdit(database, EDITED_TEXT);
+    const conflictReview = await planImport(
+      [pickFile("nobel_map.yaml", FILE_TEXT)],
+      "my-mosaics",
+      await readSources(database),
+    );
+
+    await database.apply(
+      applyReview(
+        conflictReview,
+        new Set(),
+        UPDATE_TIME,
+        new Map([[0, "keep-both"]]),
+      ),
+    );
+
+    expect(await database.readText(edited.address)).toBe(EDITED_TEXT);
+    const entries = await database.readEntries();
+    expect(entries).toHaveLength(2);
+    const copy = entries[1];
+    const copyRoot = conflictReview.rows[0].keepBothRoot;
+    expect(copy.root).toBe(copyRoot);
+    expect(copy.address).toBe(
+      `opentesela-browser:///${copyRoot}/nobel_map%20(from%20file).yaml`,
+    );
+    expect(copy.provenance).toMatchObject({
+      folder: null,
+      path: "nobel_map (from file).yaml",
+      changedSinceExport: false,
+    });
+    expect(await database.readText(copy.address)).toBe(FILE_TEXT);
+    const copyVersions = await database.readVersions(copy.address);
+    expect(copyVersions.map(readKind)).toEqual(["imported"]);
+  });
+
+  it("Keep mine", async function keepsMine(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    await importAndEdit(database, EDITED_TEXT);
+    const review = await planImport(
+      [pickFile("nobel_map.yaml", FILE_TEXT)],
+      "my-mosaics",
+      await readSources(database),
+    );
+
+    const changes = applyReview(
+      review,
+      new Set(),
+      UPDATE_TIME,
+      new Map([[0, "keep-mine"]]),
+    );
+
+    expect(changes).toEqual({
+      putFiles: [],
+      putEntries: [],
+      putVersions: [],
+      deleteVersions: [],
+      deleteAddresses: [],
+    });
+  });
+
+  it("changes nothing for a conflict without a choice", async function ignoresUnchosen(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    await importAndEdit(database, EDITED_TEXT);
+    const review = await planImport(
+      [pickFile("nobel_map.yaml", FILE_TEXT)],
+      "my-mosaics",
+      await readSources(database),
+    );
+
+    const changes = applyReview(review, new Set([0]), UPDATE_TIME);
+
+    expect(changes.putFiles).toEqual([]);
+  });
+});
+
+describe("classifyMatchingFile", function describeClassify(): void {
+  it("is unchanged when the file is the stored text", function isUnchanged(): void {
+    expect(classifyMatchingFile("b", "b", "a")).toBe("unchanged");
+  });
+
+  it("is changed when only the file differs from the synced text", function isChanged(): void {
+    expect(classifyMatchingFile("b", "a", "a")).toBe("changed");
+  });
+
+  it("is changed here when only the stored text does", function isChangedHere(): void {
+    expect(classifyMatchingFile("a", "b", "a")).toBe("changed-here");
+  });
+
+  it("is a conflict when both changed differently", function isConflict(): void {
+    expect(classifyMatchingFile("c", "b", "a")).toBe("conflict");
+  });
+
+  it("is a conflict for a mosaic never synced", function isUnsyncedConflict(): void {
+    expect(classifyMatchingFile("c", "b", null)).toBe("conflict");
+  });
+});
+
+describe("canApplyReview", function describeCanApplyReview(): void {
+  const EDITED_TEXT = writeMosaic(
+    "Nobel map, mine",
+    "https://tiles.example.net/laureates/",
+  );
+  const FILE_TEXT = writeMosaic(
+    "Nobel map, theirs",
+    "https://tiles.example.net/laureates/",
+  );
+
+  it("waits for a choice for each conflict, or a checked row", async function waitsForChoices(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    await importAndEdit(database, EDITED_TEXT);
+    const review = await planImport(
+      [
+        pickFile("nobel_map.yaml", FILE_TEXT),
+        pickFile("poets.yaml", POETS_TEXT),
+      ],
+      "my-mosaics",
+      await readSources(database),
+    );
+
+    expect(canApplyReview(review, new Set(), new Map())).toBe(false);
+    expect(canApplyReview(review, new Set([1]), new Map())).toBe(true);
+    expect(canApplyReview(review, new Set(), new Map([[0, "keep-mine"]]))).toBe(
+      true,
+    );
+  });
+});
+
 describe("planUpdate", function describePlanUpdate(): void {
   it("Update from a file", async function plansUpdate(): Promise<void> {
     const database = createMemoryBrowserDatabase<UserCatalogEntry>();
@@ -392,6 +652,56 @@ describe("planUpdate", function describePlanUpdate(): void {
     expect(unchanged.rows[0].status).toBe("unchanged");
     expect(invalid.rows[0].status).toBe("invalid");
   });
+
+  it("Update over local edits", async function plansUpdateOverEdits(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    const editedText = writeMosaic("Nobel map, mine", "https://a.example/");
+    const edited = await importAndEdit(database, editedText);
+
+    const review = await planUpdate(
+      pickFile("nobel_map.yaml", POETS_TEXT),
+      edited,
+      await readSources(database),
+    );
+    await database.apply(applyReview(review, new Set([0]), UPDATE_TIME));
+
+    expect(review.rows[0].status).toBe("changed");
+    expect(review.rows[0].replacesLocalChanges).toBe(true);
+    const versions = await database.readVersions(edited.address);
+    expect(versions.map(readKind)).toEqual(["updated", "saved", "imported"]);
+    expect(versions[1].text).toBe(editedText);
+  });
+
+  it("says nothing about local changes for an entry not changed since export", async function plansPlainUpdate(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    await importMyMosaics(database, [pickFile("nobel_map.yaml", NOBEL_TEXT)]);
+    const [entry] = await database.readEntries();
+
+    const review = await planUpdate(
+      pickFile("nobel_map.yaml", POETS_TEXT),
+      entry,
+      await readSources(database),
+    );
+
+    expect(review.rows[0].replacesLocalChanges).toBe(false);
+  });
+
+  it("updates an entry edited here back to its file", async function plansRevert(): Promise<void> {
+    const database = createMemoryBrowserDatabase<UserCatalogEntry>();
+    const edited = await importAndEdit(
+      database,
+      writeMosaic("Nobel map, mine", "https://a.example/"),
+    );
+
+    const review = await planUpdate(
+      pickFile("nobel_map.yaml", NOBEL_TEXT),
+      edited,
+      await readSources(database),
+    );
+
+    expect(review.rows[0].status).toBe("changed");
+    expect(review.rows[0].replacesLocalChanges).toBe(true);
+  });
 });
 
 describe("applyReview", function describeApplyReview(): void {
@@ -418,9 +728,21 @@ describe("applyReview", function describeApplyReview(): void {
             path: "maps/nobel_map.yaml",
             addedAt: "2026-11-20T10:00:00.000Z",
             updatedAt: null,
+            changedSinceExport: false,
+            copiedFrom: null,
           },
+          syncedAt: "2026-11-20T10:00:00.000Z",
         },
       ],
+      putVersions: [
+        {
+          address,
+          savedAt: "2026-11-20T10:00:00.000Z",
+          kind: "imported",
+          text: NOBEL_TEXT,
+        },
+      ],
+      deleteVersions: [],
       deleteAddresses: [],
     });
   });
@@ -446,8 +768,13 @@ describe("applyReview", function describeApplyReview(): void {
       path: "maps/nobel_map.yaml",
       addedAt: "2026-11-20T10:00:00.000Z",
       updatedAt: "2026-11-21T09:30:00.000Z",
+      changedSinceExport: false,
+      copiedFrom: null,
     });
+    expect(updatedEntry.syncedAt).toBe("2026-11-21T09:30:00.000Z");
     expect(await database.readText(entry.address)).toBe(POETS_TEXT);
+    const versions = await database.readVersions(entry.address);
+    expect(versions.map(readKind)).toEqual(["updated", "imported"]);
   });
 
   it("deletes a checked missing entry and its file", async function deletesMissing(): Promise<void> {
@@ -480,6 +807,8 @@ describe("applyReview", function describeApplyReview(): void {
     expect(changes).toEqual({
       putFiles: [],
       putEntries: [],
+      putVersions: [],
+      deleteVersions: [],
       deleteAddresses: [],
     });
   });
@@ -497,6 +826,8 @@ describe("applyReview", function describeApplyReview(): void {
     expect(changes).toEqual({
       putFiles: [],
       putEntries: [],
+      putVersions: [],
+      deleteVersions: [],
       deleteAddresses: [],
     });
   });

@@ -122,6 +122,28 @@ describe("createSiteDecisions", function describeCreateSiteDecisions(): void {
     ]);
   });
 
+  it("reads a decision of a mosaic stored in this browser", function readsStoredMosaicDecision(): void {
+    const storedMosaicAllow: SiteDecision = {
+      ...MOSAIC_COVERS_ALLOW,
+      mosaic: "opentesela-browser:///r1/nobel_books.yaml",
+    };
+    const storage = buildStoredStorage([storedMosaicAllow]);
+
+    const store = createSiteDecisions({ storage });
+
+    expect(readSiteDecisionsSnapshot(store)).toEqual([storedMosaicAllow]);
+  });
+
+  it("drops a mod decision whose mod is stored in this browser", function dropsBrowserMod(): void {
+    const storage = buildStoredStorage([
+      { ...COVERS_ALLOW, mod: "opentesela-browser:///r1/mod_conf.yaml" },
+    ]);
+
+    const store = createSiteDecisions({ storage });
+
+    expect(readSiteDecisionsSnapshot(store)).toEqual([]);
+  });
+
   it("drops an entry with both a mod and a mosaic, or neither", function dropsAmbiguousEntries(): void {
     const { mod: _mod, ...noDeclarer } = COVERS_ALLOW;
     const storage = buildStoredStorage([

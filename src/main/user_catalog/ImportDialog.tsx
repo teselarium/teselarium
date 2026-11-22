@@ -13,9 +13,13 @@ import {
   readUserCatalogSnapshot,
   STORE_REFUSED_MESSAGE,
   subscribeUserCatalog,
+  USER_CATALOG_NOTICE_MESSAGES,
   waitForUserCatalogStart,
 } from "./user_catalog_store.ts";
-import type { UserCatalogStore } from "./user_catalog_store.ts";
+import type {
+  UserCatalogSnapshot,
+  UserCatalogStore,
+} from "./user_catalog_store.ts";
 
 interface ImportDialogProps {
   shownId: number;
@@ -34,6 +38,20 @@ async function planPickedImport(
     selection.folder,
     buildReviewSources(store),
   );
+}
+
+/** Why nothing can be imported: the browser refused the store, another tab blocks it, or the review's error. */
+function describeImportError(
+  snapshot: UserCatalogSnapshot,
+  reviewError: string | null,
+): string | null {
+  if (!snapshot.isAvailable) {
+    return STORE_REFUSED_MESSAGE;
+  }
+  if (snapshot.notice !== null) {
+    return USER_CATALOG_NOTICE_MESSAGES[snapshot.notice];
+  }
+  return reviewError;
 }
 
 /**
@@ -76,7 +94,7 @@ export function ImportDialog({
   }
 
   const isBusy = review.phase === "reading" || review.phase === "applying";
-  const error = snapshot.isAvailable ? review.error : STORE_REFUSED_MESSAGE;
+  const error = describeImportError(snapshot, review.error);
   return (
     <CatalogDialogFrame
       shownId={shownId}
@@ -107,8 +125,10 @@ export function ImportDialog({
         <ReviewList
           review={review.review}
           checked={review.checked}
+          choices={review.choices}
           isDisabled={isBusy}
           onToggle={review.toggle}
+          onChoose={review.choose}
         />
       )}
     </CatalogDialogFrame>

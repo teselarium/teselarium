@@ -6,6 +6,7 @@
 // so it must never contain a closing script tag.
 
 const CONNECT_METHOD = "sandbox.connect";
+const CONNECTED_METHOD = "sandbox.connected";
 const BLOCKED_METHOD = "sandbox.blocked";
 const MOUNT_FAILED_METHOD = "sandbox.mountFailed";
 const MOUNTED_METHOD = "sandbox.mounted";
@@ -566,6 +567,9 @@ function connectToEngine(event) {
   if (isTheme(params.context?.theme)) {
     loader.theme = params.context.theme;
   }
+  // The stage shows the frame only after this notification, so the frame is
+  // never seen without its color scheme.
+  sendNotification(CONNECTED_METHOD, {});
   replaceBlockedDialogs();
   startFrameMode(params);
 }

@@ -98,6 +98,14 @@ const PLAYER_ANSWER_TEST_CODE = buildTestCode(
 const LISTED_MOD_SOURCE = "./default_mods/mod_explorer/fixtures/listed_mod";
 
 /** Cases that answer `userCatalog.import` and send `userCatalog.remove` unanswered. */
+/** The address a case answers `userCatalog.save` with. */
+const SAVED_FIXTURE_ADDRESS =
+  "opentesela-browser:///fixture/laureates_my_way.yaml";
+
+/** The draft a case saves. */
+const SAVED_DRAFT =
+  'mosaic:\n  title: "Laureates, my way"\n  mod: "mod_viewer"\n';
+
 const USER_CATALOG_ANSWER_TEST_CODE = buildTestCode(
   [
     "function requestFromMod(method, params) {",
@@ -122,20 +130,50 @@ const USER_CATALOG_ANSWER_TEST_CODE = buildTestCode(
     '  const removed = await requestFromMod("userCatalog.remove", { mosaic: "opentesela-browser:///fixture/nobel_map.yaml" });',
     "  context.expect(removed).toBe(false);",
     "}",
+    "",
+    "async function savesAnswered(context) {",
+    "  await context.mount();",
+    `  context.answer("userCatalog.save", "${SAVED_FIXTURE_ADDRESS}");`,
+    `  const saved = await requestFromMod("userCatalog.save", { content: ${JSON.stringify(SAVED_DRAFT)} });`,
+    `  context.expect(saved).toBe("${SAVED_FIXTURE_ADDRESS}");`,
+    '  context.expect(context.requests[0].method).toBe("userCatalog.save");',
+    `  context.expect(context.requests[0].params.content).toBe(${JSON.stringify(SAVED_DRAFT)});`,
+    '  const catalog = await requestFromMod("catalog.list", {});',
+    "  context.expect(catalog.mosaics.filter(isUserMosaic)).toEqual([]);",
+    "}",
   ],
   [
     ["imports with an answer", "importsAnswered"],
     ["removes nothing without an answer", "removesUnanswered"],
+    ["saves with an answer", "savesAnswered"],
   ],
+);
+
+/** A case that answers `userCatalog.save` with a boolean, which `answer` refuses. */
+const WRONG_SAVE_ANSWER_TEST_CODE = buildTestCode(
+  [
+    "function answersSaveWrongly(context) {",
+    '  context.answer("userCatalog.save", true);',
+    "}",
+  ],
+  [["answers a save with true", "answersSaveWrongly"]],
 );
 
 /** A fixture stored mosaic, which no store holds. */
 const STORED_MOSAIC_SOURCE = "opentesela-browser:///fixture/nobel_map.yaml";
+/** A provenance answered without `changedSinceExport` and `copiedFrom`. */
 const STORED_MOSAIC_PROVENANCE = {
   folder: "my-mosaics",
   path: "nobel_map.yaml",
   addedAt: "2026-11-20T10:00:00.000Z",
   updatedAt: null,
+};
+
+/** `STORED_MOSAIC_PROVENANCE` as the scripted catalog completes it. */
+const COMPLETED_PROVENANCE = {
+  ...STORED_MOSAIC_PROVENANCE,
+  changedSinceExport: false,
+  copiedFrom: null,
 };
 
 /** Cases that script `catalog.list` with a fixture catalog, with a wrong catalog, and send it unanswered. */
@@ -152,7 +190,7 @@ const CATALOG_ANSWER_TEST_CODE = buildTestCode(
     `  context.answer("catalog.list", { mosaics: [{ source: "${STORED_MOSAIC_SOURCE}", provenance: ${JSON.stringify(STORED_MOSAIC_PROVENANCE)} }] });`,
     "  await context.mount();",
     '  const catalog = await globalThis.probe.engine.request("catalog.list", {});',
-    `  context.expect(catalog.mosaics).toEqual([{ source: "${STORED_MOSAIC_SOURCE}", listedBy: "user", place: "browser", defaultOf: null, provenance: ${JSON.stringify(STORED_MOSAIC_PROVENANCE)} }]);`,
+    `  context.expect(catalog.mosaics).toEqual([{ source: "${STORED_MOSAIC_SOURCE}", listedBy: "user", place: "browser", defaultOf: null, provenance: ${JSON.stringify(COMPLETED_PROVENANCE)} }]);`,
     "}",
     "",
     "function answersWrongCatalog(context) {",
@@ -515,6 +553,38 @@ test.describe(
       });
       await expect(page.getByRole("dialog")).toHaveCount(0);
       expect(report.findings).toEqual([]);
+    });
+
+    test("Save answered", async function answersSave({ page }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("user_catalog", USER_CATALOG_ANSWER_TEST_CODE),
+        "user_catalog",
+      );
+
+      expect(findCase(report, "saves with an answer")).toEqual({
+        name: "saves with an answer",
+        status: "pass",
+        message: null,
+      });
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    });
+
+    test("Wrong save answer", async function rejectsWrongSave({
+      page,
+    }): Promise<void> {
+      const report = await checkTestMod(
+        page,
+        buildTestedProbeFiles("wrong_save", WRONG_SAVE_ANSWER_TEST_CODE),
+        "wrong_save",
+      );
+
+      expect(findCase(report, "answers a save with true")).toEqual({
+        name: "answers a save with true",
+        status: "fail",
+        message:
+          "the answer to userCatalog.save must be a mosaic address or null",
+      });
     });
 
     test("Unanswered removal", async function answersRemovalFalse({

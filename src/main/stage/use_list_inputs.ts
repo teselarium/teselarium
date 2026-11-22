@@ -13,7 +13,11 @@ import {
 } from "../settings/recently_used.ts";
 import type { RecentlyUsedSnapshot } from "../settings/recently_used.ts";
 import { useStoreSnapshot } from "../use_store_snapshot.ts";
-import { openChoice, readCatalogSources } from "./combination_list_inputs.ts";
+import {
+  openChoice,
+  openFromList,
+  readCatalogSources,
+} from "./combination_list_inputs.ts";
 import type {
   CapsuleListProps,
   ListInputs,
@@ -31,6 +35,12 @@ export type ListLoads = (
 function buildRowActions(props: CapsuleListProps): RowActions {
   const actions: RowActions = {
     choose: openChoice.bind(
+      undefined,
+      props.stage,
+      props.sandbox,
+      props.onOpenChange,
+    ),
+    openViewer: openFromList.bind(
       undefined,
       props.stage,
       props.sandbox,

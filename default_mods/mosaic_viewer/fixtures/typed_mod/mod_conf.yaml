@@ -1,0 +1,10 @@
+# A fixture mod with a tile type, for the edit mode's alias hints (test/edit_cases.ts), which only validate drafts with it: it has no code.
+mod:
+  title: "Typed Fixture Mod"
+  version: "1.0.0"
+  api: "^0.1.0"
+  description: "The typed mod of the mosaic viewer's edit cases."
+  entrypoint: "./main.js"
+  type_path: "./item_type.md"
+  config:
+    columns: 6

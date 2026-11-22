@@ -555,12 +555,13 @@ describe("mosaic list", function describeMosaicList(): void {
       name: "For untyped + Science fiction books",
     });
     const options = within(pair).getAllByRole("option");
-    expect(options).toHaveLength(1);
-    expect(options[0]).toHaveTextContent("Unsaved combination");
-    expect(options[0]).toHaveTextContent("untyped + Science fiction books");
-    expect(hasNamed(options[0], "Current")).toBe(true);
-    expect(hasNamed(options[0], "Mosaic")).toBe(false);
-    expect(readScore(options[0])).toBe("3/3");
+    expect(options).toHaveLength(2);
+    expect(options[0]).toHaveTextContent("Save as mosaic");
+    expect(options[1]).toHaveTextContent("Unsaved combination");
+    expect(options[1]).toHaveTextContent("untyped + Science fiction books");
+    expect(hasNamed(options[1], "Current")).toBe(true);
+    expect(hasNamed(options[1], "Mosaic")).toBe(false);
+    expect(readScore(options[1])).toBe("3/3");
   });
 
   it("Mosaic details: the mosaic file's address and the run link as the app's full address", async function showsMosaicDetails(): Promise<void> {

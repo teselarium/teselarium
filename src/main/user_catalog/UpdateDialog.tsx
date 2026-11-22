@@ -129,8 +129,10 @@ export function UpdateDialog({
         <ReviewList
           review={review.review}
           checked={review.checked}
+          choices={review.choices}
           isDisabled={isBusy}
           onToggle={review.toggle}
+          onChoose={review.choose}
         />
       )}
     </CatalogDialogFrame>

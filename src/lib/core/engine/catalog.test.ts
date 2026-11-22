@@ -73,7 +73,10 @@ const STORED_ENTRY: UserCatalogEntry = {
     path: "maps/nobel_map.yaml",
     addedAt: "2026-11-20T10:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: "2026-11-20T10:00:00.000Z",
 };
 
 const REMOTE_ENTRY: UserCatalogEntry = {
@@ -85,7 +88,10 @@ const REMOTE_ENTRY: UserCatalogEntry = {
     path: null,
     addedAt: "2026-11-20T11:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: null,
 };
 
 /** The user catalog entry of the book list's default mosaic, added by URL. */
@@ -336,5 +342,40 @@ describe("buildCatalog", function describeBuildCatalog(): void {
     );
 
     expect(catalog.mosaics[0].provenance).not.toBe(STORED_ENTRY.provenance);
+  });
+
+  it("Saved copy", async function listsSavedCopy(): Promise<void> {
+    const recording = buildRecordingFetch();
+    const sampleAddress =
+      "https://example.org/samples/mosaics/nobel_laureates_map.yaml";
+    const copy: UserCatalogEntry = {
+      ...STORED_ENTRY,
+      address: "opentesela-browser:///r9/laureates_my_way.yaml",
+      provenance: {
+        ...STORED_ENTRY.provenance,
+        folder: null,
+        path: "laureates_my_way.yaml",
+        changedSinceExport: true,
+        copiedFrom: sampleAddress,
+      },
+      syncedAt: null,
+    };
+
+    const catalog = await buildCatalog(
+      buildInstanceCatalog({}),
+      false,
+      [copy],
+      recording.fetchOptions,
+    );
+
+    expect(catalog.mosaics[0].provenance).toEqual({
+      folder: null,
+      path: "laureates_my_way.yaml",
+      addedAt: STORED_ENTRY.provenance.addedAt,
+      updatedAt: null,
+      changedSinceExport: true,
+      copiedFrom: sampleAddress,
+    });
+    expect(catalog.mosaics[0]).not.toHaveProperty("syncedAt");
   });
 });

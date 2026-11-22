@@ -30,7 +30,10 @@ const STORED_ENTRY: UserCatalogEntry = {
     path: "maps/nobel_map.yaml",
     addedAt: "2026-11-20T10:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: "2026-11-20T10:00:00.000Z",
 };
 
 const REMOTE_ENTRY: UserCatalogEntry = {
@@ -42,7 +45,10 @@ const REMOTE_ENTRY: UserCatalogEntry = {
     path: null,
     addedAt: "2026-11-20T11:00:00.000Z",
     updatedAt: null,
+    changedSinceExport: false,
+    copiedFrom: null,
   },
+  syncedAt: null,
 };
 
 function buildStoredFixture(): Promise<DialogFixture> {
@@ -104,6 +110,40 @@ describe("UpdateDialog", function describeUpdateDialog(): void {
 
     expect(within(list).getByText("Unchanged")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Update" })).toBeDisabled();
+  });
+});
+
+describe("UpdateDialog over local edits", function describeUpdateOverEdits(): void {
+  it("Update over local edits", async function warnsAboutLocalEdits(): Promise<void> {
+    const edited: UserCatalogEntry = {
+      ...STORED_ENTRY,
+      provenance: { ...STORED_ENTRY.provenance, changedSinceExport: true },
+    };
+    const fixture = await buildDialogFixture(
+      [edited],
+      new Map([[STORED_ENTRY.address, NOBEL_TEXT]]),
+    );
+    renderCatalogDialog(fixture, {
+      kind: "catalogUpdate",
+      address: STORED_ENTRY.address,
+    });
+
+    pickWithInput("Mosaic file", [
+      buildPickedFile("nobel_map (2).yaml", CHANGED_TEXT),
+    ]);
+    await screen.findByRole("list", { name: "Picked files" });
+
+    expect(
+      screen.getByText(
+        "The changes made here since the last export are replaced. They stay in the history.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Update" }));
+    await waitFor(function answered(): void {
+      expect(fixture.onAnswer).toHaveBeenCalledExactlyOnceWith(SHOWN_ID, true);
+    });
+    const versions = await fixture.database.readVersions(STORED_ENTRY.address);
+    expect(versions[1].text).toBe(NOBEL_TEXT);
   });
 });
 
@@ -267,9 +307,35 @@ describe("ExportMosaicDialog", function describeExportMosaicDialog(): void {
     );
     fireEvent.click(saveButton);
 
-    expect(fixture.onAnswer).toHaveBeenCalledExactlyOnceWith(SHOWN_ID, true);
+    await waitFor(function answered(): void {
+      expect(fixture.onAnswer).toHaveBeenCalledExactlyOnceWith(SHOWN_ID, true);
+    });
     const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
     expect(blob.type).toBe("application/yaml");
     expect(await blob.text()).toBe(NOBEL_TEXT);
+  });
+
+  it("Saved, then exported", async function syncsExportedEntry(): Promise<void> {
+    const edited: UserCatalogEntry = {
+      ...STORED_ENTRY,
+      provenance: { ...STORED_ENTRY.provenance, changedSinceExport: true },
+    };
+    const fixture = await buildDialogFixture(
+      [edited],
+      new Map([[STORED_ENTRY.address, NOBEL_TEXT]]),
+    );
+    renderCatalogDialog(fixture, {
+      kind: "catalogExport",
+      address: STORED_ENTRY.address,
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+
+    await waitFor(function answered(): void {
+      expect(fixture.onAnswer).toHaveBeenCalledExactlyOnceWith(SHOWN_ID, true);
+    });
+    const [entry] = readUserCatalogSnapshot(fixture.store).entries;
+    expect(entry.provenance.changedSinceExport).toBe(false);
+    expect(entry.syncedAt).toBe(STORED_ENTRY.syncedAt);
   });
 });

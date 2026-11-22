@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { createMemoryBrowserDatabase } from "./index.ts";
-import type { BrowserDatabaseChanges } from "./index.ts";
+import { describe, expect, it, vi } from "vitest";
+import { createMemoryBrowserDatabase, openBrowserDatabase } from "./index.ts";
+import type { BrowserDatabaseChanges, StoredVersion } from "./index.ts";
 
 interface TestEntry {
   address: string;
@@ -121,3 +121,196 @@ describe("createMemoryBrowserDatabase", function describeMemoryDatabase(): void 
 function readEntryAddress(entry: TestEntry): string {
   return entry.address;
 }
+
+function buildVersion(
+  address: string,
+  savedAt: string,
+  text: string,
+): StoredVersion {
+  const version: StoredVersion = { address, savedAt, kind: "saved", text };
+  return version;
+}
+
+function readSavedAt(version: StoredVersion): string {
+  return version.savedAt;
+}
+
+describe("versions of the memory database", function describeMemoryVersions(): void {
+  it("reads an address's versions newest first", async function readsNewestFirst(): Promise<void> {
+    const database = createMemoryBrowserDatabase<TestEntry>();
+    await database.apply({
+      ...buildNobelChanges(),
+      putVersions: [
+        buildVersion(NOBEL_ADDRESS, "2026-01-01T10:00:00.000Z", "one"),
+        buildVersion(NOBEL_ADDRESS, "2026-01-03T10:00:00.000Z", "three"),
+        buildVersion(POETS_ADDRESS, "2026-01-04T10:00:00.000Z", "poets"),
+        buildVersion(NOBEL_ADDRESS, "2026-01-02T10:00:00.000Z", "two"),
+      ],
+    });
+
+    const versions = await database.readVersions(NOBEL_ADDRESS);
+
+    expect(versions.map(readSavedAt)).toEqual([
+      "2026-01-03T10:00:00.000Z",
+      "2026-01-02T10:00:00.000Z",
+      "2026-01-01T10:00:00.000Z",
+    ]);
+  });
+
+  it("deletes the versions it is given", async function deletesVersions(): Promise<void> {
+    const database = createMemoryBrowserDatabase<TestEntry>();
+    await database.apply({
+      ...buildNobelChanges(),
+      putVersions: [
+        buildVersion(NOBEL_ADDRESS, "2026-01-01T10:00:00.000Z", "one"),
+        buildVersion(NOBEL_ADDRESS, "2026-01-02T10:00:00.000Z", "two"),
+      ],
+    });
+
+    await database.apply({
+      putFiles: [],
+      putEntries: [],
+      deleteAddresses: [],
+      deleteVersions: [
+        { address: NOBEL_ADDRESS, savedAt: "2026-01-01T10:00:00.000Z" },
+      ],
+    });
+
+    const versions = await database.readVersions(NOBEL_ADDRESS);
+    expect(versions.map(readSavedAt)).toEqual(["2026-01-02T10:00:00.000Z"]);
+  });
+
+  it("deletes an entry's versions with the entry", async function deletesWithEntry(): Promise<void> {
+    const database = createMemoryBrowserDatabase<TestEntry>();
+    await database.apply({
+      ...buildNobelChanges(),
+      putVersions: [
+        buildVersion(NOBEL_ADDRESS, "2026-01-01T10:00:00.000Z", "one"),
+      ],
+    });
+
+    await database.apply({
+      putFiles: [],
+      putEntries: [],
+      deleteAddresses: [NOBEL_ADDRESS],
+    });
+
+    expect(await database.readVersions(NOBEL_ADDRESS)).toEqual([]);
+  });
+
+  it("clears the versions", async function clearsVersions(): Promise<void> {
+    const database = createMemoryBrowserDatabase<TestEntry>();
+    await database.apply({
+      ...buildNobelChanges(),
+      putVersions: [
+        buildVersion(NOBEL_ADDRESS, "2026-01-01T10:00:00.000Z", "one"),
+      ],
+    });
+
+    await database.clear();
+
+    expect(await database.readVersions(NOBEL_ADDRESS)).toEqual([]);
+  });
+});
+
+/** An open request that the test settles by hand, as IndexedDB would. */
+interface FakeOpenRequest {
+  onupgradeneeded: (() => void) | null;
+  onblocked: (() => void) | null;
+  onsuccess: (() => void) | null;
+  onerror: (() => void) | null;
+  error: DOMException | null;
+  result: unknown;
+}
+
+function buildFakeOpenRequest(): FakeOpenRequest {
+  const request: FakeOpenRequest = {
+    onupgradeneeded: null,
+    onblocked: null,
+    onsuccess: null,
+    onerror: null,
+    error: null,
+    result: undefined,
+  };
+  return request;
+}
+
+function buildFakeFactory(request: FakeOpenRequest): IDBFactory {
+  const factory = {
+    open: vi
+      .fn<(name: string, version: number) => FakeOpenRequest>()
+      .mockReturnValue(request),
+  };
+  return factory as unknown as IDBFactory;
+}
+
+function waitForNextTask(resolve: () => void): void {
+  setTimeout(resolve, 0);
+}
+
+function waitForMicrotasks(): Promise<void> {
+  return new Promise(waitForNextTask);
+}
+
+describe("openBrowserDatabase", function describeOpenBrowserDatabase(): void {
+  it("opens version 2", async function opensVersionTwo(): Promise<void> {
+    const request = buildFakeOpenRequest();
+    const factory = buildFakeFactory(request);
+
+    void openBrowserDatabase<TestEntry>({ factory });
+
+    expect(factory.open).toHaveBeenCalledWith("opentesela", 2);
+  });
+
+  it("resolves to null when the upgrade fails", async function failsUpgrade(): Promise<void> {
+    const request = buildFakeOpenRequest();
+
+    const opening = openBrowserDatabase<TestEntry>({
+      factory: buildFakeFactory(request),
+    });
+    await waitForMicrotasks();
+    request.error = new DOMException("The upgrade was aborted", "AbortError");
+    request.onerror?.();
+
+    expect(await opening).toBeNull();
+  });
+
+  it("reports a blocked opening, and opens once it is unblocked", async function reportsBlocked(): Promise<void> {
+    const request = buildFakeOpenRequest();
+    const onBlocked = vi.fn<() => void>();
+    const opening = openBrowserDatabase<TestEntry>({
+      factory: buildFakeFactory(request),
+      onBlocked,
+    });
+    await waitForMicrotasks();
+
+    request.onblocked?.();
+
+    expect(onBlocked).toHaveBeenCalledOnce();
+    request.result = { onversionchange: null, close: vi.fn<() => void>() };
+    request.onsuccess?.();
+    expect(await opening).not.toBeNull();
+  });
+
+  it("closes the connection on versionchange and reports it", async function closesOnVersionChange(): Promise<void> {
+    const request = buildFakeOpenRequest();
+    const onVersionChange = vi.fn<() => void>();
+    const connection = {
+      onversionchange: null as (() => void) | null,
+      close: vi.fn<() => void>(),
+    };
+    const opening = openBrowserDatabase<TestEntry>({
+      factory: buildFakeFactory(request),
+      onVersionChange,
+    });
+    await waitForMicrotasks();
+    request.result = connection;
+    request.onsuccess?.();
+    await opening;
+
+    connection.onversionchange?.();
+
+    expect(connection.close).toHaveBeenCalledOnce();
+    expect(onVersionChange).toHaveBeenCalledOnce();
+  });
+});

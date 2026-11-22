@@ -23,6 +23,15 @@ const VIEWER_STYLE = `
   code { overflow-wrap: anywhere; }
   section { margin-top: var(--ot-space-4); }
   form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); margin-top: var(--ot-space-4); }
+  /* Edit mode: one column of fields, each label above its field. */
+  [role="tablist"] { display: flex; flex-wrap: wrap; gap: var(--ot-space-2); margin-top: var(--ot-space-4); }
+  [role="tabpanel"] { margin-top: var(--ot-space-2); }
+  fieldset { min-width: 0; margin: var(--ot-space-4) 0 0; }
+  .edit-field { display: flex; flex-direction: column; gap: var(--ot-space-1); margin-top: var(--ot-space-2); min-width: 0; }
+  .edit-field > :is(input, textarea), textarea[name="content"] { box-sizing: border-box; width: 100%; max-width: 100%; }
+  .edit-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; align-items: end; gap: var(--ot-space-2); }
+  .edit-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--ot-space-4); }
+  ul[aria-label="Problems"] { padding-left: 0; list-style: none; }
   /*
    * A narrow frame, such as a phone's: each permission is a small grid, its
    * category and, at the end, its status on the first line, then its host,
@@ -33,6 +42,7 @@ const VIEWER_STYLE = `
    * import another mod's files. Keep both copies alike.
    */
   @media (max-width: 29.99rem) {
+    .edit-row { grid-template-columns: minmax(0, 1fr); }
     :is(table, tbody) { display: block; }
     thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "category status" "host host" "reason reason"; }

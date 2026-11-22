@@ -30,6 +30,7 @@ import {
   stopModSession,
 } from "../engine/index.ts";
 import type {
+  ActionAnswer,
   AppAction,
   Catalog,
   FrameLayout,
@@ -97,7 +98,7 @@ export interface SandboxServices {
   onRequestAction: (
     sandboxId: string,
     action: AppAction,
-  ) => Promise<boolean> | null;
+  ) => Promise<ActionAnswer> | null;
   /** Asks the stage to check a mod for the requesting sandbox. `null` when it is not the visible one. */
   onCheckMod: (
     requesterId: string,
@@ -193,6 +194,8 @@ export interface SandboxRuntime {
   /** Set when the mod starts. */
   launch: ModLaunch | null;
   session: ModSession | null;
+  /** Set when the frame loader says `sandbox.connected`: the frame has its color scheme. */
+  isFrameConnected: boolean;
   /**
    * The link's mod reference resolved against the app's address, or the
    * reference as written when it cannot be resolved. For a mosaic link, `""`
@@ -815,6 +818,7 @@ export function launchSandbox(
     consentLines: [],
     launch: null,
     session: null,
+    isFrameConnected: false,
     modReference: resolveLinkModReference(sandbox, services),
     tilesLocation: resolveLinkTiles(sandbox, services),
     fileIssues: [],
@@ -916,6 +920,15 @@ function addRuntimeNotification(
   services.onChange();
 }
 
+/** Records that the sandbox's frame has its color scheme, so the stage can show it. */
+function markFrameConnected(
+  runtime: SandboxRuntime,
+  services: SandboxServices,
+): void {
+  runtime.isFrameConnected = true;
+  services.onChange();
+}
+
 /** Connects the session of a running sandbox to its frame, on the frame's first load. */
 export function attachSandboxFrame(
   runtime: SandboxRuntime,
@@ -942,6 +955,7 @@ export function attachSandboxFrame(
     onRequestAction: services.onRequestAction.bind(undefined, runtime.id),
     onCheckMod: services.onCheckMod.bind(undefined, runtime.id),
     onNotify: addRuntimeNotification.bind(undefined, runtime, services),
+    onConnected: markFrameConnected.bind(undefined, runtime, services),
     theme: services.readTheme(),
     layout: services.readLayout(runtime.id),
   });

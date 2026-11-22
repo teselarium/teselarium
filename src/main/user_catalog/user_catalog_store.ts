@@ -1,12 +1,16 @@
 import type {
   BrowserDatabase,
   BrowserDatabaseChanges,
+  StoredVersion,
 } from "../../lib/core/storage/index.ts";
 import { changeStageUserCatalog } from "../../lib/core/stage/index.ts";
 import type { Stage } from "../../lib/core/stage/index.ts";
 import type { UserCatalogEntry } from "../../lib/user_catalog/index.ts";
 import { forgetRecentlyUsedMosaics } from "../settings/recently_used.ts";
 import type { RecentlyUsed } from "../settings/recently_used.ts";
+import { createSiteDecisions } from "../settings/site_decisions.ts";
+import type { SiteDecisions } from "../settings/site_decisions.ts";
+import { createMemoryStorage } from "../../lib/core/storage/index.ts";
 
 /** The user catalog's database. */
 export type UserCatalogDatabase = BrowserDatabase<UserCatalogEntry>;
@@ -17,6 +21,46 @@ export type PersistentStorage = Pick<StorageManager, "persist" | "persisted">;
 /** The message of the error that the import dialog shows when the browser refused the store. */
 export const STORE_REFUSED_MESSAGE =
   "This browser does not let the app store files, for example in a private window. Nothing was stored.";
+
+/**
+ * Why the stored mosaics cannot be used in this tab for now: another tab
+ * still has an older version of the database open, which blocks the
+ * upgrade, or another tab upgraded it, so this tab must reload.
+ */
+export type UserCatalogNotice = "blocked" | "reload";
+
+/** What the user is told for each notice. */
+export const USER_CATALOG_NOTICE_MESSAGES: Record<UserCatalogNotice, string> = {
+  blocked:
+    "Another tab of this app still uses an older version of its storage. Close or reload that tab to open the mosaics stored in this browser.",
+  reload:
+    "This app was updated in another tab. Reload this tab to keep using the mosaics stored in this browser.",
+};
+
+/**
+ * The notices the database opening raises. It starts with the app, before
+ * the store exists, so the store follows them once it is created. Mutable.
+ */
+export interface UserCatalogNotices {
+  current: UserCatalogNotice | null;
+  listeners: Set<() => void>;
+}
+
+export function createUserCatalogNotices(): UserCatalogNotices {
+  const notices: UserCatalogNotices = { current: null, listeners: new Set() };
+  return notices;
+}
+
+/** Sets the current notice, `null` for none, and tells who follows them. */
+export function raiseUserCatalogNotice(
+  notices: UserCatalogNotices,
+  notice: UserCatalogNotice | null,
+): void {
+  notices.current = notice;
+  for (const listener of notices.listeners) {
+    listener();
+  }
+}
 
 /** The browser files store cannot be used: the browser refused to open it. */
 export class UserCatalogUnavailableError extends Error {
@@ -40,6 +84,10 @@ export interface UserCatalogStoreOptions {
   recentlyUsed: RecentlyUsed;
   /** `navigator.storage`, or `null` when the browser has none. */
   persistentStorage: PersistentStorage | null;
+  /** The notices of the database opening. Absent: none is ever raised. */
+  notices?: UserCatalogNotices;
+  /** The remembered site decisions, where a save allows its `show` lines. Absent: kept in memory. */
+  siteDecisions?: SiteDecisions;
 }
 
 /** What the dialogs and Settings render. Frozen. */
@@ -51,6 +99,8 @@ export interface UserCatalogSnapshot {
   isAvailable: boolean;
   /** Whether the database was opened and its entries read, or found refused. */
   isStarted: boolean;
+  /** Why the stored mosaics cannot be used in this tab for now, or `null`. */
+  notice: UserCatalogNotice | null;
 }
 
 /** The user catalog of the app: its entries, the database they live in, and who follows them. Mutable. */
@@ -62,6 +112,8 @@ export interface UserCatalogStore {
   stage: Stage;
   recentlyUsed: RecentlyUsed;
   persistentStorage: PersistentStorage | null;
+  notices: UserCatalogNotices;
+  siteDecisions: SiteDecisions;
   /** Whether the browser was asked to keep the storage, so it is asked once per page. */
   hasAskedPersistence: boolean;
   listeners: Set<() => void>;
@@ -128,6 +180,10 @@ async function finishStart(
 ): Promise<void> {
   const started = await start;
   store.database = started.database;
+  if (store.notices.current === "blocked") {
+    // The other tab closed: the opening went through.
+    raiseUserCatalogNotice(store.notices, null);
+  }
   publishUserCatalog(store, {
     ...store.snapshot,
     entries: Object.freeze(structuredClone([...started.entries])),
@@ -137,6 +193,16 @@ async function finishStart(
   if (started.entries.length > 0) {
     await changeStageUserCatalog(store.stage, started.entries);
   }
+}
+
+function followNotice(store: UserCatalogStore): void {
+  if (store.snapshot.notice === store.notices.current) {
+    return;
+  }
+  publishUserCatalog(store, {
+    ...store.snapshot,
+    notice: store.notices.current,
+  });
 }
 
 /**
@@ -153,6 +219,10 @@ export function createUserCatalogStore(
     stage: options.stage,
     recentlyUsed: options.recentlyUsed,
     persistentStorage: options.persistentStorage,
+    notices: options.notices ?? createUserCatalogNotices(),
+    siteDecisions:
+      options.siteDecisions ??
+      createSiteDecisions({ storage: createMemoryStorage() }),
     hasAskedPersistence: false,
     listeners: new Set(),
     snapshot: Object.freeze({
@@ -160,8 +230,11 @@ export function createUserCatalogStore(
       persisted: null,
       isAvailable: true,
       isStarted: false,
+      notice: null,
     }),
   };
+  store.notices.listeners.add(followNotice.bind(undefined, store));
+  followNotice(store);
   store.starting = finishStart(store, options.start);
   void readPersistence(store);
   return store;
@@ -280,6 +353,19 @@ export async function readUserCatalogText(
     return null;
   }
   return store.database.readText(address);
+}
+
+/** The versions of the stored file at `address`, newest first, or none when the browser refused the database. */
+export async function readUserCatalogVersions(
+  store: UserCatalogStore,
+  address: string,
+): Promise<StoredVersion[]> {
+  await store.starting;
+  if (store.database === null) {
+    const noVersions: StoredVersion[] = [];
+    return noVersions;
+  }
+  return store.database.readVersions(address);
 }
 
 export function readUserCatalogSnapshot(
