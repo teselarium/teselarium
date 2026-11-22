@@ -17,6 +17,7 @@ let writeText: Mock<(text: string) => Promise<void>>;
 let onReloadTiles: Mock<() => void>;
 let onTheaterToggle: Mock<() => void>;
 let onFullscreen: Mock<() => void>;
+let onEdit: Mock<() => void>;
 
 beforeEach(function stubClipboard(): void {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -25,6 +26,7 @@ beforeEach(function stubClipboard(): void {
   onReloadTiles = vi.fn<() => void>();
   onTheaterToggle = vi.fn<() => void>();
   onFullscreen = vi.fn<() => void>();
+  onEdit = vi.fn<() => void>();
   vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
 });
 
@@ -40,6 +42,8 @@ interface HarnessProps {
   isTheaterMode?: boolean;
   /** Whether the sandbox has a running mod frame, which fullscreen needs. */
   hasModFrame?: boolean;
+  /** The edit item's name, when the bar is under phone width and the sandbox has one. */
+  editLabel?: string;
 }
 
 /** The menu as the stage bar holds it: its open state, and the feedback it reports. */
@@ -48,6 +52,7 @@ function MoreActionsHarness({
   isNarrow = false,
   isTheaterMode = false,
   hasModFrame = true,
+  editLabel,
 }: HarnessProps): ReactElement {
   const [isOpen, setIsOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -61,6 +66,11 @@ function MoreActionsHarness({
         onOpenChange={setIsOpen}
         onFeedbackChange={setFeedback}
         isNarrow={isNarrow}
+        editItem={
+          editLabel === undefined
+            ? null
+            : { label: editLabel, onSelect: onEdit }
+        }
         viewActions={{
           isTheaterMode,
           onTheaterToggle,
@@ -205,6 +215,39 @@ function readMenuItemNames(): string[] {
   return names;
 }
 
+/** The text node of the theater item's label. */
+function isTheaterLabel(node: ChildNode): boolean {
+  return (
+    node.nodeType === Node.TEXT_NODE && node.textContent === "Theater mode"
+  );
+}
+
+describe("edit item under phone width", function describeEditItem(): void {
+  it("Smaller than a phone: the edit item, with the button's name, opens the viewer", function choosesEdit(): void {
+    render(<MoreActionsHarness isNarrow editLabel="Edit a copy" />);
+    openMenu();
+
+    expect(readMenuItemNames()).toEqual([
+      "Copy link",
+      "Reload tiles",
+      "Edit a copy",
+      "Theater mode",
+      "Fullscreen",
+    ]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit a copy" }));
+
+    expect(onEdit).toHaveBeenCalledOnce();
+  });
+
+  it("No edit item from phone width", function hidesEdit(): void {
+    render(<MoreActionsHarness isNarrow />);
+
+    openMenu();
+
+    expect(screen.queryByRole("menuitem", { name: /^Edit/ })).toBeNull();
+  });
+});
+
 describe("view actions on a narrow bar", function describeViewActions(): void {
   it("Wide bar keeps the menu short", function keepsWideMenuShort(): void {
     render(<MoreActionsHarness />);
@@ -243,6 +286,31 @@ describe("view actions on a narrow bar", function describeViewActions(): void {
     expect(
       screen.getByRole("menuitemcheckbox", { name: "Theater mode" }),
     ).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("Theater mode's check comes after its label, so its icon lines up with the other items", function placesCheckAtEnd(): void {
+    render(<MoreActionsHarness isNarrow isTheaterMode />);
+    openMenu();
+
+    const item = screen.getByRole("menuitemcheckbox", { name: "Theater mode" });
+    const label = Array.from(item.childNodes).find(isTheaterLabel);
+    const check = item.querySelector("[data-theater-check]");
+
+    expect(label).toBeDefined();
+    expect(check).not.toBeNull();
+    expect(
+      (label?.compareDocumentPosition(check as Node) ?? 0) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("Theater mode off: no check", function hidesCheck(): void {
+    render(<MoreActionsHarness isNarrow />);
+    openMenu();
+
+    const item = screen.getByRole("menuitemcheckbox", { name: "Theater mode" });
+
+    expect(item.querySelector("[data-theater-check]")).toBeNull();
   });
 
   it("Fullscreen shows the mod fullscreen", function startsFullscreen(): void {

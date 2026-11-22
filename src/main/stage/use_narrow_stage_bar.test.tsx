@@ -40,13 +40,16 @@ interface HarnessProps {
 function BarHarness({ contentKey = "sandbox-1" }: HarnessProps): ReactElement {
   const barRef = useRef<HTMLElement>(null);
   const leftSideRef = useRef<HTMLDivElement>(null);
-  const isNarrow = useNarrowStageBar(barRef, leftSideRef, contentKey);
+  const form = useNarrowStageBar(barRef, leftSideRef, contentKey);
   return (
     <section ref={barRef} aria-label="Stage bar">
       <div ref={leftSideRef} data-testid="left-side">
         <div data-capsule-row="" data-testid="capsule-row" />
-        {isNarrow ? "narrow" : "wide"}
+        {form.isNarrow ? "narrow" : "wide"}
       </div>
+      <p data-testid="phone-width">
+        {form.isUnderPhoneWidth ? "under phone width" : "phone width or more"}
+      </p>
     </section>
   );
 }
@@ -132,6 +135,19 @@ describe("useNarrowStageBar", function describeUseNarrowStageBar(): void {
     expect(showAtWidth(480)).toBe("wide");
     expect(showAtWidth(481)).toBe("wide");
     expect(showAtWidth(479)).toBe("narrow");
+  });
+
+  it("is under phone width under 262px of content width, the bar of a 360px viewport", function followsPhoneWidth(): void {
+    renderBar();
+
+    showAtWidth(261);
+    expect(screen.getByTestId("phone-width")).toHaveTextContent(
+      "under phone width",
+    );
+    showAtWidth(262);
+    expect(screen.getByTestId("phone-width")).toHaveTextContent(
+      "phone width or more",
+    );
   });
 
   it("folds when the capsules do not fit, until the bar is wider than where it folded", function foldsOnFit(): void {

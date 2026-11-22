@@ -456,7 +456,8 @@ describe("StageView", function describeStageView(): void {
       "Mod: Book List",
       "Collection: None",
       "Mosaic: Unsaved combination",
-      "Combination: Book List",
+      "Combination: Unsaved combination",
+      "Edit as a new mosaic",
       "More actions",
       "Errors: 0, 0 unread",
       "Warnings: 0, 0 unread",
@@ -465,6 +466,34 @@ describe("StageView", function describeStageView(): void {
       "Fullscreen",
       "Close",
     ]);
+  });
+
+  it("Edit button: opens the mosaic viewer in a new sandbox, with the combination behind it", async function opensEditor(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    renderStageView(stage);
+    const opener = readStageSnapshot(stage).sandboxes[0];
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit as a new mosaic" }),
+    );
+
+    const sandboxes = readStageSnapshot(stage).sandboxes;
+    expect(sandboxes).toHaveLength(2);
+    expect(sandboxes[0].id).toBe(opener.id);
+    expect(sandboxes[1].hash).toContain("mod=mosaic_viewer");
+    expect(sandboxes[1].hash).toContain("mode=new");
+  });
+
+  it("Plain title: no edit button", async function hidesEditButton(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=mod_viewer&target=${SAMPLE_MOD_REFERENCE}`,
+    );
+    renderStageView(stage);
+
+    expect(screen.queryByRole("button", { name: /^Mod:/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Edit/ })).toBeNull();
   });
 
   it("shows Reload tiles for a mod opened with a collection", async function showsReload(): Promise<void> {
@@ -723,7 +752,8 @@ describe("StageView", function describeStageView(): void {
       "Mod: Book List",
       "Collection: Science fiction books",
       "Mosaic: Unsaved combination",
-      "Combination: Book List",
+      "Combination: Unsaved combination",
+      "Edit as a new mosaic",
       "More actions",
       "Errors: 0, 0 unread",
       "Warnings: 0, 0 unread",
@@ -1178,6 +1208,29 @@ describe("combination capsules", function describeCombinationCapsules(): void {
     }
     expect(texts).toContain("+");
     expect(texts).toContain("→");
+  });
+
+  it("Folded capsule of an unsaved combination: the mosaic's look, and rows with the mod's and collection's titles", async function foldsUnsaved(): Promise<void> {
+    const stage = await startTestStage(
+      `#/run?mod=${SAMPLE_MOD_REFERENCE}&collection=${SAMPLE_COLLECTION_REFERENCE}`,
+    );
+    renderStageView(stage);
+
+    const folded = findCapsule("Combination: Unsaved combination");
+    expect(folded).toHaveTextContent("Unsaved combination");
+    expect(folded.className).toContain("border-dashed");
+    expect(folded.querySelector("svg.lucide-opentesela-mosaic")).not.toBeNull();
+    expect(folded.querySelector("svg.lucide-opentesela-mod")).toBeNull();
+    fireEvent.keyDown(folded, { key: "Enter" });
+    const names: string[] = [];
+    for (const item of screen.getAllByRole("menuitem")) {
+      names.push(item.textContent ?? "");
+    }
+    expect(names).toEqual([
+      "Mosaic: Unsaved combination",
+      "Mod: Book List",
+      "Collection: Science fiction books",
+    ]);
   });
 
   it("Capsule icons: the sidebar's icons for mod, collection and mosaic", async function usesSidebarIcons(): Promise<void> {

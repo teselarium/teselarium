@@ -15,6 +15,19 @@ export interface BarFold {
   foldedAt: number | null;
 }
 
+/**
+ * Under this content width, in CSS pixels, the bar is narrower than on a
+ * 360px wide viewport (288px, minus its 24px of padding and 2px of border):
+ * the edit button moves into "More actions".
+ */
+export const PHONE_STAGE_BAR_WIDTH = 262;
+
+/** The bar's form: narrow or wide, and whether it is narrower than on a phone. */
+export interface StageBarForm {
+  isNarrow: boolean;
+  isUnderPhoneWidth: boolean;
+}
+
 /** What the bar measured: its content width, and whether its left side overflows. */
 export interface BarMeasure {
   width: number;
@@ -103,14 +116,15 @@ interface FoldFollowing {
  * in it, overflows because its capsules at their minimum width do not fit. It then stays narrow until
  * the bar is wider than where it folded. A new `contentKey`, which names what
  * the bar holds besides its titles, drops that width, so the bar is measured
- * again. The observer and the layout effect run before the paint, so a bar
- * is never drawn in the wrong form.
+ * again. It also says whether the bar is under 262px of content width,
+ * narrower than on a 360px viewport. The observer and the layout effect run
+ * before the paint, so a bar is never drawn in the wrong form.
  */
 export function useNarrowStageBar(
   barRef: RefObject<HTMLElement | null>,
   leftSideRef: RefObject<HTMLElement | null>,
   contentKey: string,
-): boolean {
+): StageBarForm {
   const [width, setWidth] = useState<number | null>(null);
   const [following, setFollowing] = useState<FoldFollowing>({
     contentKey,
@@ -155,5 +169,9 @@ export function useNarrowStageBar(
     [width, fold, contentKey, leftSideRef],
   );
 
-  return fold.isNarrow;
+  const form: StageBarForm = {
+    isNarrow: fold.isNarrow,
+    isUnderPhoneWidth: width !== null && width < PHONE_STAGE_BAR_WIDTH,
+  };
+  return form;
 }

@@ -18,7 +18,7 @@ This change makes the mosaic viewer the place where a mosaic is viewed and edite
 - **Draft kept while away**: the draft is kept in the viewer's storage slot until it is saved or discarded, so leaving the page loses nothing.
 
 **Where editing starts**
-- In the stage bar, an edit button with a pencil icon, between the mosaic capsule and "More actions", one click away at every width:
+- In the stage bar, an edit button with a pencil icon, between the mosaic capsule and "More actions", one click away down to a 360px wide phone. On a smaller screen, "More actions" holds it:
   - **"Edit mosaic"** for a stored mosaic;
   - **"Edit a copy"** for a remote, instance or default mosaic;
   - **"Edit as a new mosaic"** for an unsaved combination with a collection or none. Nothing is stored until the user saves. Its draft is titled after the combination (`<mod> + <collection>`), and gets the combination's mod and collection, and the `show` lines of its `sites` mosaic, if any.
@@ -51,6 +51,10 @@ This change makes the mosaic viewer the place where a mosaic is viewed and edite
 All of these are additions that existing mods keep working with.
 
 **Phones and color schemes**
+- The stage bar keeps the edit button on a 360px wide phone, where the folded capsule shrinks to at least 80px, and moves it into "More actions" below. The bar's capsules fold a little earlier on a wide bar, as the button takes its place.
+- Two fixes in the stage bar, found while testing the button on a phone:
+  - the "More actions" items line up: "Theater mode" was indented by its check, which now sits at the item's end;
+  - the folded capsule keeps the mosaic capsule's look for an unsaved combination ("Unsaved combination", dashed, the mosaic icon), instead of turning into the mod capsule, and its menu rows say the mod's and the collection's titles.
 - The viewer's edit mode follows the viewer's layout on a phone: one column, the form's rows stacking, the textarea at full width, buttons at least 32px.
 - The save confirmation and the history dialog are app dialogs that fit a 360×740 viewport.
 - The highlighted new hosts and the "Changed since export" mark use theme badge variants, checked in the light and the dark color scheme.
@@ -69,7 +73,7 @@ All of these are additions that existing mods keep working with.
 - `mod-tests`: `answer` accepts the new dialog requests, and the scripted catalog accepts the new provenance keys.
 - `mod-api-version`: the version is `0.1.19`.
 - `default-mods`: the mosaic viewer's edit mode, its entry points, "Changed since export" in the explorer and the viewer, folder export, and their cases.
-- `stage-bar`: the edit button between the mosaic capsule and "More actions".
+- `stage-bar`: the edit button between the mosaic capsule and "More actions", and in "More actions" under 288px; aligned "More actions" items; the folded capsule keeps the mosaic's look; the fold widths that move with the button.
 - `site-consent`: lines confirmed at save are remembered as allowed for that mosaic.
 
 ## Impact
@@ -87,6 +91,7 @@ All of these are additions that existing mods keep working with.
 - **Docs**: the mosaic, user catalog, storage, engine, stage and main READMEs, the mosaics module and its viewer and explorer READMEs, and `docs/mod_plugin_spec.md`.
 - **Release**: a patch changeset, since the mod API bump is a patch and nothing breaks for users or instantiations.
 - **Out of scope**:
+  - collapsing the sidebar before the stage bar's capsules fold, so a narrowing window doesn't fold them and then unfold them at the 768px breakpoint (`fit-narrow-stage-bar`);
   - a code editor library;
   - a form for `config`;
   - editing collections or mods;

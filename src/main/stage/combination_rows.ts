@@ -50,8 +50,8 @@ export interface CombinationRow {
   /** Set by the search for an entry found only through its mosaics. */
   foundMosaics: FoundMosaics | null;
   mark: RowMark | null;
-  /** The badge column: a count for a mod or collection entry with mosaics, the icon alone for a mosaic, the pencil for the edit row. */
-  mosaics: MosaicBadge | "icon" | "edit" | null;
+  /** The badge column: a count for a mod or collection entry with mosaics, the icon alone for a mosaic. */
+  mosaics: MosaicBadge | "icon" | null;
   /** The score column, or `null` for an entry with no score. An entry with a page shows its best option's score (`matchEntries`). */
   score: EntryScore;
   /** A page's options, its mosaics then "Without a mosaic", for an entry with mosaics. Choosing the entry opens its page. */
@@ -167,8 +167,6 @@ export function readLoadedValues<Value>(
 export interface RowActions {
   /** Closes the list, then opens `link`, or nothing for `null`, the current entry. */
   choose: (link: RunLink | null) => void;
-  /** Closes the list, then opens `link` in a new sandbox, leaving the current one behind it. */
-  openViewer: (link: RunLink) => void;
   /** Drops a recently used entry that cannot be loaded. */
   remove: (entry: LoadedFileSource) => void;
 }

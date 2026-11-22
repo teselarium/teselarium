@@ -27,7 +27,6 @@ import {
   buildMosaicListRows,
   buildPairHeading,
   CURRENT_PAIR_ID,
-  EDIT_ROW_ID,
 } from "./mosaic_list.ts";
 import { buildTestScore, listRowTitles } from "./test_rows.ts";
 
@@ -163,7 +162,6 @@ function buildSandbox(link: SandboxLink, modTitle: string): ListSandbox {
 interface BuiltInputs {
   inputs: ListInputs;
   choose: ReturnType<typeof vi.fn<(link: RunLink | null) => void>>;
-  openViewer: ReturnType<typeof vi.fn<(link: RunLink) => void>>;
 }
 
 function buildInputs(
@@ -172,12 +170,7 @@ function buildInputs(
   recent: RecentlyUsedSnapshot = buildRecent(),
 ): BuiltInputs {
   const choose = vi.fn<(link: RunLink | null) => void>();
-  const openViewer = vi.fn<(link: RunLink) => void>();
-  const actions: RowActions = {
-    choose,
-    openViewer,
-    remove: vi.fn<RowActions["remove"]>(),
-  };
+  const actions: RowActions = { choose, remove: vi.fn<RowActions["remove"]>() };
   const inputs: ListInputs = {
     catalog: CATALOG,
     sandbox,
@@ -185,7 +178,7 @@ function buildInputs(
     recent,
     actions,
   };
-  const built = { inputs, choose, openViewer };
+  const built = { inputs, choose };
   return built;
 }
 
@@ -419,113 +412,6 @@ describe("buildCollectionListRows", function describeBuildCollectionListRows(): 
   });
 });
 
-describe("edit row of the mosaic list", function describeEditRow(): void {
-  it("Unsaved combination", function startsWithSaveRow(): void {
-    const { inputs } = buildInputs(buildFlashcardsSandbox());
-
-    const rows = buildMosaicListRows(inputs);
-
-    expect(listRowTitles(rows.pinnedRows)).toEqual([
-      "Save as mosaic",
-      "Unsaved combination",
-    ]);
-    expect(rows.pinnedRows[0]).toMatchObject({
-      id: EDIT_ROW_ID,
-      details: ["Flashcards + Nobel Prize in Literature laureates"],
-      mosaics: "edit",
-      mark: null,
-      score: null,
-      isSelectable: true,
-    });
-  });
-
-  it("Sample mosaic", function startsWithCopyRow(): void {
-    const { inputs } = buildInputs(buildMapMosaicSandbox());
-
-    const rows = buildMosaicListRows(inputs);
-
-    expect(rows.pinnedRows[0].title).toBe("Edit a copy");
-    expect(rows.pinnedRows[0].details).toEqual(["Nobel laureates on the map"]);
-  });
-
-  it("Stored mosaic", function startsWithEditRow(): void {
-    const stored = "opentesela-browser:///r1/nobel_map.yaml";
-    const { inputs, openViewer } = buildInputs(
-      buildSandbox(
-        buildLink({ mod: COUNTRY_MAP, mosaic: stored }),
-        "Country Map",
-      ),
-    );
-
-    const rows = buildMosaicListRows(inputs);
-    rows.pinnedRows[0].onChoose();
-
-    expect(rows.pinnedRows[0].title).toBe("Edit mosaic");
-    expect(openViewer).toHaveBeenCalledExactlyOnceWith({
-      mod: "mosaic_viewer",
-      collection: null,
-      params: { target: stored, mode: "edit" },
-    });
-  });
-
-  it("Tile link", function hasNoEditRow(): void {
-    const { inputs } = buildInputs(
-      buildSandbox(buildLink({ collection: null, tile: TILE }), "Flashcards"),
-    );
-
-    const rows = buildMosaicListRows(inputs);
-
-    expect(listRowTitles(rows.pinnedRows)).not.toContain("Save as mosaic");
-    expect(listRowTitles(rows.pinnedRows)).not.toContain("Edit a copy");
-  });
-
-  it("opens a copy of a mosaic", function opensCopy(): void {
-    const { inputs, openViewer, choose } = buildInputs(buildMapMosaicSandbox());
-
-    buildMosaicListRows(inputs).pinnedRows[0].onChoose();
-
-    expect(openViewer).toHaveBeenCalledExactlyOnceWith({
-      mod: "mosaic_viewer",
-      collection: null,
-      params: { target: MAP_MOSAIC, mode: "copy" },
-    });
-    expect(choose).not.toHaveBeenCalled();
-  });
-
-  it("Save the combination", function opensNewDraft(): void {
-    const { inputs, openViewer } = buildInputs(buildFlashcardsSandbox());
-
-    buildMosaicListRows(inputs).pinnedRows[0].onChoose();
-
-    expect(openViewer).toHaveBeenCalledExactlyOnceWith({
-      mod: "mosaic_viewer",
-      collection: null,
-      params: {
-        mode: "new",
-        draft_mod: FLASHCARDS,
-        draft_collection: LAUREATES,
-      },
-    });
-  });
-
-  it("passes the sites and leaves out None", function opensWithSites(): void {
-    const { inputs, openViewer } = buildInputs(
-      buildSandbox(
-        buildLink({ collection: null, sites: BOOKS_MOSAIC }),
-        "Flashcards",
-      ),
-    );
-
-    buildMosaicListRows(inputs).pinnedRows[0].onChoose();
-
-    expect(openViewer).toHaveBeenCalledExactlyOnceWith({
-      mod: "mosaic_viewer",
-      collection: null,
-      params: { mode: "new", draft_mod: FLASHCARDS, draft_sites: BOOKS_MOSAIC },
-    });
-  });
-});
-
 describe("buildMosaicListRows", function describeBuildMosaicListRows(): void {
   it("Current unsaved pair: pinned first, current, with its pair and its score without aliases", function pinsCurrentPair(): void {
     const { inputs, choose } = buildInputs(
@@ -537,8 +423,8 @@ describe("buildMosaicListRows", function describeBuildMosaicListRows(): void {
 
     const rows = buildMosaicListRows(inputs);
 
-    expect(rows.pinnedRows).toHaveLength(2);
-    const pinned = rows.pinnedRows[1];
+    expect(rows.pinnedRows).toHaveLength(1);
+    const pinned = rows.pinnedRows[0];
     expect(pinned).toMatchObject({
       id: CURRENT_PAIR_ID,
       title: "Unsaved combination",
@@ -572,12 +458,12 @@ describe("buildMosaicListRows", function describeBuildMosaicListRows(): void {
     });
   });
 
-  it("Alias summary: a mosaic of the current pair says its aliases, and only the edit row is pinned", function describesAliases(): void {
+  it("Alias summary: a mosaic of the current pair says its aliases, and no row is pinned", function describesAliases(): void {
     const { inputs } = buildInputs(buildMapMosaicSandbox());
 
     const rows = buildMosaicListRows(inputs);
 
-    expect(listRowTitles(rows.pinnedRows)).toEqual(["Edit a copy"]);
+    expect(rows.pinnedRows).toEqual([]);
     const map = findRow(rows.entries, MAP_MOSAIC);
     expect(map.mark).toBe("current");
     expect(map.pair?.isCurrentPair).toBe(true);

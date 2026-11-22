@@ -2,10 +2,7 @@ import type {
   CombinationSnapshot,
   CountTarget,
 } from "../../lib/core/combinations/index.ts";
-import {
-  openStageCombination,
-  openStageLink,
-} from "../../lib/core/stage/index.ts";
+import { openStageCombination } from "../../lib/core/stage/index.ts";
 import type {
   SandboxLink,
   SandboxSnapshot,
@@ -110,17 +107,6 @@ export function readCountTarget(link: SandboxLink): CountTarget | null {
  * Closes the list, then opens `link` in place of the sandbox (see
  * `openStageCombination`). A `null` link, the current entry, opens nothing.
  */
-/** Closes the list, then opens `link` in a new sandbox whose opener is the list's sandbox, so back returns to it. */
-export function openFromList(
-  stage: Stage,
-  sandbox: SandboxSnapshot,
-  onOpenChange: (isOpen: boolean) => void,
-  link: RunLink,
-): void {
-  onOpenChange(false);
-  openStageLink(stage, link, sandbox.id);
-}
-
 export function openChoice(
   stage: Stage,
   sandbox: SandboxSnapshot,

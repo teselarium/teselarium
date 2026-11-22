@@ -150,16 +150,19 @@ function renderCapsuleRow(props: CombinationTitleProps): ReactElement {
 }
 
 /**
- * The single capsule of a narrow bar (under 480px, or when the capsules do not fit): the mosaic's title, or the
- * mod's for an unsaved combination, whose menu has "Mosaic", "Mod" and
- * "Collection" rows that open their lists.
+ * The single capsule of a narrow bar (under 480px, or when the capsules do
+ * not fit), with the mosaic capsule's look: its icon and title, so
+ * "Unsaved combination" with a dashed border for a combination. Its menu
+ * has "Mosaic: <title>", "Mod: <title>" and "Collection: <title>" rows that
+ * open their lists, so a phone shows what runs one tap away.
  */
 function FoldedCapsule(props: CombinationTitleProps): ReactElement {
   const sandbox = props.sandbox;
   const isUnsaved = sandbox.mosaicReference === null;
-  const title = isUnsaved
-    ? readModCapsuleTitle(sandbox).title
-    : readMosaicCapsuleTitle(sandbox);
+  const mosaicTitle = readMosaicCapsuleTitle(sandbox);
+  const mosaicRow = `Mosaic: ${mosaicTitle}`;
+  const modRow = `Mod: ${readModCapsuleTitle(sandbox).title}`;
+  const collectionRow = `Collection: ${readCollectionCapsuleTitle(sandbox)}`;
 
   // The list a chosen row opens once the menu is closed, so the list keeps the focus.
   const chosenListRef = useRef<CapsulePanel | null>(null);
@@ -205,27 +208,29 @@ function FoldedCapsule(props: CombinationTitleProps): ReactElement {
         <DropdownMenuTrigger asChild>
           <CombinationCapsule
             kind="Combination"
-            icon={isUnsaved ? <ModIcon /> : <MosaicIcon />}
-            title={title}
+            icon={<MosaicIcon />}
+            title={mosaicTitle}
             shrink={1}
             isDashed={isUnsaved}
           />
         </DropdownMenuTrigger>
+        {/* The rows' titles are cut, so the menu stays inside a phone's viewport. */}
         <DropdownMenuContent
           align="start"
+          className="max-w-[calc(100vw-2rem)]"
           onCloseAutoFocus={handleCloseAutoFocus}
         >
           <DropdownMenuItem onSelect={handleMosaicSelect}>
             <MosaicIcon />
-            Mosaic
+            <span className="truncate">{mosaicRow}</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={handleModSelect}>
             <ModIcon />
-            Mod
+            <span className="truncate">{modRow}</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={handleCollectionSelect}>
             <CollectionIcon />
-            Collection
+            <span className="truncate">{collectionRow}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

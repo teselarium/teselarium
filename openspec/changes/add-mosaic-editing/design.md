@@ -112,9 +112,19 @@ See proposal.md, "Why". This change starts from the code as `rename-catalog-voca
 
 - `StageBar.tsx` renders a `StageBarIconButton` with lucide's pencil, after `SitesChip` and before `MoreActionsMenu`, with its name as its tooltip.
 - A pure helper in `src/main/stage/` gives the button's name and link, or none, from the sandbox's link and the catalog entry's `place`. It takes over the logic of the former pinned row in `mosaic_list.ts`. The button opens its link with the stage's open path, as a viewer link does.
-- It stays on the bar on a narrow bar too, since one click is its point. If the 360×740 check finds the capsule under 120px, the fallback is to move it into the "More actions" menu on a narrow bar only, as theater mode is.
+- **Down to a phone.** It stays on the bar while the bar is at least 288px wide, the bar's width on a 360px viewport, since one click is its point. Measured there, the folded capsule is 85px, so the phone minimum of the capsule goes from 120px to 80px. Under 288px, `MoreActionsMenu` gets the same action as an item with the pencil, and the bar drops the button.
+  - The menu is drawn in a portal, outside the bar, so a container query cannot switch the item. `useNarrowStageBar` already observes the bar's content width: it also answers whether that width is under 262px (288px minus the bar's 24px of padding and 2px of border), and `StageBar` uses it for both the button and the item.
+  - The bar's content key includes whether the button is on the bar, so a change drops the width at which the capsules did not fit.
+- **The fold moves.** The button and its gap take 40px beside the capsules. Measured with the e2e swap mosaic, the bar now folds at 620px instead of 580px, so the scenarios that showed the icons-only step at 600px use 660px. "Nobel laureates on the map" folds at about 594px of content width, so "Capsules never break" moves from 575px to 630px, where its capsules still shrink. Compacting the bar's gaps and padding to win the 40px back was measured and rejected: it touches the room left for a message button's `99+` and leaves about 1px of margin.
+- Alternative: keeping the button on the bar at every width. Rejected: on a 320px viewport, the capsule would be left with about 45px.
 - Alternative: a row pinned at the top of the mosaic list, which was built first. Rejected after manual testing: it was hidden behind the capsule's chevron and read as one of the mosaics to switch to. Keeping both was rejected too, as two entry points to one action invite confusion.
 - "Edit as a new mosaic" rather than "Save as mosaic": the viewer opens in edit mode, and a broken combination is fixed before it is saved.
+
+### 10. Two fixes in the stage bar's narrow form
+
+- **"More actions" items line up.** shadcn's `DropdownMenuCheckboxItem` reserves 32px on the left for its check, where the other items have 8px, so "Theater mode" was indented. The vendored file is not edited: `MoreActionsMenu` passes a `className` that gives the item the other items' padding and moves the check's slot to the item's end.
+- **The folded capsule keeps the mosaic's look.** `FoldedCapsule` in `CombinationTitle.tsx` always shows the mosaic icon and the mosaic capsule's title (`readMosaicCapsuleTitle`), so "Unsaved combination" with the dashed border for a combination, as the wide bar's mosaic capsule does. Its menu rows show the three capsules' titles, "Mosaic: <title>", "Mod: <title>" and "Collection: <title>", so a phone still shows what runs one tap away. Before, a chosen mod or collection turned the folded capsule into a mod capsule, which read as if the user had left the mosaic list.
+- Sidebar collapse before the fold is a separate change (`fit-narrow-stage-bar`): it changes the sidebar's remembered state and its resizing, beyond the stage bar.
 
 ## Risks / Trade-offs
 

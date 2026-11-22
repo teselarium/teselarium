@@ -434,47 +434,6 @@ describe("toolbar", function describeToolbar(): void {
     );
   });
 
-  it("Edit row: first, with the pencil, kept by the filters and hidden by the search", async function showsEditRow(): Promise<void> {
-    const rows = buildRows(
-      [
-        buildTestRow("Flashcards", { score: buildTestScore(0, 17) }),
-        buildTestRow("Book List", { score: buildTestScore(3, 17) }),
-      ],
-      {
-        pinnedRows: [
-          buildTestRow("Save as mosaic", {
-            id: "edit-mosaic",
-            mosaics: "edit",
-          }),
-        ],
-      },
-    );
-    render(<ListHarness rows={rows} listChoices={createListChoices()} />);
-    openList();
-
-    expect(listOptionIds()[0]).toBe("edit-mosaic");
-    expect(
-      findOption("edit-mosaic").querySelector("[data-edit-icon] svg"),
-    ).not.toBeNull();
-    openMenu("Filter");
-    const menu = await screen.findByRole("menu");
-    fireEvent.pointerDown(
-      within(menu).getByRole("menuitemcheckbox", { name: "Compatible only" }),
-    );
-    fireEvent.click(
-      within(menu).getByRole("menuitemcheckbox", { name: "Compatible only" }),
-    );
-    await flushTurns();
-    expect(listOptionIds()).toEqual(["edit-mosaic", "Book List"]);
-
-    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
-    fireEvent.change(screen.getByRole("combobox"), {
-      target: { value: "Book" },
-    });
-    await flushTurns();
-    expect(listOptionIds()).toEqual(["Book List"]);
-  });
-
   it("keeps the choices of each list kind apart", async function keepsKindsApart(): Promise<void> {
     const listChoices = createListChoices();
     render(
@@ -980,8 +939,8 @@ const CURRENT_PAIR: MosaicPairFacts = Object.freeze({
   hasCurrentCollection: true,
 });
 
-/** The edit row, then the current mosaic and another one, the current one in the pair's group once `isPairKnown`. */
-function buildEditAndMosaicRows(isPairKnown: boolean): ListRows {
+/** A pinned row, then the current mosaic and another one, the current one in the pair's group once `isPairKnown`. */
+function buildPinnedAndMosaicRows(isPairKnown: boolean): ListRows {
   return buildRows(
     [
       buildTestRow("Laureates map", {
@@ -991,9 +950,7 @@ function buildEditAndMosaicRows(isPairKnown: boolean): ListRows {
       buildTestRow("Books list"),
     ],
     {
-      pinnedRows: [
-        buildTestRow("Edit a copy", { id: "edit-mosaic", mosaics: "edit" }),
-      ],
+      pinnedRows: [buildTestRow("Pinned row", { id: "pinned-row" })],
     },
   );
 }
@@ -1008,11 +965,11 @@ function buildPairFirstChoices(): ListChoices {
 }
 
 describe("opening highlight", function describeOpeningHighlight(): void {
-  it("The user moves to another group, then to the edit row: the edit row is highlighted", function movesToEditRow(): void {
+  it("The user moves to another group, then to the pinned row: the pinned row is highlighted", function movesToPinnedRow(): void {
     render(
       <ListHarness
         kind="mosaic"
-        rows={buildEditAndMosaicRows(true)}
+        rows={buildPinnedAndMosaicRows(true)}
         listChoices={buildPairFirstChoices()}
       />,
     );
@@ -1023,16 +980,16 @@ describe("opening highlight", function describeOpeningHighlight(): void {
     expect(readHighlighted()).toBe("Books list");
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Home" });
 
-    expect(readHighlighted()).toBe("edit-mosaic");
+    expect(readHighlighted()).toBe("pinned-row");
   });
 
-  it("Current mosaic moved to the pair's group while settling: it stays highlighted, not the edit row", function keepsHighlightOnGroupMove(): void {
+  it("Current mosaic moved to the pair's group while settling: it stays highlighted, not the pinned row", function keepsHighlightOnGroupMove(): void {
     vi.useFakeTimers();
     const listChoices = buildPairFirstChoices();
     const { rerender } = render(
       <ListHarness
         kind="mosaic"
-        rows={buildEditAndMosaicRows(false)}
+        rows={buildPinnedAndMosaicRows(false)}
         listChoices={listChoices}
       />,
     );
@@ -1042,14 +999,14 @@ describe("opening highlight", function describeOpeningHighlight(): void {
     rerender(
       <ListHarness
         kind="mosaic"
-        rows={buildEditAndMosaicRows(true)}
+        rows={buildPinnedAndMosaicRows(true)}
         listChoices={listChoices}
       />,
     );
     advanceTime(SETTLE_INTERVAL_MS * 2);
 
     expect(listOptionIds()).toEqual([
-      "edit-mosaic",
+      "pinned-row",
       "Laureates map",
       "Books list",
     ]);

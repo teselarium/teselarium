@@ -1,7 +1,9 @@
 import {
+  Check,
   Ellipsis,
   Link,
   Maximize,
+  Pencil,
   RectangleHorizontal,
   RotateCw,
 } from "lucide-react";
@@ -52,8 +54,23 @@ interface MoreActionsMenuProps {
   onFeedbackChange: (feedback: string) => void;
   /** Whether the stage bar is under 480px wide: the menu then holds the view actions. */
   isNarrow: boolean;
+  /** The edit button's action, which the menu holds on a bar under phone width, or `null`. */
+  editItem: MenuEditItem | null;
   viewActions: ViewActions;
 }
+
+/** The edit button's action as a menu item: its name and what choosing it does. */
+export interface MenuEditItem {
+  label: string;
+  onSelect: () => void;
+}
+
+/**
+ * The theater item gets the other items' left padding, and shadcn's check
+ * slot, its first `span`, on the left, is hidden: its own check follows the
+ * label at the item's end, so every item's icon starts at the same place.
+ */
+const THEATER_ITEM_CLASSES = "pl-2 [&>span:first-child]:hidden";
 
 /** How the last "Copy link" went, while the button says so. */
 type CopyState = "idle" | "copied" | "failed";
@@ -72,11 +89,15 @@ function renderViewItems(viewActions: ViewActions): ReactElement {
     <>
       <DropdownMenuSeparator />
       <DropdownMenuCheckboxItem
+        className={THEATER_ITEM_CLASSES}
         checked={viewActions.isTheaterMode}
         onCheckedChange={viewActions.onTheaterToggle}
       >
         <RectangleHorizontal />
         Theater mode
+        {viewActions.isTheaterMode ? (
+          <Check aria-hidden="true" className="ml-auto" data-theater-check="" />
+        ) : null}
       </DropdownMenuCheckboxItem>
       {viewActions.onFullscreen === null ? null : (
         <DropdownMenuItem onSelect={viewActions.onFullscreen}>
@@ -91,7 +112,8 @@ function renderViewItems(viewActions: ViewActions): ReactElement {
 /**
  * The "More actions" button (`…`) and its menu: "Copy link", which copies
  * the app's full address with the run link, and, for a sandbox opened with a
- * collection or a tile, "Reload tiles". On a narrow bar it also holds
+ * collection or a tile, "Reload tiles", then, on a bar under phone width,
+ * the edit button's action. On a narrow bar it also holds
  * "Theater mode", checked while it is on, and, while the mod runs in its
  * frame, "Fullscreen". After a copy the menu closes, and the
  * button's tooltip says "Link copied", or "Cannot copy the link", for 2
@@ -106,6 +128,7 @@ export function MoreActionsMenu({
   onOpenChange,
   onFeedbackChange,
   isNarrow,
+  editItem,
   viewActions,
 }: MoreActionsMenuProps): ReactElement {
   const [copyState, setCopyState] = useState<CopyState>("idle");
@@ -153,6 +176,12 @@ export function MoreActionsMenu({
             Reload tiles
           </DropdownMenuItem>
         ) : null}
+        {editItem === null ? null : (
+          <DropdownMenuItem onSelect={editItem.onSelect}>
+            <Pencil />
+            {editItem.label}
+          </DropdownMenuItem>
+        )}
         {isNarrow ? renderViewItems(viewActions) : null}
       </DropdownMenuContent>
     </DropdownMenu>

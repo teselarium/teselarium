@@ -1404,7 +1404,7 @@ test.describe("The bar folds as it narrows", function describeLadder(): void {
     await expect(capsule(page, MOD_CAPSULE)).not.toContainText(TILES_VERSION);
     expect(await readCloseOffset(page)).toBe(wideOffset);
 
-    await setBarWidth(page, 600);
+    await setBarWidth(page, 660);
     await expect(capsuleTitle(page, MOD_CAPSULE)).toBeHidden();
     await expect(capsuleTitle(page, COLLECTION_CAPSULE)).toBeHidden();
     await expect(capsule(page, MOD_CAPSULE)).toBeVisible();
@@ -1422,14 +1422,14 @@ test.describe("The bar folds as it narrows", function describeLadder(): void {
   test("Folding follows the space left", async function foldsBesideChip({
     page,
   }): Promise<void> {
-    // The chip and the gaps around it leave 600px to the bar.
-    await page.setViewportSize({ width: 672, height: 800 });
+    // The chip and the gaps around it leave 660px to the bar.
+    await page.setViewportSize({ width: 732, height: 800 });
     await openSwapMosaic(page);
 
     await hamburgerButton(page).click();
 
     await expect(hamburgerButton(page)).toHaveAccessibleName("Show sidebar");
-    expect((await readBox(stageBar(page))).width).toBe(600);
+    expect((await readBox(stageBar(page))).width).toBe(660);
     await expect(capsuleTitle(page, MOD_CAPSULE)).toBeHidden();
     await expect(capsuleTitle(page, COLLECTION_CAPSULE)).toBeHidden();
     await expect(capsule(page, MOD_CAPSULE)).toBeVisible();
@@ -1894,11 +1894,14 @@ test.describe("Narrow stage bar", function describeNarrowBar(): void {
 
     const box = await folded.evaluate(readElementBox);
 
-    expect(box.width).toBeGreaterThanOrEqual(120);
+    expect(box.width).toBeGreaterThanOrEqual(80);
     const title = folded.locator("span").first();
     await expect(title).toBeVisible();
     await expect(title).toHaveText(MAP_MOSAIC_TITLE);
-    expect((await title.evaluate(readElementBox)).width).toBeGreaterThan(48);
+    // Beside the edit button, the start of the title: about two characters.
+    expect((await title.evaluate(readElementBox)).width).toBeGreaterThanOrEqual(
+      16,
+    );
   });
 
   test("Errors and notifications: one button, a grouped popover, then all read", async function groupsMessages({
@@ -2053,8 +2056,8 @@ test.describe("Narrow stage bar", function describeNarrowBar(): void {
     const mosaicCapsule = capsule(page, `Mosaic: ${MAP_MOSAIC_TITLE}`);
     await expect(mosaicCapsule).toBeVisible();
 
-    // As on a landscape phone with the sidebar expanded: the capsules have to shrink, and still fit.
-    await setBarContentWidth(page, 575);
+    // Beside the edit button the capsules have to shrink, and still fit: they fold at about 594px.
+    await setBarContentWidth(page, 630);
 
     await expect(mosaicCapsule).toBeVisible();
     await expect(capsule(page, /^Collection: /)).toBeVisible();
@@ -2181,18 +2184,21 @@ async function openMosaicList(page: Page): Promise<void> {
   await expect(page.getByRole("combobox")).toBeFocused();
 }
 
-test.describe("Edit row of the mosaic list", function describeEditRow(): void {
-  test("Save the combination", async function savesCombination({
+/** The stage bar's edit button, named after what it does. */
+function editButton(page: Page, name: string): Locator {
+  return stageBar(page).getByRole("button", { name, exact: true });
+}
+
+test.describe("Edit button of the stage bar", function describeEditButton(): void {
+  test("Edit the combination", async function editsCombination({
     page,
   }): Promise<void> {
     await openSampleSandbox(page, FLASHCARDS_LAUREATES_LINK);
     await openMosaicList(page);
-    expect((await readOptionTitles(page)).slice(0, 2)).toEqual([
-      "Save as mosaic",
-      "Unsaved combination",
-    ]);
+    expect((await readOptionTitles(page))[0]).toBe("Unsaved combination");
+    await page.keyboard.press("Escape");
 
-    await listOption(page, "Save as mosaic").click();
+    await editButton(page, "Edit as a new mosaic").click();
 
     await expect(
       mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
@@ -2219,9 +2225,8 @@ test.describe("Edit row of the mosaic list", function describeEditRow(): void {
     page,
   }): Promise<void> {
     await page.goto(NOBEL_MAP_MOSAIC_LINK);
-    await openMosaicList(page);
 
-    await listOption(page, "Edit a copy").click();
+    await editButton(page, "Edit a copy").click();
 
     await expect(
       mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
@@ -2234,40 +2239,131 @@ test.describe("Edit row of the mosaic list", function describeEditRow(): void {
     ).toBeVisible();
   });
 
-  test("Edit row on a phone", async function laysOutEditRow({
+  test("Edit button on a phone", async function laysOutEditButton({
     page,
   }): Promise<void> {
     await page.setViewportSize(SMALL_PHONE_VIEWPORT);
     await page.goto(FLASHCARDS_LAUREATES_LINK);
-    // On a phone the capsules fold into one, whose menu opens each list.
-    await capsule(page, /^Combination: /).click();
-    await page.getByRole("menuitem", { name: "Mosaic" }).click();
-    await openList(page).evaluate(finishAnimations);
+    const button = editButton(page, "Edit as a new mosaic");
+    await expect(button).toBeVisible();
 
-    const editRow = listOption(page, "Save as mosaic");
-    const editBox = await readBox(editRow);
-    const pairBox = await readBox(
-      listOption(page, "Unsaved combination").first(),
+    const buttonBox = await button.evaluate(readElementBox);
+    const barBox = await stageBar(page).evaluate(readElementBox);
+    const foldedBox = await capsule(page, /^Combination: /).evaluate(
+      readElementBox,
     );
-    expect(editBox.height).toBe(pairBox.height);
-    expect(editBox.height).toBeGreaterThanOrEqual(32);
-    expect(editBox.x + editBox.width).toBeLessThanOrEqual(
-      SMALL_PHONE_VIEWPORT.width,
-    );
+    expect(buttonBox.width).toBeGreaterThanOrEqual(32);
+    expect(buttonBox.height).toBeGreaterThanOrEqual(32);
+    expect(buttonBox.left).toBeGreaterThanOrEqual(barBox.left);
+    expect(buttonBox.right).toBeLessThanOrEqual(barBox.right);
+    expect(foldedBox.width).toBeGreaterThanOrEqual(80);
     await expect(
-      editRow.locator("[data-column=title] > span").first(),
-    ).toHaveText("Save as mosaic");
-    expect(
-      await editRow
-        .locator("[data-column=title] > span")
-        .first()
-        .evaluate(isCut),
-    ).toBe(false);
+      capsule(page, /^Combination: /)
+        .locator("span")
+        .first(),
+    ).toHaveText(/^Unsaved/);
+    expect(await page.evaluate(canScrollSideways)).toBe(false);
 
-    await editRow.click();
+    await button.click();
 
     await expect(
       mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
     ).toHaveText("New mosaic");
+  });
+
+  test("Smaller than a phone", async function editsFromMenu({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    await expect(capsule(page, /^Combination: /)).toBeVisible();
+    await expect(editButton(page, "Edit a copy")).toHaveCount(0);
+    expect(await page.evaluate(canScrollSideways)).toBe(false);
+
+    const menu = await openMoreActions(page);
+    await menu.getByRole("menuitem", { name: "Edit a copy" }).click();
+
+    await expect(
+      mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
+    ).toHaveText(`Copy of "${MAP_MOSAIC_TITLE}"`);
+  });
+});
+
+/** Runs on a menu item: the left edge of its first shown icon. */
+function readIconLeft(item: Element): number {
+  for (const icon of item.querySelectorAll("svg")) {
+    const box = icon.getBoundingClientRect();
+    if (box.width > 0) {
+      return box.left;
+    }
+  }
+  return -1;
+}
+
+/** Runs on the theater item: whether its check sits well right of its icon, past the label. */
+function isCheckAfterLabel(item: Element): boolean {
+  const check = item.querySelector("[data-theater-check]");
+  const icons = item.querySelectorAll("svg");
+  const icon = icons[0];
+  if (check === null || icon === undefined) {
+    return false;
+  }
+  return (
+    check.getBoundingClientRect().left > icon.getBoundingClientRect().right + 40
+  );
+}
+
+test.describe("More actions on a phone", function describePhoneMenu(): void {
+  test("Items line up on a phone", async function linesUpItems({
+    page,
+  }): Promise<void> {
+    await page.setViewportSize(SMALL_PHONE_VIEWPORT);
+    await page.goto(FLASHCARDS_LAUREATES_LINK);
+    const first = await openMoreActions(page);
+    await first.getByRole("menuitemcheckbox", { name: "Theater mode" }).click();
+    await expect(first).toHaveCount(0);
+
+    const menu = await openMoreActions(page);
+    const copyLeft = await menu
+      .getByRole("menuitem", { name: "Copy link" })
+      .evaluate(readIconLeft);
+    const reloadLeft = await menu
+      .getByRole("menuitem", { name: "Reload tiles" })
+      .evaluate(readIconLeft);
+    const theater = menu.getByRole("menuitemcheckbox", {
+      name: "Theater mode",
+    });
+
+    expect(Math.abs(reloadLeft - copyLeft)).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs((await theater.evaluate(readIconLeft)) - copyLeft),
+    ).toBeLessThanOrEqual(1);
+    expect(await theater.evaluate(isCheckAfterLabel)).toBe(true);
+  });
+});
+
+test.describe("Folded capsule of a combination", function describeFoldedCombination(): void {
+  test("Folded unsaved combination keeps the mosaic's look", async function keepsMosaicLook({
+    page,
+  }): Promise<void> {
+    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    await setBarWidth(page, 400);
+    await capsule(page, `Combination: ${MAP_MOSAIC_TITLE}`).click();
+    await page.getByRole("menuitem", { name: /^Mod: / }).click();
+
+    await listOption(page, "Flashcards").first().click();
+
+    await setBarWidth(page, 400);
+    const folded = capsule(page, "Combination: Unsaved combination");
+    await expect(folded).toBeVisible();
+    await expect(folded).toHaveClass(/border-dashed/);
+    await expect(folded.locator("svg.lucide-opentesela-mosaic")).toHaveCount(1);
+    await folded.click();
+    await expect(
+      page.getByRole("menuitem", { name: "Mosaic: Unsaved combination" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Mod: Flashcards" }),
+    ).toBeVisible();
   });
 });

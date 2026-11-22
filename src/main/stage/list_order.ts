@@ -53,7 +53,7 @@ function compareTilesThenTitles(a: CombinationRow, b: CombinationRow): number {
 /** Whether an entry of the mod or collection list has mosaics with the other capsule's value. */
 export function hasMosaics(entry: CombinationRow): boolean {
   const mosaics = entry.mosaics;
-  return typeof mosaics === "object" && mosaics !== null && mosaics.count > 0;
+  return mosaics !== null && mosaics !== "icon" && mosaics.count > 0;
 }
 
 function isCurrentPair(entry: CombinationRow): boolean {

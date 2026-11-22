@@ -11,8 +11,6 @@ import type {
   EntryScore,
   MosaicSummary,
 } from "../../lib/core/combinations/index.ts";
-import type { RunLink } from "../../lib/core/engine/index.ts";
-import { isBrowserFileAddress } from "../../lib/files/index.ts";
 import {
   buildMosaicChoice,
   buildPairChoice,
@@ -57,88 +55,6 @@ export const UNSAVED_COMBINATION_TITLE = "Unsaved combination";
 
 /** The id of the pinned row of the sandbox's own unsaved pair. */
 export const CURRENT_PAIR_ID = "unsaved-combination";
-
-/** The id of the pinned edit row, above the other pinned rows. */
-export const EDIT_ROW_ID = "edit-mosaic";
-
-/** The default mod that edits mosaics. */
-const MOSAIC_VIEWER_NAME = "mosaic_viewer";
-
-/** What the edit row does, from the sandbox's link, its label, and what it edits, under the label. */
-interface EditRowTarget {
-  title: string;
-  detail: string;
-  params: Record<string, string>;
-}
-
-/**
- * The edit row's target (`combination-pickers`, "Edit row links"): "Edit
- * mosaic" for a mosaic stored in this browser, "Edit a copy" for any other
- * mosaic, "Save as mosaic" for a combination with a collection or none, and
- * `null` for a tile link. Every address is the link's resolved one.
- */
-function readEditRowTarget(sandbox: ListSandbox): EditRowTarget | null {
-  const link = sandbox.link;
-  if (link.mosaic !== null) {
-    const isStored = isBrowserFileAddress(link.mosaic);
-    const mosaicTarget: EditRowTarget = {
-      title: isStored ? "Edit mosaic" : "Edit a copy",
-      detail: sandbox.mosaic?.title ?? link.mosaic,
-      params: { target: link.mosaic, mode: isStored ? "edit" : "copy" },
-    };
-    return mosaicTarget;
-  }
-  if (link.tile !== null) {
-    return null;
-  }
-  const params: Record<string, string> = { mode: "new", draft_mod: link.mod };
-  if (link.collection !== null) {
-    params.draft_collection = link.collection;
-  }
-  if (link.sites !== null) {
-    params.draft_sites = link.sites;
-  }
-  const newTarget: EditRowTarget = {
-    title: "Save as mosaic",
-    detail: describeCurrentPair(sandbox),
-    params,
-  };
-  return newTarget;
-}
-
-/**
- * The pinned edit row, with the pencil, which opens the mosaic viewer in its
- * mode, or `null` for a tile link. Under its label, what it edits: the
- * mosaic's title, or the pair, so it is as tall as the list's other rows.
- */
-function buildEditRow(inputs: ListInputs): CombinationRow | null {
-  const target = readEditRowTarget(inputs.sandbox);
-  if (target === null) {
-    return null;
-  }
-  const viewerLink: RunLink = {
-    mod: MOSAIC_VIEWER_NAME,
-    collection: null,
-    params: target.params,
-  };
-  const row: CombinationRow = {
-    id: EDIT_ROW_ID,
-    title: target.title,
-    details: [target.detail],
-    foundMosaics: null,
-    mark: null,
-    mosaics: "edit",
-    score: null,
-    options: null,
-    searchText: target.title,
-    pair: null,
-    isSelectable: true,
-    failure: null,
-    onChoose: inputs.actions.openViewer.bind(undefined, viewerLink),
-    onRemove: null,
-  };
-  return row;
-}
 
 function readMosaicListSources(
   catalog: CatalogSources,
@@ -415,18 +331,11 @@ function buildTriedRow(
   return row;
 }
 
-/**
- * The pinned rows: the edit row, then the sandbox's own pair, when it is
- * not opened from a mosaic: current, and choosing it opens nothing.
- */
+/** The sandbox's own pair, when it is not opened from a mosaic: current, and choosing it opens nothing. */
 function buildPinnedRows(inputs: ListInputs): CombinationRow[] {
   const sandbox = inputs.sandbox;
   const link = sandbox.link;
   const rows: CombinationRow[] = [];
-  const editRow = buildEditRow(inputs);
-  if (editRow !== null) {
-    rows.push(editRow);
-  }
   if (!isUnsavedPair(link)) {
     return rows;
   }
@@ -467,8 +376,8 @@ export function buildPairHeading(sandbox: ListSandbox): string {
 }
 
 /**
- * The mosaic list's rows: pinned, the edit row and the sandbox's own pair
- * when it is not opened from a mosaic; then the catalog's mosaics, the recently used ones
+ * The mosaic list's rows: pinned, the sandbox's own pair when it is not
+ * opened from a mosaic; then the catalog's mosaics, the recently used ones
  * it does not list (the ring), the current mosaic (the dot), and the tried
  * combinations, each an "Unsaved combination" with the ring. A mosaic scores
  * with its aliases, a combination without. Choosing a mosaic opens it

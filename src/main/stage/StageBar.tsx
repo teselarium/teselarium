@@ -1,4 +1,4 @@
-import { Maximize, RectangleHorizontal, X } from "lucide-react";
+import { Maximize, Pencil, RectangleHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Badge } from "@/vendor/shadcn/ui/badge.tsx";
@@ -14,6 +14,7 @@ import {
   dismissMessage,
   isCombinationSandbox,
   markMessagesRead,
+  openStageLink,
 } from "../../lib/core/stage/index.ts";
 import type {
   MessageLevel,
@@ -45,6 +46,8 @@ import { MessagePopover } from "./MessagePopover.tsx";
 import { MessagesButton } from "./MessagesButton.tsx";
 import { MessagesPopover } from "./MessagesPopover.tsx";
 import { MoreActionsMenu } from "./MoreActionsMenu.tsx";
+import { readMosaicEditAction } from "./mosaic_edit_action.ts";
+import type { MosaicEditAction } from "./mosaic_edit_action.ts";
 import type { ViewActions } from "./MoreActionsMenu.tsx";
 import { SitesChip } from "./SitesChip.tsx";
 import { isMessageLevelPanel, isMessagesPanel } from "./stage_bar_panels.ts";
@@ -158,11 +161,13 @@ function hasModFrame(sandbox: SandboxSnapshot): boolean {
 function readBarContentKey(
   sandbox: SandboxSnapshot,
   isCombination: boolean,
+  editAction: MosaicEditAction | null,
 ): string {
   const parts = [
     sandbox.id,
     isCombination ? "capsules" : "title",
     sandbox.sites === null ? "" : "sites",
+    editAction === null ? "" : "edit",
     hasModFrame(sandbox) ? "fullscreen" : "",
     sandbox.canClose ? "close" : "",
   ];
@@ -195,8 +200,10 @@ function renderPlainTitle(sandbox: SandboxSnapshot): ReactElement {
  * The visible sandbox's bar, in one row above its frame, a container whose
  * width folds its left side. On the left: for a combination sandbox, the
  * capsules mod + collection -> mosaic, each opening its list, then the Sites
- * chip for a sandbox with `sites`; for any other sandbox, the mod's name and
- * version; then the "More actions" menu. On the right, from 480px of bar
+ * chip for a sandbox with `sites`, then the edit button, which opens the
+ * mosaic viewer in edit mode, except for a tile link, and moves into "More
+ * actions" under phone width; for any other
+ * sandbox, the mod's name and version; then the "More actions" menu. On the right, from 480px of bar
  * width: the errors, warnings and notifications buttons, a separator, the
  * theater mode toggle, the fullscreen button while the mod runs in its
  * frame, then, when the sandbox has a close button, a separator and the
@@ -237,11 +244,16 @@ export function StageBar({
     ...stage.instanceCatalog.mods,
     ...recent.mods,
   ]);
-  const isNarrow = useNarrowStageBar(
+  const editAction = isCombination ? readMosaicEditAction(sandbox.link) : null;
+  const barForm = useNarrowStageBar(
     barRef,
     leftSideRef,
-    readBarContentKey(sandbox, isCombination),
+    readBarContentKey(sandbox, isCombination, editAction),
   );
+  const isNarrow = barForm.isNarrow;
+  // Under phone width, the bar is narrow and the edit button moves into "More actions".
+  const barEditAction = barForm.isUnderPhoneWidth ? null : editAction;
+  const menuEditAction = barForm.isUnderPhoneWidth ? editAction : null;
   const [shownNarrow, setShownNarrow] = useState(isNarrow);
   // Folding or unfolding replaces the buttons of messages, so their open popover closes.
   if (shownNarrow !== isNarrow) {
@@ -322,6 +334,11 @@ export function StageBar({
   function handleFullscreenClick(): void {
     setOpenPanel(null);
     onFullscreen(sandbox.id);
+  }
+
+  /** Opens the mosaic viewer in a new sandbox, with this one behind it, so back returns to it. */
+  function handleEditClick(action: MosaicEditAction): void {
+    openStageLink(stage, action.link, sandbox.id);
   }
 
   function handleCloseClick(): void {
@@ -470,6 +487,14 @@ export function StageBar({
             onOpenChange={handlePanelOpenChange.bind(undefined, "sites")}
           />
         )}
+        {barEditAction === null ? null : (
+          <StageBarIconButton
+            label={barEditAction.label}
+            onClick={handleEditClick.bind(undefined, barEditAction)}
+          >
+            <Pencil />
+          </StageBarIconButton>
+        )}
         <MoreActionsMenu
           hash={sandbox.hash}
           canReloadTiles={sandbox.canReloadTiles}
@@ -478,6 +503,14 @@ export function StageBar({
           onOpenChange={handlePanelOpenChange.bind(undefined, "more")}
           onFeedbackChange={setCopyFeedback}
           isNarrow={isNarrow}
+          editItem={
+            menuEditAction === null
+              ? null
+              : {
+                  label: menuEditAction.label,
+                  onSelect: handleEditClick.bind(undefined, menuEditAction),
+                }
+          }
           viewActions={viewActions}
         />
       </div>

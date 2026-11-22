@@ -118,7 +118,7 @@ function showMatch(
     ...entry,
     score: pickBestScore(listScores(pageOptions)),
     mosaics:
-      isFoundThroughMosaics && typeof mosaics === "object" && mosaics !== null
+      isFoundThroughMosaics && mosaics !== null && mosaics !== "icon"
         ? { count: mosaics.count, matching: match.mosaicIds.length }
         : mosaics,
     foundMosaics:
