@@ -696,6 +696,8 @@ const MOSAIC_VIEWER_CASES = [
   "refuses to edit a mosaic not stored in this browser",
   "says a mode it cannot use",
   "starts a new mosaic from a combination",
+  "titles a new mosaic without a collection after its mod",
+  "keeps a new mosaic untitled when a title cannot be read",
   "shows the hints of a draft",
   "adds an alias from a suggestion",
   "shows broken YAML and disables the form",

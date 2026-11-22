@@ -21,7 +21,7 @@ This change makes the mosaic viewer the place where a mosaic is viewed and edite
 - In the stage bar's mosaic list, a row pinned at the top:
   - **"Edit mosaic"** for a stored mosaic;
   - **"Edit a copy"** for a remote, instance or default mosaic;
-  - **"Save as mosaic"** for an unsaved combination with a collection or none. Its draft gets the combination's mod and collection, and the `show` lines of its `sites` mosaic, if any.
+  - **"Save as mosaic"** for an unsaved combination with a collection or none. Its draft is titled after the combination (`<mod> + <collection>`), and gets the combination's mod and collection, and the `show` lines of its `sites` mosaic, if any.
 - In the mosaic viewer: "Edit" for a stored mosaic, "Edit a copy" for any other.
 - A copy's relative `mod` and `collection` references are rewritten as absolute addresses, so the copy opens from the browser.
 

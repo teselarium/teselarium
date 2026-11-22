@@ -192,11 +192,46 @@ export async function startsNewMosaic(context: CaseContext): Promise<void> {
   await context.waitFor(findFormInput.bind(undefined, context, "title"));
   context.expect(readHeading(context)).toBe("New mosaic");
   const text = readTextarea(context).value;
-  context.expect(text).toContain('title: "Untitled mosaic"');
+  context
+    .expect(text)
+    .toContain('title: "Typed Fixture Mod + Fixture collection"');
   context
     .expect(text)
     .toContain("/default_mods/mosaic_viewer/fixtures/typed_mod");
   context.expect(text).toContain(FIXTURE_PATHS.fixtureCollection);
+}
+
+/** The `title` line of a new draft, once edit mode shows it. */
+async function readNewDraftTitle(
+  context: CaseContext,
+  params: Record<string, string>,
+): Promise<string> {
+  await mountInMode(context, { mode: "new", ...params });
+  await context.waitFor(findFormInput.bind(undefined, context, "title"));
+  const titleLine = /^ {2}title: .*$/m.exec(readTextarea(context).value);
+  const title = titleLine?.[0].trim() ?? "";
+  return title;
+}
+
+export async function titlesNewMosaicAfterMod(
+  context: CaseContext,
+): Promise<void> {
+  const title = await readNewDraftTitle(context, {
+    draft_mod: resolveFixture(FIXTURE_REFERENCES.typedMod),
+  });
+
+  context.expect(title).toBe('title: "Typed Fixture Mod"');
+}
+
+export async function keepsUntitledWithoutTitles(
+  context: CaseContext,
+): Promise<void> {
+  const title = await readNewDraftTitle(context, {
+    draft_mod: resolveFixture(FIXTURE_REFERENCES.typedMod),
+    draft_collection: resolveFixture(`.${FIXTURE_PATHS.missingCollection}`),
+  });
+
+  context.expect(title).toBe('title: "Untitled mosaic"');
 }
 
 export async function aliasesFromSuggestion(

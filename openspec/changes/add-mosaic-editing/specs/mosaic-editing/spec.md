@@ -98,11 +98,22 @@ Starting a copy of a mosaic SHALL rewrite its relative `mod` and `collection` as
 - **THEN** the draft's `mod` is `https://example.org/samples/mods/book_list`, and its `config` and `permissions` are as in the original
 
 ### Requirement: A mosaic from a combination
-Starting a mosaic from an unsaved combination SHALL make a new draft with the title "Untitled mosaic", the combination's mod and collection as absolute addresses, or no collection for "None", and the `show` lines of its `sites` mosaic, if it has one. A combination opened with a tile SHALL NOT start one.
+Starting a mosaic from an unsaved combination SHALL make a new draft titled after the combination (see "Title of a mosaic from a combination"), with the combination's mod and collection as absolute addresses, or no collection for "None", and the `show` lines of its `sites` mosaic, if it has one. A combination opened with a tile SHALL NOT start one.
 
 #### Scenario: Flashcards with the laureates' books
 - **WHEN** the user starts a mosaic from Flashcards with the laureates' books, opened with the `sites` of "Books by Nobel laureates"
 - **THEN** the draft names those mod and collection addresses, and holds the four `show` lines of "Books by Nobel laureates"
+
+### Requirement: Title of a mosaic from a combination
+A draft started from a combination SHALL be titled with its mod's title and its collection's title as `<mod> + <collection>`, or the mod's title alone for "None". When either title cannot be read, it SHALL be titled "Untitled mosaic".
+
+#### Scenario: Titled after the laureates' books
+- **WHEN** the user starts a mosaic from Flashcards with the laureates' books
+- **THEN** the draft is titled "Flashcards + Nobel Prize in Literature laureates books"
+
+#### Scenario: Title that cannot be read
+- **WHEN** the user starts a mosaic from a combination whose collection answers HTTP 404
+- **THEN** the draft is titled "Untitled mosaic"
 
 ### Requirement: Version history
 Each stored mosaic SHALL keep its versions: the imported text, each update from a file, each save and each restore, each with its time and kind. It SHALL keep the 20 newest, and SHALL always keep the version last imported or exported. Removing the entry SHALL remove its versions.

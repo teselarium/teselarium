@@ -59,7 +59,7 @@ The mosaic viewer SHALL start in edit mode from its `mode` parameter: `edit` for
 
 #### Scenario: New from a combination
 - **WHEN** the viewer opens with `mode=new` and `draft_mod` and `draft_collection` set
-- **THEN** it is in edit mode with a draft titled "Untitled mosaic" that names that mod and collection
+- **THEN** it is in edit mode with a draft titled `<mod> + <collection>` with the titles of that mod and collection, which names that mod and collection
 
 #### Scenario: Edit mode for a remote mosaic
 - **WHEN** the viewer opens with `mode=edit` and a sample mosaic as `target`

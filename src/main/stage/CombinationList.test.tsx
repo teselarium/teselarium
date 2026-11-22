@@ -6,7 +6,11 @@ import type { Mock } from "vitest";
 import { TooltipProvider } from "@/vendor/shadcn/ui/tooltip.tsx";
 import type { EntryScore } from "../../lib/core/combinations/index.ts";
 import { CombinationList } from "./CombinationList.tsx";
-import type { CombinationRow, ListRows } from "./combination_rows.ts";
+import type {
+  CombinationRow,
+  ListRows,
+  MosaicPairFacts,
+} from "./combination_rows.ts";
 import type { ListDetail } from "./ListDetails.tsx";
 import { createListChoices, readListChoicesSnapshot } from "./list_choices.ts";
 import type { ListChoices, ListKind } from "./list_choices.ts";
@@ -970,7 +974,88 @@ function buildCurrentLastRows(): ListRows {
   ]);
 }
 
+const CURRENT_PAIR: MosaicPairFacts = Object.freeze({
+  isCurrentPair: true,
+  hasCurrentMod: true,
+  hasCurrentCollection: true,
+});
+
+/** The edit row, then the current mosaic and another one, the current one in the pair's group once `isPairKnown`. */
+function buildEditAndMosaicRows(isPairKnown: boolean): ListRows {
+  return buildRows(
+    [
+      buildTestRow("Laureates map", {
+        mark: "current",
+        pair: isPairKnown ? CURRENT_PAIR : null,
+      }),
+      buildTestRow("Books list"),
+    ],
+    {
+      pinnedRows: [
+        buildTestRow("Edit a copy", { id: "edit-mosaic", mosaics: "edit" }),
+      ],
+    },
+  );
+}
+
+function buildPairFirstChoices(): ListChoices {
+  const listChoices = createListChoices();
+  listChoices.snapshot = {
+    ...listChoices.snapshot,
+    mosaic: { sort: "pair-first", filters: [] },
+  };
+  return listChoices;
+}
+
 describe("opening highlight", function describeOpeningHighlight(): void {
+  it("The user moves to another group, then to the edit row: the edit row is highlighted", function movesToEditRow(): void {
+    render(
+      <ListHarness
+        kind="mosaic"
+        rows={buildEditAndMosaicRows(true)}
+        listChoices={buildPairFirstChoices()}
+      />,
+    );
+    openList();
+    expect(readHighlighted()).toBe("Laureates map");
+
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+    expect(readHighlighted()).toBe("Books list");
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Home" });
+
+    expect(readHighlighted()).toBe("edit-mosaic");
+  });
+
+  it("Current mosaic moved to the pair's group while settling: it stays highlighted, not the edit row", function keepsHighlightOnGroupMove(): void {
+    vi.useFakeTimers();
+    const listChoices = buildPairFirstChoices();
+    const { rerender } = render(
+      <ListHarness
+        kind="mosaic"
+        rows={buildEditAndMosaicRows(false)}
+        listChoices={listChoices}
+      />,
+    );
+    openList();
+    expect(readHighlighted()).toBe("Laureates map");
+
+    rerender(
+      <ListHarness
+        kind="mosaic"
+        rows={buildEditAndMosaicRows(true)}
+        listChoices={listChoices}
+      />,
+    );
+    advanceTime(SETTLE_INTERVAL_MS * 2);
+
+    expect(listOptionIds()).toEqual([
+      "edit-mosaic",
+      "Laureates map",
+      "Books list",
+    ]);
+    expect(readHighlighted()).toBe("Laureates map");
+  });
+
   it("Current mod highlighted: the current entry, although others come first", function highlightsCurrent(): void {
     render(
       <ListHarness

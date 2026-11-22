@@ -91,8 +91,9 @@ The tasks use the names of `add-user-catalog` (`BrowserDatabase`, `planImport`, 
 
   Verify with `npm run test:e2e -- default_mods`.
 - [x] 8.6 Update `docs/modules/mosaics/viewer/README.md` (edit mode, its parameters, requests and cases) and `docs/modules/mosaics/explorer/README.md` (the mark). Point `docs/modules/mosaics/maker/README.md` to the viewer's edit mode, which takes the maker's role. Verify that the requests the READMEs name match the sources.
+- [x] 8.7 Title a new draft after its combination (`mosaic-editing`, "Title of a mosaic from a combination"; design, decision 8): in `edit_start.ts`, read the mod's and the collection's titles with `mods.inspect` and `collections.inspect`, and send `title` with the draft's first `mosaics.edit`, keeping "Untitled mosaic" when either fails. First update the `mode=new` case and add one where the collection cannot be inspected. Update the new mosaic's title in `docs/modules/mosaics/viewer/README.md`. Verify with `npm run test:e2e -- default_mods stage_bar`.
 
 ## 9. Release and verification
 
 - [x] 9.1 Add `.changeset/add-mosaic-editing.md` with a `patch` bump, since the mod API bump is a patch and nothing breaks for users or instantiations ("Bump rule" in `docs/releasing.md`). Add a one-line summary: users can edit mosaics stored in this browser, save copies of any mosaic or an unsaved combination as a mosaic, see their history, resolve conflicts on re-import and export a folder as a `.zip`. Verify the file follows the format of the other files in `.changeset/`.
-- [x] 9.2 On a clean install (`npm ci`), run `npm run build`, `npm run test`, `npm run lint`, `npm run format:check`, `npm run test:e2e` and, since the change touches the specs of the mod API (`mod-engine-api`, `mod-api-version`, `mod-app-actions`), `npm run test:e2e:samples`. Verify each passes.
+- [ ] 9.2 On a clean install (`npm ci`), run `npm run build`, `npm run test`, `npm run lint`, `npm run format:check`, `npm run test:e2e` and, since the change touches the specs of the mod API (`mod-engine-api`, `mod-api-version`, `mod-app-actions`), `npm run test:e2e:samples`. Verify each passes.

@@ -12,6 +12,7 @@ import {
   readProbeContext,
   requestFromProbe,
   serveAppOriginMod,
+  stageBar,
   startProbeRequests,
   waitForProbe,
 } from "./mod_routes.ts";
@@ -43,6 +44,24 @@ function writeProbeMosaic(page: Page, title: string): string {
     "mosaic:",
     `  title: "${title}"`,
     `  mod: "${modAddress}"`,
+    "",
+  ].join("\n");
+  return text;
+}
+
+const FLASHCARDS_LAUREATES_LINK =
+  "/#/run?mod=./samples/mods/flashcards&collection=./samples/tiles/literature_nobel_laureates/collection.yaml";
+
+const DECK_TITLE = "Laureates, my deck";
+
+/** A mosaic file of the Flashcards sample with the laureates, on the app's origin. */
+function writeFlashcardsMosaic(page: Page, title: string): string {
+  const samples = new URL("/samples/", page.url());
+  const text = [
+    "mosaic:",
+    `  title: "${title}"`,
+    `  mod: "${new URL("mods/flashcards", samples).href}"`,
+    `  collection: "${new URL("tiles/literature_nobel_laureates/collection.yaml", samples).href}"`,
     "",
   ].join("\n");
   return text;
@@ -859,6 +878,23 @@ test.describe(
       await page.goto("/#/settings");
       await expect(page.getByRole("main")).toContainText("Portraits");
       await expect(page.getByRole("main")).toContainText("1 allowed");
+    });
+
+    test("Listed in the stage bar", async function listsStoredMosaic({
+      page,
+    }): Promise<void> {
+      const frame = await openProbe(page);
+      await saveDraft(page, frame, writeFlashcardsMosaic(page, DECK_TITLE));
+
+      await page.goto(FLASHCARDS_LAUREATES_LINK);
+      await stageBar(page)
+        .getByRole("button", { name: /^Mosaic: / })
+        .click();
+      const list = page.locator("[data-slot=popover-content]");
+      const row = list.getByRole("option").filter({ hasText: DECK_TITLE });
+      // The row counts the matching tiles once the stored file is read.
+      await expect(row).toContainText("17/17");
+      await expect(list).not.toContainText("Cannot load file");
     });
 
     test("Keep both", async function keepsBoth({ page }): Promise<void> {

@@ -161,11 +161,11 @@ function startApp(
     notices: userCatalogNotices,
     siteDecisions,
   });
-  // The stage bar's lists measure what they show, cached for the page.
+  // The stage bar's lists measure what they show, cached for the page. They
+  // load files as the stage does, stored mosaics included.
   const combinations = createCombinationCatalog({
     fetchOptions: {
-      baseUrl: document.baseURI,
-      npmHost: NPM_HOST,
+      ...stage.fetchOptions,
       defaultModsFolder: stage.defaults.folder,
     },
     readCatalog: readStageCatalog.bind(undefined, stage),

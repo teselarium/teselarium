@@ -1,5 +1,5 @@
 import { ChevronLeft, PencilIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type {
   Dispatch,
@@ -440,6 +440,78 @@ function findEntry(
   return null;
 }
 
+/** The key a group of the main list is rendered with. */
+function readGroupKey(group: EntryGroup, index: number): string {
+  return group.heading ?? `group-${index}`;
+}
+
+/** The highlighted row and the key of the group that shows it, in one commit. */
+interface HighlightPlace {
+  rowId: string;
+  groupKey: string | null;
+}
+
+/** Whether the row highlighted in `committed` is still highlighted, now in another group. */
+function isMovedToAnotherGroup(
+  committed: HighlightPlace | null,
+  current: HighlightPlace,
+): boolean {
+  if (committed === null || committed.rowId !== current.rowId) {
+    return false;
+  }
+  return (
+    committed.groupKey !== null &&
+    current.groupKey !== null &&
+    committed.groupKey !== current.groupKey
+  );
+}
+
+/** The key of the group that shows the row `rowId`, or `null` when no group does. */
+function findRowGroupKey(
+  groups: readonly EntryGroup[],
+  rowId: string,
+): string | null {
+  for (const [index, group] of groups.entries()) {
+    for (const entry of group.entries) {
+      if (entry.id === rowId) {
+        return readGroupKey(group, index);
+      }
+    }
+  }
+  return null;
+}
+
+/** The first row of `groups` that can be chosen, as cmdk proposes it, or `null`. */
+function findFirstSelectableId(groups: readonly EntryGroup[]): string | null {
+  for (const group of groups) {
+    for (const entry of group.entries) {
+      if (entry.isSelectable) {
+        return entry.id;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Whether `value` is cmdk's proposal of the first row after the highlighted
+ * row moved to another group, and was mounted again there: the moved row is
+ * still highlighted and shown, and `value` is the first row that can be
+ * chosen. A user's move to another row goes through, and consumes the guard.
+ */
+function isProposalForMovedRow(
+  groups: readonly EntryGroup[],
+  highlighted: string,
+  movedRow: string | null,
+  value: string,
+): boolean {
+  if (movedRow === null || movedRow !== highlighted || value === highlighted) {
+    return false;
+  }
+  const isShown = findRowGroupKey(groups, movedRow) !== null;
+  return isShown && value === findFirstSelectableId(groups);
+}
+
 /** The rows of `groups`, in the order shown. */
 function listGroupRows(groups: readonly EntryGroup[]): CombinationRow[] {
   const rows: CombinationRow[] = [];
@@ -580,6 +652,12 @@ export function CombinationList({
   // make cmdk propose the first row in the same commit; that proposal is
   // dropped, and the guard is cleared once the commit is done.
   const pendingHighlightRef = useRef<string | null>(null);
+  // The highlighted row and its group in the last commit, to see it move to another group.
+  const committedPlaceRef = useRef<HighlightPlace | null>(null);
+  // The highlighted row that moved to another group, whose first-row proposal from cmdk is undone.
+  const movedRowRef = useRef<string | null>(null);
+  // The moved row to highlight again once cmdk's proposal is committed, before it is painted.
+  const restoredRowRef = useRef<string | null>(null);
   const sortedAtRef = useRef(0);
   const [settle, setSettle] = useState<SettleState>(SORT_AGAIN);
   const [wasOpen, setWasOpen] = useState(false);
@@ -612,6 +690,40 @@ export function CombinationList({
   const mainGroups: EntryGroup[] = placePinnedRows(
     arrangeSettledGroups(freshGroups, layout),
     showPinnedRows(rows.pinnedRows, view.mainSearch),
+  );
+  // A highlighted row that moves to another group, as a mosaic does once the
+  // current pair is known, is mounted again, and cmdk then proposes the first
+  // row, in a later commit of its own: that proposal is undone. cmdk has
+  // already taken it, and reads the highlight again only when it changes, so
+  // the proposal is committed, then the moved row highlighted again.
+  // Only while the main list is open, so opening it again is no move.
+  const highlightedGroupKey =
+    isOpen && page === null && !view.isShowingDetails
+      ? findRowGroupKey(mainGroups, highlighted)
+      : null;
+  // Before cmdk's proposal: React runs a commit's effects before it renders again.
+  useLayoutEffect(
+    function rememberHighlightPlace(): void {
+      const place: HighlightPlace = {
+        rowId: highlighted,
+        groupKey: highlightedGroupKey,
+      };
+      if (isMovedToAnotherGroup(committedPlaceRef.current, place)) {
+        movedRowRef.current = highlighted;
+      }
+      committedPlaceRef.current = place;
+    },
+    [highlighted, highlightedGroupKey],
+  );
+  useLayoutEffect(
+    function highlightMovedRowAgain(): void {
+      const restoredRow = restoredRowRef.current;
+      if (restoredRow !== null) {
+        restoredRowRef.current = null;
+        setHighlighted(restoredRow);
+      }
+    },
+    [highlighted],
   );
   // The opening's rows are sorted: highlight the current entry before the list is shown, so cmdk mounts on it and scrolls it into view.
   if (isOpen && isHighlightingCurrent && settle.layout !== null) {
@@ -731,6 +843,14 @@ export function CombinationList({
   function handleHighlightChange(value: string): void {
     const pending = pendingHighlightRef.current;
     pendingHighlightRef.current = null;
+    const movedRow = movedRowRef.current;
+    movedRowRef.current = null;
+    if (
+      pending === null &&
+      isProposalForMovedRow(mainGroups, highlighted, movedRow, value)
+    ) {
+      restoredRowRef.current = highlighted;
+    }
     setHighlighted(pending ?? value);
   }
 
@@ -776,7 +896,7 @@ export function CombinationList({
       }
       rendered.push(
         <CommandGroup
-          key={group.heading ?? `group-${index}`}
+          key={readGroupKey(group, index)}
           heading={group.heading ?? undefined}
         >
           {items}

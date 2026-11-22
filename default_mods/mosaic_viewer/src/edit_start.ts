@@ -16,7 +16,7 @@ import type { ViewerView } from "./viewer_view.ts";
 /** The scheme of the mosaics stored in this browser, the only ones edit mode saves over. */
 const BROWSER_FILE_PROTOCOL = "opentesela-browser:";
 
-/** The first text of a new mosaic, which `mosaics.edit` fills with the combination's mod, collection and sites. */
+/** The first text of a new mosaic, which `mosaics.edit` fills with the combination's title, mod, collection and sites. Its title stays when the combination's titles cannot be read. */
 const NEW_DRAFT_TEXT = 'mosaic:\n  title: "Untitled mosaic"\n';
 
 /** What the viewer says when `mode=edit` names a mosaic that is not stored in this browser. */
@@ -126,15 +126,49 @@ export interface NewMosaicParams {
   sites: string | undefined;
 }
 
+/** The combination's collection, or `null` for "None". */
+function readDraftCollection(params: NewMosaicParams): string | null {
+  if (params.collection === undefined || params.collection === "") {
+    return null;
+  }
+  return params.collection;
+}
+
+/**
+ * The combination's name, as the stage bar gives it: `<mod> + <collection>`
+ * with their titles, or the mod's title alone without a collection. `null`
+ * when either cannot be inspected.
+ */
+async function readCombinationTitle(
+  engine: ModEngine,
+  mod: string,
+  collection: string | null,
+): Promise<string | null> {
+  try {
+    const modInspection = await engine.request("mods.inspect", { mod });
+    if (collection === null) {
+      return modInspection.title;
+    }
+    const collectionInspection = await engine.request("collections.inspect", {
+      collection,
+    });
+    const title = `${modInspection.title} + ${collectionInspection.title}`;
+    return title;
+  } catch {
+    return null;
+  }
+}
+
 function showNothingSaved(title: string): Promise<void> {
   renderMessage(title, buildStatusMessage("The new mosaic was not saved."));
   return Promise.resolve();
 }
 
 /**
- * Edit mode for a new mosaic from a combination (`mode=new`): "Untitled
- * mosaic" with the combination's mod, its collection or none, and the `show`
- * lines of its `sites` mosaic, if any.
+ * Edit mode for a new mosaic from a combination (`mode=new`): titled after
+ * the combination, or "Untitled mosaic" when its titles cannot be read, with
+ * its mod, its collection or none, and the `show` lines of its `sites`
+ * mosaic, if any.
  */
 export async function startNewMosaic(
   engine: ModEngine,
@@ -142,9 +176,18 @@ export async function startNewMosaic(
   title: string,
   params: NewMosaicParams,
 ): Promise<void> {
+  const collection = readDraftCollection(params);
   const edits: MosaicDraftEdits = { mod: params.mod };
-  if (params.collection !== undefined && params.collection !== "") {
-    edits.collection = params.collection;
+  if (collection !== null) {
+    edits.collection = collection;
+  }
+  const combinationTitle = await readCombinationTitle(
+    engine,
+    params.mod,
+    collection,
+  );
+  if (combinationTitle !== null) {
+    edits.title = combinationTitle;
   }
   let content: string;
   try {

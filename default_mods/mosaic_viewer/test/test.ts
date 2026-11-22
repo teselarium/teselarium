@@ -19,6 +19,7 @@ import {
   asksBeforeCancel,
   editsCopyOfMosaic,
   ignoresStaleValidation,
+  keepsUntitledWithoutTitles,
   keepsEditModeWhenNotSaved,
   leavesWithoutChanges,
   refusesEditOfRemoteMosaic,
@@ -29,6 +30,7 @@ import {
   showsHints,
   startsCopyFromLink,
   startsNewMosaic,
+  titlesNewMosaicAfterMod,
 } from "./edit_cases.ts";
 import {
   exportsFolderOfStoredMosaic,
@@ -114,6 +116,14 @@ export default function registerViewerTests(t: ModTestRegistration): void {
   );
   t.test("says a mode it cannot use", refusesUnknownMode);
   t.test("starts a new mosaic from a combination", startsNewMosaic);
+  t.test(
+    "titles a new mosaic without a collection after its mod",
+    titlesNewMosaicAfterMod,
+  );
+  t.test(
+    "keeps a new mosaic untitled when a title cannot be read",
+    keepsUntitledWithoutTitles,
+  );
   t.test("shows the hints of a draft", showsHints);
   t.test("adds an alias from a suggestion", aliasesFromSuggestion);
   t.test("shows broken YAML and disables the form", showsBrokenYaml);
