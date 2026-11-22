@@ -10,6 +10,7 @@ import {
 } from "../../test/memory_storage.ts";
 import type { MemoryStorage } from "../../test/memory_storage.ts";
 import {
+  askSidebarForRoom,
   changeSidebarViewport,
   clampSidebarWidth,
   collapseLayout,
@@ -24,8 +25,10 @@ import {
   pressHamburger,
   readSidebarSnapshot,
   readStoredLayout,
+  showSidebarSandbox,
   SIDEBAR_LAYOUT_KEY,
   stepLayoutWidth,
+  stepSidebarWidth,
   subscribeSidebar,
   toggleLayout,
   toggleSidebar,
@@ -329,6 +332,206 @@ describe("narrow viewports", function describeNarrow(): void {
     expect(readSidebarSnapshot(fixture.store)).toMatchObject({
       state: "expanded",
       width: 320,
+      isNarrow: false,
+    });
+  });
+});
+
+function storeLayout(storage: MemoryStorage, layout: SidebarLayout): void {
+  storage.setItem(SIDEBAR_LAYOUT_KEY, JSON.stringify(layout));
+}
+
+/** A fixture whose sidebar has stepped aside for the sandbox `nobel`. */
+function buildSteppedAsideFixture(): LayoutFixture {
+  const fixture = buildFixture();
+  showSidebarSandbox(fixture.store, "nobel");
+  askSidebarForRoom(fixture.store, "nobel");
+  return fixture;
+}
+
+function dragTo300(store: SidebarLayoutStore): void {
+  dragSidebar(store, 300);
+}
+
+function stepWider(store: SidebarLayoutStore): void {
+  stepSidebarWidth(store, 16);
+}
+
+const USER_ACTIONS: readonly ((store: SidebarLayoutStore) => void)[] = [
+  collapseSidebar,
+  expandSidebar,
+  pressHamburger,
+  toggleSidebar,
+  dragTo300,
+  stepWider,
+];
+
+describe("stepping aside for the stage bar", function describeStepAside(): void {
+  it("steps aside for the first sandbox shown, and says collapsed", function stepsAside(): void {
+    const fixture = buildFixture();
+    showSidebarSandbox(fixture.store, "nobel");
+
+    expect(askSidebarForRoom(fixture.store, "nobel")).toBe(true);
+    expect(readSidebarSnapshot(fixture.store)).toMatchObject({
+      state: "collapsed",
+      width: 240,
+      isSteppedAside: true,
+    });
+    expect(askSidebarForRoom(fixture.store, "nobel")).toBe(false);
+  });
+
+  it("refuses a sandbox shown after a first one that never asked", function refusesLaterSandbox(): void {
+    const fixture = buildFixture();
+    showSidebarSandbox(fixture.store, "short");
+    showSidebarSandbox(fixture.store, "long");
+
+    expect(askSidebarForRoom(fixture.store, "long")).toBe(false);
+    expect(readSidebarSnapshot(fixture.store)).toMatchObject({
+      state: "expanded",
+      isSteppedAside: false,
+    });
+  });
+
+  it("refuses another sandbox until the viewport narrows, then grants the shown one", function grantsAfterNarrowing(): void {
+    const fixture = buildFixture();
+    showSidebarSandbox(fixture.store, "short");
+    showSidebarSandbox(fixture.store, "long");
+    showSidebarSandbox(fixture.store, "short");
+
+    expect(askSidebarForRoom(fixture.store, "short")).toBe(false);
+    changeSidebarViewport(fixture.store, 1300);
+    expect(askSidebarForRoom(fixture.store, "short")).toBe(false);
+    changeSidebarViewport(fixture.store, 1200);
+    expect(askSidebarForRoom(fixture.store, "long")).toBe(false);
+    expect(askSidebarForRoom(fixture.store, "short")).toBe(true);
+  });
+
+  it("gives the grant after narrowing to the next sandbox shown when none is", function grantsNextShown(): void {
+    const fixture = buildFixture();
+    changeSidebarViewport(fixture.store, 1200);
+    showSidebarSandbox(fixture.store, "nobel");
+
+    expect(askSidebarForRoom(fixture.store, "nobel")).toBe(true);
+  });
+
+  it("refuses when collapsed, hidden or on a narrow viewport", function refusesWithoutRoom(): void {
+    const collapsed = buildFixture();
+    collapseSidebar(collapsed.store);
+    const hiddenStorage = createMemoryStorage();
+    storeLayout(hiddenStorage, buildLayout("hidden"));
+    const fixtures = [
+      collapsed,
+      buildFixture(hiddenStorage),
+      buildFixture(createMemoryStorage(), true),
+    ];
+
+    for (const fixture of fixtures) {
+      changeSidebarViewport(fixture.store, 360);
+      showSidebarSandbox(fixture.store, "nobel");
+      const before = readSidebarSnapshot(fixture.store);
+
+      expect(askSidebarForRoom(fixture.store, "nobel")).toBe(false);
+      expect(readSidebarSnapshot(fixture.store).state).toBe(before.state);
+    }
+  });
+
+  it("ends the step aside and the grant on every user action", function endsOnUserAction(): void {
+    for (const userAction of USER_ACTIONS) {
+      const fixture = buildSteppedAsideFixture();
+
+      userAction(fixture.store);
+
+      expect(readSidebarSnapshot(fixture.store).isSteppedAside).toBe(false);
+      expect(fixture.store.steppedAside).toBeNull();
+      expect(fixture.store.roomGrant).toBeNull();
+    }
+  });
+
+  it("starts a user action from the rail the user sees", function startsFromRail(): void {
+    const toggled = buildSteppedAsideFixture();
+    const expanded = buildSteppedAsideFixture();
+    const dragged = buildSteppedAsideFixture();
+
+    toggleSidebar(toggled.store);
+    expandSidebar(expanded.store);
+    dragSidebar(dragged.store, 120);
+
+    expect(readSidebarSnapshot(toggled.store).state).toBe("expanded");
+    expect(readSidebarSnapshot(expanded.store).state).toBe("expanded");
+    expect(readStoredValue(dragged.storage)).toEqual(buildLayout("collapsed"));
+  });
+
+  it("keeps the stored layout expanded at its width", function storesNothing(): void {
+    const storage = createMemoryStorage();
+    storeLayout(storage, buildLayout("expanded", "expanded", 320));
+    const fixture = buildFixture(storage);
+    showSidebarSandbox(fixture.store, "nobel");
+
+    askSidebarForRoom(fixture.store, "nobel");
+
+    expect(readStoredValue(storage)).toEqual(
+      buildLayout("expanded", "expanded", 320),
+    );
+    expect(readSidebarSnapshot(buildFixture(storage).store)).toMatchObject({
+      state: "expanded",
+      width: 320,
+      isSteppedAside: false,
+    });
+  });
+});
+
+/** A fixture whose 240px sidebar stepped aside when the window narrowed to 860px. */
+function buildNarrowedFixture(storage: MemoryStorage): LayoutFixture {
+  const fixture = buildFixture(storage);
+  showSidebarSandbox(fixture.store, "nobel");
+  changeSidebarViewport(fixture.store, 860);
+  askSidebarForRoom(fixture.store, "nobel");
+  return fixture;
+}
+
+describe("coming back after stepping aside", function describeComeback(): void {
+  it("is not back 40px wider, and is back wider by the room the rail gave", function comesBackByRoom(): void {
+    const fixture = buildNarrowedFixture(createMemoryStorage());
+
+    changeSidebarViewport(fixture.store, 900);
+    expect(readSidebarSnapshot(fixture.store).state).toBe("collapsed");
+    changeSidebarViewport(fixture.store, 860 + 240 - 48 - 1);
+    expect(readSidebarSnapshot(fixture.store).state).toBe("collapsed");
+    changeSidebarViewport(fixture.store, 860 + 240 - 48);
+    expect(readSidebarSnapshot(fixture.store)).toMatchObject({
+      state: "expanded",
+      width: 240,
+      isSteppedAside: false,
+    });
+  });
+
+  it("counts the room from the width clamped to the viewport", function countsClampedRoom(): void {
+    const storage = createMemoryStorage();
+    storeLayout(storage, buildLayout("expanded", "expanded", 400));
+    const fixture = buildNarrowedFixture(storage);
+
+    changeSidebarViewport(fixture.store, 860 + 344 - 48 - 1);
+    expect(readSidebarSnapshot(fixture.store).isSteppedAside).toBe(true);
+    changeSidebarViewport(fixture.store, 860 + 344 - 48);
+    expect(readSidebarSnapshot(fixture.store).isSteppedAside).toBe(false);
+  });
+
+  it("is collapsed on a narrow viewport, and expanded after widening back", function followsNarrowViewport(): void {
+    const fixture = buildNarrowedFixture(createMemoryStorage());
+
+    changeSidebarViewport(fixture.store, 700);
+    changeSystemPreference(fixture.narrowQuery, true);
+    expect(readSidebarSnapshot(fixture.store)).toMatchObject({
+      state: "collapsed",
+      isNarrow: true,
+      isSteppedAside: false,
+    });
+    changeSidebarViewport(fixture.store, 1280);
+    changeSystemPreference(fixture.narrowQuery, false);
+
+    expect(readSidebarSnapshot(fixture.store)).toMatchObject({
+      state: "expanded",
+      width: 240,
       isNarrow: false,
     });
   });

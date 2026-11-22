@@ -42,6 +42,8 @@ import { fetchTestFile, testTexts } from "../../test/test_files.ts";
 import {
   buildTestCombinations,
   EXPLORER_LINK,
+  ignoreShownSandbox,
+  refuseSidebarRoom,
   settleStage,
 } from "../../test/test_stages.ts";
 import {
@@ -147,6 +149,8 @@ function renderLists(
         userCatalog={createTestUserCatalog(fixture.stage, fixture.recentlyUsed)}
         playerSites={createPlayerSites({ storage })}
         theater={createTheaterSetting({ storage, stage: fixture.stage })}
+        onAskRoom={refuseSidebarRoom}
+        onShowSandbox={ignoreShownSandbox}
       />
     </TooltipProvider>,
   );

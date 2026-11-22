@@ -12,10 +12,12 @@ import { readTooltipOnFocus } from "../../test/tooltip_texts.ts";
 import { chooseTheme } from "../theme/app_theme.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import {
+  askSidebarForRoom,
   collapseSidebar,
   expandSidebar,
   pressHamburger,
   readSidebarSnapshot,
+  showSidebarSandbox,
 } from "./sidebar_layout.ts";
 
 function renderSidebar(fixture: AppFixture): RenderResult {
@@ -354,6 +356,22 @@ describe("collapsed rail", function describeRail(): void {
     expect(readSidebarSnapshot(fixture.layout).state).toBe("collapsed");
     fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
 
+    expect(readSidebarSnapshot(fixture.layout).state).toBe("expanded");
+  });
+
+  it("shows a step aside for the stage bar as a rail whose button expands it", async function expandsSteppedAside(): Promise<void> {
+    const fixture = await startTestApp("");
+    renderSidebar(fixture);
+
+    act(function stepAside(): void {
+      showSidebarSandbox(fixture.layout, "nobel");
+      askSidebarForRoom(fixture.layout, "nobel");
+    });
+    expect(sidebarAside()).toHaveAttribute("data-stepped-aside");
+    expect(sidebarAside()).toHaveAttribute("data-state", "collapsed");
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+
+    expect(sidebarAside()).not.toHaveAttribute("data-stepped-aside");
     expect(readSidebarSnapshot(fixture.layout).state).toBe("expanded");
   });
 

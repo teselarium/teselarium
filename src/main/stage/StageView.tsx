@@ -58,6 +58,10 @@ interface StageViewProps {
   userCatalog: UserCatalogStore;
   /** Theater mode, which the stage bar's button turns on and off. */
   theater: TheaterSetting;
+  /** Asks for room before the stage bar's capsules fold. Returns whether room was made. */
+  onAskRoom: (sandboxId: string) => boolean;
+  /** Says which sandbox the stage bar shows. */
+  onShowSandbox: (sandboxId: string) => void;
 }
 
 /** The shown action for the player dialog, or `null` when it is not a player. */
@@ -213,6 +217,8 @@ export function StageView({
   playerSites,
   userCatalog,
   theater,
+  onAskRoom,
+  onShowSandbox,
 }: StageViewProps): ReactElement {
   const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
   const stageViewRef = useRef<HTMLDivElement>(null);
@@ -293,6 +299,8 @@ export function StageView({
           isTheaterMode={snapshot.isTheaterMode}
           theater={theater}
           onFullscreen={handleFullscreen}
+          onAskRoom={onAskRoom}
+          onShowSandbox={onShowSandbox}
         />
       )}
       <div className="relative flex flex-1 flex-col">

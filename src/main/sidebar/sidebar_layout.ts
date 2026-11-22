@@ -33,6 +33,19 @@ export interface SidebarSnapshot {
   maxWidth: number;
   /** On a narrow viewport, expanded means the drawer over the content. */
   isNarrow: boolean;
+  /** The sidebar shows its rail for the stage bar, though it is stored expanded. */
+  isSteppedAside: boolean;
+}
+
+/** The sidebar showed its rail for the stage bar: the viewport's width then, and the width the rail gave. */
+export interface SteppedAside {
+  viewportWidth: number;
+  room: number;
+}
+
+/** The sandbox whose stage bar may ask for room. `null` gives it to the next sandbox shown. */
+export interface RoomGrant {
+  sandboxId: string | null;
 }
 
 /**
@@ -47,6 +60,11 @@ export interface SidebarLayoutStore {
   storage: SidebarStorage;
   listeners: Set<() => void>;
   snapshot: SidebarSnapshot;
+  /** Not stored: a reload starts from the wide layout. */
+  steppedAside: SteppedAside | null;
+  roomGrant: RoomGrant | null;
+  /** The sandbox the stage bar shows, or `null` before it shows one. */
+  shownSandboxId: string | null;
 }
 
 /** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
@@ -66,6 +84,8 @@ const MAX_WIDTH = 400;
 const MAX_VIEWPORT_SHARE = 0.4;
 /** Released narrower than this, the sidebar collapses. */
 const COLLAPSE_BELOW = 160;
+/** `--sidebar-rail-width` in `app.css` (3rem), at the default font size. */
+const SIDEBAR_RAIL_WIDTH = 48;
 
 /** Replaced as soon as the store is built. */
 const DEFAULT_SNAPSHOT: SidebarSnapshot = Object.freeze({
@@ -73,6 +93,7 @@ const DEFAULT_SNAPSHOT: SidebarSnapshot = Object.freeze({
   width: 240,
   maxWidth: 400,
   isNarrow: false,
+  isSteppedAside: false,
 });
 
 const SIDEBAR_STATES: readonly string[] = ["expanded", "collapsed", "hidden"];
@@ -217,16 +238,23 @@ function buildNarrowLayout(wide: SidebarLayout): SidebarLayout {
   return narrow;
 }
 
-function readCurrentLayout(store: SidebarLayoutStore): SidebarLayout {
-  return store.isNarrow ? store.narrow : store.wide;
+/** The wide layout the user sees: collapsed while the sidebar has stepped aside. */
+function readSeenWideLayout(store: SidebarLayoutStore): SidebarLayout {
+  return store.steppedAside === null ? store.wide : collapseLayout(store.wide);
+}
+
+/** The layout the user sees, which every user action starts from. */
+function readSeenLayout(store: SidebarLayoutStore): SidebarLayout {
+  return store.isNarrow ? store.narrow : readSeenWideLayout(store);
 }
 
 function buildSnapshot(store: SidebarLayoutStore): SidebarSnapshot {
   const snapshot: SidebarSnapshot = {
-    state: readCurrentLayout(store).state,
+    state: readSeenLayout(store).state,
     width: clampSidebarWidth(store.wide.width, store.viewportWidth),
     maxWidth: clampSidebarWidth(MAX_WIDTH, store.viewportWidth),
     isNarrow: store.isNarrow,
+    isSteppedAside: store.steppedAside !== null,
   };
   return Object.freeze(snapshot);
 }
@@ -249,7 +277,20 @@ function applyLayout(store: SidebarLayoutStore, layout: SidebarLayout): void {
   publishSidebar(store);
 }
 
-/** Entering narrow mode collapses the sidebar without storing; leaving it restores the wide layout. */
+/** A user action: it ends the step aside, and no sandbox may ask for room until the window narrows. */
+function applyUserLayout(
+  store: SidebarLayoutStore,
+  layout: SidebarLayout,
+): void {
+  store.steppedAside = null;
+  store.roomGrant = null;
+  applyLayout(store, layout);
+}
+
+/**
+ * Entering narrow mode collapses the sidebar without storing, and ends a
+ * step aside; leaving it restores the wide layout.
+ */
 function followNarrowQuery(
   store: SidebarLayoutStore,
   narrowQuery: NarrowViewportQuery,
@@ -259,6 +300,9 @@ function followNarrowQuery(
   }
   store.isNarrow = narrowQuery.matches;
   store.narrow = buildNarrowLayout(store.wide);
+  if (store.isNarrow) {
+    store.steppedAside = null;
+  }
   publishSidebar(store);
 }
 
@@ -275,6 +319,9 @@ export function createSidebarLayout(
     storage: options.storage,
     listeners: new Set(),
     snapshot: DEFAULT_SNAPSHOT,
+    steppedAside: null,
+    roomGrant: { sandboxId: null },
+    shownSandboxId: null,
   };
   store.snapshot = buildSnapshot(store);
   options.narrowQuery.addEventListener(
@@ -285,33 +332,55 @@ export function createSidebarLayout(
 }
 
 export function collapseSidebar(store: SidebarLayoutStore): void {
-  applyLayout(store, collapseLayout(readCurrentLayout(store)));
+  applyUserLayout(store, collapseLayout(readSeenLayout(store)));
 }
 
 export function expandSidebar(store: SidebarLayoutStore): void {
-  applyLayout(store, expandLayout(readCurrentLayout(store)));
+  applyUserLayout(store, expandLayout(readSeenLayout(store)));
 }
 
 export function pressHamburger(store: SidebarLayoutStore): void {
-  applyLayout(store, hideOrShowLayout(readCurrentLayout(store)));
+  applyUserLayout(store, hideOrShowLayout(readSeenLayout(store)));
 }
 
 export function toggleSidebar(store: SidebarLayoutStore): void {
-  applyLayout(store, toggleLayout(readCurrentLayout(store)));
+  applyUserLayout(store, toggleLayout(readSeenLayout(store)));
 }
 
 export function dragSidebar(store: SidebarLayoutStore, width: number): void {
-  applyLayout(store, dragLayout(store.wide, width, store.viewportWidth));
+  applyUserLayout(
+    store,
+    dragLayout(readSeenWideLayout(store), width, store.viewportWidth),
+  );
 }
 
 export function stepSidebarWidth(
   store: SidebarLayoutStore,
   step: number,
 ): void {
-  applyLayout(store, stepLayoutWidth(store.wide, step, store.viewportWidth));
+  applyUserLayout(
+    store,
+    stepLayoutWidth(readSeenWideLayout(store), step, store.viewportWidth),
+  );
 }
 
-/** The window was resized: the width is clamped again. The stored width does not change. */
+/**
+ * Whether the window has widened, since the sidebar stepped aside, by the
+ * room the rail gave: the expanded sidebar then leaves the stage bar no
+ * narrower than it was beside the rail.
+ */
+function hasRoomToComeBack(
+  steppedAside: SteppedAside,
+  viewportWidth: number,
+): boolean {
+  return viewportWidth >= steppedAside.viewportWidth + steppedAside.room;
+}
+
+/**
+ * The window was resized: the width is clamped again. The stored width does
+ * not change. A narrower window gives the grant to the sandbox shown, and a
+ * sidebar that stepped aside comes back once there is room for it.
+ */
 export function changeSidebarViewport(
   store: SidebarLayoutStore,
   viewportWidth: number,
@@ -319,8 +388,84 @@ export function changeSidebarViewport(
   if (store.viewportWidth === viewportWidth) {
     return;
   }
+  if (viewportWidth < store.viewportWidth) {
+    store.roomGrant = { sandboxId: store.shownSandboxId };
+  }
+  if (
+    store.steppedAside !== null &&
+    hasRoomToComeBack(store.steppedAside, viewportWidth)
+  ) {
+    store.steppedAside = null;
+  }
   store.viewportWidth = viewportWidth;
   publishSidebar(store);
+}
+
+/**
+ * An open grant goes to the sandbox shown; showing another sandbox than the
+ * one it is bound to ends it.
+ */
+function followShownSandbox(
+  grant: RoomGrant | null,
+  sandboxId: string,
+): RoomGrant | null {
+  if (grant === null) {
+    return null;
+  }
+  if (grant.sandboxId !== null && grant.sandboxId !== sandboxId) {
+    return null;
+  }
+  const bound: RoomGrant = { sandboxId };
+  return bound;
+}
+
+/**
+ * The stage bar shows `sandboxId`. The sandbox shown when the app opened,
+ * or right after the window narrowed, may ask for room; one the user opens
+ * after it may not. A step aside stays: the sidebar never moves under the user.
+ */
+export function showSidebarSandbox(
+  store: SidebarLayoutStore,
+  sandboxId: string,
+): void {
+  if (store.shownSandboxId === sandboxId) {
+    return;
+  }
+  store.shownSandboxId = sandboxId;
+  store.roomGrant = followShownSandbox(store.roomGrant, sandboxId);
+}
+
+function canStepAside(store: SidebarLayoutStore, sandboxId: string): boolean {
+  return (
+    !store.isNarrow &&
+    store.wide.state === "expanded" &&
+    store.steppedAside === null &&
+    store.roomGrant?.sandboxId === sandboxId
+  );
+}
+
+/**
+ * The stage bar of `sandboxId` asks for room before folding its capsules.
+ * An expanded sidebar on a wide viewport shows its rail, without storing it,
+ * when the grant is the sandbox's. Returns whether it did.
+ */
+export function askSidebarForRoom(
+  store: SidebarLayoutStore,
+  sandboxId: string,
+): boolean {
+  if (!canStepAside(store, sandboxId)) {
+    return false;
+  }
+  const expandedWidth = clampSidebarWidth(
+    store.wide.width,
+    store.viewportWidth,
+  );
+  store.steppedAside = {
+    viewportWidth: store.viewportWidth,
+    room: expandedWidth - SIDEBAR_RAIL_WIDTH,
+  };
+  publishSidebar(store);
+  return true;
 }
 
 export function readSidebarSnapshot(

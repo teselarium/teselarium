@@ -28,11 +28,16 @@ export interface StageBarForm {
   isUnderPhoneWidth: boolean;
 }
 
-/** What the bar measured: its content width, and whether its left side overflows. */
+/**
+ * What the bar measured: its content width, whether its left side
+ * overflows, and whether the sidebar gave room for it.
+ */
 export interface BarMeasure {
   width: number;
   /** Only meaningful while the bar is wide: its capsules at their minimum do not fit. */
   leftSideOverflows: boolean;
+  /** The sidebar stepped aside: the bar stays wide and is measured again once wider. */
+  roomGiven: boolean;
 }
 
 export const WIDE_BAR: BarFold = Object.freeze({
@@ -43,7 +48,8 @@ export const WIDE_BAR: BarFold = Object.freeze({
 /**
  * The bar's fold after a measure: narrow under 480px; narrow while it is no
  * wider than where its capsules did not fit; narrow when, wide, its left
- * side overflows, recording that width; wide otherwise.
+ * side overflows and the sidebar gave no room, recording that width; wide
+ * otherwise.
  */
 export function followBarFold(fold: BarFold, measure: BarMeasure): BarFold {
   if (fold.foldedAt !== null && measure.width <= fold.foldedAt) {
@@ -53,7 +59,7 @@ export function followBarFold(fold: BarFold, measure: BarMeasure): BarFold {
     const narrow: BarFold = { isNarrow: true, foldedAt: null };
     return narrow;
   }
-  if (!fold.isNarrow && measure.leftSideOverflows) {
+  if (!fold.isNarrow && measure.leftSideOverflows && !measure.roomGiven) {
     const folded: BarFold = { isNarrow: true, foldedAt: measure.width };
     return folded;
   }
@@ -105,6 +111,21 @@ function capsulesOverflow(leftSide: HTMLElement | null): boolean {
   return overflowsSideways(leftSide) || overflowsSideways(capsuleRow);
 }
 
+/**
+ * Before the capsules of a wide bar of 480px or more fold because they do
+ * not fit, the bar asks the sidebar for room. Returns its answer.
+ */
+function askRoomBeforeFold(
+  width: number,
+  leftSideOverflows: boolean,
+  onAskRoom: () => boolean,
+): boolean {
+  if (!leftSideOverflows || width < NARROW_STAGE_BAR_WIDTH) {
+    return false;
+  }
+  return onAskRoom();
+}
+
 interface FoldFollowing {
   contentKey: string;
   fold: BarFold;
@@ -116,14 +137,18 @@ interface FoldFollowing {
  * in it, overflows because its capsules at their minimum width do not fit. It then stays narrow until
  * the bar is wider than where it folded. A new `contentKey`, which names what
  * the bar holds besides its titles, drops that width, so the bar is measured
- * again. It also says whether the bar is under 262px of content width,
- * narrower than on a 360px viewport. The observer and the layout effect run
- * before the paint, so a bar is never drawn in the wrong form.
+ * again. Before folding because its capsules do not fit, it calls
+ * `onAskRoom`: when the sidebar makes room, the bar stays wide, and folds
+ * only if its capsules still do not fit once wider. It also says whether the
+ * bar is under 262px of content width, narrower than on a 360px viewport.
+ * The observer, the layout effect and the sidebar's answer run before the
+ * paint, so a bar is never drawn in the wrong form.
  */
 export function useNarrowStageBar(
   barRef: RefObject<HTMLElement | null>,
   leftSideRef: RefObject<HTMLElement | null>,
   contentKey: string,
+  onAskRoom: () => boolean,
 ): StageBarForm {
   const [width, setWidth] = useState<number | null>(null);
   const [following, setFollowing] = useState<FoldFollowing>({
@@ -156,17 +181,19 @@ export function useNarrowStageBar(
       if (width === null) {
         return;
       }
+      const leftSideOverflows =
+        !fold.isNarrow && capsulesOverflow(leftSideRef.current);
       const measure: BarMeasure = {
         width,
-        leftSideOverflows:
-          !fold.isNarrow && capsulesOverflow(leftSideRef.current),
+        leftSideOverflows,
+        roomGiven: askRoomBeforeFold(width, leftSideOverflows, onAskRoom),
       };
       const next = keepSameFold(fold, followBarFold(fold, measure));
       if (next !== fold) {
         setFollowing({ contentKey, fold: next });
       }
     },
-    [width, fold, contentKey, leftSideRef],
+    [width, fold, contentKey, leftSideRef, onAskRoom],
   );
 
   const form: StageBarForm = {

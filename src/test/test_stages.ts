@@ -126,3 +126,13 @@ export async function startTestStage(
   await settleStage(stage);
   return stage;
 }
+
+/** The stage view's `onAskRoom` without a sidebar: no room is made. */
+export function refuseSidebarRoom(_sandboxId: string): boolean {
+  return false;
+}
+
+/** The stage view's `onShowSandbox` without a sidebar. */
+export function ignoreShownSandbox(_sandboxId: string): void {
+  // No sidebar follows the sandbox shown.
+}

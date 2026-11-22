@@ -56,6 +56,7 @@ import type { ModFiles } from "./mod_routes.ts";
 import {
   hamburgerButton,
   sectionItem,
+  sidebar,
   sidebarHeadingRow,
 } from "./app_layout.ts";
 import {
@@ -2365,5 +2366,51 @@ test.describe("Folded capsule of a combination", function describeFoldedCombinat
     await expect(
       page.getByRole("menuitem", { name: "Mod: Flashcards" }),
     ).toBeVisible();
+  });
+});
+
+/** What the page records while a test watches the bar fold. */
+interface FoldWatch {
+  hasBarFolded: boolean;
+}
+
+/**
+ * Runs on the stage bar: records in `hasBarFolded` whether it is ever
+ * narrow (`data-narrow`), which shows the folded capsule, from now on.
+ */
+function watchBarFold(bar: Element): void {
+  const watch = globalThis as unknown as FoldWatch;
+  watch.hasBarFolded = bar.hasAttribute("data-narrow");
+  function recordFold(): void {
+    if (bar.hasAttribute("data-narrow")) {
+      watch.hasBarFolded = true;
+    }
+  }
+  new MutationObserver(recordFold).observe(bar, {
+    attributeFilter: ["data-narrow"],
+  });
+}
+
+function readHasBarFolded(): boolean {
+  return (globalThis as unknown as FoldWatch).hasBarFolded;
+}
+
+test.describe("Room before the capsules fold", function describeRoom(): void {
+  test("Room is made", async function makesRoom({ page }): Promise<void> {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    const mosaicCapsule = capsule(page, `Mosaic: ${MAP_MOSAIC_TITLE}`);
+    await expect(mosaicCapsule).toBeVisible();
+    await stageBar(page).evaluate(watchBarFold);
+
+    for (let width = DESKTOP_VIEWPORT.width - 10; width >= 860; width -= 10) {
+      await page.setViewportSize({ width, height: DESKTOP_VIEWPORT.height });
+    }
+
+    await expect(sidebar(page)).toHaveAttribute("data-stepped-aside");
+    await expect(mosaicCapsule).toBeVisible();
+    await expect(capsule(page, /^Mod: /)).toBeVisible();
+    await expect(capsule(page, /^Collection: /)).toBeVisible();
+    expect(await page.evaluate(readHasBarFolded)).toBe(false);
   });
 });

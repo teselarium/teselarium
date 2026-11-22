@@ -277,6 +277,8 @@ function findCurrentSection(
  * and renders nothing else. On a narrow viewport it stays a rail, and
  * expanding it opens the same rows in a drawer over the content. Every row
  * starts with the same icon cell, so no button moves between the states.
+ * While it has stepped aside for the stage bar, it is the rail, and says so
+ * in `data-stepped-aside`.
  */
 export function Sidebar({
   stage,
@@ -329,6 +331,7 @@ export function Sidebar({
       aria-label="Sidebar"
       className="relative flex min-h-0 flex-col overflow-hidden rounded-lg border border-sidebar-border bg-sidebar px-(--sidebar-inset) text-sidebar-foreground shadow-panel"
       data-state={layoutSnapshot.state}
+      data-stepped-aside={layoutSnapshot.isSteppedAside ? "" : undefined}
     >
       <SidebarHeadingRow
         layout={layout}
