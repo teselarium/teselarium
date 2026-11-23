@@ -1,0 +1,12 @@
+mosaic:
+  title: "Flashcards: Nobel Prize in Literature laureates"
+  description: "Study Nobel Prize in Literature laureates since 2010"
+  mod: "http://localhost:5173/samples/mods/flashcards/mod_conf.yaml"
+  collection: "http://localhost:5173/samples/tiles/literature_nobel_laureates/collection.yaml"
+  aliases:
+    title: ["name"]
+    question: ["nobel_year"]
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the laureates' portraits"

@@ -20,5 +20,6 @@ export const INSTANCE_CATALOG: InstanceCatalog = {
   mosaics: [
     "./samples/mosaics/nobel_books_list.yaml",
     "./samples/mosaics/nobel_laureates_map.yaml",
+    "./samples/mosaics/flashcards_literature_laureates.yaml",
   ],
 };

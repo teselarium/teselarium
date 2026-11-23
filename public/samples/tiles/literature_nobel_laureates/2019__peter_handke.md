@@ -32,6 +32,8 @@ nobel_year: 2019
 image: "https://upload.wikimedia.org/wikipedia/commons/e/ea/Peter-handke.jpg"
 ---
 
+# Peter Handke
+
 Peter Handke (German: [ˈpeːtɐ ˈhantkə]; born 6 December 1942) is an Austrian novelist, playwright, translator, poet, film director, and screenwriter. He was awarded the 2019 Nobel Prize in Literature "for an influential work that with linguistic ingenuity has explored the periphery and the specificity of human experience." Handke is considered to be one of the most influential and original German-language writers in the second half of the 20th century.
 
 Source: https://en.wikipedia.org/wiki/Peter_Handke

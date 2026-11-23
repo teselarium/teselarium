@@ -25,6 +25,8 @@ nobel_year: 2018
 image: "https://upload.wikimedia.org/wikipedia/commons/e/e0/Olga_Tokarczuk-9739.jpg"
 ---
 
+# Olga Tokarczuk
+
 Olga Nawoja Tokarczuk (Polish: [tɔˈkart͡ʂuk]; born 29 January 1962) is a Polish writer, activist, and public intellectual.
 
 Source: https://en.wikipedia.org/wiki/Olga_Tokarczuk
