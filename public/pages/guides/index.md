@@ -1,5 +1,9 @@
 # Guides
 
-<div role="status">This section is a work in progress.</div>
+Short, hands-on guides.
 
-Guides on using OpenTesela will be published here.
+## Start here
+
+- [Open, try and share a mosaic](open_try_and_share.md): open a mosaic, see the same data in another way, save your version and share it.
+
+More guides will come.

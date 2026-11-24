@@ -30,3 +30,6 @@ blob-report
 *.njsproj
 *.sln
 *.sw?
+
+# Local tests
+local_tests
