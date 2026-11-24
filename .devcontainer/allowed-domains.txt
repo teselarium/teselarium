@@ -12,6 +12,8 @@ github.com
 registry.npmjs.org
 
 # Claude Code
+claude.com
+claude.ai
 api.anthropic.com
 mcp-proxy.anthropic.com
 statsig.com
