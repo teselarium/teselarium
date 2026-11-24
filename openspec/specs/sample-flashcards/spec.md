@@ -7,7 +7,7 @@ Describes what the shipped sample flashcards mod (`public/samples/mods/flashcard
 ## Requirements
 
 ### Requirement: Mod file
-The mod file SHALL give the mod the title "Flashcards", and SHALL declare `api: "^0.1.14"`, the first mod API version with `default_mosaic`, its tile type `./flashcard_type.md`, its test file `./test.js` and `default_mosaic: "./mosaic.yaml"`, whose mosaic names the mod's own folder and the sample deck `./flashcard_collection.yaml` as its collection. Neither the mod file nor its default mosaic SHALL declare permissions. The sample deck's collection file SHALL use `title`.
+The mod file SHALL give the mod the title "Flashcards", and SHALL declare `api: "^0.2.0"`, its tile type `./flashcard_type.md`, its test file `./test.js` and `default_mosaic: "./mosaic.yaml"`, whose mosaic names the mod's own folder and the sample deck `./flashcard_collection.yaml` as its collection. Neither the mod file nor its default mosaic SHALL declare permissions. The sample deck's collection file SHALL use `title`.
 
 #### Scenario: Inspect the sample
 - **WHEN** `mods.inspect` is sent for `./samples/mods/flashcards`

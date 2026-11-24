@@ -22,7 +22,7 @@ The mod SHALL ship its sample collection in its own folder, `sites/`, with 11 UN
 - **THEN** its default mosaic's collection and every tile it lists are in the copy
 
 ### Requirement: Mod file and default mosaic
-The mod file SHALL give the mod the title "Country Map", and SHALL declare `api: "^0.1.14"`, the first mod API version with `default_mosaic`, its tile type `./country_tile_type.md`, its test file `./test.js` and `default_mosaic: "./mosaic.yaml"`, and no permission. Its default mosaic SHALL name the mod's own folder, the sample sites' `./sites/collection.yaml` as its collection, and a `show` permission only for `https://upload.wikimedia.org`, the host the sites' images load from.
+The mod file SHALL give the mod the title "Country Map", and SHALL declare `api: "^0.2.0"`, its tile type `./country_tile_type.md`, its test file `./test.js` and `default_mosaic: "./mosaic.yaml"`, and no permission. Its default mosaic SHALL name the mod's own folder, the sample sites' `./sites/collection.yaml` as its collection, and a `show` permission only for `https://upload.wikimedia.org`, the host the sites' images load from.
 
 #### Scenario: Sample matches the app's API
 - **WHEN** the sample country map mod is opened from its default mosaic

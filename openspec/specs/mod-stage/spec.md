@@ -268,7 +268,7 @@ The app SHALL open a mosaic for the address hash `#/run` with the query paramete
 - **THEN** the sandbox shows the error that says `mod_viewer` is switched off, and no file of `mod_viewer` is requested
 
 #### Scenario: Mosaic of a mod for another API
-- **WHEN** a mosaic names a mod with `api: "^0.2.0"`
+- **WHEN** a mosaic names a mod with `api: "^0.3.0"`
 - **THEN** the app asks the mod API question before starting the mod, as for a run link to that mod
 
 ### Requirement: A mosaic link has no mod, collection or tile

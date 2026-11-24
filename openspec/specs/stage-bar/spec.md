@@ -43,7 +43,7 @@ Until the mod file is loaded, the stage bar SHALL show "Loading mod…" in place
 - **THEN** the mod capsule shows the mod's name and no version
 
 #### Scenario: Cancelled API question
-- **WHEN** a mod with `api: "^0.2.0"` is opened and the user presses "Cancel"
+- **WHEN** a mod with `api: "^0.3.0"` is opened and the user presses "Cancel"
 - **THEN** the mod capsule shows the mod's name and no version
 
 ### Requirement: Sandbox messages
@@ -65,8 +65,8 @@ Each sandbox SHALL keep its own messages, each with a level (`error`, `warning` 
 When a sandbox shows an error instead of its frame, such as a load failure, a switched-off default mod or a cancelled API question, the same error SHALL be an `error` message from the app, so the errors count includes it.
 
 #### Scenario: Cancelled API question
-- **WHEN** a mod with `api: "^0.2.0"` is opened and the user presses "Cancel"
-- **THEN** the errors popover lists one error labeled "App" that names `^0.2.0` and the app's mod API version
+- **WHEN** a mod with `api: "^0.3.0"` is opened and the user presses "Cancel"
+- **THEN** the errors popover lists one error labeled "App" that names `^0.3.0` and the app's mod API version
 
 ### Requirement: Each message names its producer
 Each item in a popover SHALL show its producer as the fixed label "App" or "Mod", followed by the source and the text, and the two labels SHALL look different. A mod SHALL NOT be able to choose or change the label: the mod's title, source and text never replace it.

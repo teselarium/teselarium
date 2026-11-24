@@ -73,15 +73,15 @@ The mod viewer `mod_viewer` SHALL declare `open` for `"*"`, and SHALL show the m
 #### Scenario: View the sample mod
 - **WHEN** the app is opened at `#/run?mod=mod_viewer&target=./samples/mods/book_list`
 - **THEN** the viewer's frame shows `Book List`, `1.1.0`, its description, the config value `show_covers`, and the default mosaic's address ending in `samples/mods/book_list/mosaic.yaml`
-- **AND** it shows the API range `^0.1.14`, marked as matching, and no "Name" row
+- **AND** it shows the API range `^0.2.0`, marked as matching, and no "Name" row
 
 #### Scenario: View a mod with a permission
 - **WHEN** the viewer shows a fixture mod that declares `show` for `https://upload.wikimedia.org` with the reason `Shows the book covers`
 - **THEN** the viewer's frame shows that permission with its reason, marked as granted
 
 #### Scenario: View a mod for another API
-- **WHEN** the viewer shows a mod with `api: "^0.2.0"`
-- **THEN** the viewer's frame shows `^0.2.0` and the app's mod API version, marked as not matching
+- **WHEN** the viewer shows a mod with `api: "^0.3.0"`
+- **THEN** the viewer's frame shows `^0.3.0` and the app's mod API version, marked as not matching
 
 #### Scenario: View a mod without a range
 - **WHEN** the viewer shows a mod file without `api`
