@@ -88,7 +88,7 @@ Saving a new draft SHALL store it as a new user catalog entry with a root of its
 
 #### Scenario: Saved from a copy
 - **WHEN** the user edits a copy of `https://example.org/samples/mosaics/nobel_laureates_map.yaml`, titled "Laureates, my way", and saves
-- **THEN** the catalog lists a stored mosaic at `opentesela-browser:///<root>/laureates_my_way.yaml`, listed by the user, copied from that address
+- **THEN** the catalog lists a stored mosaic at `teselarium-browser:///<root>/laureates_my_way.yaml`, listed by the user, copied from that address
 
 ### Requirement: Copies have absolute references
 Starting a copy of a mosaic SHALL rewrite its relative `mod` and `collection` as the absolute addresses they resolve to from the original, with the form's comment-keeping edits, and keep everything else.

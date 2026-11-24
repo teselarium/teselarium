@@ -24,7 +24,7 @@ Mods use configuration files called mod_conf.yaml for defining mod metadata and 
 mod:
   title: "Country Map"
   version: "1.0.1"
-  api: "^0.1.14"
+  api: "^0.2.0"
   description: "Shows any collection on a world map, with a marker per country, a list of its tiles and a card for each one."
   entrypoint: "./main.js"
   type_path: "./country_tile_type.md"
@@ -101,7 +101,7 @@ tile is left out.
 
 ## Width and layout
 
-A mod's frame fills the stage area. By default, its layout is `contained`: the base stylesheet keeps `<body>` at most `--ot-content-width` wide and centered, so content stays readable on a wide screen. The user can turn on theater mode from the stage bar, where the body has no limit, or show the mod fullscreen. A mod reads its layout as `context.layout` or from the `data-ot-layout` attribute on `<html>`, and receives `layout.changed` with `{ layout }` when it changes (see [Write HTML, get the app's look](modules/lib/core/theme/README.md#write-html-get-the-apps-look) in the theme's README). A mod that needs the full width in every layout, such as media, a map or a game, adds one style:
+A mod's frame fills the stage area. By default, its layout is `contained`: the base stylesheet keeps `<body>` at most `--tes-content-width` wide and centered, so content stays readable on a wide screen. The user can turn on theater mode from the stage bar, where the body has no limit, or show the mod fullscreen. A mod reads its layout as `context.layout` or from the `data-tes-layout` attribute on `<html>`, and receives `layout.changed` with `{ layout }` when it changes (see [Write HTML, get the app's look](modules/lib/core/theme/README.md#write-html-get-the-apps-look) in the theme's README). A mod that needs the full width in every layout, such as media, a map or a game, adds one style:
 
 ```css
 body { max-width: none; }
@@ -111,7 +111,7 @@ body { max-width: none; }
 
 A tile's `body` is markdown, as its author wrote it. A mod does not need a markdown parser to show it: the engine renders it to safe HTML that works inside the mod's sandbox, with images, video, audio and pictures, paths resolved against the tile, links that open through the app and a placeholder for each video or audio player (see [Tile bodies](modules/lib/core/engine/README.md#tile-bodies) in the engine's README).
 
-The simplest way is the `ot-tile-body` element, which every mod frame defines. Set its `tile` to one of the tiles of the mount context:
+The simplest way is the `tes-tile-body` element, which every mod frame defines. Set its `tile` to one of the tiles of the mount context:
 
 ```js
 export default function mount(engine, context) {
@@ -119,7 +119,7 @@ export default function mount(engine, context) {
     const article = document.createElement("article");
     const title = document.createElement("h2");
     title.textContent = tile.metadata.title;
-    const body = document.createElement("ot-tile-body");
+    const body = document.createElement("tes-tile-body");
     body.tile = tile;
     article.append(title, body);
     document.body.append(article);
@@ -127,12 +127,12 @@ export default function mount(engine, context) {
 }
 ```
 
-The element sends `tiles.renderBody`, shows the result as its children and fires a bubbling `ot-rendered` event. The theme styles the rendered body, alerts and player placeholders, and the mod's CSS can style it too, since it is in the light DOM.
+The element sends `tiles.renderBody`, shows the result as its children and fires a bubbling `tes-rendered` event. The theme styles the rendered body, alerts and player placeholders, and the mod's CSS can style it too, since it is in the light DOM.
 
-The element also draws the body's diagrams: each fenced `mermaid` block becomes a `<figure data-mermaid-source>` holding the diagram as an SVG, in the theme's colors, drawn again when the color scheme changes. The text shows first: a block stays as code until its diagram replaces it, blocks are drawn one at a time as they come into view, and a block mermaid cannot draw stays as code. A block waiting for its diagram, or a diagram being drawn again, has `aria-busy="true"`, which the base stylesheet pulses; the drawn figure, a failed block and a block out of view have none. Labels are text, so a diagram's markup adds no element; an image shape's picture loads only from a host in `permissions.show`, and from another host the block stays as code. Mermaid's built-in icons are drawn, but icon packs are not registered (see [Diagrams](modules/lib/core/tile_bodies/README.md#diagrams) in the tile bodies module). The element fires a bubbling `ot-diagrams-drawn` event each time the blocks in view are drawn; `ot-rendered` still fires first, as soon as the text is shown. A body without mermaid blocks fires none, and so does a body replaced or removed before its diagrams are drawn. To keep the blocks as code, and never load the library, set `diagrams` to `"source"` before `tile` (the default is `"draw"`):
+The element also draws the body's diagrams: each fenced `mermaid` block becomes a `<figure data-mermaid-source>` holding the diagram as an SVG, in the theme's colors, drawn again when the color scheme changes. The text shows first: a block stays as code until its diagram replaces it, blocks are drawn one at a time as they come into view, and a block mermaid cannot draw stays as code. A block waiting for its diagram, or a diagram being drawn again, has `aria-busy="true"`, which the base stylesheet pulses; the drawn figure, a failed block and a block out of view have none. Labels are text, so a diagram's markup adds no element; an image shape's picture loads only from a host in `permissions.show`, and from another host the block stays as code. Mermaid's built-in icons are drawn, but icon packs are not registered (see [Diagrams](modules/lib/core/tile_bodies/README.md#diagrams) in the tile bodies module). The element fires a bubbling `tes-diagrams-drawn` event each time the blocks in view are drawn; `tes-rendered` still fires first, as soon as the text is shown. A body without mermaid blocks fires none, and so does a body replaced or removed before its diagrams are drawn. To keep the blocks as code, and never load the library, set `diagrams` to `"source"` before `tile` (the default is `"draw"`):
 
 ```js
-const body = document.createElement("ot-tile-body");
+const body = document.createElement("tes-tile-body");
 body.diagrams = "source";
 body.tile = tile;
 ```
@@ -146,7 +146,7 @@ const { html } = await engine.request("tiles.renderBody", {
 container.innerHTML = html;
 ```
 
-A rendered body holds GitHub-flavored markdown and the HTML GitHub allows, with `<video>`, `<audio>` and `<picture>`, alerts (`aside.ot-alert`) and player placeholders (`button.ot-player`). Formulas between dollars and fenced `math` blocks are MathML: each `<math>` keeps the formula's source in its `<annotation encoding="application/x-tex">`, and a formula that cannot be rendered stays as `code.language-math` with `data-ot-math-error`. Code blocks labeled with a common language are highlighted with `hljs-` spans the theme colors, and emoji shortcodes such as `:tada:` are emoji. When a library a body needs cannot be loaded, the request fails with `-32603`, and `ot-tile-body` shows the message (see [Tile bodies](modules/lib/core/tile_bodies/README.md#math) in the tile bodies module).
+A rendered body holds GitHub-flavored markdown and the HTML GitHub allows, with `<video>`, `<audio>` and `<picture>`, alerts (`aside.tes-alert`) and player placeholders (`button.tes-player`). Formulas between dollars and fenced `math` blocks are MathML: each `<math>` keeps the formula's source in its `<annotation encoding="application/x-tex">`, and a formula that cannot be rendered stays as `code.language-math` with `data-tes-math-error`. Code blocks labeled with a common language are highlighted with `hljs-` spans the theme colors, and emoji shortcodes such as `:tada:` are emoji. When a library a body needs cannot be loaded, the request fails with `-32603`, and `tes-tile-body` shows the message (see [Tile bodies](modules/lib/core/tile_bodies/README.md#math) in the tile bodies module).
 
 Either way, the frame loader handles clicks in the rendered body: a link asks the user to open it in a new tab (`links.open`), a link to a heading of the body scrolls to it, and a click on a player placeholder asks the user to play it in the app's player dialog (`players.open`). A mod writes no code for them.
 
@@ -154,7 +154,7 @@ To handle a click yourself, cancel it in your own listener with `preventDefault(
 
 ```js
 function openInViewer(event) {
-  const link = event.target.closest("a[data-ot-link]");
+  const link = event.target.closest("a[data-tes-link]");
   if (link === null) {
     return;
   }
@@ -313,7 +313,7 @@ The sample country map mod, `public/samples/mods/country_map/`, is the complete 
 mod:
   title: "Country Map"
   version: "1.0.0"
-  api: "^0.1.14"
+  api: "^0.2.0"
   entrypoint: "./main.js"
   libraries:
     leaflet:
@@ -353,7 +353,7 @@ The same mod with its own copy of the files, next to `mod_conf.yaml`:
 mod:
   title: "country_map"
   version: "0.1.0"
-  api: "^0.1.10"
+  api: "^0.2.0"
   entrypoint: "./main.js"
   libraries:
     leaflet:
@@ -376,7 +376,7 @@ A mod can be written in TypeScript, split into modules, or use npm packages, as 
 - **One ESM file per entry point.** Output format `esm`, for the browser, with the entry's default export kept as the file's default export.
 - **Dependencies inlined.** Every module the entry imports, the mod's own and npm packages alike, goes into that file. Nothing is left external.
 - **No code splitting.** Dynamic `import()` calls are inlined too, so the bundle never loads a second chunk. With Rolldown, that is `output.codeSplitting: false`; with Rollup or Vite, `inlineDynamicImports: true`; with esbuild, `bundle: true` without `splitting`.
-- **Libraries through bundling, declaring, `libs.load` or `ot-tile-body`.** A small library is bundled like any dependency. A large one the app ships, such as mermaid, comes from `libs.load` (see [Libraries](#libraries)), and a tile's markdown from `ot-tile-body` (see [Showing a tile's body](#showing-a-tiles-body)), so the mod bundles neither. Any other large library, or one the author would rather not bundle, can be declared in `mod_conf.yaml` and loaded with `libs.load` too (see [Declared libraries](#declared-libraries)). Loading code from another site yourself needs a `code` permission and the user's consent: a bundle or a declaration avoids both.
+- **Libraries through bundling, declaring, `libs.load` or `tes-tile-body`.** A small library is bundled like any dependency. A large one the app ships, such as mermaid, comes from `libs.load` (see [Libraries](#libraries)), and a tile's markdown from `tes-tile-body` (see [Showing a tile's body](#showing-a-tiles-body)), so the mod bundles neither. Any other large library, or one the author would rather not bundle, can be declared in `mod_conf.yaml` and loaded with `libs.load` too (see [Declared libraries](#declared-libraries)). Loading code from another site yourself needs a `code` permission and the user's consent: a bundle or a declaration avoids both.
 - **Test files bundled the same way.** The test file is fetched and imported like the entrypoint, so it is one self-contained ES module too. It may import the mod's helpers, which the bundle inlines, but it does not import the entrypoint: each case mounts the mod through its context (see [Mod tests](#mod-tests)).
 - **HTTP caching.** The app fetches `mod_conf.yaml`, the entrypoint and the test file with the browser's ordinary HTTP cache. Serve them so a new version is seen: either with revalidation (`Cache-Control: no-cache` and an `ETag`), or with bundles named after their content, such as `main.3f9a2c.js`, cached for long and named by a `mod_conf.yaml` that is always revalidated.
 
@@ -414,7 +414,7 @@ The report's status is `pass` when there are no findings, `warn` when there are 
 
 ## Mod tests
 
-The bundle and mount checks tell whether a mod's files fit together and whether it starts and uses the mod API correctly, not whether it does what you meant: that it lists the books, that a click stores the selection, that it asks before deleting. Tests say that. They ship in the mod's folder and the app runs them as part of every check, so they hold wherever the mod is served and whatever OpenTesela runs it, with no tools on either side.
+The bundle and mount checks tell whether a mod's files fit together and whether it starts and uses the mod API correctly, not whether it does what you meant: that it lists the books, that a click stores the selection, that it asks before deleting. Tests say that. They ship in the mod's folder and the app runs them as part of every check, so they hold wherever the mod is served and whatever Teselarium runs it, with no tools on either side.
 
 ### The test file
 
@@ -533,7 +533,7 @@ async function deletesAfterConfirming(context) {
 }
 ```
 
-A catalog answer is a mapping whose optional `mods`, `collections` and `mosaics` are lists of entries with a non-empty string `source`, an optional `listedBy` (`"instance"`, `"default"` or `"user"`) and an optional `place` (`"remote"` or `"browser"`). A mosaic entry may also have `defaultOf`: `null`, or `{ source, title }` with non-empty strings, and `provenance`: `null`, or a mapping with a non-empty string `addedAt`, `folder`, `path`, `updatedAt` and `copiedFrom` each a string or `null`, `null` when missing, and a boolean `changedSinceExport`, `false` when missing (since mod API `0.1.18`; `changedSinceExport` and `copiedFrom` since `0.1.19`). Any other key throws. A missing list is empty. A missing `listedBy` is `"default"` for a mosaic with a `defaultOf`, `"user"` for one with a `provenance`, and `"instance"` otherwise. A missing `place` is `"browser"` for an `opentesela-browser:` source and `"remote"` otherwise. A missing `defaultOf` or `provenance` is `null`. So `catalog.list` resolves with the catalog in its complete form, as the app answers it (see [Reading the catalog](modules/lib/core/engine/README.md#reading-the-catalog)). A case that shows a stored user mosaic lists a fixture with `place: "browser"` or an `opentesela-browser:` source, and a `provenance`, so it never needs a store. Any other value throws, naming the first wrong key, for example `the answer to catalog.list must be a catalog: "mods[0]" must be a mapping with a non-empty "source"` or `the answer to catalog.list must be a catalog: "mosaics[0].place" must be "remote" or "browser"`. Sources are kept as given, so a case can list its own fixtures by their address in the default mods folder, and the mod's `*.inspect` requests resolve them against the app's address. A `catalog.list` without a queued answer, in a case or in the mount check, gets the live catalog: the catalog as the app answers it. Script it before `mount` when the mod lists the catalog as it mounts, so the case never depends on what the app ships:
+A catalog answer is a mapping whose optional `mods`, `collections` and `mosaics` are lists of entries with a non-empty string `source`, an optional `listedBy` (`"instance"`, `"default"` or `"user"`) and an optional `place` (`"remote"` or `"browser"`). A mosaic entry may also have `defaultOf`: `null`, or `{ source, title }` with non-empty strings, and `provenance`: `null`, or a mapping with a non-empty string `addedAt`, `folder`, `path`, `updatedAt` and `copiedFrom` each a string or `null`, `null` when missing, and a boolean `changedSinceExport`, `false` when missing (since mod API `0.1.18`; `changedSinceExport` and `copiedFrom` since `0.1.19`). Any other key throws. A missing list is empty. A missing `listedBy` is `"default"` for a mosaic with a `defaultOf`, `"user"` for one with a `provenance`, and `"instance"` otherwise. A missing `place` is `"browser"` for a `teselarium-browser:` source and `"remote"` otherwise. A missing `defaultOf` or `provenance` is `null`. So `catalog.list` resolves with the catalog in its complete form, as the app answers it (see [Reading the catalog](modules/lib/core/engine/README.md#reading-the-catalog)). A case that shows a stored user mosaic lists a fixture with `place: "browser"` or a `teselarium-browser:` source, and a `provenance`, so it never needs a store. Any other value throws, naming the first wrong key, for example `the answer to catalog.list must be a catalog: "mods[0]" must be a mapping with a non-empty "source"` or `the answer to catalog.list must be a catalog: "mosaics[0].place" must be "remote" or "browser"`. Sources are kept as given, so a case can list its own fixtures by their address in the default mods folder, and the mod's `*.inspect` requests resolve them against the app's address. A `catalog.list` without a queued answer, in a case or in the mount check, gets the live catalog: the catalog as the app answers it. Script it before `mount` when the mod lists the catalog as it mounts, so the case never depends on what the app ships:
 
 ```js
 async function listsTheFixtureMod(context) {

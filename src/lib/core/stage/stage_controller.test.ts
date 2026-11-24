@@ -261,7 +261,7 @@ async function openViewerFromHome(history: FakeHistory): Promise<Stage> {
 
 /** The history state the stage writes for an entry. */
 function stageState(position: number, section: string | null): unknown {
-  const historyState = { opentesela: { position, section } };
+  const historyState = { teselarium: { position, section } };
   return historyState;
 }
 
@@ -2509,7 +2509,7 @@ async function followFromHome(hash: string): Promise<Stage> {
 }
 
 const STORED_MOSAIC_ADDRESS =
-  "opentesela-browser:///r1/books_on_the_shelf.yaml";
+  "teselarium-browser:///r1/books_on_the_shelf.yaml";
 
 const STORED_USER_ENTRY: UserCatalogEntry = {
   address: STORED_MOSAIC_ADDRESS,
@@ -2603,7 +2603,7 @@ describe("stored mosaics", function describeStoredMosaics(): void {
     });
     expect(requested).toContain(SAMPLE_MOD_SOURCE);
     for (const url of requested) {
-      expect(url.startsWith("opentesela-browser:")).toBe(false);
+      expect(url.startsWith("teselarium-browser:")).toBe(false);
     }
   });
 

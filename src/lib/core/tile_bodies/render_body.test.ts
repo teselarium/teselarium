@@ -108,7 +108,7 @@ describe("Paths in bodies are resolved against the tile", function describePaths
     const html = await renderHtml("[Next](../films/stalker.md)");
 
     expect(html).toBe(
-      '<p><a href="https://example.org/films/stalker.md" data-ot-link="">Next</a></p>',
+      '<p><a href="https://example.org/films/stalker.md" data-tes-link="">Next</a></p>',
     );
   });
 
@@ -116,7 +116,7 @@ describe("Paths in bodies are resolved against the tile", function describePaths
     const html = await renderHtml("[See notes](#notes)");
 
     expect(html).toBe(
-      '<p><a href="#notes" data-ot-fragment="">See notes</a></p>',
+      '<p><a href="#notes" data-tes-fragment="">See notes</a></p>',
     );
   });
 
@@ -172,7 +172,7 @@ describe("Players in bodies become placeholders", function describePlaceholders(
     const bodyScan = scanBody(body);
 
     expect(html).toBe(
-      '<button type="button" class="ot-player" data-ot-player="https://www.youtube.com/embed/aqz-KE-bpKQ"><span class="ot-player-box"><span class="ot-player-title">Big Buck Bunny</span><span class="ot-player-host">youtube.com</span></span></button>',
+      '<button type="button" class="tes-player" data-tes-player="https://www.youtube.com/embed/aqz-KE-bpKQ"><span class="tes-player-box"><span class="tes-player-title">Big Buck Bunny</span><span class="tes-player-host">youtube.com</span></span></button>',
     );
     expect([...bodyScan.playerAddresses.keys()]).toEqual([
       "https://www.youtube.com/embed/aqz-KE-bpKQ",
@@ -189,7 +189,7 @@ describe("Players in bodies become placeholders", function describePlaceholders(
     const bodyScan = scanBody(body);
 
     expect(html).toContain(
-      '<button type="button" class="ot-player" data-ot-player="https://www.youtube.com/watch?v=aqz-KE-bpKQ"><span class="ot-player-box"><span class="ot-player-title">Trailer</span>',
+      '<button type="button" class="tes-player" data-tes-player="https://www.youtube.com/watch?v=aqz-KE-bpKQ"><span class="tes-player-box"><span class="tes-player-title">Trailer</span>',
     );
     expect(html).not.toContain("<img");
     expect(bodyScan.mediaUrls).toEqual([]);
@@ -208,7 +208,7 @@ describe("Players in bodies become placeholders", function describePlaceholders(
 
     expect(html).not.toContain("allow");
     expect(html).toContain(
-      '<span class="ot-player-host">maps.example.net</span>',
+      '<span class="tes-player-host">maps.example.net</span>',
     );
     expect(
       bodyScan.playerAddresses.get("https://maps.example.net/embed?id=7"),
@@ -221,16 +221,16 @@ describe("Players in bodies become placeholders", function describePlaceholders(
       },
       title: null,
     });
-    expect(html).toContain('<span class="ot-player-title">Player</span>');
+    expect(html).toContain('<span class="tes-player-title">Player</span>');
   });
 
   it("does not record the address of a forged placeholder", async function ignoresForgedPlaceholder(): Promise<void> {
     const body =
-      '<button type="button" class="ot-player" data-ot-player="https://evil.example.net/embed">Play</button>';
+      '<button type="button" class="tes-player" data-tes-player="https://evil.example.net/embed">Play</button>';
     const html = await renderHtml(body);
     const bodyScan = scanBody(body);
 
-    expect(html).toContain('data-ot-player="https://evil.example.net/embed"');
+    expect(html).toContain('data-tes-player="https://evil.example.net/embed"');
     expect(bodyScan.playerAddresses.size).toBe(0);
   });
 });
@@ -243,7 +243,7 @@ describe("Iframes that are not players", function describeOtherIframes(): void {
     const bodyScan = scanBody(body);
 
     expect(html).toBe(
-      '<a href="http://example.org/widget" data-ot-link="">Widget</a>',
+      '<a href="http://example.org/widget" data-tes-link="">Widget</a>',
     );
     expect(bodyScan.playerAddresses.size).toBe(0);
   });
@@ -415,7 +415,7 @@ describe("Formulas that fail stay as written", function describeFailingMath(): v
     const html = await renderHtml("Before $\\frac{a}{$ after.");
 
     expect(html).toBe(
-      '<p>Before <code class="language-math math-inline" data-ot-math-error="Unexpected end of input in a macro argument, expected &#x27;}&#x27; at end of input: \\frac{a}{">\\frac{a}{</code> after.</p>',
+      '<p>Before <code class="language-math math-inline" data-tes-math-error="Unexpected end of input in a macro argument, expected &#x27;}&#x27; at end of input: \\frac{a}{">\\frac{a}{</code> after.</p>',
     );
   });
 
@@ -423,7 +423,7 @@ describe("Formulas that fail stay as written", function describeFailingMath(): v
     const html = await renderHtml("```math\n\\frac{a}{\n```");
 
     expect(html).toMatch(
-      /^<pre><code class="language-math" data-ot-math-error="[^"]+">\\frac\{a\}\{\n<\/code><\/pre>$/,
+      /^<pre><code class="language-math" data-tes-math-error="[^"]+">\\frac\{a\}\{\n<\/code><\/pre>$/,
     );
   });
 
@@ -431,7 +431,7 @@ describe("Formulas that fail stay as written", function describeFailingMath(): v
     const html = await renderHtml("$$\n\\frac{a}{\n$$");
 
     expect(html).toMatch(
-      /^<pre><code class="language-math math-display" data-ot-math-error="[^"]+">\\frac\{a\}\{<\/code><\/pre>$/,
+      /^<pre><code class="language-math math-display" data-tes-math-error="[^"]+">\\frac\{a\}\{<\/code><\/pre>$/,
     );
   });
 
@@ -439,14 +439,14 @@ describe("Formulas that fail stay as written", function describeFailingMath(): v
     const html = await renderHtml("$\\def\\loop{\\loop}\\loop$");
 
     expect(html).toBe(
-      '<p><code class="language-math math-inline" data-ot-math-error="Too many expansions: infinite loop or need to increase maxExpand setting">\\def\\loop{\\loop}\\loop</code></p>',
+      '<p><code class="language-math math-inline" data-tes-math-error="Too many expansions: infinite loop or need to increase maxExpand setting">\\def\\loop{\\loop}\\loop</code></p>',
     );
   });
 
   it("renders the rest of the body", async function rendersRestOfBody(): Promise<void> {
     const html = await renderHtml("$\\frac{a}{$ and $\\frac{c}{d}$ and *e*");
 
-    expect(html).toContain("data-ot-math-error");
+    expect(html).toContain("data-tes-math-error");
     expect(html).toContain("<mfrac><mi>c</mi><mi>d</mi></mfrac>");
     expect(html).toContain("<em>e</em>");
   });
@@ -457,7 +457,7 @@ describe("Alerts", function describeAlerts(): void {
     const html = await renderHtml("> [!NOTE]\n> Tiles are markdown files.");
 
     expect(html).toBe(
-      '<aside class="ot-alert" data-ot-alert="note">\n<p class="ot-alert-title">Note</p>\n<p>Tiles are markdown files.</p>\n</aside>',
+      '<aside class="tes-alert" data-tes-alert="note">\n<p class="tes-alert-title">Note</p>\n<p>Tiles are markdown files.</p>\n</aside>',
     );
   });
 
@@ -466,7 +466,7 @@ describe("Alerts", function describeAlerts(): void {
 
     expect(html).toContain("<blockquote>");
     expect(html).toContain("[!TODO]");
-    expect(html).not.toContain("ot-alert");
+    expect(html).not.toContain("tes-alert");
   });
 
   it("renders the four other kinds, in any case", async function rendersOtherKinds(): Promise<void> {
@@ -481,7 +481,7 @@ describe("Alerts", function describeAlerts(): void {
       const html = await renderHtml(`> ${marker}\n> Text.`);
 
       expect(html).toContain(
-        `<aside class="ot-alert" data-ot-alert="${kind}">\n<p class="ot-alert-title">${title}</p>`,
+        `<aside class="tes-alert" data-tes-alert="${kind}">\n<p class="tes-alert-title">${title}</p>`,
       );
     }
   });
@@ -490,7 +490,7 @@ describe("Alerts", function describeAlerts(): void {
     const html = await renderHtml("> [!TIP]\n>\n> Separate paragraph.");
 
     expect(html).toBe(
-      '<aside class="ot-alert" data-ot-alert="tip">\n<p class="ot-alert-title">Tip</p>\n<p>Separate paragraph.</p>\n</aside>',
+      '<aside class="tes-alert" data-tes-alert="tip">\n<p class="tes-alert-title">Tip</p>\n<p>Separate paragraph.</p>\n</aside>',
     );
   });
 

@@ -1,4 +1,4 @@
-# OpenTesela Format Specification
+# Teselarium Format Specification
 
 ## Glossary
 
@@ -66,9 +66,9 @@ flowchart LR
 
 ### Portability principles
 
-OpenTesela is implemented as a Single Page Application design to be self hosted via static files like github pages. The project can be clones and put tiles, mods and mosaics inside the dedicated folder in order that the app load them by default.
-OpenTesela could be also loaded in a html file and initialized from there without the need of cloning the full project, the default tiles, mods and mosaics can be defined during initialization.
-A third way of using OpenTesela is by setting a mosaic path as parameter in the url via hash routing (`#/run?mosaic=<path or url>`). In this way user can share a mosaic by only sharing a link.
+Teselarium is implemented as a Single Page Application design to be self hosted via static files like github pages. The project can be clones and put tiles, mods and mosaics inside the dedicated folder in order that the app load them by default.
+Teselarium could be also loaded in a html file and initialized from there without the need of cloning the full project, the default tiles, mods and mosaics can be defined during initialization.
+A third way of using Teselarium is by setting a mosaic path as parameter in the url via hash routing (`#/run?mosaic=<path or url>`). In this way user can share a mosaic by only sharing a link.
 
 ## Tiles and Tile Collections
 
@@ -204,7 +204,7 @@ mod:
 
 ## Mosaic
 
-A mosaic is the final product presented to the users where they can interact with tiles using the mod UI. OpenTesela opens it from a mosaic yaml file, `mosaic.yaml` in a folder by convention, that ties together a mod and a tile collection. It can change the mod's default configuration values, add aliases that rename the tiles' metadata fields to the names of the mod's tile type, for increasing compatibility, and declare the hosts the tiles' images come from. For example, for the "country_markers_map" mod above:
+A mosaic is the final product presented to the users where they can interact with tiles using the mod UI. Teselarium opens it from a mosaic yaml file, `mosaic.yaml` in a folder by convention, that ties together a mod and a tile collection. It can change the mod's default configuration values, add aliases that rename the tiles' metadata fields to the names of the mod's tile type, for increasing compatibility, and declare the hosts the tiles' images come from. For example, for the "country_markers_map" mod above:
 
 ```yaml
 mosaic:

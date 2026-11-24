@@ -70,7 +70,7 @@ function describeMathError(error: unknown): string {
 /**
  * The MathML of a formula as a raw node, which `rehype-raw` parses with the
  * body's HTML, or `null` when Temml cannot render it. The code element then
- * gets `data-ot-math-error` with the reason, and stays as it was.
+ * gets `data-tes-math-error` with the reason, and stays as it was.
  */
 function renderFormula(
   code: Element,
@@ -84,7 +84,7 @@ function renderFormula(
     const rawNode: ElementContent = { type: "raw", value: mathMl };
     return rawNode;
   } catch (error) {
-    code.properties.dataOtMathError = describeMathError(error);
+    code.properties.dataTesMathError = describeMathError(error);
     return null;
   }
 }
@@ -118,7 +118,7 @@ function renderMathIn(parent: Root | Element): void {
  * `code.math-inline`, and each `<pre>` holding `code.language-math` (display
  * math and fenced `math` blocks), becomes Temml's MathML, with the formula in
  * an `<annotation encoding="application/x-tex">`. A formula Temml cannot
- * render stays as written, with `data-ot-math-error` on its code. The
+ * render stays as written, with `data-tes-math-error` on its code. The
  * MathML is sanitized afterwards with the rest of the body. Changes the tree
  * in place.
  */

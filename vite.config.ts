@@ -88,7 +88,7 @@ function warnLargeChunk(
 /** Warns about chunks larger than `CHUNK_SIZE_WARNING_LIMIT`, except the libraries mods load. */
 function warnLargeChunks(): Plugin {
   const plugin: Plugin = {
-    name: "opentesela:warn-large-chunks",
+    name: "teselarium:warn-large-chunks",
     apply: "build",
     generateBundle: warnLargeChunk,
   };

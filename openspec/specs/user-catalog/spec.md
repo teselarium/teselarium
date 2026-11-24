@@ -7,7 +7,7 @@ Lets users keep mosaics of their own next to what the instance offers: mosaics i
 ## Requirements
 
 ### Requirement: User catalog entries
-The user catalog SHALL hold mosaic entries in order of addition. Each entry SHALL be either stored, with the `opentesela-browser:` address of its file, or remote, with the `http:` or `https:` address of its mosaic file. Two entries SHALL NOT have the same address. The user catalog SHALL be kept in the browser with the browser files store, and restored when the app opens.
+The user catalog SHALL hold mosaic entries in order of addition. Each entry SHALL be either stored, with the `teselarium-browser:` address of its file, or remote, with the `http:` or `https:` address of its mosaic file. Two entries SHALL NOT have the same address. The user catalog SHALL be kept in the browser with the browser files store, and restored when the app opens.
 
 #### Scenario: Stored and remote entries
 - **WHEN** the user imports `nobel_map.yaml` and then adds `https://mosaics.example.net/maps/laureates.yml` by URL
@@ -85,7 +85,7 @@ When the user picks a folder whose name matches stored entries, the review SHALL
 - **THEN** the review lists `old.yaml` as "Not in the folder", unchecked, and applying it unchecked keeps its entry
 
 ### Requirement: References that will not open
-The review SHALL warn, under a file, for each relative `mod` or `collection` reference of the mosaic whose resolved `opentesela-browser:` address is not stored and is not in the picked files, naming the reference as written. The file SHALL still be importable.
+The review SHALL warn, under a file, for each relative `mod` or `collection` reference of the mosaic whose resolved `teselarium-browser:` address is not stored and is not in the picked files, naming the reference as written. The file SHALL still be importable.
 
 #### Scenario: Single file with a relative collection
 - **WHEN** the user imports the single file `nobel_map.yaml`, whose `collection` is `../tiles/laureates`

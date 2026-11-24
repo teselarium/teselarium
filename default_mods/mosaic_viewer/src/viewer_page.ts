@@ -16,21 +16,21 @@ import type { ViewerView } from "./viewer_view.ts";
 // Layout only: the colors, borders and fonts come from the theme.
 const VIEWER_STYLE = `
   article h1 { margin-top: 0; }
-  dd + dt { margin-top: var(--ot-space-2); }
+  dd + dt { margin-top: var(--tes-space-2); }
   dd { overflow-wrap: anywhere; }
   pre { margin: 0; }
   td { overflow-wrap: anywhere; }
   code { overflow-wrap: anywhere; }
-  section { margin-top: var(--ot-space-4); }
-  form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); margin-top: var(--ot-space-4); }
+  section { margin-top: var(--tes-space-4); }
+  form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tes-space-2); margin-top: var(--tes-space-4); }
   /* Edit mode: one column of fields, each label above its field. */
-  [role="tablist"] { display: flex; flex-wrap: wrap; gap: var(--ot-space-2); margin-top: var(--ot-space-4); }
-  [role="tabpanel"] { margin-top: var(--ot-space-2); }
-  fieldset { min-width: 0; margin: var(--ot-space-4) 0 0; }
-  .edit-field { display: flex; flex-direction: column; gap: var(--ot-space-1); margin-top: var(--ot-space-2); min-width: 0; }
+  [role="tablist"] { display: flex; flex-wrap: wrap; gap: var(--tes-space-2); margin-top: var(--tes-space-4); }
+  [role="tabpanel"] { margin-top: var(--tes-space-2); }
+  fieldset { min-width: 0; margin: var(--tes-space-4) 0 0; }
+  .edit-field { display: flex; flex-direction: column; gap: var(--tes-space-1); margin-top: var(--tes-space-2); min-width: 0; }
   .edit-field > :is(input, textarea), textarea[name="content"] { box-sizing: border-box; width: 100%; max-width: 100%; }
-  .edit-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; align-items: end; gap: var(--ot-space-2); }
-  .edit-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--ot-space-4); }
+  .edit-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; align-items: end; gap: var(--tes-space-2); }
+  .edit-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--tes-space-4); }
   ul[aria-label="Problems"] { padding-left: 0; list-style: none; }
   /*
    * A narrow frame, such as a phone's: each permission is a small grid, its

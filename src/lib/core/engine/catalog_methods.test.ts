@@ -30,7 +30,7 @@ function recordFetch(
 }
 
 const STORED_ENTRY: UserCatalogEntry = {
-  address: "opentesela-browser:///r1/maps/nobel_map.yaml",
+  address: "teselarium-browser:///r1/maps/nobel_map.yaml",
   place: "browser",
   root: "r1",
   provenance: {

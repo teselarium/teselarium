@@ -10,7 +10,7 @@ It also holds the browser database: the IndexedDB database where the app keeps t
 
 Implemented in `src/lib/core/storage/`. Other modules import only from the public entry point `src/lib/core/storage/index.ts`.
 
-- `readModValue(storage, slot, key)` and `writeModValue(storage, slot, key, value)`: read and write a value of a slot, a `ModSlot` (`{ mod, context }`), under the key `"opentesela.mod-storage:" + JSON.stringify([mod, context, key])` (see the [engine module](../engine/README.md#storage-slots)).
+- `readModValue(storage, slot, key)` and `writeModValue(storage, slot, key, value)`: read and write a value of a slot, a `ModSlot` (`{ mod, context }`), under the key `"teselarium.mod-storage:" + JSON.stringify([mod, context, key])` (see the [engine module](../engine/README.md#storage-slots)).
 - `createMemoryStorage()`: a new, empty `ModStorage` backed by a `Map`. It shares nothing with `localStorage` or with another memory storage, and is dropped with its last reference. The mod check gives one to each checked mod as its throwaway slot, and tests use it in place of `localStorage`.
 - Types: `ModSlot`, the mod's source and its context (`""` for none); `ModStorage`, the `getItem`, `setItem` and `removeItem` part of `Storage`; and `MemoryStorage`, a `ModStorage` that also exposes its `items` map.
 
@@ -31,11 +31,11 @@ readModValue(localStorage, slot, "selected"); // unchanged
 
 ### Browser database
 
-The IndexedDB database `opentesela`, version 2, has three object stores:
+The IndexedDB database `teselarium`, version 2, has three object stores:
 
 | Store | Key | Value |
 | --- | --- | --- |
-| `files` | the file's `opentesela-browser:` address | `{ address, text }` |
+| `files` | the file's `teselarium-browser:` address | `{ address, text }` |
 | `user-catalog` | the entry's address | `{ position, entry }`, where `entry` is the user catalog entry and `position` its place in the order of addition |
 | `versions` | `[address, savedAt]`, with an index `address` on `address` | `{ address, savedAt, kind, text }`, one text a stored file had, where `kind` is `"imported"`, `"updated"`, `"saved"` or `"restored"` and `savedAt` an ISO 8601 time in UTC. Added in version 2. |
 
@@ -76,7 +76,7 @@ Example:
 import { createMemoryBrowserDatabase } from "./lib/core/storage/index.ts";
 
 const database = createMemoryBrowserDatabase<{ address: string }>();
-const address = "opentesela-browser:///r1/nobel_map.yaml";
+const address = "teselarium-browser:///r1/nobel_map.yaml";
 await database.apply({
   putFiles: [{ address, text: "title: Nobel map\n" }],
   putEntries: [{ address }],

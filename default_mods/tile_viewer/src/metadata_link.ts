@@ -18,14 +18,14 @@ function buildThumbnail(address: string): HTMLImageElement {
 }
 
 /**
- * A web address of the metadata as a link with `data-ot-link`, so the frame
+ * A web address of the metadata as a link with `data-tes-link`, so the frame
  * loader asks the user before opening it, as for a link of a body. An image
  * address also shows its thumbnail, before the address.
  */
 export function buildMetadataLink(address: string): HTMLElement {
   const link = document.createElement("a");
   link.href = address;
-  link.dataset.otLink = "";
+  link.dataset.tesLink = "";
   if (isImageAddress(address)) {
     link.append(buildThumbnail(address));
   }

@@ -39,7 +39,7 @@ import {
 import { openProbe, serveExplorerOfTilesMod } from "./test_mods.ts";
 import { DARK_COLORS, LIGHT_COLORS } from "./theme_probes.ts";
 
-const SIDEBAR_LAYOUT_KEY = "opentesela.sidebar";
+const SIDEBAR_LAYOUT_KEY = "teselarium.sidebar";
 
 /** An element's box, as Playwright measures it. */
 interface Box {
@@ -341,7 +341,7 @@ test.describe("Section navigation", function describeNavigation(): void {
 
     await page.goBack();
     await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
+      pageBody(page).getByRole("heading", { level: 1, name: "Teselarium" }),
     ).toBeVisible();
     await page.goBack();
 
@@ -628,7 +628,7 @@ test.describe("Sidebar layout is remembered", function describeRemembered(): voi
     await sidebar(page)
       .getByRole("button", { name: "Collapse sidebar" })
       .click();
-    const keys = [SIDEBAR_LAYOUT_KEY, "sidebar", "layout", "opentesela.layout"];
+    const keys = [SIDEBAR_LAYOUT_KEY, "sidebar", "layout", "teselarium.layout"];
 
     const answers = [];
     for (const key of keys) {
@@ -673,7 +673,7 @@ test.describe("Narrow viewports", function describeNarrow(): void {
     await sidebar(page).getByRole("button", { name: "Expand sidebar" }).click();
 
     const drawer = page.getByRole("dialog");
-    await expect(drawer.getByText("OpenTesela", { exact: true })).toBeVisible();
+    await expect(drawer.getByText("Teselarium", { exact: true })).toBeVisible();
     const drawerHamburger = drawer.getByRole("button", {
       name: "Hide sidebar",
     });

@@ -24,7 +24,7 @@ const SAMPLE_COLLECTION_URL = `${FIXTURES_BASE_URL}${SAMPLE_COLLECTION_PATH}`;
 const BOOKS_URL = `${FIXTURES_BASE_URL}tiles/books/`;
 const KALLOCAIN_URL = `${BOOKS_URL}kallocain.md`;
 const LOCAL_COLLECTION_URL = "file:///library/books_collection.yaml";
-const CODE_RAN_MARKER = "openTeselaCollectionCodeRan";
+const CODE_RAN_MARKER = "teselariumCollectionCodeRan";
 const SAMPLE_BOOK_FILES = ["farenheit_451.md", "kallocain.md", "fictions.md"];
 const EMPTY_COLLECTION_TEXT = 'collection:\n  title: "Empty"\n  tiles: []\n';
 

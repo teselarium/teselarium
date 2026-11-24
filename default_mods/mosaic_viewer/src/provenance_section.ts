@@ -131,7 +131,7 @@ function buildOutlineButton(
   handleClick: (event: MouseEvent) => void,
 ): HTMLButtonElement {
   const button = buildButton(label, handleClick);
-  button.dataset.otVariant = "outline";
+  button.dataset.tesVariant = "outline";
   return button;
 }
 
@@ -177,7 +177,7 @@ function buildProvenanceActions(
     "Remove",
     removeMosaic.bind(undefined, view),
   );
-  removeButton.dataset.otVariant = "destructive";
+  removeButton.dataset.tesVariant = "destructive";
   form.append(removeButton);
   return form;
 }

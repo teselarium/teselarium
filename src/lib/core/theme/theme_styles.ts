@@ -11,20 +11,20 @@ function buildDeclarationLines(colorScheme: ColorScheme): string[] {
 }
 
 /**
- * The token values as CSS, in the cascade layer `opentesela`: the light
- * values on `:root` and on any element with `data-ot-color-scheme="light"`,
- * then the dark values on any element with `data-ot-color-scheme="dark"`.
+ * The token values as CSS, in the cascade layer `teselarium`: the light
+ * values on `:root` and on any element with `data-tes-color-scheme="light"`,
+ * then the dark values on any element with `data-tes-color-scheme="dark"`.
  * The dark block comes last, so it wins on a dark `<html>`, which `:root`
  * matches too. The text never changes: switching only changes the attribute.
  */
 export function buildThemeTokenStyles(): string {
   const tokenStyles = [
-    "@layer opentesela {",
+    "@layer teselarium {",
     "  :root,",
-    '  [data-ot-color-scheme="light"] {',
+    '  [data-tes-color-scheme="light"] {',
     ...buildDeclarationLines("light"),
     "  }",
-    '  [data-ot-color-scheme="dark"] {',
+    '  [data-tes-color-scheme="dark"] {',
     ...buildDeclarationLines("dark"),
     "  }",
     "}",

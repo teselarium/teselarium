@@ -272,7 +272,7 @@ describe("loadMod", function describeLoadMod(): void {
   it("Caret range", async function loadsCaretRange(): Promise<void> {
     const mod = await loadMod(SAMPLE_MOD_SOURCE, { fetch: fetchFixture });
 
-    expect(mod.api).toBe("^0.1.0");
+    expect(mod.api).toBe("^0.2.0");
   });
 
   it("No api key", async function loadsNoRange(): Promise<void> {

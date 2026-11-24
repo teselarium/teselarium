@@ -49,7 +49,7 @@ export interface CatalogImportAction {
 /** `userCatalog.update`: the update dialog of one stored entry. */
 export interface CatalogUpdateAction {
   kind: "catalogUpdate";
-  /** The stored entry's `opentesela-browser:` address. */
+  /** The stored entry's `teselarium-browser:` address. */
   address: string;
 }
 
@@ -63,7 +63,7 @@ export interface CatalogAddAction {
 /** `userCatalog.export`: the save dialog of one stored entry's file. */
 export interface CatalogExportAction {
   kind: "catalogExport";
-  /** The stored entry's `opentesela-browser:` address. */
+  /** The stored entry's `teselarium-browser:` address. */
   address: string;
 }
 
@@ -88,7 +88,7 @@ export interface CatalogSaveAction {
 /** `userCatalog.history`: the history dialog of one stored entry. */
 export interface CatalogHistoryAction {
   kind: "catalogHistory";
-  /** The stored entry's `opentesela-browser:` address. */
+  /** The stored entry's `teselarium-browser:` address. */
   address: string;
 }
 

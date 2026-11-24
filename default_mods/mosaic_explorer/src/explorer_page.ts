@@ -5,17 +5,17 @@ import type { ExplorerView } from "./explorer_view.ts";
 
 // Layout only: the colors, borders and fonts come from the theme.
 const EXPLORER_STYLE = `
-  ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: var(--ot-space-4); }
+  ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: var(--tes-space-4); }
   li { display: grid; }
   li > * { margin: 0; }
   article { display: grid; grid-template-rows: auto 1fr auto; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-1) var(--ot-space-2); }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tes-space-1) var(--tes-space-2); }
   header > * { margin: 0; }
   header > h2 { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
   header > small { flex-basis: 100%; }
-  body > p:first-of-type { display: flex; flex-wrap: wrap; gap: var(--ot-space-2); }
+  body > p:first-of-type { display: flex; flex-wrap: wrap; gap: var(--tes-space-2); }
   body > p:first-of-type > button { min-height: 2rem; }
-  article > p:last-child { display: flex; flex-wrap: wrap; gap: var(--ot-space-2); margin-bottom: 0; }
+  article > p:last-child { display: flex; flex-wrap: wrap; gap: var(--tes-space-2); margin-bottom: 0; }
   code { overflow-wrap: anywhere; }
 `;
 
@@ -32,7 +32,7 @@ function buildToolbarButton(
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = label;
-  button.dataset.otVariant = "outline";
+  button.dataset.tesVariant = "outline";
   button.addEventListener("click", handleClick);
   return button;
 }

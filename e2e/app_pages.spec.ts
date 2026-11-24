@@ -89,7 +89,7 @@ interface PageContentBox {
 
 /**
  * Runs in the page: the page's content, measured inside its page area (the
- * page's host), and the width of `--ot-reading-width`, measured on a probe.
+ * page's host), and the width of `--tes-reading-width`, measured on a probe.
  */
 function readPageContentBox(pageContent: Element): PageContentBox {
   const root = pageContent.getRootNode();
@@ -101,7 +101,7 @@ function readPageContentBox(pageContent: Element): PageContentBox {
   const areaBox = root.host.getBoundingClientRect();
   const contentBox = pageContent.getBoundingClientRect();
   const probe = document.createElement("div");
-  probe.style.width = "var(--ot-reading-width)";
+  probe.style.width = "var(--tes-reading-width)";
   document.body.append(probe);
   const readingWidth = probe.getBoundingClientRect().width;
   probe.remove();
@@ -260,7 +260,7 @@ test.describe("Pages look like mods", function describeLook(): void {
   test("Dark page", async function followsColorScheme({ page }): Promise<void> {
     await page.emulateMedia({ colorScheme: "light" });
     await page.goto("/");
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
     expect(await pageBody(page).evaluate(readTextColor)).toBe(
       LIGHT_COLORS.foreground.computed,
     );
@@ -286,7 +286,7 @@ test.describe("Pages are drawn on the canvas", function describeCanvas(): void {
 
     await page.goto("/");
 
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
     expect(await pageBody(page).evaluate(readBackgroundColor)).toBe(
       "rgba(0, 0, 0, 0)",
     );
@@ -302,7 +302,7 @@ test.describe("Pages keep clear of the hamburger chip", function describeChip():
   }): Promise<void> {
     await page.setViewportSize({ width: 600, height: 800 });
     await page.goto("/");
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
 
     await hamburgerButton(page).click();
 
@@ -317,7 +317,7 @@ test.describe("Pages keep clear of the hamburger chip", function describeChip():
   }): Promise<void> {
     await page.setViewportSize({ width: 2560, height: 1080 });
     await page.goto("/");
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
 
     await hamburgerButton(page).click();
 
@@ -335,7 +335,7 @@ test.describe("Pages keep a reading width", function describeReadingWidth(): voi
 
     await page.goto("/");
 
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
     const box = await pageBody(page).evaluate(readPageContentBox);
     expect(box.readingWidth).toBeGreaterThan(0);
     expect(box.areaWidth).toBeGreaterThan(box.readingWidth);
@@ -350,7 +350,7 @@ test.describe("Pages keep a reading width", function describeReadingWidth(): voi
 
     await page.goto("/");
 
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
     const box = await pageBody(page).evaluate(readPageContentBox);
     expect(box.areaWidth).toBeLessThan(box.readingWidth);
     expect(box.contentWidth).toBeCloseTo(box.areaWidth, 0);
@@ -363,7 +363,7 @@ test.describe("Pages keep a reading width", function describeReadingWidth(): voi
 
     await page.goto("/");
 
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
     const box = await pageBody(page).evaluate(readPageContentBox);
     expect(box.contentWidth).toBeCloseTo(box.readingWidth, 0);
   });
@@ -414,7 +414,7 @@ test.describe("Page load failures", function describeFailures(): void {
     await expect(page.getByRole("alert")).toContainText("404");
     await openSection(page, "Home");
 
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
   });
 });
 
@@ -424,9 +424,9 @@ test.describe("Vanilla pages", function describeVanillaPages(): void {
   }): Promise<void> {
     await page.goto("/");
 
-    await expect(pageHeading(page, "Home")).toBeVisible();
+    await expect(pageHeading(page, "Teselarium")).toBeVisible();
     await expect(pageBody(page).getByRole("status")).toContainText(
-      "work in progress",
+      "early phase",
     );
   });
 
@@ -435,13 +435,10 @@ test.describe("Vanilla pages", function describeVanillaPages(): void {
   }): Promise<void> {
     for (const [hash, name] of [
       ["#/guides", "Guides"],
-      ["#/about", "About"],
+      ["#/about", "About Teselarium"],
     ]) {
       await page.goto(`/${hash}`);
       await expect(pageHeading(page, name)).toBeVisible();
-      await expect(pageBody(page).getByRole("status")).toContainText(
-        "work in progress",
-      );
     }
   });
 });

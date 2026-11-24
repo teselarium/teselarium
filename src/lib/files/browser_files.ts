@@ -1,5 +1,5 @@
 /** Scheme of the files the app stores in the browser. */
-export const BROWSER_FILE_PROTOCOL = "opentesela-browser:";
+export const BROWSER_FILE_PROTOCOL = "teselarium-browser:";
 
 const BROWSER_FILES_ORIGIN = `${BROWSER_FILE_PROTOCOL}///`;
 
@@ -11,7 +11,7 @@ export interface BrowserFileReader {
   readText(address: string): Promise<string | null>;
 }
 
-/** Whether `source` is an absolute `opentesela-browser:` address. */
+/** Whether `source` is an absolute `teselarium-browser:` address. */
 export function isBrowserFileAddress(source: string): boolean {
   if (!URL.canParse(source)) {
     return false;
@@ -34,7 +34,7 @@ function encodePathSegment(segment: string): string {
 }
 
 /**
- * The address of a stored file: `opentesela-browser:///<root>/<path>`, where
+ * The address of a stored file: `teselarium-browser:///<root>/<path>`, where
  * `root` stands for the imported folder or single file, and `path` is the
  * file's path inside it.
  */

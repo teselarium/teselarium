@@ -1219,8 +1219,8 @@ describe("combination capsules", function describeCombinationCapsules(): void {
     const folded = findCapsule("Combination: Unsaved combination");
     expect(folded).toHaveTextContent("Unsaved combination");
     expect(folded.className).toContain("border-dashed");
-    expect(folded.querySelector("svg.lucide-opentesela-mosaic")).not.toBeNull();
-    expect(folded.querySelector("svg.lucide-opentesela-mod")).toBeNull();
+    expect(folded.querySelector("svg.lucide-teselarium-mosaic")).not.toBeNull();
+    expect(folded.querySelector("svg.lucide-teselarium-mod")).toBeNull();
     fireEvent.keyDown(folded, { key: "Enter" });
     const names: string[] = [];
     for (const item of screen.getAllByRole("menuitem")) {
@@ -1238,7 +1238,7 @@ describe("combination capsules", function describeCombinationCapsules(): void {
     renderStageView(stage);
 
     expect(
-      findCapsule("Mod: Book List").querySelector("svg.lucide-opentesela-mod"),
+      findCapsule("Mod: Book List").querySelector("svg.lucide-teselarium-mod"),
     ).not.toBeNull();
     expect(
       findCapsule("Collection: Science fiction books").querySelector(
@@ -1247,12 +1247,12 @@ describe("combination capsules", function describeCombinationCapsules(): void {
     ).not.toBeNull();
     expect(
       findCapsule("Mosaic: Books on the shelf").querySelector(
-        "svg.lucide-opentesela-mosaic",
+        "svg.lucide-teselarium-mosaic",
       ),
     ).not.toBeNull();
     expect(
       findCapsule("Combination: Books on the shelf").querySelector(
-        "svg.lucide-opentesela-mosaic",
+        "svg.lucide-teselarium-mosaic",
       ),
     ).not.toBeNull();
   });

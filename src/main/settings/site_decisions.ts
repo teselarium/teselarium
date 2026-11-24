@@ -35,8 +35,8 @@ export type SiteDecisionLine = Pick<
   "mod" | "mosaic" | "category" | "host"
 >;
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const SITE_DECISIONS_KEY = "opentesela.site-decisions";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const SITE_DECISIONS_KEY = "teselarium.site-decisions";
 
 function isWebAddress(value: unknown): boolean {
   if (typeof value !== "string" || !URL.canParse(value)) {

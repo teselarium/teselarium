@@ -149,7 +149,7 @@ export async function drawsCardBackground(context: CaseContext): Promise<void> {
   const card = findElement(context, "li > article");
   context
     .expect(getComputedStyle(card).backgroundColor)
-    .toBe(readTokenAs("--ot-card", "color"));
+    .toBe(readTokenAs("--tes-card", "color"));
 }
 
 export async function drawsFailureBorder(context: CaseContext): Promise<void> {
@@ -158,5 +158,5 @@ export async function drawsFailureBorder(context: CaseContext): Promise<void> {
   const alert = findElement(context, 'li > [role="alert"]');
   context
     .expect(getComputedStyle(alert).borderTopColor)
-    .toBe(readTokenAs("--ot-destructive", "color"));
+    .toBe(readTokenAs("--tes-destructive", "color"));
 }

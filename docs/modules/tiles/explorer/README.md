@@ -24,7 +24,7 @@ It gets the app's look as the [mod explorer](../../mods/explorer/README.md) does
 mod:
   title: "Tiles"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Lists tile collections and opens them in the collection viewer."
   entrypoint: "./main.js"
   test_path: "./test.js"
@@ -63,7 +63,7 @@ Its labels and its filter are pure modules, `src/tile_labels.ts` and `src/tile_f
 mod:
   title: "Collection Viewer"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Shows a tile collection's title, description, entry issues and tiles, without loading them."
   entrypoint: "./main.js"
   test_path: "./test.js"

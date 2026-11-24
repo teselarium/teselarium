@@ -6,8 +6,8 @@ export type ThemeChoice = "system" | "light" | "dark";
 /** The part of `Storage` the theme choice uses. The app passes `localStorage`. */
 export type ThemeStorage = Pick<Storage, "getItem" | "setItem">;
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const THEME_CHOICE_KEY = "opentesela.theme-choice";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const THEME_CHOICE_KEY = "teselarium.theme-choice";
 
 const THEME_CHOICES: readonly string[] = ["system", "light", "dark"];
 

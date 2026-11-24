@@ -4,9 +4,9 @@ import { buildModConf, stageBar } from "./mod_routes.ts";
 import type { ModFiles } from "./mod_routes.ts";
 
 /** Kept in step with `THEATER_MODE_KEY` in `src/main/stage/theater_setting.ts`. */
-export const THEATER_MODE_KEY = "opentesela.theater-mode";
+export const THEATER_MODE_KEY = "teselarium.theater-mode";
 
-/** The viewport where the stage area is wider than `--ot-content-width`. */
+/** The viewport where the stage area is wider than `--tes-content-width`. */
 export const WIDE_VIEWPORT = { width: 2560, height: 1080 };
 
 /** A phone in portrait. */
@@ -27,13 +27,13 @@ export const LAYOUT_PROBE_MOD_CODE = `export default function mount(engine, cont
   globalThis.probe = {
     engine,
     context,
-    attributeAtMount: document.documentElement.dataset.otLayout,
+    attributeAtMount: document.documentElement.dataset.tesLayout,
     layoutEvents: [],
   };
   engine.on("layout.changed", function recordLayout(params) {
     globalThis.probe.layoutEvents.push({
       layout: params.layout,
-      attribute: document.documentElement.dataset.otLayout,
+      attribute: document.documentElement.dataset.tesLayout,
     });
   });
   const heading = document.createElement("h1");
@@ -100,9 +100,9 @@ export async function storeTheaterBeforeLoad(
   });
 }
 
-/** Runs in a page or a frame: the `data-ot-layout` of `<html>`. */
+/** Runs in a page or a frame: the `data-tes-layout` of `<html>`. */
 export function readLayoutAttribute(): string | undefined {
-  return document.documentElement.dataset.otLayout;
+  return document.documentElement.dataset.tesLayout;
 }
 
 /** Waits until a frame's layout attribute is `layout`. */
@@ -143,10 +143,10 @@ export function readContextLayout(): unknown {
   return (globalThis as LayoutProbeGlobal).probe?.context.layout;
 }
 
-/** Runs in the app's page: the width of `--ot-content-width`, measured on a probe element. */
+/** Runs in the app's page: the width of `--tes-content-width`, measured on a probe element. */
 export function measureContentWidth(): number {
   const probe = document.createElement("div");
-  probe.style.width = "var(--ot-content-width)";
+  probe.style.width = "var(--tes-content-width)";
   document.body.append(probe);
   const width = probe.getBoundingClientRect().width;
   probe.remove();

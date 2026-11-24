@@ -46,7 +46,7 @@ export interface Catalog {
   mosaics: CatalogMosaicEntry[];
 }
 
-/** `"browser"` for an `opentesela-browser:` address, `"remote"` for any other. */
+/** `"browser"` for a `teselarium-browser:` address, `"remote"` for any other. */
 function readCatalogPlace(source: string): CatalogPlace {
   if (isBrowserFileAddress(source)) {
     return "browser";

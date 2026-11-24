@@ -700,7 +700,7 @@ async function answerRedirect(location: string, route: Route): Promise<void> {
 
 /** Runs in a mod frame: whether the image of the rendered body loaded. */
 function isBodyImageLoaded(): boolean {
-  const image = document.querySelector("ot-tile-body img") as HTMLImageElement;
+  const image = document.querySelector("tes-tile-body img") as HTMLImageElement;
   return image.complete && image.naturalWidth > 0;
 }
 

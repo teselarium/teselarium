@@ -46,13 +46,13 @@ export const THEME_PROBE_MOD_CODE = `export default function mount(engine, conte
   globalThis.probe = {
     engine,
     context,
-    attributeAtMount: document.documentElement.dataset.otColorScheme,
+    attributeAtMount: document.documentElement.dataset.tesColorScheme,
     themeEvents: [],
   };
   engine.on("theme.changed", function recordTheme(theme) {
     globalThis.probe.themeEvents.push({
       colorScheme: theme.colorScheme,
-      attribute: document.documentElement.dataset.otColorScheme,
+      attribute: document.documentElement.dataset.tesColorScheme,
     });
   });
   const heading = document.createElement("h1");
@@ -106,9 +106,9 @@ export async function chooseTheme(page: Page, label: string): Promise<void> {
   }
 }
 
-/** Runs in a page or a frame: the `data-ot-color-scheme` of `<html>`. */
+/** Runs in a page or a frame: the `data-tes-color-scheme` of `<html>`. */
 export function readColorSchemeAttribute(): string | null {
-  return document.documentElement.getAttribute("data-ot-color-scheme");
+  return document.documentElement.getAttribute("data-tes-color-scheme");
 }
 
 export interface ElementColors {
@@ -236,7 +236,7 @@ export default function mountRecordingThemes(engine, context) {
   engine.on("theme.changed", function recordTheme(theme) {
     globalThis.probe.themeEvents.push({
       colorScheme: theme.colorScheme,
-      attribute: document.documentElement.dataset.otColorScheme,
+      attribute: document.documentElement.dataset.tesColorScheme,
     });
   });
   return ${unexportedMod.mountName}(engine, context);
@@ -379,7 +379,7 @@ export async function waitForFrameColorScheme(
 
 function hasColorSchemeAttribute(colorScheme: string): boolean {
   return (
-    document.documentElement.getAttribute("data-ot-color-scheme") ===
+    document.documentElement.getAttribute("data-tes-color-scheme") ===
     colorScheme
   );
 }
@@ -421,7 +421,9 @@ export function recordPaints(): void {
       if (frame !== null && getComputedStyle(frame).visibility === "visible") {
         paintLog.visibleFrameTimes.push(absoluteTime);
       }
-    } else if (!document.documentElement.hasAttribute("data-ot-color-scheme")) {
+    } else if (
+      !document.documentElement.hasAttribute("data-tes-color-scheme")
+    ) {
       paintLog.unthemedTimes.push(absoluteTime);
     }
     remainingFrames -= 1;
@@ -492,18 +494,18 @@ export function readTokenAs(tokenAndProperty: string[]): string {
 }
 
 /**
- * Runs in a frame: every declaration outside the `opentesela` layer that
+ * Runs in a frame: every declaration outside the `teselarium` layer that
  * sets a look property (a color, background, border, font or shadow), as
  * `selector { property }`. Corner radii and a `box-shadow` of exactly
- * `var(--ot-shadow)` are not counted: the sample mod sets them on its books
- * from the theme's `--ot-radius` and `--ot-shadow`. Empty when the frame's own
+ * `var(--tes-shadow)` are not counted: the sample mod sets them on its books
+ * from the theme's `--tes-radius` and `--tes-shadow`. Empty when the frame's own
  * styles are layout, shape and the theme's shadow only. Self-contained, since
  * it runs in the frame.
  */
 export function listOwnLookDeclarations(): string[] {
   const lookPattern = /^(background|border|font)|color$|shadow$/;
   const shapePattern = /-radius$/;
-  const themeShadow = "var(--ot-shadow)";
+  const themeShadow = "var(--tes-shadow)";
   const found: string[] = [];
   const rules: CSSRule[] = [];
   for (const sheet of document.styleSheets) {
@@ -511,7 +513,7 @@ export function listOwnLookDeclarations(): string[] {
   }
   while (rules.length > 0) {
     const rule = rules.shift() as CSSRule;
-    if (rule instanceof CSSLayerBlockRule && rule.name === "opentesela") {
+    if (rule instanceof CSSLayerBlockRule && rule.name === "teselarium") {
       continue;
     }
     if ("cssRules" in rule) {

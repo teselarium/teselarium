@@ -112,7 +112,7 @@ async function opensTheCardOfAClickedBook(context) {
     .expect(readTexts(card.querySelectorAll("dd")))
     .toEqual(["1940", "Sweden", "Swedish", "220"]);
   context
-    .expect(readTexts(card.querySelectorAll("span[data-ot-variant]")))
+    .expect(readTexts(card.querySelectorAll("span[data-tes-variant]")))
     .toEqual(["Dystopian", "Political", "Social science fiction"]);
 }
 
@@ -122,7 +122,9 @@ async function leavesOutMissingMetadata(context) {
   const card = context.root.querySelector("dialog");
   context.expect(card.querySelector("h2").textContent).toBe("Untitled draft");
   context.expect(card.querySelectorAll("dt, dd").length).toBe(0);
-  context.expect(card.querySelectorAll("span[data-ot-variant]").length).toBe(0);
+  context
+    .expect(card.querySelectorAll("span[data-tes-variant]").length)
+    .toBe(0);
 }
 
 async function showsADateWithoutAYearAsWritten(context) {

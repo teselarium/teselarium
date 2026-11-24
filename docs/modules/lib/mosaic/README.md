@@ -170,7 +170,7 @@ Implemented in `mosaic_document.ts`, with the `yaml` package.
 - `readDraftFields(content)`: the fields a draft holds as written, `MosaicDraftFields` (`{ title, description, mod, collection, config, aliases, show }`), read with the loader's YAML rules but without its format checks: a text that is missing or not a string is `null`, `aliases` keeps the fields with a list of names, and `show` the lines with a string host and reason. `null` when the text cannot be read. `mosaics.validate` answers it, so an editor's form never reads YAML.
 - `listRelativeReferences(mosaic)`: the keys, `mod` and `collection`, of a parsed `mosaic` mapping whose reference is relative: neither an absolute address nor a default mod name. A copy rewrites them, and a new draft may not have them.
 - `buildLoadedMosaic(parsedYaml, options)`: what `loadMosaicFile` does after fetching, for a text already in memory. The engine validates drafts with it.
-- `DRAFT_ADDRESS`: `opentesela-draft:///mosaic.yaml`, the address a draft without one is read at.
+- `DRAFT_ADDRESS`: `teselarium-draft:///mosaic.yaml`, the address a draft without one is read at.
 - Errors: `MosaicEditError`, whose `reason` says which edit is wrong, or that the draft cannot be read (`the draft cannot be read: <parse error>`), or that the edits make the mosaic invalid (`the edits make the mosaic invalid: <loader error>`). Its message is `Cannot edit mosaic draft: <reason>`.
 - Types: `MosaicEdits`, `MosaicDraftFields`, `MosaicShowLine` (`{ host, reason }`).
 

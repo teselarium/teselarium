@@ -66,7 +66,7 @@ function buildPlaceNav(
   const tiles = place.inspection.tiles;
   const titleButton = document.createElement("button");
   titleButton.type = "button";
-  titleButton.dataset.otVariant = "ghost";
+  titleButton.dataset.tesVariant = "ghost";
   titleButton.textContent = place.inspection.title;
   titleButton.addEventListener(
     "click",
@@ -86,7 +86,7 @@ function buildPlaceNav(
     "Next",
     tiles[place.index + 1],
   );
-  next.dataset.otVariant = "primary";
+  next.dataset.tesVariant = "primary";
   const nav = document.createElement("nav");
   nav.setAttribute("aria-label", "Collection");
   nav.append(titleButton, position, previous, next);

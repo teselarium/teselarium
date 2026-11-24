@@ -217,7 +217,7 @@ function readQuestionText(context) {
 
 function findSideBody(context, sideName) {
   const body = context.root.querySelector(
-    `[data-side="${sideName}"] > ot-tile-body`,
+    `[data-side="${sideName}"] > tes-tile-body`,
   );
   return body;
 }
@@ -572,7 +572,7 @@ async function showsTheMetadataOfTables(context) {
       "Which character separates the cells of a table?",
       "The pipe, |",
     ]);
-  context.expect(card.querySelector("ot-tile-body")).not.toBe(null);
+  context.expect(card.querySelector("tes-tile-body")).not.toBe(null);
 }
 
 async function writesAListAndAMapping(context) {

@@ -277,10 +277,10 @@ function readBookLook(button: Element): BookLook {
   return look;
 }
 
-/** The value of `--ot-shadow` as the frame computes a `box-shadow`. */
+/** The value of `--tes-shadow` as the frame computes a `box-shadow`. */
 async function readThemeShadow(frame: Frame): Promise<string> {
   const themeShadow = await frame.evaluate(readTokenAs, [
-    "--ot-shadow",
+    "--tes-shadow",
     "box-shadow",
   ]);
   return themeShadow;
@@ -350,7 +350,7 @@ test.describe(
     }): Promise<void> {
       const frame = await openSample(page);
       const radius = await frame.evaluate(readTokenAs, [
-        "--ot-radius",
+        "--tes-radius",
         "border-top-right-radius",
       ]);
 
@@ -909,9 +909,7 @@ test.describe("Mod file", { tag: "@sample" }, function describeModFile(): void {
     await expect(viewerDefinition(viewer, "Default mosaic")).toHaveText(
       /samples\/mods\/book_list\/mosaic\.yaml$/,
     );
-    await expect(viewerDefinition(viewer, "API range")).toContainText(
-      "^0.1.14",
-    );
+    await expect(viewerDefinition(viewer, "API range")).toContainText("^0.2.0");
     await expect(viewerDefinition(viewer, "API range")).toContainText(
       "matches",
     );

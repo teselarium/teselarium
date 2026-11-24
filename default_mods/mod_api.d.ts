@@ -61,7 +61,7 @@ export interface ModTheme {
 
 /**
  * How wide the mod's frame lays out its content: `contained` (the body at
- * most `--ot-content-width`, centered), `theater` (the whole stage area) or
+ * most `--tes-content-width`, centered), `theater` (the whole stage area) or
  * `fullscreen` (the whole screen).
  */
 export type ModLayout = "contained" | "theater" | "fullscreen";
@@ -252,7 +252,7 @@ export interface MosaicEditParams {
 /** Who listed a catalog entry: the instance catalog, a mod as its default mosaic, or the user. */
 export type CatalogListedBy = "instance" | "default" | "user";
 
-/** Where a catalog entry's file lives: `"browser"` for an `opentesela-browser:` address, `"remote"` for any other. */
+/** Where a catalog entry's file lives: `"browser"` for a `teselarium-browser:` address, `"remote"` for any other. */
 export type CatalogPlace = "remote" | "browser";
 
 /**
@@ -498,7 +498,7 @@ export interface CaseCatalogMosaicEntry extends CaseCatalogEntry {
  * A catalog a case answers `catalog.list` with: missing lists are empty. A
  * missing `listedBy` is `"default"` for a mosaic with a `defaultOf`, `"user"`
  * for one with a `provenance`, and `"instance"` otherwise. A missing `place`
- * is `"browser"` for an `opentesela-browser:` source and `"remote"`
+ * is `"browser"` for a `teselarium-browser:` source and `"remote"`
  * otherwise. A missing `defaultOf` or `provenance` is `null`, and a
  * provenance is completed as `CaseCatalogProvenance` says.
  */

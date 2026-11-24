@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Loads a single tile (a markdown document with YAML frontmatter) from a relative path, an absolute URL or a local file the user picked, into a plain tile object: source, metadata, body and types. Other parts of OpenTesela, such as collections, validation, mods and the tiles UI, build on this object.
+Loads a single tile (a markdown document with YAML frontmatter) from a relative path, an absolute URL or a local file the user picked, into a plain tile object: source, metadata, body and types. Other parts of Teselarium, such as collections, validation, mods and the tiles UI, build on this object.
 
 ## Requirements
 

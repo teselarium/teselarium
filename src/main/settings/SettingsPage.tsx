@@ -317,7 +317,7 @@ export function SettingsPage({
             aria-label="Versions"
             className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm"
           >
-            <dt className="text-muted-foreground">OpenTesela</dt>
+            <dt className="text-muted-foreground">Teselarium</dt>
             <dd>{APP_VERSION}</dd>
             <dt className="text-muted-foreground">Mod API</dt>
             <dd>{MOD_API_VERSION}</dd>

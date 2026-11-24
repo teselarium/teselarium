@@ -44,7 +44,7 @@ function serveFixtures(): void {
       "mod:",
       '  title: "Book mod"',
       '  version: "1.2.0"',
-      '  api: "^0.1.0"',
+      '  api: "^0.2.0"',
       '  entrypoint: "./main.js"',
       '  type_path: "../types/book.md"',
       "  libraries:",

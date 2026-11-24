@@ -2,7 +2,7 @@
 mod:
   title: "Typed Fixture Mod"
   version: "1.0.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "The typed mod of the mosaic viewer's edit cases."
   entrypoint: "./main.js"
   type_path: "./item_type.md"

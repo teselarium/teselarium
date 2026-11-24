@@ -100,7 +100,7 @@ const LISTED_MOD_SOURCE = "./default_mods/mod_explorer/fixtures/listed_mod";
 /** Cases that answer `userCatalog.import` and send `userCatalog.remove` unanswered. */
 /** The address a case answers `userCatalog.save` with. */
 const SAVED_FIXTURE_ADDRESS =
-  "opentesela-browser:///fixture/laureates_my_way.yaml";
+  "teselarium-browser:///fixture/laureates_my_way.yaml";
 
 /** The draft a case saves. */
 const SAVED_DRAFT =
@@ -127,7 +127,7 @@ const USER_CATALOG_ANSWER_TEST_CODE = buildTestCode(
     "",
     "async function removesUnanswered(context) {",
     "  await context.mount();",
-    '  const removed = await requestFromMod("userCatalog.remove", { mosaic: "opentesela-browser:///fixture/nobel_map.yaml" });',
+    '  const removed = await requestFromMod("userCatalog.remove", { mosaic: "teselarium-browser:///fixture/nobel_map.yaml" });',
     "  context.expect(removed).toBe(false);",
     "}",
     "",
@@ -160,7 +160,7 @@ const WRONG_SAVE_ANSWER_TEST_CODE = buildTestCode(
 );
 
 /** A fixture stored mosaic, which no store holds. */
-const STORED_MOSAIC_SOURCE = "opentesela-browser:///fixture/nobel_map.yaml";
+const STORED_MOSAIC_SOURCE = "teselarium-browser:///fixture/nobel_map.yaml";
 /** A provenance answered without `changedSinceExport` and `copiedFrom`. */
 const STORED_MOSAIC_PROVENANCE = {
   folder: "my-mosaics",

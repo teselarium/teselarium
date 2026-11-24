@@ -523,11 +523,11 @@ async function expectPressedDetailsButton(page: Page): Promise<void> {
   // Away from the button, so its colors are the pressed ones, not the hover ones.
   await page.mouse.move(0, 0);
   const accent = await page.evaluate(readTokenAs, [
-    "--ot-accent",
+    "--tes-accent",
     "background-color",
   ]);
   const accentForeground = await page.evaluate(readTokenAs, [
-    "--ot-accent-foreground",
+    "--tes-accent-foreground",
     "color",
   ]);
 
@@ -1162,7 +1162,7 @@ const LABELS_MOSAIC_SOURCE = `${TEST_CATALOG_PREVIEW_URL}${LABELS_MOSAIC_PATH}`;
 /** Runs in the page before the app: the typed probe and its notes are recently used. */
 function storeRecentProbe(sources: { mod: string; collection: string }): void {
   localStorage.setItem(
-    "opentesela.recently-used",
+    "teselarium.recently-used",
     JSON.stringify({
       mods: [sources.mod],
       collections: [sources.collection],
@@ -1522,7 +1522,7 @@ async function openModList(page: Page): Promise<void> {
 const NOBEL_MAP_MOSAIC_LINK =
   "/#/run?mosaic=./samples/mosaics/nobel_laureates_map.yaml";
 
-/** The computed colors of a highlighted row's alias and background, and of `--ot-accent-foreground`. */
+/** The computed colors of a highlighted row's alias and background, and of `--tes-accent-foreground`. */
 interface HighlightColors {
   aliasColor: string;
   rowBackground: string;
@@ -1536,7 +1536,7 @@ function readHighlightColors(alias: Element): HighlightColors {
     throw new Error("Expected the alias to be inside a list row");
   }
   const probe = document.createElement("div");
-  probe.style.color = "var(--ot-accent-foreground)";
+  probe.style.color = "var(--tes-accent-foreground)";
   document.body.append(probe);
   const colors: HighlightColors = {
     aliasColor: getComputedStyle(alias).color,
@@ -1547,7 +1547,7 @@ function readHighlightColors(alias: Element): HighlightColors {
   return colors;
 }
 
-/** Whether the alias is drawn in `--ot-accent-foreground`, once the row's highlight settled. */
+/** Whether the alias is drawn in `--tes-accent-foreground`, once the row's highlight settled. */
 async function readAliasMatchesAccent(alias: Locator): Promise<boolean> {
   const colors = await alias.evaluate(readHighlightColors);
   return colors.aliasColor === colors.accentForeground;
@@ -1781,7 +1781,7 @@ test.describe("Combination lists", function describeCombinationLists(): void {
 
 function readCombinationCount(): number {
   const stored: unknown = JSON.parse(
-    localStorage.getItem("opentesela.recently-used") ?? "{}",
+    localStorage.getItem("teselarium.recently-used") ?? "{}",
   );
   const combinations = (stored as { combinations?: unknown[] }).combinations;
   return combinations?.length ?? 0;
@@ -2357,7 +2357,7 @@ test.describe("Folded capsule of a combination", function describeFoldedCombinat
     const folded = capsule(page, "Combination: Unsaved combination");
     await expect(folded).toBeVisible();
     await expect(folded).toHaveClass(/border-dashed/);
-    await expect(folded.locator("svg.lucide-opentesela-mosaic")).toHaveCount(1);
+    await expect(folded.locator("svg.lucide-teselarium-mosaic")).toHaveCount(1);
     await folded.click();
     await expect(
       page.getByRole("menuitem", { name: "Mosaic: Unsaved combination" }),

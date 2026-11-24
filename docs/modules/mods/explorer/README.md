@@ -23,7 +23,7 @@ Its TypeScript source, in `default_mods/mod_explorer/src/`, is a short example o
 mod:
   title: "Mods"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Lists mods and opens them in the mod viewer."
   entrypoint: "./main.js"
   test_path: "./test.js"

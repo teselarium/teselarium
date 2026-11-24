@@ -1,12 +1,12 @@
-# OpenTesela
+# Teselarium
 
 _Modular and reusable knowledge_
 
 Bring your notes. Choose a visualization. Share the result with a link.
 
-OpenTesela runs as static files. No server, no account.
+Teselarium runs as static files. No server, no account.
 
-> OpenTesela is in an early phase of its development (version 0.x) and some features are not ready yet. See [What works today](#what-works-today).
+> Teselarium is in an early phase of its development (version 0.x) and some features are not ready yet. See [What works today](#what-works-today).
 > Live demo: https://DEMO_URL
 
 ## How it works
@@ -19,7 +19,7 @@ OpenTesela runs as static files. No server, no account.
 A mod says which fields it needs. Any tile that has them works with it. So the same notes can be shown in many ways, and one mod can show notes written by someone else.
 
 A mosaic opens from a link: `#/run?mosaic=<address of the file>`. The tiles, the mod and the mosaic can each live on a different website.
-OpenTesela can also works locally importing files from your computer.
+Teselarium can also works locally importing files from your computer.
 
 ## Why
 

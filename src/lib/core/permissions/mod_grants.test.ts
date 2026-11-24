@@ -236,7 +236,7 @@ const FOREIGN_MOSAIC = {
   ] satisfies ModPermission[],
 };
 const STORED_MOSAIC = {
-  source: "opentesela-browser:///r1/maps/nobel_map.yaml",
+  source: "teselarium-browser:///r1/maps/nobel_map.yaml",
   permissions: FOREIGN_MOSAIC.permissions,
 };
 

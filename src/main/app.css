@@ -1,60 +1,60 @@
 /*
  * The app's stylesheet: the Tailwind CSS entry. Every design value comes from
- * the theme tokens (`--ot-*`, see src/lib/core/theme/): shadcn/ui's variables
+ * the theme tokens (`--tes-*`, see src/lib/core/theme/): shadcn/ui's variables
  * are aliases of them, and Tailwind's theme reads those aliases.
  */
 
 /* The token layer first, so it is the weakest whatever order the styles load in. */
-@layer opentesela, theme, base, components, utilities;
+@layer teselarium, theme, base, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:where([data-ot-color-scheme="dark"], [data-ot-color-scheme="dark"] *));
+@custom-variant dark (&:where([data-tes-color-scheme="dark"], [data-tes-color-scheme="dark"] *));
 
 /*
  * shadcn/ui's variables, from the tokens. On every color scheme element, not
- * only `:root`, so a section recomputes them from its own `--ot-*` values.
+ * only `:root`, so a section recomputes them from its own `--tes-*` values.
  */
 :root,
-[data-ot-color-scheme] {
-  --background: var(--ot-background);
-  --foreground: var(--ot-foreground);
-  --card: var(--ot-card);
-  --card-foreground: var(--ot-card-foreground);
-  --popover: var(--ot-popover);
-  --popover-foreground: var(--ot-popover-foreground);
-  --primary: var(--ot-primary);
-  --primary-foreground: var(--ot-primary-foreground);
-  --secondary: var(--ot-secondary);
-  --secondary-foreground: var(--ot-secondary-foreground);
-  --muted: var(--ot-muted);
-  --muted-foreground: var(--ot-muted-foreground);
-  --accent: var(--ot-accent);
-  --accent-foreground: var(--ot-accent-foreground);
-  --highlight: var(--ot-highlight);
-  --highlight-foreground: var(--ot-highlight-foreground);
-  --destructive: var(--ot-destructive);
-  --destructive-foreground: var(--ot-destructive-foreground);
-  --warning: var(--ot-warning);
-  --success: var(--ot-success);
-  --border: var(--ot-border);
-  --input: var(--ot-input);
-  --ring: var(--ot-ring);
-  --radius: var(--ot-radius);
+[data-tes-color-scheme] {
+  --background: var(--tes-background);
+  --foreground: var(--tes-foreground);
+  --card: var(--tes-card);
+  --card-foreground: var(--tes-card-foreground);
+  --popover: var(--tes-popover);
+  --popover-foreground: var(--tes-popover-foreground);
+  --primary: var(--tes-primary);
+  --primary-foreground: var(--tes-primary-foreground);
+  --secondary: var(--tes-secondary);
+  --secondary-foreground: var(--tes-secondary-foreground);
+  --muted: var(--tes-muted);
+  --muted-foreground: var(--tes-muted-foreground);
+  --accent: var(--tes-accent);
+  --accent-foreground: var(--tes-accent-foreground);
+  --highlight: var(--tes-highlight);
+  --highlight-foreground: var(--tes-highlight-foreground);
+  --destructive: var(--tes-destructive);
+  --destructive-foreground: var(--tes-destructive-foreground);
+  --warning: var(--tes-warning);
+  --success: var(--tes-success);
+  --border: var(--tes-border);
+  --input: var(--tes-input);
+  --ring: var(--tes-ring);
+  --radius: var(--tes-radius);
   /* The sidebar's roles, for the app only: mods do not get them. */
-  --sidebar: var(--ot-card);
-  --sidebar-foreground: var(--ot-card-foreground);
-  --sidebar-accent: var(--ot-accent);
-  --sidebar-accent-foreground: var(--ot-accent-foreground);
-  --sidebar-border: var(--ot-border);
-  --sidebar-ring: var(--ot-ring);
+  --sidebar: var(--tes-card);
+  --sidebar-foreground: var(--tes-card-foreground);
+  --sidebar-accent: var(--tes-accent);
+  --sidebar-accent-foreground: var(--tes-accent-foreground);
+  --sidebar-border: var(--tes-border);
+  --sidebar-ring: var(--tes-ring);
   /* The app's canvas, behind its panels and pages: white in light. Mods do not get it. */
-  --app-canvas: var(--ot-card);
+  --app-canvas: var(--tes-card);
 }
 
 /* In dark, the canvas stays the background, and the panels' lighter surface gives the depth. */
-[data-ot-color-scheme="dark"] {
-  --app-canvas: var(--ot-background);
+[data-tes-color-scheme="dark"] {
+  --app-canvas: var(--tes-background);
 }
 
 @theme inline {
@@ -91,17 +91,17 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--ot-font-sans);
-  --font-mono: var(--ot-font-mono);
-  --shadow-lg: var(--ot-shadow);
+  --font-sans: var(--tes-font-sans);
+  --font-mono: var(--tes-font-mono);
+  --shadow-lg: var(--tes-shadow);
   /*
    * The panels' shadow (sidebar, stage bar, frame): 2px down and right, without blur.
    * A blurred shadow beside a running mod's frame slows the mod down in
    * WebKit; this one costs nothing to draw. App-only: mods do not get it.
    */
   --shadow-panel: 2px 2px 0 rgb(0 0 0 / 0.06);
-  /* `p-4` is 4 × `--ot-space-1`, which is `--ot-space-4`. */
-  --spacing: var(--ot-space-1);
+  /* `p-4` is 4 × `--tes-space-1`, which is `--tes-space-4`. */
+  --spacing: var(--tes-space-1);
 }
 
 @layer base {
@@ -112,8 +112,8 @@
   body {
     @apply text-foreground;
     background-color: var(--app-canvas);
-    font-size: var(--ot-font-size);
-    line-height: var(--ot-line-height);
+    font-size: var(--tes-font-size);
+    line-height: var(--tes-line-height);
   }
 
   code {
@@ -121,7 +121,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--ot-ring);
+    outline: 2px solid var(--tes-ring);
     outline-offset: 2px;
   }
 }
@@ -137,12 +137,12 @@
  */
 .app-layout,
 .sidebar-drawer {
-  --shell-gap: var(--ot-space-2);
-  --sidebar-rail-width: calc(var(--ot-space-1) * 12);
+  --shell-gap: var(--tes-space-2);
+  --sidebar-rail-width: calc(var(--tes-space-1) * 12);
   /* The sidebar's first row and the stage bar: one row. */
-  --shell-row-height: calc(var(--ot-space-1) * 10);
+  --shell-row-height: calc(var(--tes-space-1) * 10);
   /* The sidebar's padding on each side, inside its border. */
-  --sidebar-inset: var(--ot-space-1);
+  --sidebar-inset: var(--tes-space-1);
   /* The icon cell every sidebar row starts with: the rail inside its 1px borders and padding. */
   --sidebar-cell-size: calc(
     var(--sidebar-rail-width) - 2 * var(--sidebar-inset) - 2px
@@ -218,19 +218,19 @@
  * dark, made 20% more saturated where the browser supports relative colors.
  */
 .mosaic-shape-1 {
-  --mosaic-shape: var(--ot-primary);
+  --mosaic-shape: var(--tes-primary);
 }
 
 .mosaic-shape-2 {
-  --mosaic-shape: var(--ot-secondary);
+  --mosaic-shape: var(--tes-secondary);
 }
 
 .mosaic-shape-3 {
-  --mosaic-shape: var(--ot-destructive);
+  --mosaic-shape: var(--tes-destructive);
 }
 
 .mosaic-shape-4 {
-  --mosaic-shape: var(--ot-warning);
+  --mosaic-shape: var(--tes-warning);
 }
 
 .mosaic-shape {
@@ -250,18 +250,18 @@
  * shapes keep their hue and saturation, and are darkened to about the
  * lightness of the light scheme's colors.
  */
-[data-ot-color-scheme="dark"]
+[data-tes-color-scheme="dark"]
   :is([aria-current="page"], [data-selected="true"], [data-highlighted])
   .mosaic-shape {
   fill: color-mix(
     in oklch,
     var(--mosaic-shape) 40%,
-    var(--ot-accent-foreground)
+    var(--tes-accent-foreground)
   );
 }
 
 @supports (color: oklch(from red l c h)) {
-  [data-ot-color-scheme="dark"]
+  [data-tes-color-scheme="dark"]
     :is([aria-current="page"], [data-selected="true"], [data-highlighted])
     .mosaic-shape {
     fill: oklch(from var(--mosaic-shape) calc(l * 0.62) calc(c * 1.2) h);

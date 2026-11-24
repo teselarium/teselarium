@@ -506,7 +506,7 @@ function readBox(element: Element): ElementBox {
 
 /** Runs in the page before the app: "Load media linked by tiles" off. */
 function turnOffTileLinkedMedia(): void {
-  localStorage.setItem("opentesela.tile-linked-media", "false");
+  localStorage.setItem("teselarium.tile-linked-media", "false");
 }
 
 /** Runs on an image: its natural width, 0 until it loaded. */
@@ -552,7 +552,7 @@ function listOwnColorsWithoutTokens(): string[] {
       if (value === undefined || !colorPattern.test(property.trim())) {
         continue;
       }
-      if (!value.includes("var(--ot-")) {
+      if (!value.includes("var(--tes-")) {
         found.push(`${rule.selectorText} { ${declaration.trim()} }`);
       }
     }
@@ -782,7 +782,10 @@ test.describe("Map look", { tag: "@sample" }, function describeMapLook(): void {
     await page.emulateMedia({ colorScheme: "dark" });
     await waitForFrameColorScheme(frame, "dark");
 
-    const darkMuted = await frame.evaluate(readTokenAs, ["--ot-muted", "fill"]);
+    const darkMuted = await frame.evaluate(readTokenAs, [
+      "--tes-muted",
+      "fill",
+    ]);
     expect(await frame.evaluate(readCountryFill, "Spain")).toBe(darkMuted);
     expect(darkMuted).not.toBe(lightFill);
     expect(await isFrameMarked(frame)).toBe(true);
@@ -1030,11 +1033,11 @@ test.describe("Sidebar", { tag: "@sample" }, function describeSidebar(): void {
     );
 
     const card = await frame.evaluate(readTokenAs, [
-      "--ot-card",
+      "--tes-card",
       "background-color",
     ]);
     const background = await frame.evaluate(readTokenAs, [
-      "--ot-background",
+      "--tes-background",
       "background-color",
     ]);
     const colors = await frame.evaluate(readMapColors);

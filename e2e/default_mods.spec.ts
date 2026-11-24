@@ -142,7 +142,7 @@ test.describe(
       await page.goto("/");
 
       await expect(
-        pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
+        pageBody(page).getByRole("heading", { level: 1, name: "Teselarium" }),
       ).toBeVisible();
       await expect(page.locator("[data-sandbox-id]")).toHaveCount(0);
       await expect(page.locator("iframe")).toHaveCount(0);
@@ -498,8 +498,8 @@ test.describe(
       const report = checkReport(viewer);
       await expect(report.getByRole("heading")).toContainText("Check passed");
       await expect(
-        report.getByRole("heading").locator("span[data-ot-variant]"),
-      ).toHaveAttribute("data-ot-variant", "success");
+        report.getByRole("heading").locator("span[data-tes-variant]"),
+      ).toHaveAttribute("data-tes-variant", "success");
       await expect(report.getByText("No findings.")).toBeVisible();
       await expect(report.getByRole("list", { name: "Findings" })).toHaveCount(
         0,
@@ -509,10 +509,9 @@ test.describe(
         .getByRole("listitem");
       await expect(cases).toHaveText(listPassedCaseTexts(TILES_CASE_NAMES));
       for (const caseItem of await cases.all()) {
-        await expect(caseItem.locator("span[data-ot-variant]")).toHaveAttribute(
-          "data-ot-variant",
-          "success",
-        );
+        await expect(
+          caseItem.locator("span[data-tes-variant]"),
+        ).toHaveAttribute("data-tes-variant", "success");
       }
       await expect(
         visibleSandbox(page).locator('iframe[title="Mod Viewer"]'),
@@ -534,8 +533,8 @@ test.describe(
       const report = checkReport(viewer);
       await expect(report.getByRole("heading")).toContainText("Check failed");
       await expect(
-        report.getByRole("heading").locator("span[data-ot-variant]"),
-      ).toHaveAttribute("data-ot-variant", "destructive");
+        report.getByRole("heading").locator("span[data-tes-variant]"),
+      ).toHaveAttribute("data-tes-variant", "destructive");
       const finding = report.getByRole("listitem");
       await expect(finding).toHaveCount(1);
       await expect(finding).toContainText("bundle");
@@ -559,14 +558,14 @@ test.describe(
       const report = checkReport(viewer);
       await expect(report.getByRole("heading")).toContainText("Check failed");
       await expect(
-        report.getByRole("heading").locator("span[data-ot-variant]"),
-      ).toHaveAttribute("data-ot-variant", "destructive");
+        report.getByRole("heading").locator("span[data-tes-variant]"),
+      ).toHaveAttribute("data-tes-variant", "destructive");
       const caseItem = report
         .getByRole("list", { name: "Tests" })
         .getByRole("listitem");
       await expect(caseItem).toHaveText("fail lists books: no books");
-      await expect(caseItem.locator("span[data-ot-variant]")).toHaveAttribute(
-        "data-ot-variant",
+      await expect(caseItem.locator("span[data-tes-variant]")).toHaveAttribute(
+        "data-tes-variant",
         "destructive",
       );
     });
@@ -1130,7 +1129,7 @@ test.describe(
 
         await expect(card).toHaveCSS(
           "background-color",
-          await explorer.evaluate(readTokenAs, ["--ot-card", "color"]),
+          await explorer.evaluate(readTokenAs, ["--tes-card", "color"]),
         );
         await expect(
           card.getByRole("button", { name: new RegExp(LAUREATES_TITLE) }),
@@ -1156,7 +1155,7 @@ test.describe(
       await expect(alert).toHaveCSS(
         "border-top-color",
         await explorer.evaluate(readTokenAs, [
-          "--ot-destructive",
+          "--tes-destructive",
           "border-top-color",
         ]),
       );
@@ -1277,7 +1276,7 @@ test.describe(
         "Kallocain",
       );
       await expect(viewer.locator("article > small")).toHaveText(tile);
-      await expect(viewer.locator("ot-tile-body")).toContainText(
+      await expect(viewer.locator("tes-tile-body")).toContainText(
         "A fixture tile of the tile viewer's tests.",
       );
       await expect(stageBar(page)).toContainText("Tile Viewer");
@@ -1323,7 +1322,7 @@ test.describe(
       const viewer = tileViewerFrame(page);
 
       await viewer
-        .locator("ot-tile-body")
+        .locator("tes-tile-body")
         .getByRole("link", { name: "Fahrenheit 451" })
         .click();
 
@@ -1565,6 +1564,8 @@ const MOSAIC_EXPLORER_RUN_LINK = "/#/run?mod=mosaic_explorer";
 const BOOKS_MOSAIC_REFERENCE = "./samples/mosaics/nobel_books_list.yaml";
 const BOOKS_MOSAIC_TITLE = "Books by Nobel laureates";
 const MAP_MOSAIC_TITLE = "Nobel laureates on the map";
+const FLASHCARDS_MOSAIC_TITLE =
+  "Flashcards: Nobel Prize in Literature laureates";
 
 /** The default mosaics of the vanilla catalog's mods, in mod order: Book List, Flashcards, Country Map. */
 const DEFAULT_MOSAIC_TITLES = [
@@ -1660,6 +1661,7 @@ test.describe(
         await expect(cards.getByRole("heading")).toHaveText([
           BOOKS_MOSAIC_TITLE,
           MAP_MOSAIC_TITLE,
+          FLASHCARDS_MOSAIC_TITLE,
         ]);
         await expect(cards.nth(0)).toContainText(
           "The book list with the books of the Nobel Prize in Literature laureates, eight per row.",
@@ -1682,7 +1684,11 @@ test.describe(
         const titles = await mosaicExplorerCards(page)
           .getByRole("heading")
           .allTextContents();
-        expect(titles).toEqual([BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE]);
+        expect(titles).toEqual([
+          BOOKS_MOSAIC_TITLE,
+          MAP_MOSAIC_TITLE,
+          FLASHCARDS_MOSAIC_TITLE,
+        ]);
         for (const defaultMosaicTitle of DEFAULT_MOSAIC_TITLES) {
           expect(titles).not.toContain(defaultMosaicTitle);
         }
@@ -1698,14 +1704,20 @@ test.describe(
         await openSection(page, "Mosaics");
 
         await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
-          [BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE, ...DEFAULT_MOSAIC_TITLES],
+          [
+            BOOKS_MOSAIC_TITLE,
+            MAP_MOSAIC_TITLE,
+            FLASHCARDS_MOSAIC_TITLE,
+            ...DEFAULT_MOSAIC_TITLES,
+          ],
         );
         const cards = mosaicExplorerCards(page);
-        await expect(cards.nth(2).locator("small")).toHaveText(
+        await expect(cards.nth(3).locator("small")).toHaveText(
           "Default mosaic of Book List",
         );
         await expect(cards.nth(0).locator("small")).toHaveCount(0);
         await expect(cards.nth(1).locator("small")).toHaveCount(0);
+        await expect(cards.nth(2).locator("small")).toHaveCount(0);
       },
     );
 
@@ -1718,6 +1730,7 @@ test.describe(
         expect(await readMosaicTitles(page)).toEqual([
           BOOKS_MOSAIC_TITLE,
           MAP_MOSAIC_TITLE,
+          FLASHCARDS_MOSAIC_TITLE,
         ]);
         const explorer = await findModFrame(page, "Mosaics");
         await markFrame(explorer);
@@ -1726,7 +1739,12 @@ test.describe(
         await openSection(page, "Mosaics");
 
         await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
-          [BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE, ...DEFAULT_MOSAIC_TITLES],
+          [
+            BOOKS_MOSAIC_TITLE,
+            MAP_MOSAIC_TITLE,
+            FLASHCARDS_MOSAIC_TITLE,
+            ...DEFAULT_MOSAIC_TITLES,
+          ],
         );
         expect(await isFrameMarked(explorer)).toBe(true);
 
@@ -1734,7 +1752,7 @@ test.describe(
         await openSection(page, "Mosaics");
 
         await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
-          [BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE],
+          [BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE, FLASHCARDS_MOSAIC_TITLE],
         );
         expect(await isFrameMarked(explorer)).toBe(true);
       },
@@ -1921,7 +1939,7 @@ test.describe(
           modSection.getByRole("button", { name: "Country Map" }),
         ).toBeVisible();
         await expect(modSection).toContainText("1.0.1");
-        await expect(modSection).toContainText("^0.1.14");
+        await expect(modSection).toContainText("^0.2.0");
         await expect(modSection).toContainText("matches");
         await expect(modSection).not.toContainText("does not match");
         const collectionSection = mosaicViewerSection(page, "Collection");
@@ -2443,7 +2461,7 @@ function readPlaceBadgeColors(): {
     const isTransparent = badgeFill === "rgba(0, 0, 0, 0)";
     badges.push({
       text: badge.textContent ?? "",
-      variant: badge.getAttribute("data-ot-variant"),
+      variant: badge.getAttribute("data-tes-variant"),
       color: getComputedStyle(badge).color,
       fill: isTransparent ? getComputedStyle(card).backgroundColor : badgeFill,
     });
@@ -2755,7 +2773,7 @@ test.describe("Editing mosaics in the viewer", function describeEditing(): void 
 
     const card = mosaicCard(page, "Edited books");
     const badge = card.getByText("Unexported changes");
-    await expect(badge).toHaveAttribute("data-ot-variant", "warning");
+    await expect(badge).toHaveAttribute("data-tes-variant", "warning");
     await expect
       .poll(readChangedBadgeContrast.bind(undefined, page))
       .toBeGreaterThanOrEqual(MINIMUM_TEXT_CONTRAST);

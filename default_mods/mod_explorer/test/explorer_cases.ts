@@ -127,5 +127,5 @@ export async function drawsCardBackground(context: CaseContext): Promise<void> {
   const card = findElement(context, "li > article");
   context
     .expect(getComputedStyle(card).backgroundColor)
-    .toBe(readTokenAs("--ot-card", "color"));
+    .toBe(readTokenAs("--tes-card", "color"));
 }

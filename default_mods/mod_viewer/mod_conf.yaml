@@ -1,7 +1,7 @@
 mod:
   title: "Mod Viewer"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Shows a mod's metadata and runs it with or without tiles."
   entrypoint: "./main.js"
   test_path: "./test.js"

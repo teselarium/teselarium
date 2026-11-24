@@ -18,7 +18,7 @@ which asks for the bump (`patch`, `minor` or `major`) and the summary and writes
 
 ```md
 ---
-"opentesela": patch
+"teselarium": patch
 ---
 
 The mod viewer shows the mod's license.

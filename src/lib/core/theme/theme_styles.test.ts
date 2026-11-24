@@ -10,7 +10,7 @@ import {
 const COLOR_LITERAL_PATTERN =
   /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\(|\b(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|transparent|currentcolor|canvas|canvastext|buttonface|buttontext)\b/i;
 
-/** The `data-ot-variant` values of the mod-theme spec, "Variant attributes". */
+/** The `data-tes-variant` values of the mod-theme spec, "Variant attributes". */
 const BUTTON_VARIANTS = [
   "primary",
   "secondary",
@@ -30,8 +30,8 @@ const BADGE_VARIANTS = [
 /** The variants of a `<textarea>`. */
 const TEXTAREA_VARIANTS = ["code"];
 
-const LIGHT_SELECTOR = ':root,\n  [data-ot-color-scheme="light"] {';
-const DARK_SELECTOR = '[data-ot-color-scheme="dark"] {';
+const LIGHT_SELECTOR = ':root,\n  [data-tes-color-scheme="light"] {';
+const DARK_SELECTOR = '[data-tes-color-scheme="dark"] {';
 
 /** The text of the rule block that starts at `selector`, up to its closing brace. */
 function readBlock(styles: string, selector: string): string {
@@ -45,10 +45,10 @@ function countOccurrences(text: string, part: string): number {
 }
 
 describe("buildThemeTokenStyles", function describeTokenStyles(): void {
-  it("puts both blocks in the opentesela layer", function wrapsInLayer(): void {
+  it("puts both blocks in the teselarium layer", function wrapsInLayer(): void {
     const styles = buildThemeTokenStyles();
 
-    expect(styles.startsWith("@layer opentesela {")).toBe(true);
+    expect(styles.startsWith("@layer teselarium {")).toBe(true);
     expect(styles.trimEnd().endsWith("}")).toBe(true);
   });
 
@@ -129,10 +129,10 @@ function isOneBlock(css: string): boolean {
 }
 
 describe("base stylesheet", function describeBaseStylesheet(): void {
-  it("is entirely inside the opentesela layer", function wrapsInLayer(): void {
+  it("is entirely inside the teselarium layer", function wrapsInLayer(): void {
     const text = removeComments(BASE_STYLESHEET).trim();
 
-    expect(text.startsWith("@layer opentesela {")).toBe(true);
+    expect(text.startsWith("@layer teselarium {")).toBe(true);
     expect(isOneBlock(BASE_STYLESHEET)).toBe(true);
   });
 
@@ -156,7 +156,7 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
 
   it("uses only theme tokens as variables", function checksVariables(): void {
     for (const match of BASE_STYLESHEET.matchAll(/var\((--[\w-]+)\)/g)) {
-      expect(match[1]).toMatch(/^--ot-/);
+      expect(match[1]).toMatch(/^--tes-/);
     }
   });
 
@@ -187,7 +187,7 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       "dialog",
       ":focus-visible",
       'button[aria-pressed="true"]',
-      "[data-ot-color-scheme]",
+      "[data-tes-color-scheme]",
       'button[type="submit"]',
       "@media (prefers-reduced-motion: reduce)",
     ];
@@ -209,13 +209,13 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       "summary",
       '[aria-busy="true"]',
       '[role="tab"][aria-selected="true"]',
-      'textarea[data-ot-variant="code"]',
-      "button[data-ot-player]",
-      'aside[data-ot-alert="note"]',
-      'aside[data-ot-alert="tip"]',
-      'aside[data-ot-alert="important"]',
-      'aside[data-ot-alert="warning"]',
-      'aside[data-ot-alert="caution"]',
+      'textarea[data-tes-variant="code"]',
+      "button[data-tes-player]",
+      'aside[data-tes-alert="note"]',
+      'aside[data-tes-alert="tip"]',
+      'aside[data-tes-alert="important"]',
+      'aside[data-tes-alert="warning"]',
+      'aside[data-tes-alert="caution"]',
       "figure[data-mermaid-source]",
       'math[display="block"]',
       'span[class~="hljs-keyword"]',
@@ -242,10 +242,10 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
     const selectors = listPreludes(BASE_STYLESHEET).join(",");
 
     for (const variant of BUTTON_VARIANTS) {
-      expect(selectors).toContain(`button[data-ot-variant="${variant}"]`);
+      expect(selectors).toContain(`button[data-tes-variant="${variant}"]`);
     }
     for (const variant of BADGE_VARIANTS) {
-      expect(selectors).toContain(`span[data-ot-variant="${variant}"]`);
+      expect(selectors).toContain(`span[data-tes-variant="${variant}"]`);
     }
   });
 
@@ -257,10 +257,10 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
       ...TEXTAREA_VARIANTS,
     ]);
 
-    const attributes = [...css.matchAll(/\[data-ot-variant([^\]]*)\]/g)];
+    const attributes = [...css.matchAll(/\[data-tes-variant([^\]]*)\]/g)];
     expect(attributes.length).toBeGreaterThan(0);
     for (const attribute of attributes) {
-      expect(attribute[0]).toMatch(/^\[data-ot-variant="[a-z-]+"\]$/);
+      expect(attribute[0]).toMatch(/^\[data-tes-variant="[a-z-]+"\]$/);
       const value = /^="([a-z-]+)"$/.exec(attribute[1])?.[1] ?? "";
       expect(knownValues.has(value)).toBe(true);
     }
@@ -270,7 +270,9 @@ describe("base stylesheet", function describeBaseStylesheet(): void {
   it("keeps each variant on its element", function checksVariantElements(): void {
     const css = removeComments(BASE_STYLESHEET);
 
-    for (const match of css.matchAll(/(\S*)\[data-ot-variant="([a-z-]+)"\]/g)) {
+    for (const match of css.matchAll(
+      /(\S*)\[data-tes-variant="([a-z-]+)"\]/g,
+    )) {
       const [, element, value] = match;
       if (element.endsWith("button")) {
         expect(BUTTON_VARIANTS).toContain(value);

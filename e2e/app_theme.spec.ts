@@ -238,10 +238,10 @@ test.describe("The theme choice is remembered", function describeRemembered(): v
     const frame = await findModFrame(page, "probe");
     await waitForProbe(frame);
     const keys = [
-      "opentesela.theme-choice",
+      "teselarium.theme-choice",
       "theme-choice",
       "theme",
-      "opentesela.theme",
+      "teselarium.theme",
       "themeChoice",
     ];
 

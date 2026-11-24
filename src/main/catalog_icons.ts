@@ -8,7 +8,7 @@ import type { LucideIcon } from "lucide-react";
  * the mosaic's frame. Drawn on lucide's grid, so it keeps lucide's stroke and
  * color settings.
  */
-const ModIcon: LucideIcon = createLucideIcon("opentesela-mod", [
+const ModIcon: LucideIcon = createLucideIcon("teselarium-mod", [
   ["path", { d: "M19 3a2 2 0 0 1 2 2", key: "corner-top-right" }],
   ["path", { d: "M21 19a2 2 0 0 1-2 2", key: "corner-bottom-right" }],
   ["path", { d: "M5 21a2 2 0 0 1-2-2", key: "corner-bottom-left" }],
@@ -35,7 +35,7 @@ const ModIcon: LucideIcon = createLucideIcon("opentesela-mod", [
 const TILE_STROKE_OPACITY = "0.25";
 const TILE_FILL_OPACITY = "0.1";
 
-const MosaicIcon: LucideIcon = createLucideIcon("opentesela-mosaic", [
+const MosaicIcon: LucideIcon = createLucideIcon("teselarium-mosaic", [
   [
     "rect",
     {

@@ -50,7 +50,7 @@ function buildTileRow(
   row.setAttribute("role", "row");
   const button = document.createElement("button");
   button.type = "button";
-  button.dataset.otVariant = "ghost";
+  button.dataset.tesVariant = "ghost";
   button.textContent = label;
   button.addEventListener(
     "click",

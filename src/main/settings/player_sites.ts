@@ -13,8 +13,8 @@ export interface PlayerSites {
   snapshot: readonly string[];
 }
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const PLAYER_SITES_KEY = "opentesela.player-sites";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const PLAYER_SITES_KEY = "teselarium.player-sites";
 
 /** A host name as `URL.hostname` gives it: lower case, without a scheme, port or path. */
 function isHost(value: unknown): value is string {

@@ -54,7 +54,7 @@ import {
 } from "./tile_body_routes.ts";
 import { themeControl } from "./theme_probes.ts";
 
-const SECTION_SWITCHES_KEY = "opentesela.sidebar-sections";
+const SECTION_SWITCHES_KEY = "teselarium.sidebar-sections";
 const TILE_MEDIA_LABEL = "Load media linked by tiles";
 const PROBE_HASH = `#/run?mod=${encodeURIComponent(`${FOREIGN_HOST}/probe/`)}`;
 const COVERS_LINE = `show content from ${COVER_HOST}`;
@@ -737,7 +737,7 @@ test.describe("Section switches are remembered", function describeRemembered(): 
       SECTION_SWITCHES_KEY,
       "sidebar-sections",
       "sections",
-      "opentesela.sections",
+      "teselarium.sections",
     ];
 
     const answers = [];

@@ -136,41 +136,41 @@ The mod viewer SHALL offer to open the viewed mod's default mosaic (only when th
 - **THEN** the viewer offers no choice to open a default mosaic
 
 ### Requirement: Default mods show how to get the app's look
-The default mods SHALL get their look only from the theme: semantic HTML, the color scheme, and the `data-ot-variant` attribute. Their own styles SHALL set layout only (display, grid, flex, gaps, widths, alignment, overflow) and SHALL NOT set colors, borders, backgrounds, fonts, radii or shadows. No class or `style` attribute in them SHALL exist to change the look.
+The default mods SHALL get their look only from the theme: semantic HTML, the color scheme, and the `data-tes-variant` attribute. Their own styles SHALL set layout only (display, grid, flex, gaps, widths, alignment, overflow) and SHALL NOT set colors, borders, backgrounds, fonts, radii or shadows. No class or `style` attribute in them SHALL exist to change the look.
 
 #### Scenario: Own styles are layout only
-- **WHEN** the mod explorer, the mod viewer, the collection explorer, the collection viewer and the tile viewer are running and the rules of each frame's stylesheets outside the `opentesela` layer are listed
+- **WHEN** the mod explorer, the mod viewer, the collection explorer, the collection viewer and the tile viewer are running and the rules of each frame's stylesheets outside the `teselarium` layer are listed
 - **THEN** no rule sets a color, background, border, font, border radius or shadow property
 
 #### Scenario: Explorer lists mods as cards
 - **WHEN** the mod explorer runs with its vanilla config
-- **THEN** `Book List` is shown in an `<article>` whose computed background color is the value of `--ot-card`
+- **THEN** `Book List` is shown in an `<article>` whose computed background color is the value of `--tes-card`
 - **AND** the article holds a button whose accessible name contains `Book List`
 
 #### Scenario: Explorer shows a failure as an alert
 - **WHEN** the explorer's `mods` list holds `./samples/mods/missing`
-- **THEN** its frame shows an element with `role="alert"` that holds `./samples/mods/missing` and a message naming `404`, with the computed border color of `--ot-destructive`
+- **THEN** its frame shows an element with `role="alert"` that holds `./samples/mods/missing` and a message naming `404`, with the computed border color of `--tes-destructive`
 
 #### Scenario: Viewer's main action is primary
 - **WHEN** the viewer shows the sample book list mod
-- **THEN** the "Run with sample tiles" button's computed background color is the value of `--ot-primary`, and the "Run without tiles" button's is the value of `--ot-background`
+- **THEN** the "Run with sample tiles" button's computed background color is the value of `--tes-primary`, and the "Run without tiles" button's is the value of `--tes-background`
 
 #### Scenario: Viewer shows permission statuses as badges
 - **WHEN** the viewer shows the sample book list mod
-- **THEN** the `show` permission for `https://upload.wikimedia.org` has a badge with the text `granted` and `data-ot-variant="success"`
+- **THEN** the `show` permission for `https://upload.wikimedia.org` has a badge with the text `granted` and `data-tes-variant="success"`
 
 #### Scenario: Collection explorer lists collections as cards
 - **WHEN** the collection explorer runs with its vanilla config
-- **THEN** `Nobel Prize in Literature laureates` is shown in an `<article>` whose computed background color is the value of `--ot-card`
+- **THEN** `Nobel Prize in Literature laureates` is shown in an `<article>` whose computed background color is the value of `--tes-card`
 - **AND** the article holds a button whose accessible name contains `Nobel Prize in Literature laureates`
 
 #### Scenario: Collection explorer shows a failure as an alert
 - **WHEN** the collection explorer's `collections` list holds `./samples/tiles/missing.yaml`
-- **THEN** its frame shows an element with `role="alert"` that holds `./samples/tiles/missing.yaml` and a message naming `404`, with the computed border color of `--ot-destructive`
+- **THEN** its frame shows an element with `role="alert"` that holds `./samples/tiles/missing.yaml` and a message naming `404`, with the computed border color of `--tes-destructive`
 
 #### Scenario: Tile viewer draws the tile as a card
 - **WHEN** the tile viewer shows a tile
-- **THEN** the heading, source, metadata and body are in an `<article>` whose computed background color is the value of `--ot-card`, with an `<hr>` between the source and the metadata and another between the metadata and the body, and the Next button's computed background color is the value of `--ot-primary` when it is shown
+- **THEN** the heading, source, metadata and body are in an `<article>` whose computed background color is the value of `--tes-card`, with an `<hr>` between the source and the metadata and another between the metadata and the body, and the Next button's computed background color is the value of `--tes-primary` when it is shown
 
 ### Requirement: Mod viewer checks the mod
 While the mod viewer shows a mod, it SHALL have a "Check mod" button that sends `mods.check` with the viewed mod's source, and the typed collection whenever the collection field is not empty, sent as typed, without surrounding spaces, as "Run with this collection" sends it. Without a mod to show, it SHALL have no such button. While the check runs, the button SHALL be disabled and the viewer SHALL say that the mod is being checked.
@@ -189,7 +189,7 @@ While the mod viewer shows a mod, it SHALL have a "Check mod" button that sends 
 - **AND** the mod's default mosaic is not requested
 
 ### Requirement: Mod viewer shows the check report
-The mod viewer SHALL show the report's status as a badge, with `data-ot-variant` `success` for `"pass"`, `warning` for `"warn"` and `destructive` for `"fail"`, each test case with its status and message, and each finding with its step, level, source and message. When the request fails, it SHALL show the error message as an alert. The mod viewer SHALL stay the visible mod.
+The mod viewer SHALL show the report's status as a badge, with `data-tes-variant` `success` for `"pass"`, `warning` for `"warn"` and `destructive` for `"fail"`, each test case with its status and message, and each finding with its step, level, source and message. When the request fails, it SHALL show the error message as an alert. The mod viewer SHALL stay the visible mod.
 
 #### Scenario: Sample mod passes
 - **WHEN** the viewer shows a mod whose check passes, with a test file of two cases, and the user presses "Check mod"
@@ -388,7 +388,7 @@ The collection viewer's cases SHALL cover showing the name, description, source 
 - **THEN** the viewer still shows the collection, and its `role="status"` region holds the `-32002` refusal's message
 
 ### Requirement: Tile viewer
-The tile viewer `tile_viewer` SHALL declare `open` for `"*"` and have no tile type. It SHALL show the first tile it receives: a heading, the tile's source, its metadata and its body, drawn by `<ot-tile-body>`. The heading SHALL be the tile's `title` when it is a non-empty string, and the decoded file name of its source otherwise. Without a tile, it SHALL say that no tile was given.
+The tile viewer `tile_viewer` SHALL declare `open` for `"*"` and have no tile type. It SHALL show the first tile it receives: a heading, the tile's source, its metadata and its body, drawn by `<tes-tile-body>`. The heading SHALL be the tile's `title` when it is a non-empty string, and the decoded file name of its source otherwise. Without a tile, it SHALL say that no tile was given.
 
 #### Scenario: View a tile
 - **WHEN** the app is opened at the run link of `tile_viewer` whose `tile` is a tile with `title: "Kallocain"` and a body
@@ -458,7 +458,7 @@ The button next to the "Metadata" heading SHALL look like a button without a poi
 
 #### Scenario: Button shape
 - **WHEN** the viewer shows a tile whose metadata starts collapsed
-- **THEN** the button next to the "Metadata" heading has a visible border and the background of the theme's outline button, `--ot-background`, without a pointer over it
+- **THEN** the button next to the "Metadata" heading has a visible border and the background of the theme's outline button, `--tes-background`, without a pointer over it
 - **AND** it is no taller than the heading
 
 ### Requirement: Tile viewer cuts a long list
@@ -469,11 +469,11 @@ When collapsed, a list that does not fit SHALL show its first items that fit, fo
 - **THEN** it shows the first 5 items and a line saying `and 15 more`
 
 ### Requirement: Tile viewer links metadata addresses
-Each metadata string that is an absolute `http:` or `https:` address SHALL be shown as a link to it with `data-ot-link`, so that following it asks the user as any link of a body does.
+Each metadata string that is an absolute `http:` or `https:` address SHALL be shown as a link to it with `data-tes-link`, so that following it asks the user as any link of a body does.
 
 #### Scenario: Web address
 - **WHEN** the viewer shows a tile with `source: "https://example.org/books/kallocain"`
-- **THEN** the value is a link to that address with `data-ot-link`, and clicking it sends `links.open` with that address
+- **THEN** the value is a link to that address with `data-tes-link`, and clicking it sends `links.open` with that address
 
 ### Requirement: Tile viewer shows image thumbnails
 When a metadata address's path ends with an image extension (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.avif` or `.svg`, in any letter case, without its query or fragment), its link SHALL also show a thumbnail of the image, two lines of text high, before the address, loaded lazily. A thumbnail that fails to load SHALL be hidden, leaving the link.

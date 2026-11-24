@@ -7,7 +7,7 @@ function findClickedTileLink(event: MouseEvent): HTMLAnchorElement | null {
   if (!(event.target instanceof Element)) {
     return null;
   }
-  const link = event.target.closest<HTMLAnchorElement>("a[data-ot-link]");
+  const link = event.target.closest<HTMLAnchorElement>("a[data-tes-link]");
   if (link === null || !isTileAddress(link.href)) {
     return null;
   }

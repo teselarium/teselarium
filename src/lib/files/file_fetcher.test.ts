@@ -40,7 +40,7 @@ function pickLibraryFolder(): LocalFiles {
   return localFiles;
 }
 
-const STORED_MOSAIC_ADDRESS = "opentesela-browser:///r1/maps/nobel_map.yaml";
+const STORED_MOSAIC_ADDRESS = "teselarium-browser:///r1/maps/nobel_map.yaml";
 
 async function readStoredText(
   storedFiles: ReadonlyMap<string, string>,
@@ -62,7 +62,7 @@ function createStoredFileReader(
 function storeNobelMap(): BrowserFileReader {
   const storedFiles = new Map<string, string>([
     [STORED_MOSAIC_ADDRESS, "title: Nobel map\n"],
-    ["opentesela-browser:///r1/tiles/laureates/collection.yaml", "title: L\n"],
+    ["teselarium-browser:///r1/tiles/laureates/collection.yaml", "title: L\n"],
   ]);
   const reader = createStoredFileReader(storedFiles);
   return reader;
@@ -387,14 +387,14 @@ describe("fetchFile", function describeFetchFile(): void {
     });
 
     expect(fetchedFile.source).toBe(
-      "opentesela-browser:///r1/tiles/laureates/collection.yaml",
+      "teselarium-browser:///r1/tiles/laureates/collection.yaml",
     );
     expect(sampleFetch).not.toHaveBeenCalled();
   });
 
   it("File is not stored", async function rejectsMissingStoredFile(): Promise<void> {
     const sampleFetch = createSampleFetch();
-    const missingAddress = "opentesela-browser:///r1/poets.yaml";
+    const missingAddress = "teselarium-browser:///r1/poets.yaml";
 
     const fetching = fetchFile(missingAddress, {
       fetch: sampleFetch,

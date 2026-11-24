@@ -60,6 +60,7 @@ describe("INSTANCE_CATALOG", function describeInstanceCatalog(): void {
       mosaics: [
         "https://example.org/samples/mosaics/nobel_books_list.yaml",
         "https://example.org/samples/mosaics/nobel_laureates_map.yaml",
+        "https://example.org/samples/mosaics/flashcards_literature_laureates.yaml",
       ],
     });
   });

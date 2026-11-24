@@ -324,7 +324,7 @@ describe("mod list", function describeModList(): void {
   it("Mod outside the catalog: listed with the dot, which wins over the ring", async function listsOutsideMod(): Promise<void> {
     testTexts.set(
       OTHER_MOD_SOURCE,
-      'mod:\n  title: "Other"\n  version: "2.0.0"\n  api: "^0.1.0"\n  entrypoint: "./main.js"\n',
+      'mod:\n  title: "Other"\n  version: "2.0.0"\n  api: "^0.2.0"\n  entrypoint: "./main.js"\n',
     );
     testTexts.set("https://example.org/fixtures/mods/other/main.js", "");
     const fixture = await startListStage(

@@ -7,7 +7,7 @@ import { parseYaml } from "./yaml_parser.ts";
 
 const TEST_SOURCE = `${FIXTURES_BASE_URL}test.yaml`;
 const COLLECTION_PATH = "tiles/books_collection.yaml";
-const CODE_RAN_MARKER = "openTeselaYamlCodeRan";
+const CODE_RAN_MARKER = "teselariumYamlCodeRan";
 
 function buildFetchedFile(content: string): FetchedFile {
   const fetchedFile: FetchedFile = { source: TEST_SOURCE, content };

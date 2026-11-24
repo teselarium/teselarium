@@ -68,10 +68,10 @@ function readComputedColor(selector: string): string {
   return getComputedStyle(element).color;
 }
 
-/** Runs in the probe's frame: the color `--ot-primary` computes to, as the browser writes colors. */
+/** Runs in the probe's frame: the color `--tes-primary` computes to, as the browser writes colors. */
 function readPrimaryColor(): string {
   const probe = document.createElement("span");
-  probe.style.color = "var(--ot-primary)";
+  probe.style.color = "var(--tes-primary)";
   document.body.append(probe);
   const color = getComputedStyle(probe).color;
   probe.remove();
@@ -80,7 +80,7 @@ function readPrimaryColor(): string {
 
 /** Runs in the probe's frame: the names of the computed font families of the first `<math>`, without quotes. */
 function readMathFontFamilies(): string[] {
-  const math = document.querySelector("ot-tile-body math") as Element;
+  const math = document.querySelector("tes-tile-body math") as Element;
   const families: string[] = [];
   for (const family of getComputedStyle(math).fontFamily.split(",")) {
     families.push(family.trim().replace(/^["']|["']$/g, ""));
@@ -94,7 +94,7 @@ test.describe(
   function describeMathFont(): void {
     test("Math font", async function namesMathFonts({ page }): Promise<void> {
       const frame = await showExtrasBody(page, MATH_INDEX);
-      await expect(frame.locator("ot-tile-body math").first()).toBeVisible();
+      await expect(frame.locator("tes-tile-body math").first()).toBeVisible();
 
       expect(await frame.evaluate(readMathFontFamilies)).toEqual([
         "STIX Two Math",
@@ -116,7 +116,7 @@ test.describe(
     }): Promise<void> {
       await page.emulateMedia({ colorScheme: "dark" });
       const frame = await showExtrasBody(page, CODE_INDEX);
-      const keywordSelector = "ot-tile-body span.hljs-keyword";
+      const keywordSelector = "tes-tile-body span.hljs-keyword";
       await expect(frame.locator(keywordSelector)).toBeVisible();
       const darkPrimary = await frame.evaluate(readPrimaryColor);
       await markFrame(frame);
@@ -150,10 +150,10 @@ test.describe(
 
       await frame.evaluate(showTileBodies, [0, 1]);
 
-      await expect(frame.locator("ot-tile-body").first()).toHaveText(
+      await expect(frame.locator("tes-tile-body").first()).toHaveText(
         "It costs $5 and $10.",
       );
-      await expect(frame.locator("ot-tile-body em")).toHaveText("calm");
+      await expect(frame.locator("tes-tile-body em")).toHaveText("calm");
       expect(listMatchingUrls(requestedUrls, EXTRA_CHUNK_PATTERN)).toEqual([]);
     });
   },

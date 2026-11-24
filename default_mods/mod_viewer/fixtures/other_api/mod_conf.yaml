@@ -2,6 +2,6 @@
 mod:
   title: "Other API"
   version: "1.0.0"
-  api: "^0.2.0"
+  api: "^0.3.0"
   description: "A fixture mod for another mod API."
   entrypoint: "./main.js"

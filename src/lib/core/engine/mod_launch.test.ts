@@ -1280,7 +1280,7 @@ describe("buildModLaunch", function describeBuildModLaunch(): void {
   });
 
   it("Mods for 0.1.0 still match", async function matchesFirstVersionRange(): Promise<void> {
-    serveUntypedMod("^0.1.0");
+    serveUntypedMod("^0.2.0");
 
     const launch = await launchMod({ ...SAMPLE_LINK, mod: UNTYPED_MOD_SOURCE });
 

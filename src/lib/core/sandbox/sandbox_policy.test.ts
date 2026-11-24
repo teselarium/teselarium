@@ -69,7 +69,7 @@ describe("collectContentHosts", function describeCollectContentHosts(): void {
 
   it("Stored mosaic's sandbox", function dropsBrowserSources(): void {
     const contentHosts = collectContentHosts([
-      "opentesela-browser:///r1/maps/nobel_map.yaml",
+      "teselarium-browser:///r1/maps/nobel_map.yaml",
       "https://mods.example.net/book_list/mod_conf.yaml",
       "https://tiles.example.net/laureates/collection.yaml",
     ]);

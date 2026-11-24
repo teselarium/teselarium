@@ -20,8 +20,8 @@ export interface TileMediaSetting {
   snapshot: boolean;
 }
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const TILE_MEDIA_SETTING_KEY = "opentesela.tile-linked-media";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const TILE_MEDIA_SETTING_KEY = "teselarium.tile-linked-media";
 
 function readStoredValue(storage: TileMediaStorage): unknown {
   const stored = readStoredJson(storage, TILE_MEDIA_SETTING_KEY);

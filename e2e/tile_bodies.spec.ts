@@ -71,11 +71,11 @@ async function showRichBody(page: Page): Promise<BodyProbe> {
   return bodyProbe;
 }
 
-/** Runs in the probe's frame: counts the `ot-rendered` events that reach `document`. */
+/** Runs in the probe's frame: counts the `tes-rendered` events that reach `document`. */
 function countRenderedEvents(): void {
   const probeGlobal = globalThis as unknown as { renderedCount: number };
   probeGlobal.renderedCount = 0;
-  document.addEventListener("ot-rendered", function countRendered(): void {
+  document.addEventListener("tes-rendered", function countRendered(): void {
     probeGlobal.renderedCount += 1;
   });
 }
@@ -86,7 +86,7 @@ function readRenderedCount(): number {
 
 /** Runs in the probe's frame: shows a tile that is not one of the mod's. */
 function showOtherTile(): void {
-  const body = document.createElement("ot-tile-body") as HTMLElement & {
+  const body = document.createElement("tes-tile-body") as HTMLElement & {
     tile: unknown;
   };
   document.body.append(body);
@@ -96,7 +96,7 @@ function showOtherTile(): void {
 /** Runs in the probe's frame: cancels every click on a body link in the mod's own listener. */
 function handleLinksInMod(): void {
   document.addEventListener("click", function cancelLinkClick(event): void {
-    if ((event.target as Element).closest("a[data-ot-link]") !== null) {
+    if ((event.target as Element).closest("a[data-tes-link]") !== null) {
       event.preventDefault();
     }
   });
@@ -130,10 +130,10 @@ function readComputedProperty([selector, property]: string[]): string {
   return getComputedStyle(element).getPropertyValue(property);
 }
 
-/** Runs in the probe's frame: the color `--ot-warning` computes to, as the browser writes colors. */
+/** Runs in the probe's frame: the color `--tes-warning` computes to, as the browser writes colors. */
 function readWarningColor(): string {
   const probe = document.createElement("span");
-  probe.style.color = "var(--ot-warning)";
+  probe.style.color = "var(--tes-warning)";
   document.body.append(probe);
   const color = getComputedStyle(probe).color;
   probe.remove();
@@ -153,9 +153,9 @@ test.describe(
       await frame.evaluate(showTileBodies, [0]);
 
       await expect(
-        frame.locator("ot-tile-body h1", { hasText: "Notes" }),
+        frame.locator("tes-tile-body h1", { hasText: "Notes" }),
       ).toBeVisible();
-      await expect(frame.locator("ot-tile-body em")).toHaveText("dystopian");
+      await expect(frame.locator("tes-tile-body em")).toHaveText("dystopian");
       expect(await frame.evaluate(readRenderedCount)).toBe(1);
     });
 
@@ -166,7 +166,7 @@ test.describe(
 
       await frame.evaluate(showOtherTile);
 
-      await expect(frame.locator('ot-tile-body [role="alert"]')).toHaveText(
+      await expect(frame.locator('tes-tile-body [role="alert"]')).toHaveText(
         "tiles.renderBody: the source https://example.org/other.md is not one of the mod's tiles",
       );
     });
@@ -284,7 +284,7 @@ test.describe(
 
       expect(
         await frame.evaluate(readComputedProperty, [
-          'aside[data-ot-alert="warning"]',
+          'aside[data-tes-alert="warning"]',
           "border-left-color",
         ]),
       ).toBe(await frame.evaluate(readWarningColor));
@@ -306,7 +306,7 @@ test.describe(
       });
       const shortBox = await shortPlaceholder.boundingBox();
       const longBox = await longPlaceholder.boundingBox();
-      const bodyBox = await frame.locator("ot-tile-body").boundingBox();
+      const bodyBox = await frame.locator("tes-tile-body").boundingBox();
 
       expect(longBox?.width).toBeCloseTo(shortBox?.width ?? 0, 1);
       expect(longBox?.height).toBeCloseTo(shortBox?.height ?? 0, 1);

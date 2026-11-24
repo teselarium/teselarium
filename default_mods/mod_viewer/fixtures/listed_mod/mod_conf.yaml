@@ -2,7 +2,7 @@
 mod:
   title: "Listed Mod"
   version: "1.0.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "A fixture mod that the viewer's tests show."
   entrypoint: "./main.js"
   default_mosaic: "./mosaic.yaml"

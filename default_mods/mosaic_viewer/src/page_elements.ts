@@ -17,10 +17,10 @@ export function buildStatusMessage(text: string): HTMLElement {
   return status;
 }
 
-/** A badge: a `<span>` with `data-ot-variant`. */
+/** A badge: a `<span>` with `data-tes-variant`. */
 export function buildBadge(text: string, variant: string): HTMLElement {
   const badge = document.createElement("span");
-  badge.dataset.otVariant = variant;
+  badge.dataset.tesVariant = variant;
   badge.textContent = text;
   return badge;
 }

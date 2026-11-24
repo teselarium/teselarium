@@ -35,10 +35,10 @@ export async function drawsPrimaryAction(context: CaseContext): Promise<void> {
 
   context
     .expect(readButtonBackground(context, "Open default mosaic"))
-    .toBe(readTokenAs("--ot-primary", "color"));
+    .toBe(readTokenAs("--tes-primary", "color"));
   context
     .expect(readButtonBackground(context, "Run without tiles"))
-    .toBe(readTokenAs("--ot-background", "color"));
+    .toBe(readTokenAs("--tes-background", "color"));
 }
 
 export async function keepsOwnStylesToLayout(

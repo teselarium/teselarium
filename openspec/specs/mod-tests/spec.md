@@ -125,7 +125,7 @@ Each case's function SHALL receive a context with `mount`, `root` (the frame's b
 - **THEN** the request resolves with `false`, and the user catalog is unchanged
 
 #### Scenario: Save answered
-- **WHEN** a case calls `answer("userCatalog.save", "opentesela-browser:///fixture/laureates_my_way.yaml")` and the mod then sends `userCatalog.save` with a draft
+- **WHEN** a case calls `answer("userCatalog.save", "teselarium-browser:///fixture/laureates_my_way.yaml")` and the mod then sends `userCatalog.save` with a draft
 - **THEN** the request resolves with that address, no dialog is shown, nothing is saved, and the case's `requests` holds the `userCatalog.save` with its `content`
 
 #### Scenario: Wrong save answer
@@ -212,7 +212,7 @@ A `ui.notify` sent while a case runs SHALL resolve with `null` and SHALL NOT be 
 - **THEN** the request resolves with `null`, the report has no finding whose message includes `No books found`, and `requests` lists `ui.notify` with those params and result `null`
 
 ### Requirement: Scripted catalog
-The answer to `catalog.list` SHALL be a mapping whose optional `mods`, `collections` and `mosaics` are lists of entries with a non-empty string `source`, an optional `listedBy` that is `"instance"`, `"default"` or `"user"`, and an optional `place` that is `"remote"` or `"browser"`. A mosaic entry may also have an optional `defaultOf` that is `null` or `{ source, title }` with non-empty strings, and an optional `provenance` that is `null` or a mapping with a non-empty string `addedAt`, `folder`, `path`, `updatedAt` and `copiedFrom` each a string or `null`, `null` when missing, and an optional boolean `changedSinceExport`, `false` when missing. A missing list SHALL be empty. A missing `listedBy` SHALL be `"default"` for a mosaic with a `defaultOf`, `"user"` for one with a `provenance`, and `"instance"` otherwise. A missing `place` SHALL be `"browser"` for an `opentesela-browser:` source and `"remote"` otherwise. A missing `defaultOf` or `provenance` SHALL be `null`. The request SHALL resolve with the catalog in that complete form. Any other value SHALL make `answer` throw.
+The answer to `catalog.list` SHALL be a mapping whose optional `mods`, `collections` and `mosaics` are lists of entries with a non-empty string `source`, an optional `listedBy` that is `"instance"`, `"default"` or `"user"`, and an optional `place` that is `"remote"` or `"browser"`. A mosaic entry may also have an optional `defaultOf` that is `null` or `{ source, title }` with non-empty strings, and an optional `provenance` that is `null` or a mapping with a non-empty string `addedAt`, `folder`, `path`, `updatedAt` and `copiedFrom` each a string or `null`, `null` when missing, and an optional boolean `changedSinceExport`, `false` when missing. A missing list SHALL be empty. A missing `listedBy` SHALL be `"default"` for a mosaic with a `defaultOf`, `"user"` for one with a `provenance`, and `"instance"` otherwise. A missing `place` SHALL be `"browser"` for a `teselarium-browser:` source and `"remote"` otherwise. A missing `defaultOf` or `provenance` SHALL be `null`. The request SHALL resolve with the catalog in that complete form. Any other value SHALL make `answer` throw.
 
 #### Scenario: Fixture catalog
 - **WHEN** a case calls `answer("catalog.list", { "mods": [{ "source": "./default_mods/mod_explorer/fixtures/listed_mod" }] })` and the mod then sends `catalog.list`
@@ -223,7 +223,7 @@ The answer to `catalog.list` SHALL be a mapping whose optional `mods`, `collecti
 - **THEN** the call throws an error that says the answer to `catalog.list` must be a catalog and names `mods`
 
 #### Scenario: Fixture user mosaic
-- **WHEN** a case answers `catalog.list` with a mosaic whose `source` is `opentesela-browser:///fixture/nobel_map.yaml` and whose `provenance` has the folder `my-mosaics`
+- **WHEN** a case answers `catalog.list` with a mosaic whose `source` is `teselarium-browser:///fixture/nobel_map.yaml` and whose `provenance` has the folder `my-mosaics`
 - **THEN** the request resolves with that mosaic, with `listedBy` `"user"`, `place` `"browser"` and `defaultOf` `null`, and its `provenance` has `changedSinceExport` `false` and `copiedFrom` `null`
 
 #### Scenario: Wrong mark

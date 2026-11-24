@@ -39,7 +39,7 @@ function buildTitleButton(
 ): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.dataset.otVariant = "ghost";
+  button.dataset.tesVariant = "ghost";
   button.textContent = title;
   button.addEventListener(
     "click",

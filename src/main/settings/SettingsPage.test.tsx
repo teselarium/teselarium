@@ -95,12 +95,12 @@ async function buildUserCatalogOptions(
   const database = createMemoryBrowserDatabase<UserCatalogEntry>();
   await database.apply({
     putFiles: [
-      { address: "opentesela-browser:///r1/a.yaml", text: "mosaic: {}\n" },
-      { address: "opentesela-browser:///r1/b.yaml", text: "mosaic: {}\n" },
+      { address: "teselarium-browser:///r1/a.yaml", text: "mosaic: {}\n" },
+      { address: "teselarium-browser:///r1/b.yaml", text: "mosaic: {}\n" },
     ],
     putEntries: [
-      buildUserEntry("opentesela-browser:///r1/a.yaml", "browser"),
-      buildUserEntry("opentesela-browser:///r1/b.yaml", "browser"),
+      buildUserEntry("teselarium-browser:///r1/a.yaml", "browser"),
+      buildUserEntry("teselarium-browser:///r1/b.yaml", "browser"),
       buildUserEntry("https://mosaics.example.net/c.yaml", "remote"),
     ],
     deleteAddresses: [],
@@ -705,7 +705,7 @@ describe("SettingsPage", function describeSettingsPage(): void {
       "Version",
     ]);
     expect(readVersions()).toEqual({
-      OpenTesela: PACKAGE_VERSION,
+      Teselarium: PACKAGE_VERSION,
       "Mod API": MOD_API_VERSION,
     });
   });
@@ -713,7 +713,7 @@ describe("SettingsPage", function describeSettingsPage(): void {
   it("Version follows the build: shows the version of package.json", async function followsBuild(): Promise<void> {
     renderApp(await startTestApp("#/settings"));
 
-    expect(readVersions().OpenTesela).toBe(PACKAGE_VERSION);
+    expect(readVersions().Teselarium).toBe(PACKAGE_VERSION);
   });
 
   it("lists the sections in the sidebar's order", async function listsInOrder(): Promise<void> {

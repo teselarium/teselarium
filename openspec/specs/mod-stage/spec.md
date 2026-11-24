@@ -26,11 +26,11 @@ The app SHALL open a mod for the address hash `#/run`, with the query parameter 
 - **THEN** the mod's context `params` is `{ "from": "x" }`
 
 ### Requirement: Home
-The app SHALL show Home for an empty hash, for `#/`, and for any hash that is neither a run link with a non-empty `mod` or a non-empty `mosaic` nor the address of a page. Home SHALL be the target of the registry's Home section: a page in the vanilla app, or a mod that an instantiation chooses, which runs in a sandbox like any other mod. The app page SHALL keep the `OpenTesela` heading.
+The app SHALL show Home for an empty hash, for `#/`, and for any hash that is neither a run link with a non-empty `mod` or a non-empty `mosaic` nor the address of a page. Home SHALL be the target of the registry's Home section: a page in the vanilla app, or a mod that an instantiation chooses, which runs in a sandbox like any other mod. The app page SHALL keep the `Teselarium` heading.
 
 #### Scenario: No hash
 - **WHEN** the app is opened with no hash
-- **THEN** the page shows the `OpenTesela` heading and the Home page, and no mod frame is visible
+- **THEN** the page shows the `Teselarium` heading and the Home page, and no mod frame is visible
 
 #### Scenario: Unknown hash
 - **WHEN** the app is opened at `#/mods/view`

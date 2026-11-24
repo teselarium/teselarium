@@ -111,25 +111,25 @@ export const TILE_SANITIZE_SCHEMA: SanitizeSchema = {
     video: MEDIA_ATTRIBUTES,
     audio: ["src"],
     source: [...(defaultAttributes.source ?? []), "src", "type"],
-    button: [["type", "button"], ["className", "ot-player"], "dataOtPlayer"],
+    button: [["type", "button"], ["className", "tes-player"], "dataTesPlayer"],
     span: [
       ...(defaultAttributes.span ?? []),
       [
         "className",
-        "ot-player-box",
-        "ot-player-title",
-        "ot-player-host",
+        "tes-player-box",
+        "tes-player-title",
+        "tes-player-host",
         /^hljs-/,
       ],
     ],
     aside: [
-      ["className", "ot-alert"],
-      ["dataOtAlert", ...ALERT_KINDS],
+      ["className", "tes-alert"],
+      ["dataTesAlert", ...ALERT_KINDS],
     ],
-    p: [...(defaultAttributes.p ?? []), ["className", "ot-alert-title"]],
+    p: [...(defaultAttributes.p ?? []), ["className", "tes-alert-title"]],
     code: [
       ["className", /^language-./, "math-inline", "math-display", "hljs"],
-      "dataOtMathError",
+      "dataTesMathError",
     ],
   },
   protocols: {

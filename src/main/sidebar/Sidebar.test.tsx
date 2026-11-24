@@ -233,7 +233,7 @@ describe("Sidebar", function describeSidebar(): void {
     expect(sidebarAside().firstElementChild).toBe(row);
     expect(button).toHaveAccessibleName("Hide sidebar");
     expect(heading).toBe(
-      screen.getByRole("heading", { level: 1, name: "OpenTesela" }),
+      screen.getByRole("heading", { level: 1, name: "Teselarium" }),
     );
     expect(heading).not.toHaveClass("sr-only");
   });
@@ -245,7 +245,7 @@ describe("Sidebar", function describeSidebar(): void {
 
     const heading = screen.getByRole("heading", {
       level: 1,
-      name: "OpenTesela",
+      name: "Teselarium",
     });
 
     expect(heading).toHaveClass("sr-only");
@@ -267,7 +267,7 @@ describe("Sidebar", function describeSidebar(): void {
     expect(within(aside).queryAllByRole("link")).toHaveLength(0);
     expect(within(aside).queryAllByRole("separator")).toHaveLength(0);
     expect(
-      within(aside).getByRole("heading", { level: 1, name: "OpenTesela" }),
+      within(aside).getByRole("heading", { level: 1, name: "Teselarium" }),
     ).toHaveClass("sr-only");
   });
 });

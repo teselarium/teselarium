@@ -125,8 +125,8 @@ describe("tile media setting", function describeTileMediaSetting(): void {
   });
 
   it("Mods cannot reach the switch", function keepsKeyOutOfModStorage(): void {
-    expect(TILE_MEDIA_SETTING_KEY).toBe("opentesela.tile-linked-media");
-    expect(TILE_MEDIA_SETTING_KEY.startsWith("opentesela.mod-storage:")).toBe(
+    expect(TILE_MEDIA_SETTING_KEY).toBe("teselarium.tile-linked-media");
+    expect(TILE_MEDIA_SETTING_KEY.startsWith("teselarium.mod-storage:")).toBe(
       false,
     );
   });

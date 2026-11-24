@@ -200,7 +200,7 @@ test.describe(
 
       const answer = await frame.evaluate(requestFromProbe, [
         "userCatalog.save",
-        { mosaic: "opentesela-browser:///r1/a.yaml" },
+        { mosaic: "teselarium-browser:///r1/a.yaml" },
       ]);
 
       expect(answer).toEqual({

@@ -36,8 +36,8 @@ export interface RecentlyUsed {
   snapshot: RecentlyUsedSnapshot;
 }
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const RECENTLY_USED_KEY = "opentesela.recently-used";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const RECENTLY_USED_KEY = "teselarium.recently-used";
 
 /** How many entries of each kind are kept. */
 export const RECENTLY_USED_LIMIT = 10;

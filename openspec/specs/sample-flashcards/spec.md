@@ -47,7 +47,7 @@ In Explore, the mod SHALL show a table with the column headers "Title" and "File
 - **THEN** the card of Tables is open
 
 ### Requirement: Tile name
-A tile's name SHALL be its metadata `title` when that is a non-blank string, otherwise the text of the first heading of its rendered body, at any level. A tile with neither SHALL show "No title" in italic, in the theme's muted foreground color (`--ot-muted-foreground`).
+A tile's name SHALL be its metadata `title` when that is a non-blank string, otherwise the text of the first heading of its rendered body, at any level. A tile with neither SHALL show "No title" in italic, in the theme's muted foreground color (`--tes-muted-foreground`).
 
 #### Scenario: Name from the first heading
 - **WHEN** the mod receives a tile with no `title` whose body starts with `## What is a monad?`
@@ -55,7 +55,7 @@ A tile's name SHALL be its metadata `title` when that is a non-blank string, oth
 
 #### Scenario: No title and no heading
 - **WHEN** the mod receives a tile `notes_03.md` with no `title` and a body without headings
-- **THEN** its row shows "No title", with a computed `font-style` of `italic` and the computed color of `--ot-muted-foreground`
+- **THEN** its row shows "No title", with a computed `font-style` of `italic` and the computed color of `--tes-muted-foreground`
 - **AND** its button has an accessible name that contains "No title" and "notes_03.md"
 
 #### Scenario: Title that is not a string
@@ -237,18 +237,18 @@ Pressing "Start" SHALL close the setup dialog and start a session over the cards
 - **THEN** no diagram has been drawn, and after "Show answer" the answer shows the drawn diagram
 
 ### Requirement: Flashcard shape
-In Study, the card SHALL look like a flashcard, with its look set from the theme's tokens only, so it holds in light and dark. It SHALL be at most 32rem wide and centered, at least 16rem tall, and SHALL grow with its content. Its background SHALL be `--ot-card`, its shadow `--ot-shadow`, and its corner radius twice `--ot-radius`. The end of a round SHALL be shown in the same card.
+In Study, the card SHALL look like a flashcard, with its look set from the theme's tokens only, so it holds in light and dark. It SHALL be at most 32rem wide and centered, at least 16rem tall, and SHALL grow with its content. Its background SHALL be `--tes-card`, its shadow `--tes-shadow`, and its corner radius twice `--tes-radius`. The end of a round SHALL be shown in the same card.
 
 #### Scenario: A flashcard
 - **WHEN** a session shows a card, in light and in dark
-- **THEN** the card's computed background, shadow and corner radius are those of `--ot-card`, `--ot-shadow` and twice `--ot-radius`, and its width is at most 32rem
+- **THEN** the card's computed background, shadow and corner radius are those of `--tes-card`, `--tes-shadow` and twice `--tes-radius`, and its width is at most 32rem
 
 ### Requirement: Question and answer sides
-The question side SHALL have a visible label "Question", after Lucide's `circle-question-mark` icon, and a top border in `--ot-primary`. The answer side SHALL have a visible label "Answer", after Lucide's `lightbulb` icon, a `--ot-muted` background, and a top border in `--ot-border` that divides it from the question. The icons SHALL be drawn in the label's color and hidden from assistive technology.
+The question side SHALL have a visible label "Question", after Lucide's `circle-question-mark` icon, and a top border in `--tes-primary`. The answer side SHALL have a visible label "Answer", after Lucide's `lightbulb` icon, a `--tes-muted` background, and a top border in `--tes-border` that divides it from the question. The icons SHALL be drawn in the label's color and hidden from assistive technology.
 
 #### Scenario: The two sides
 - **WHEN** a card shows its answer, in light and in dark
-- **THEN** the question side's computed top border color is `--ot-primary`, the answer side's computed background is `--ot-muted`, and the labels "Question" and "Answer" are shown
+- **THEN** the question side's computed top border color is `--tes-primary`, the answer side's computed background is `--tes-muted`, and the labels "Question" and "Answer" are shown
 
 ### Requirement: Side text
 A side shown as text SHALL be centered, with a font size of 1.25rem. A side shown as a rendered body SHALL be left-aligned.
@@ -265,11 +265,11 @@ The answer side SHALL fade in over 150ms when it is shown, with no animation whe
 - **THEN** the answer side has no animation
 
 ### Requirement: Session bar
-A session bar above the card SHALL hold "Card i of N", with a font size of 0.875rem in `--ot-muted-foreground`, and a `<progress>` whose value is the number of cards graded in the round and whose maximum is N. It SHALL also hold "Round r" from the second round on, and "Restart" as a plain button.
+A session bar above the card SHALL hold "Card i of N", with a font size of 0.875rem in `--tes-muted-foreground`, and a `<progress>` whose value is the number of cards graded in the round and whose maximum is N. It SHALL also hold "Round r" from the second round on, and "Restart" as a plain button.
 
 #### Scenario: The position
 - **WHEN** a session of the sample deck shows "Card 3 of 8"
-- **THEN** "Card 3 of 8" is shown above the card in `--ot-muted-foreground`, the progress has the value 2 and the maximum 8, and "Restart" is not inside the card
+- **THEN** "Card 3 of 8" is shown above the card in `--tes-muted-foreground`, the progress has the value 2 and the maximum 8, and "Restart" is not inside the card
 
 ### Requirement: Button place
 On a study card, the buttons SHALL be on the question side, below the question and above the answer side, so that the grades take the row of "Show answer", at the same height, when the answer is shown, and a long answer does not move them. The end of a round, which has no answer side, SHALL keep its buttons at the bottom of the card.
@@ -348,7 +348,7 @@ Grading the last card of a round SHALL end the round and show "You knew K of N c
 - **THEN** the setup dialog is open
 
 ### Requirement: Not yet list
-When M cards of a round were graded "Not yet", the end of the round SHALL show, below the message and on the `--ot-muted` tint, a label "Not yet · M cards" ("card" when M is 1) after Lucide's `rotate-ccw` icon, styled like a side's label. Below it SHALL be a list named by that label, holding the names of those cards (a tile's name, or its file when it has none) in the order they were shown. Then SHALL come the button that studies them again, which has focus, and "Start again".
+When M cards of a round were graded "Not yet", the end of the round SHALL show, below the message and on the `--tes-muted` tint, a label "Not yet · M cards" ("card" when M is 1) after Lucide's `rotate-ccw` icon, styled like a side's label. Below it SHALL be a list named by that label, holding the names of those cards (a tile's name, or its file when it has none) in the order they were shown. Then SHALL come the button that studies them again, which has focus, and "Start again".
 
 #### Scenario: Two missed cards
 - **WHEN** a round of 8 cards ends with 2 cards graded "Not yet"

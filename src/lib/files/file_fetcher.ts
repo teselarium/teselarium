@@ -27,7 +27,7 @@ export interface FileFetchOptions {
   fetch?: typeof globalThis.fetch;
   /** Files the user picked, needed for `file:` locations. */
   localFiles?: LocalFiles;
-  /** Files stored in the browser, needed for `opentesela-browser:` locations. */
+  /** Files stored in the browser, needed for `teselarium-browser:` locations. */
   browserFiles?: BrowserFileReader;
 }
 
@@ -130,7 +130,7 @@ function readFileContent(url: URL, options: FileFetchOptions): Promise<string> {
 
 /**
  * Loads the text of a file from a path or URL. `file:` URLs are read from the
- * picked local files, `opentesela-browser:` URLs from the files stored in the
+ * picked local files, `teselarium-browser:` URLs from the files stored in the
  * browser, and any other URL is fetched.
  */
 export async function fetchFile(

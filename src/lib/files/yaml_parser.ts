@@ -6,7 +6,7 @@ import type { FetchedFile } from "./file_fetcher.ts";
 export type YamlValue =
   string | number | boolean | null | YamlValue[] | { [key: string]: YamlValue };
 
-/** A YAML mapping, the top level of every OpenTesela YAML file. */
+/** A YAML mapping, the top level of every Teselarium YAML file. */
 export type YamlMapping = { [key: string]: YamlValue };
 
 /** A YAML file parsed into its content. `source` is the file it was read from. */

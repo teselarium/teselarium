@@ -75,7 +75,7 @@ describe("mod storage slots", function describeModStorage(): void {
     writeModValue(storage, COLLECTION_SLOT, "selected", true);
 
     expect([...storage.items.keys()]).toEqual([
-      `opentesela.mod-storage:["${SAMPLE_MOD_SOURCE}","${SAMPLE_COLLECTION_SOURCE}","selected"]`,
+      `teselarium.mod-storage:["${SAMPLE_MOD_SOURCE}","${SAMPLE_COLLECTION_SOURCE}","selected"]`,
     ]);
   });
 
@@ -167,7 +167,7 @@ describe("Storage slots are separate per mod and context", function describeSlot
   it("Value stored before contexts", function ignoresFormerKey(): void {
     const storage = createMemoryStorage();
     storage.setItem(
-      `opentesela.mod-storage:${JSON.stringify([SAMPLE_MOD_SOURCE, "selected"])}`,
+      `teselarium.mod-storage:${JSON.stringify([SAMPLE_MOD_SOURCE, "selected"])}`,
       JSON.stringify("kallocain"),
     );
 

@@ -104,7 +104,7 @@ describe("buildSandboxDocument", function describeBuildSandboxDocument(): void {
     });
 
     expect(SANDBOX_LOADER).toContain(
-      'const TILE_BODY_ELEMENT = "ot-tile-body";',
+      'const TILE_BODY_ELEMENT = "tes-tile-body";',
     );
     expect(runningDocument).toContain(definition);
     expect(checkDocument).toContain(definition);

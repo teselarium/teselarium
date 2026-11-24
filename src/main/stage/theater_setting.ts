@@ -20,8 +20,8 @@ export interface TheaterSetting {
   stage: Stage;
 }
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const THEATER_MODE_KEY = "opentesela.theater-mode";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const THEATER_MODE_KEY = "teselarium.theater-mode";
 
 /**
  * Whether theater mode is on as the app starts, for the stage created before

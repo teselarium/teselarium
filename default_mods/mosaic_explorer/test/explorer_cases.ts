@@ -281,14 +281,14 @@ export async function showsWhereMosaicsLive(
   const storedBadge = cards[0].querySelector("h2 + span");
   context.expect(storedBadge?.textContent).toBe("Browser");
   context
-    .expect(storedBadge?.getAttribute("data-ot-variant"))
+    .expect(storedBadge?.getAttribute("data-tes-variant"))
     .toBe("secondary");
   context
     .expect(cards[0].querySelector("header > small")?.textContent)
     .toBe("Added by you");
   const remoteBadge = cards[1].querySelector("h2 + span");
   context.expect(remoteBadge?.textContent).toBe("Remote");
-  context.expect(remoteBadge?.getAttribute("data-ot-variant")).toBe("outline");
+  context.expect(remoteBadge?.getAttribute("data-tes-variant")).toBe("outline");
   context.expect(cards[1].querySelector("header > small")).toBe(null);
 }
 
@@ -305,7 +305,7 @@ export async function marksChangedMosaics(context: CaseContext): Promise<void> {
   const cards = context.root.querySelectorAll("li > article");
   const changed = cards[0].querySelector("header > small + span");
   context.expect(changed?.textContent).toBe("Unexported changes");
-  context.expect(changed?.getAttribute("data-ot-variant")).toBe("warning");
+  context.expect(changed?.getAttribute("data-tes-variant")).toBe("warning");
   context.expect(cards[1].textContent).not.toContain("Unexported changes");
 }
 
@@ -361,7 +361,7 @@ export async function importsWhenAsked(context: CaseContext): Promise<void> {
     findSettledRequest.bind(undefined, context, "userCatalog.import"),
   );
   context.expect(importRequest.result).toBe(true);
-  context.expect(importButton.getAttribute("data-ot-variant")).toBe("outline");
+  context.expect(importButton.getAttribute("data-tes-variant")).toBe("outline");
   context.expect(readStatusText(context)).toBe("");
 }
 
@@ -379,7 +379,7 @@ export async function addsByUrlWhenCancelled(
   );
   context.expect(addRequest.params).toEqual({});
   context.expect(addRequest.result).toBe(false);
-  context.expect(addButton.getAttribute("data-ot-variant")).toBe("outline");
+  context.expect(addButton.getAttribute("data-tes-variant")).toBe("outline");
   context.expect(readStatusText(context)).toBe("");
 }
 

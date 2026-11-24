@@ -134,8 +134,8 @@ interface DiagramGlobal {
 
 /**
  * Runs in the probe's frame: shows the tile at `index` in a new
- * `ot-tile-body`, and logs a snapshot of the body at each `ot-rendered` and
- * `ot-diagrams-drawn`, and one paint after the first `ot-rendered`, before
+ * `tes-tile-body`, and logs a snapshot of the body at each `tes-rendered` and
+ * `tes-diagrams-drawn`, and one paint after the first `tes-rendered`, before
  * any diagram can be drawn. Logs every busy change of its mermaid blocks and
  * figures in `busyLog`. With `nextIndex`, sets that tile as soon as the
  * loader appends mermaid's script, while the block is being drawn. It runs
@@ -144,7 +144,7 @@ interface DiagramGlobal {
 function showDiagramBody(options: ShowOptions): void {
   const diagramGlobal = globalThis as unknown as DiagramGlobal;
   const body = document.createElement(
-    "ot-tile-body",
+    "tes-tile-body",
   ) as DiagramGlobal["diagramBody"];
   diagramGlobal.bodyLog = [];
   diagramGlobal.busyLog = [];
@@ -217,9 +217,9 @@ function showDiagramBody(options: ShowOptions): void {
   if (options.diagrams !== undefined) {
     body.diagrams = options.diagrams;
   }
-  body.addEventListener("ot-rendered", logEvent);
-  body.addEventListener("ot-rendered", requestPaintSnapshot, { once: true });
-  body.addEventListener("ot-diagrams-drawn", logEvent);
+  body.addEventListener("tes-rendered", logEvent);
+  body.addEventListener("tes-rendered", requestPaintSnapshot, { once: true });
+  body.addEventListener("tes-diagrams-drawn", logEvent);
   new MutationObserver(logBusyChanges).observe(body, {
     subtree: true,
     childList: true,
@@ -262,7 +262,7 @@ function listLoggedEvents(): string[] {
 function countDrawnEvents(): number {
   let count = 0;
   for (const snapshot of (globalThis as unknown as DiagramGlobal).bodyLog) {
-    if (snapshot.event === "ot-diagrams-drawn") {
+    if (snapshot.event === "tes-diagrams-drawn") {
       count += 1;
     }
   }
@@ -389,7 +389,7 @@ test.describe(
 
       const log = await frame.evaluate(readBodyLog);
       expect(log[0]).toEqual({
-        event: "ot-rendered",
+        event: "tes-rendered",
         paragraphs: 1,
         codeBlocks: 1,
         figures: 0,
@@ -622,10 +622,10 @@ test.describe(
 
       const log = await frame.evaluate(readBodyLog);
       expect(log).toEqual([
-        { event: "ot-rendered", paragraphs: 1, codeBlocks: 1, figures: 0 },
+        { event: "tes-rendered", paragraphs: 1, codeBlocks: 1, figures: 0 },
         { event: "paint", paragraphs: 1, codeBlocks: 1, figures: 0 },
         {
-          event: "ot-diagrams-drawn",
+          event: "tes-diagrams-drawn",
           paragraphs: 1,
           codeBlocks: 0,
           figures: 1,
@@ -646,7 +646,7 @@ test.describe(
         .poll(function readEvents(): Promise<string[]> {
           return frame.evaluate(listLoggedEvents);
         })
-        .toEqual(["ot-rendered", "paint", "ot-rendered"]);
+        .toEqual(["tes-rendered", "paint", "tes-rendered"]);
       await expect
         .poll(function readType(): Promise<string> {
           return frame.evaluate(readMermaidType);
@@ -656,15 +656,15 @@ test.describe(
 
       const log = await frame.evaluate(readBodyLog);
       expect(log[2]).toEqual({
-        event: "ot-rendered",
+        event: "tes-rendered",
         paragraphs: 1,
         codeBlocks: 0,
         figures: 0,
       });
       expect(await frame.evaluate(listLoggedEvents)).toEqual([
-        "ot-rendered",
+        "tes-rendered",
         "paint",
-        "ot-rendered",
+        "tes-rendered",
       ]);
       expect(await frame.evaluate(readFigures)).toEqual([]);
     });

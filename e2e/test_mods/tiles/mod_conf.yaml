@@ -1,5 +1,5 @@
 mod:
-  api: "^0.1.0"
+  api: "^0.2.0"
   title: "Tiles"
   version: "1.0.0"
   description: "The e2e tests' own mod: lists its tiles with their titles and images."

@@ -18,7 +18,7 @@ This folder holds the code that the [shadcn/ui](https://ui.shadcn.com) CLI gener
 
 - **One-way imports.** Code here never imports project code (`src/main/`, `src/lib/`, `src/App*`). `no-restricted-imports` in `.oxlintrc.json` enforces it: any `@/` path outside `@/vendor/`, and any relative path that leaves `src/vendor/`, fails the lint. Project code imports it through the `@/` alias with the file extension, for example `import { Button } from "@/vendor/shadcn/ui/button.tsx"`.
 - **Wrap, don't modify.** When a component needs app behavior, a project component in `src/main/` wraps it.
-- **No colors here.** The CLI writes its own `:root` / `.dark` color blocks into `src/main/app.css`. They are discarded: shadcn's variables are aliases of the theme tokens (`--ot-*`), defined in `app.css`.
+- **No colors here.** The CLI writes its own `:root` / `.dark` color blocks into `src/main/app.css`. They are discarded: shadcn's variables are aliases of the theme tokens (`--tes-*`), defined in `app.css`.
 - **Tooling.** The style lint rules (function style and names, explicit return types, `react/only-export-components`) are off here, the correctness rules still apply, and Prettier skips the folder, so files stay byte-identical to the CLI's output. TypeScript still checks them.
 
 ## Components

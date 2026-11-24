@@ -71,7 +71,7 @@ function dropMarkerLine(
 function buildAlertTitle(kind: string): Paragraph {
   const title: Paragraph = {
     type: "paragraph",
-    data: { hProperties: { className: ["ot-alert-title"] } },
+    data: { hProperties: { className: ["tes-alert-title"] } },
     children: [{ type: "text", value: ALERT_TITLES.get(kind) ?? kind }],
   };
   return title;
@@ -88,7 +88,7 @@ function turnIntoAlert(blockquote: Blockquote, marker: AlertMarker): void {
   ];
   blockquote.data = {
     hName: "aside",
-    hProperties: { className: ["ot-alert"], dataOtAlert: marker.kind },
+    hProperties: { className: ["tes-alert"], dataTesAlert: marker.kind },
   };
 }
 
@@ -100,7 +100,7 @@ function isParent(node: RootContent): node is RootContent & Parent {
 /**
  * The alerts pass: a blockquote whose first line is only `[!NOTE]`, `[!TIP]`,
  * `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, in any case, becomes an
- * `aside.ot-alert` with `data-ot-alert` and a title paragraph, without the
+ * `aside.tes-alert` with `data-tes-alert` and a title paragraph, without the
  * marker line. Changes the tree in place.
  */
 export function applyAlerts(tree: Parent): void {

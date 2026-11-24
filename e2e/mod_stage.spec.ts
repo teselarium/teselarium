@@ -549,7 +549,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
     await expect(stageBar(page)).toContainText("probe");
     await page.goBack();
     await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Home" }),
+      pageBody(page).getByRole("heading", { level: 1, name: "Teselarium" }),
     ).toBeVisible();
 
     await openModsSection(page);

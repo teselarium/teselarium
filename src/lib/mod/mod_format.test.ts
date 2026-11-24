@@ -60,7 +60,7 @@ describe("readModFormat", function describeReadModFormat(): void {
     expect(modFormat).toEqual({
       title: "Book List",
       version: "1.0.0",
-      api: "^0.1.0",
+      api: "^0.2.0",
       description: "A very simple list of books with their covers.",
       entrypoint: "./main.js",
       typePath: "../../types/book.md",
@@ -276,9 +276,9 @@ describe("readModFormat", function describeReadModFormat(): void {
   });
 
   it("Caret range", function readsCaretRange(): void {
-    const modFormat = readModFormat(buildMinimalMod({ api: "^0.1.0" }));
+    const modFormat = readModFormat(buildMinimalMod({ api: "^0.2.0" }));
 
-    expect(modFormat.api).toBe("^0.1.0");
+    expect(modFormat.api).toBe("^0.2.0");
   });
 
   it("keeps the range as written", function keepsRangeText(): void {
@@ -337,7 +337,7 @@ const README_LIBRARIES_EXAMPLE = [
   "mod:",
   '  title: "country_map"',
   '  version: "0.1.0"',
-  '  api: "^0.1.10"',
+  '  api: "^0.2.0"',
   '  entrypoint: "./main.js"',
   "  libraries:",
   "    leaflet:",

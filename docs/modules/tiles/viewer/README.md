@@ -10,8 +10,8 @@ It is an ordinary sandboxed mod. It uses only the engine API: the tile reaches i
 - The tile is one card: an `<article>` with a heading and the tile's source in muted text, then, after a separator (`<hr>`), its metadata and, after another separator, its body. The heading is the tile's `title` when it is a non-empty string, and otherwise the file name of its source, decoded (`caf%C3%A9.md` is headed `café.md`).
 - The metadata, in a `<section aria-label="Metadata">`, is a description list in frontmatter order, laid out in two columns: the keys on the left, at most 40% of the card's width, and each value beside its key. A value that is not a list or a mapping is shown as written (`156`, `true`) on its key's row. A list is a list without bullets, one item per line in the value column. A mapping is a nested description list, laid out the same way in the value column. A file without metadata says "This file has no metadata."
 - The metadata has a small "Metadata" heading (an `<h2>` holding `<small>`, the theme's muted, smaller text). Long metadata starts collapsed, in 6 lines, with a button next to the heading, "Show all <n> fields", that shows every field, then "Show fewer fields". The button is the theme's outline button, so its border and the page background show it is a button without a pointer over it, and it is no taller than the heading. Lines are counted from the values (`src/metadata_lines.ts`): a single value takes 1 line, an image address 2, a list or a mapping the lines of its items or values, and an empty one 1. Collapsed, the fields show in order while they fit, and the fields after the first that does not fit are hidden. A list that does not fit shows its first items that fit and a muted line such as "and 14 more", which counts as one of the 6 lines. The first field always shows, a list with at least its first item. Metadata that fits in 6 lines has no button. Each viewer starts collapsed, also after Previous or Next. Collapsing sets `hidden` on whole fields and list items, so hidden links leave the tab order; the button has `aria-expanded` and `aria-controls`. A long text that wraps takes more lines than it counts.
-- Each metadata string that is an absolute `http:` or `https:` address is a link with `data-ot-link`, so following it asks the user to open it in a new tab, as for a link of a body. When the address's path ends with `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.avif` or `.svg`, in any letter case and without its query or fragment, the link also shows a thumbnail of the image, two lines of text high, before the address, loaded lazily. A thumbnail that fails to load is hidden, and the link stays.
-- The body is drawn by `<ot-tile-body>` at the end of the card (see [Tile bodies](../../lib/core/engine/README.md#tile-bodies) in the engine module). An empty body draws neither the separator nor a body.
+- Each metadata string that is an absolute `http:` or `https:` address is a link with `data-tes-link`, so following it asks the user to open it in a new tab, as for a link of a body. When the address's path ends with `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.avif` or `.svg`, in any letter case and without its query or fragment, the link also shows a thumbnail of the image, two lines of text high, before the address, loaded lazily. A thumbnail that fails to load is hidden, and the link stays.
+- The body is drawn by `<tes-tile-body>` at the end of the card (see [Tile bodies](../../lib/core/engine/README.md#tile-bodies) in the engine module). An empty body draws neither the separator nor a body.
 
 ### Its place in a collection
 
@@ -37,7 +37,7 @@ Its TypeScript source, in `default_mods/tile_viewer/src/`, gets the app's look f
 
 - the tile is an `<article>`, drawn as a card, the metadata a `<dl>`, its heading muted `<small>` text, and the separators around the metadata `<hr>`s;
 - the metadata's button is a plain `<button>`, the theme's outline button, kept no taller than its heading by layout-only CSS (a smaller minimum height and padding);
-- Next is the primary action (`data-ot-variant="primary"`), Previous an outline button, and the collection's title a ghost button;
+- Next is the primary action (`data-tes-variant="primary"`), Previous an outline button, and the collection's title a ghost button;
 - the errors of opening another view are a `role="status"` element.
 
 The mod's own CSS sets layout only: the metadata's two columns are a grid, and its lists drop their bullets. These rules are scoped to the metadata section, so they never reach the rendered body in the same card. No rule that sets `display` matches a `[hidden]` element, so a hidden thumbnail stays hidden. See "Write HTML, get the app's look" in the [theme module](../../lib/core/theme/README.md).
@@ -50,7 +50,7 @@ The mod's own CSS sets layout only: the metadata's two columns are a grid, and i
 mod:
   title: "Tile Viewer"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Shows a tile's metadata and body and, when it is opened from a collection, its place in it, with the previous and next tiles."
   entrypoint: "./main.js"
   test_path: "./test.js"

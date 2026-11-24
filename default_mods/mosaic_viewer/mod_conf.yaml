@@ -1,7 +1,7 @@
 mod:
   title: "Mosaic Viewer"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Shows a mosaic's mod, collection, config, aliases and permissions, opens it and checks it."
   entrypoint: "./main.js"
   test_path: "./test.js"

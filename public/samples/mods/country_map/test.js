@@ -421,7 +421,7 @@ async function showsTheTileMetadata(context) {
   context.expect(Object.hasOwn(details, "area")).toBe(false);
   context.expect(Object.hasOwn(details, "title")).toBe(false);
   context.expect(Object.hasOwn(details, "image")).toBe(false);
-  context.expect(card.querySelector("ot-tile-body")).not.toBe(null);
+  context.expect(card.querySelector("tes-tile-body")).not.toBe(null);
 }
 
 async function showsAMappingAsJson(context) {

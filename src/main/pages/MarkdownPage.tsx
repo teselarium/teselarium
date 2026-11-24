@@ -40,18 +40,18 @@ const LOADING: PageLoad = Object.freeze({ status: "loading" });
  * drawn on the app's canvas. The only class selector, and it
  * never leaves the shadow root.
  */
-const PAGE_HOST_RULES = `@layer opentesela {
+const PAGE_HOST_RULES = `@layer teselarium {
   .page-body {
     box-sizing: border-box;
     min-height: 100%;
-    max-width: var(--ot-reading-width);
+    max-width: var(--tes-reading-width);
     margin-inline: auto;
-    padding: var(--ot-space-4);
-    color: var(--ot-foreground);
-    accent-color: var(--ot-primary);
-    font-family: var(--ot-font-sans);
-    font-size: var(--ot-font-size);
-    line-height: var(--ot-line-height);
+    padding: var(--tes-space-4);
+    color: var(--tes-foreground);
+    accent-color: var(--tes-primary);
+    font-family: var(--tes-font-sans);
+    font-size: var(--tes-font-size);
+    line-height: var(--tes-line-height);
   }
 }
 `;

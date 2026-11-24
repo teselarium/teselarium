@@ -58,9 +58,9 @@ export async function marksMatchingApiRange(
   await mountWithTarget(context, FIXTURE_REFERENCES.listedMod);
 
   const apiRange = readDefinition(context, "API range");
-  context.expect(apiRange.querySelector("code")?.textContent).toBe("^0.1.0");
+  context.expect(apiRange.querySelector("code")?.textContent).toBe("^0.2.0");
   context
-    .expect(readBadge(apiRange.querySelector("span[data-ot-variant]")))
+    .expect(readBadge(apiRange.querySelector("span[data-tes-variant]")))
     .toEqual({ text: "matches", variant: "success" });
 }
 
@@ -68,9 +68,9 @@ export async function marksOtherApiRange(context: CaseContext): Promise<void> {
   await mountWithTarget(context, FIXTURE_REFERENCES.otherApi);
 
   const apiRange = readDefinition(context, "API range");
-  context.expect(apiRange.querySelector("code")?.textContent).toBe("^0.2.0");
+  context.expect(apiRange.querySelector("code")?.textContent).toBe("^0.3.0");
   context
-    .expect(readBadge(apiRange.querySelector("span[data-ot-variant]")))
+    .expect(readBadge(apiRange.querySelector("span[data-tes-variant]")))
     .toEqual({ text: "does not match", variant: "warning" });
   context
     .expect(

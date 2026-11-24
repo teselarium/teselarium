@@ -378,7 +378,7 @@ In the mod, collection and mosaic lists, the row the pointer or the keyboard hig
 
 #### Scenario: Aliases of a highlighted mosaic
 - **WHEN** the mosaic list of "Nobel laureates on the map" is open in the light color scheme and the row of that mosaic is highlighted
-- **THEN** its aliases `title ← name` and `country ← birth_country` have the computed color of `--ot-accent-foreground`, and a contrast of at least 4.5:1 with the row's background
+- **THEN** its aliases `title ← name` and `country ← birth_country` have the computed color of `--tes-accent-foreground`, and a contrast of at least 4.5:1 with the row's background
 
 #### Scenario: Dark color scheme
 - **WHEN** the same row is highlighted in the dark color scheme

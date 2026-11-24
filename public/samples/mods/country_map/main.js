@@ -127,7 +127,7 @@ const COUNTRY_MAP_STYLE = `
     padding: 0;
     container-type: inline-size;
   }
-  main > p[role="status"] { margin: var(--ot-space-4); }
+  main > p[role="status"] { margin: var(--tes-space-4); }
 
   /* The map, and the sidebar on its right when a country is selected. */
   main[data-sidebar] {
@@ -140,33 +140,33 @@ const COUNTRY_MAP_STYLE = `
 
   /* Leaflet's container, the sea, and its controls, in the theme's colors. */
   .leaflet-container {
-    background-color: color-mix(in oklab, var(--ot-muted-foreground) 14%, var(--ot-card));
-    font-family: var(--ot-font-sans);
+    background-color: color-mix(in oklab, var(--tes-muted-foreground) 14%, var(--tes-card));
+    font-family: var(--tes-font-sans);
   }
-  .leaflet-container .leaflet-bar { border-color: var(--ot-border); }
+  .leaflet-container .leaflet-bar { border-color: var(--tes-border); }
   .leaflet-container .leaflet-bar a {
-    border-bottom-color: var(--ot-border);
-    background-color: var(--ot-background);
-    color: var(--ot-foreground);
+    border-bottom-color: var(--tes-border);
+    background-color: var(--tes-background);
+    color: var(--tes-foreground);
   }
   .leaflet-container .leaflet-bar a:hover,
-  .leaflet-container .leaflet-bar a:focus { background-color: var(--ot-muted); }
+  .leaflet-container .leaflet-bar a:focus { background-color: var(--tes-muted); }
   .leaflet-container .leaflet-bar a.leaflet-disabled {
-    background-color: var(--ot-muted);
-    color: var(--ot-muted-foreground);
+    background-color: var(--tes-muted);
+    color: var(--tes-muted-foreground);
   }
   .leaflet-container .leaflet-control-attribution {
-    background-color: var(--ot-background);
-    color: var(--ot-muted-foreground);
+    background-color: var(--tes-background);
+    color: var(--tes-muted-foreground);
   }
-  .leaflet-container .leaflet-control-attribution a { color: var(--ot-foreground); }
+  .leaflet-container .leaflet-control-attribution a { color: var(--tes-foreground); }
   .leaflet-container p[role="status"] {
     margin: 0;
-    padding: var(--ot-space-2) var(--ot-space-3);
-    border: 1px solid var(--ot-border);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-background);
-    color: var(--ot-foreground);
+    padding: var(--tes-space-2) var(--tes-space-3);
+    border: 1px solid var(--tes-border);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-background);
+    color: var(--tes-foreground);
     font-size: 0.875rem;
   }
 
@@ -177,25 +177,25 @@ const COUNTRY_MAP_STYLE = `
    * the pointer; the others keep the map's grab cursor.
    */
   path.country {
-    fill: var(--ot-muted);
+    fill: var(--tes-muted);
     fill-opacity: 1;
-    stroke: var(--ot-border);
+    stroke: var(--tes-border);
     stroke-width: 1;
     cursor: inherit;
   }
   path.country.has-tiles {
-    fill: color-mix(in oklab, var(--ot-primary) 28%, var(--ot-card));
+    fill: color-mix(in oklab, var(--tes-primary) 28%, var(--tes-card));
     cursor: pointer;
   }
-  path.country.selected { fill: var(--ot-accent); }
+  path.country.selected { fill: var(--tes-accent); }
 
   /* The markers: speech bubbles holding their country's number of tiles. */
   .country-marker { cursor: pointer; }
   .country-marker > svg { display: block; overflow: visible; }
-  .country-marker path { fill: var(--ot-primary); stroke: var(--ot-background); stroke-width: 1; }
+  .country-marker path { fill: var(--tes-primary); stroke: var(--tes-background); stroke-width: 1; }
   .country-marker text {
-    fill: var(--ot-primary-foreground);
-    font-family: var(--ot-font-sans);
+    fill: var(--tes-primary-foreground);
+    font-family: var(--tes-font-sans);
     font-size: 13px;
     font-weight: 600;
   }
@@ -203,41 +203,41 @@ const COUNTRY_MAP_STYLE = `
   /* The sidebar: the country's heading, its count and its tiles. */
   aside {
     overflow-y: auto;
-    padding: var(--ot-space-4);
-    border-left: 1px solid var(--ot-border);
-    background-color: var(--ot-card);
-    color: var(--ot-card-foreground);
+    padding: var(--tes-space-4);
+    border-left: 1px solid var(--tes-border);
+    background-color: var(--tes-card);
+    color: var(--tes-card-foreground);
   }
-  aside > header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ot-space-2); }
+  aside > header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--tes-space-2); }
   aside > header > h2 { margin: 0; overflow-wrap: anywhere; }
-  aside > ul { display: grid; gap: var(--ot-space-2); padding: 0; list-style: none; }
+  aside > ul { display: grid; gap: var(--tes-space-2); padding: 0; list-style: none; }
   aside > ul > li > button {
     width: 100%;
     justify-content: flex-start;
     text-align: left;
-    background-color: color-mix(in oklab, var(--ot-primary) 8%, var(--ot-card));
+    background-color: color-mix(in oklab, var(--tes-primary) 8%, var(--tes-card));
   }
   aside > ul > li > button:hover:not(:disabled) {
-    background-color: color-mix(in oklab, var(--ot-primary) 16%, var(--ot-card));
+    background-color: color-mix(in oklab, var(--tes-primary) 16%, var(--tes-card));
   }
-  button[data-ot-variant="ghost"][aria-label="Close"] { padding: var(--ot-space-2); }
-  button[data-ot-variant="ghost"][aria-label="Close"] > svg { display: block; }
+  button[data-tes-variant="ghost"][aria-label="Close"] { padding: var(--tes-space-2); }
+  button[data-tes-variant="ghost"][aria-label="Close"] > svg { display: block; }
 
   /* Below 40rem, the sidebar goes under the map, across the frame. */
   @container (max-width: 40rem) {
     main[data-sidebar],
     main[data-sidebar="open"] { grid-template-columns: minmax(0, 1fr); height: auto; }
     main > div { height: 60vh; }
-    aside { border-top: 1px solid var(--ot-border); border-left-width: 0; }
+    aside { border-top: 1px solid var(--tes-border); border-left-width: 0; }
   }
 
   /* The card: the close button in its corner, the image above the title. */
   dialog { box-sizing: border-box; width: min(40rem, 100%); }
-  dialog > button[data-ot-variant="ghost"] { position: absolute; top: var(--ot-space-2); right: var(--ot-space-2); }
-  dialog > figure { margin: 0 0 var(--ot-space-4); }
-  dialog > figure > img { display: block; max-height: 16rem; margin: 0 auto; border-radius: var(--ot-radius); }
-  dialog > h2 { padding-right: var(--ot-space-6); }
-  dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--ot-space-4); }
+  dialog > button[data-tes-variant="ghost"] { position: absolute; top: var(--tes-space-2); right: var(--tes-space-2); }
+  dialog > figure { margin: 0 0 var(--tes-space-4); }
+  dialog > figure > img { display: block; max-height: 16rem; margin: 0 auto; border-radius: var(--tes-radius); }
+  dialog > h2 { padding-right: var(--tes-space-6); }
+  dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--tes-space-4); }
   dialog dd { margin: 0; overflow-wrap: anywhere; }
 `;
 
@@ -1184,7 +1184,7 @@ function buildCloseIcon() {
 function buildCloseButton(close) {
   const button = document.createElement("button");
   button.type = "button";
-  button.dataset.otVariant = "ghost";
+  button.dataset.tesVariant = "ghost";
   button.setAttribute("aria-label", "Close");
   button.append(buildCloseIcon());
   button.addEventListener("click", close);
@@ -1386,7 +1386,7 @@ function fillCard(view, tile) {
   title.textContent = readTileTitle(tile);
   view.card.append(title, buildCardDetails(tile));
   if (hasBody(tile)) {
-    const body = document.createElement("ot-tile-body");
+    const body = document.createElement("tes-tile-body");
     body.tile = tile;
     view.card.append(document.createElement("hr"), body);
   }

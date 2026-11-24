@@ -10,12 +10,12 @@ import type { ViewerView } from "./viewer_view.ts";
 const VIEWER_STYLE = `
   article h1 { margin-top: 0; }
   dd { overflow-wrap: anywhere; }
-  section { margin-top: var(--ot-space-4); }
+  section { margin-top: var(--tes-space-4); }
   li { overflow-wrap: anywhere; }
-  label { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); }
+  label { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tes-space-2); }
   input[type="search"] { flex: 1; min-width: 16rem; max-width: 24rem; }
-  section[aria-label="Tiles"] > small { display: block; margin: var(--ot-space-2) 0 var(--ot-space-4); }
-  section[aria-label="Tiles"] article { padding: var(--ot-space-2) var(--ot-space-4); }
+  section[aria-label="Tiles"] > small { display: block; margin: var(--tes-space-2) 0 var(--tes-space-4); }
+  section[aria-label="Tiles"] article { padding: var(--tes-space-2) var(--tes-space-4); }
   section[aria-label="Tiles"] table { margin: 0; }
   td { overflow-wrap: anywhere; }
   td > button { white-space: normal; text-align: start; overflow-wrap: anywhere; }

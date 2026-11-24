@@ -17,8 +17,8 @@ function readStageHistoryState(
   if (typeof historyState !== "object" || historyState === null) {
     return null;
   }
-  const stageState: unknown = (historyState as { opentesela?: unknown })
-    .opentesela;
+  const stageState: unknown = (historyState as { teselarium?: unknown })
+    .teselarium;
   if (typeof stageState !== "object" || stageState === null) {
     return null;
   }
@@ -65,7 +65,7 @@ export function writeStageEntry(
   entry: HistoryEntryWrite,
 ): void {
   const historyState = {
-    opentesela: { position: entry.position, section: entry.section },
+    teselarium: { position: entry.position, section: entry.section },
   };
   if (mode === "push") {
     history.pushState(historyState, "", entry.hash);

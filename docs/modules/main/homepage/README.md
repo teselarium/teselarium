@@ -31,7 +31,7 @@ A page is rendered in an isolated shadow root that holds the theme tokens and th
 - Plain HTML gets the app's look without classes, exactly as in a mod: a heading in a page and in a mod have the same size, weight and color.
 - The app's own styles (Tailwind, shadcn/ui) do not apply inside a page, and a page's styles do not apply to the sidebar.
 - A page follows the color scheme at once, without a reload.
-- A page's content is at most `--ot-reading-width` wide and centered, so lines of text stay short enough to read on wide screens. In a narrower page area it fills the area. Pages have no theater mode.
+- A page's content is at most `--tes-reading-width` wide and centered, so lines of text stay short enough to read on wide screens. In a narrower page area it fills the area. Pages have no theater mode.
 
 ## Markdown and HTML
 
@@ -40,8 +40,8 @@ Pages are [GitHub-flavored markdown](https://github.github.com/gfm/): headings, 
 - Text formatting, headings, paragraphs, lists, tables, images, links, code, `<blockquote>`, `<div>` and `<span>`.
 - The sectioning elements `<article>`, `<section>`, `<header>`, `<footer>` and `<aside>`, and `<details>` with `<summary>`.
 - `role="alert"` and `role="status"` on any element.
-- `data-ot-variant` on a `<span>`, with `primary`, `secondary`, `outline`, `destructive`, `success` or `warning`.
-- `data-ot-color-scheme="light"` or `"dark"` on any element.
+- `data-tes-variant` on a `<span>`, with `primary`, `secondary`, `outline`, `destructive`, `success` or `warning`.
+- `data-tes-color-scheme="light"` or `"dark"` on any element.
 
 Scripts, frames, forms, `<style>`, `style` attributes, event handler attributes (`onclick`, `onerror`, ...) and `javascript:` links are removed. Ids get the prefix `user-content-`, as on GitHub.
 
@@ -78,7 +78,7 @@ An **alert** and a **status note**:
 A **badge**:
 
 ```html
-<span data-ot-variant="success">New</span>
+<span data-tes-variant="success">New</span>
 ```
 
 A **disclosure**:
@@ -93,7 +93,7 @@ A **disclosure**:
 A **color scheme section**, drawn in the dark colors whatever the app's color scheme:
 
 ```html
-<section data-ot-color-scheme="dark">Always dark.</section>
+<section data-tes-color-scheme="dark">Always dark.</section>
 ```
 
 ## Links and images

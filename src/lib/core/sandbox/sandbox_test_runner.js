@@ -34,7 +34,7 @@ const CATALOG_LISTS = { mods: false, collections: false, mosaics: true };
 
 const CATALOG_LISTED_BY = ["instance", "default", "user"];
 const CATALOG_PLACES = ["remote", "browser"];
-const BROWSER_FILE_PROTOCOL = "opentesela-browser:";
+const BROWSER_FILE_PROTOCOL = "teselarium-browser:";
 // The keys of a scripted provenance: `addedAt` is required, and a missing
 // one of the others is completed with its value here.
 const PROVENANCE_DEFAULTS = {

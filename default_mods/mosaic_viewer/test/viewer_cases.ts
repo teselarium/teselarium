@@ -81,9 +81,9 @@ export async function showsTargetMod(context: CaseContext): Promise<void> {
     .expect(readBadge(readDefinition(modSection, "Version").firstElementChild))
     .toEqual({ text: "2.0.0", variant: "secondary" });
   const apiRange = readDefinition(modSection, "API range");
-  context.expect(apiRange.querySelector("code")?.textContent).toBe("^0.1.0");
+  context.expect(apiRange.querySelector("code")?.textContent).toBe("^0.2.0");
   context
-    .expect(readBadge(apiRange.querySelector("span[data-ot-variant]")))
+    .expect(readBadge(apiRange.querySelector("span[data-tes-variant]")))
     .toEqual({ text: "matches", variant: "success" });
   context.expect(modSection.ariaBusy).toBe(null);
 }

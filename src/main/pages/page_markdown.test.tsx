@@ -34,10 +34,10 @@ describe("page markdown", function describePageMarkdown(): void {
   });
 
   it("Badge from markdown", function keepsBadge(): void {
-    const page = renderPage('<span data-ot-variant="success">New</span>');
+    const page = renderPage('<span data-tes-variant="success">New</span>');
 
     const badge = page.querySelector("span");
-    expect(badge?.getAttribute("data-ot-variant")).toBe("success");
+    expect(badge?.getAttribute("data-tes-variant")).toBe("success");
     expect(badge?.textContent).toBe("New");
   });
 
@@ -48,7 +48,7 @@ describe("page markdown", function describePageMarkdown(): void {
         "<details><summary>More</summary>Hidden</details>",
         '<div role="alert">Careful</div>',
         '<div role="status">Work in progress</div>',
-        '<section data-ot-color-scheme="dark">Dark</section>',
+        '<section data-tes-color-scheme="dark">Dark</section>',
       ].join("\n\n"),
     );
 
@@ -63,7 +63,7 @@ describe("page markdown", function describePageMarkdown(): void {
     expect(page.querySelector('[role="alert"]')?.textContent).toBe("Careful");
     expect(page.querySelector('[role="status"]')).not.toBeNull();
     expect(
-      page.querySelector('[data-ot-color-scheme="dark"]')?.textContent,
+      page.querySelector('[data-tes-color-scheme="dark"]')?.textContent,
     ).toBe("Dark");
   });
 
@@ -120,15 +120,15 @@ describe("page markdown", function describePageMarkdown(): void {
     const page = renderPage(
       [
         '<div role="button">Fake button</div>',
-        '<div data-ot-variant="success">Not a badge</div>',
-        '<span data-ot-variant="loud">Unknown</span>',
-        '<section data-ot-color-scheme="sepia">Unknown scheme</section>',
+        '<div data-tes-variant="success">Not a badge</div>',
+        '<span data-tes-variant="loud">Unknown</span>',
+        '<section data-tes-color-scheme="sepia">Unknown scheme</section>',
       ].join("\n\n"),
     );
 
     expect(page.querySelector("[role]")).toBeNull();
-    expect(page.querySelector("[data-ot-variant]")).toBeNull();
-    expect(page.querySelector("[data-ot-color-scheme]")).toBeNull();
+    expect(page.querySelector("[data-tes-variant]")).toBeNull();
+    expect(page.querySelector("[data-tes-color-scheme]")).toBeNull();
   });
 
   it("Other site", function opensOtherSiteElsewhere(): void {

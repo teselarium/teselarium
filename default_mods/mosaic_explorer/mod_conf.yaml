@@ -1,7 +1,7 @@
 mod:
   title: "Mosaics"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Lists mosaics, opens them, and opens them in the mosaic viewer."
   entrypoint: "./main.js"
   test_path: "./test.js"

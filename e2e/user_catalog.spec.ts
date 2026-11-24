@@ -107,7 +107,7 @@ async function listUserMosaics(frame: Frame): Promise<CatalogMosaic[]> {
 
 /** Writes `files`, by path, into a new folder named `FOLDER_NAME`, and returns its path. */
 async function writeFolder(files: Record<string, string>): Promise<string> {
-  const parent = await mkdtemp(join(tmpdir(), "opentesela-import-"));
+  const parent = await mkdtemp(join(tmpdir(), "teselarium-import-"));
   const folder = join(parent, FOLDER_NAME);
   for (const [path, text] of Object.entries(files)) {
     const filePath = join(folder, path);
@@ -366,7 +366,7 @@ async function expectDialogBadges(
 async function switchToDarkScheme(page: Page): Promise<void> {
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveAttribute(
-    "data-ot-color-scheme",
+    "data-tes-color-scheme",
     "dark",
   );
 }
@@ -381,7 +381,7 @@ async function writeVersionOneDatabase(entry: {
     resolve,
     reject,
   ): void {
-    const request = indexedDB.open("opentesela", 1);
+    const request = indexedDB.open("teselarium", 1);
     request.onupgradeneeded = function createStores(): void {
       request.result.createObjectStore("files", { keyPath: "address" });
       request.result.createObjectStore("user-catalog");
@@ -585,7 +585,7 @@ test.describe("User catalog dialog colors", function describeColors(): void {
     await expectBadgeColors(page);
     await page.emulateMedia({ colorScheme: "dark" });
     await expect(page.locator("html")).toHaveAttribute(
-      "data-ot-color-scheme",
+      "data-tes-color-scheme",
       "dark",
     );
     await expectBadgeColors(page);
@@ -739,7 +739,7 @@ test.describe(
       const [stored] = await listUserMosaics(frame);
       expect(stored).toMatchObject({ listedBy: "user", place: "browser" });
       expect(stored.source).toMatch(
-        /^opentesela-browser:\/\/\/[^/]+\/maps\/nobel_map\.yaml$/,
+        /^teselarium-browser:\/\/\/[^/]+\/maps\/nobel_map\.yaml$/,
       );
       await openStoredMosaic(page, stored.source);
       const opened = await findModFrame(page, "probe");
@@ -829,7 +829,7 @@ test.describe(
     }): Promise<void> {
       await serveAppOriginMod(page, buildProbeFiles("probe"));
       await page.goto("/test-mods/probe/mod_conf.yaml");
-      const address = "opentesela-browser:///r1/nobel_map.yaml";
+      const address = "teselarium-browser:///r1/nobel_map.yaml";
       await page.evaluate(writeVersionOneDatabase, {
         address,
         text: writeProbeMosaic(page, "Nobel map"),

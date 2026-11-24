@@ -65,7 +65,7 @@ describe("inspectMod", function describeInspectMod(): void {
       title: "Book List",
       version: "1.0.0",
       description: "A very simple list of books with their covers.",
-      api: "^0.1.0",
+      api: "^0.2.0",
       apiCompatible: true,
       typeSource: SAMPLE_TYPE_SOURCE,
       defaultMosaic: SAMPLE_DEFAULT_MOSAIC_SOURCE,

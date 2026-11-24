@@ -254,7 +254,7 @@ On viewports narrower than 768px, the sidebar SHALL start collapsed whatever is 
 
 #### Scenario: Open sidebar keeps the first row
 - **WHEN** the user expands the sidebar on a 375×700 viewport
-- **THEN** the open sidebar shows a hamburger button and the `OpenTesela` heading, and that hamburger button is where the rail's was, within 1 pixel
+- **THEN** the open sidebar shows a hamburger button and the `Teselarium` heading, and that hamburger button is where the rail's was, within 1 pixel
 
 #### Scenario: Escape closes the drawer
 - **WHEN** the expanded sidebar is open over the content on a 375×700 viewport and the user presses Escape
@@ -279,15 +279,15 @@ A coming-soon section SHALL be shown in the sidebar as a disabled item that says
 - **THEN** no item says `Coming soon`
 
 ### Requirement: Sidebar heading row
-The sidebar's first row SHALL hold the hamburger button and then the `OpenTesela` level 1 heading. The app SHALL have no header above the sidebar and the main area. The heading SHALL be visible only while the sidebar is expanded, and SHALL stay the page's accessible heading in every state.
+The sidebar's first row SHALL hold the hamburger button and then the `Teselarium` level 1 heading. The app SHALL have no header above the sidebar and the main area. The heading SHALL be visible only while the sidebar is expanded, and SHALL stay the page's accessible heading in every state.
 
 #### Scenario: No app header
 - **WHEN** the vanilla app is opened on a 1280×800 viewport
-- **THEN** the page has no `banner` landmark, and the sidebar's first row holds the hamburger button followed by the `OpenTesela` heading
+- **THEN** the page has no `banner` landmark, and the sidebar's first row holds the hamburger button followed by the `Teselarium` heading
 
 #### Scenario: Heading in the rail
 - **WHEN** the sidebar is collapsed
-- **THEN** the `OpenTesela` text is not visible, and the page still has a level 1 heading named `OpenTesela`
+- **THEN** the `Teselarium` text is not visible, and the page still has a level 1 heading named `Teselarium`
 
 ### Requirement: Sidebar buttons keep their place
 The hamburger button, every section item's icon, the theme control and the collapse toggle SHALL each keep the same horizontal position when the sidebar changes between expanded and collapsed, and the hamburger button SHALL also keep its position when the sidebar is hidden or shown again. In the expanded sidebar, labels SHALL be shown to the right of the icons.

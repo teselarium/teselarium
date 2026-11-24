@@ -625,7 +625,7 @@ A `mosaics.open` request whose `mosaic` is not a non-empty string, whose `params
 
 #### Scenario: Stored user mosaic entry
 - **WHEN** the user imported `maps/nobel_map.yaml` from the folder `my-mosaics` and a mod sends `catalog.list`
-- **THEN** the result's `mosaics` ends with an entry whose `source` starts with `opentesela-browser:///`, with `listedBy` `"user"`, `place` `"browser"`, `defaultOf` `null` and the provenance of that import
+- **THEN** the result's `mosaics` ends with an entry whose `source` starts with `teselarium-browser:///`, with `listedBy` `"user"`, `place` `"browser"`, `defaultOf` `null` and the provenance of that import
 
 ### Requirement: Reading the catalog needs no permission
 Any mod, visible or hidden, SHALL be answered `catalog.list` without any permission. Answering it SHALL request no file while "List the default mosaics of mods" is off, and only the catalog mods' mod files while it is on: no entrypoint, library, collection or mosaic file.
@@ -728,10 +728,10 @@ The `draft` of `mosaics.validate`'s answer SHALL be the fields the draft holds a
 
 #### Scenario: New mosaic saved
 - **WHEN** the visible mod sends `userCatalog.save` with a valid new draft and the user presses "Save"
-- **THEN** the request resolves with an `opentesela-browser:` address, which the catalog lists as a user mosaic
+- **THEN** the request resolves with a `teselarium-browser:` address, which the catalog lists as a user mosaic
 
 #### Scenario: Missing content
-- **WHEN** a mod sends `userCatalog.save` with `{ "mosaic": "opentesela-browser:///r1/a.yaml" }`
+- **WHEN** a mod sends `userCatalog.save` with `{ "mosaic": "teselarium-browser:///r1/a.yaml" }`
 - **THEN** the response has an error with code `-32602` whose message is `userCatalog.save: "content" must be a non-empty string`
 
 ### Requirement: History and folder export requests

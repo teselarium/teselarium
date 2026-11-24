@@ -10,8 +10,8 @@
  *   comes from the HTML of `tiles.renderBody`, parsed into an inert
  *   `<template>`. One function, `findHeadingSection`, reads it there and in
  *   the study card, so the table, the card count and the card agree.
- * - A study card with "First heading" is an `<ot-tile-body>` whose
- *   `ot-rendered` listener hides everything but the heading, and "Show
+ * - A study card with "First heading" is an `<tes-tile-body>` whose
+ *   `tes-rendered` listener hides everything but the heading, and "Show
  *   answer" shows the section. The listener runs before the element draws
  *   its diagrams, so a diagram in the answer is drawn only after the flip.
  * - The tile card and the setup dialog are native modal `<dialog>` elements
@@ -139,39 +139,39 @@ const FLASHCARDS_STYLE = `
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--ot-space-4);
-    margin-bottom: var(--ot-space-4);
+    gap: var(--tes-space-4);
+    margin-bottom: var(--tes-space-4);
   }
   main > header > h1 { margin: 0; }
   main > header > [role="group"],
-  [data-actions] { display: flex; flex-wrap: wrap; gap: var(--ot-space-2); }
+  [data-actions] { display: flex; flex-wrap: wrap; gap: var(--tes-space-2); }
 
   tbody > tr { cursor: pointer; }
   td > button { justify-content: flex-start; min-height: 0; text-align: start; }
   td { overflow-wrap: anywhere; }
-  [data-untitled] { font-style: italic; color: var(--ot-muted-foreground); }
+  [data-untitled] { font-style: italic; color: var(--tes-muted-foreground); }
 
   dialog { box-sizing: border-box; width: min(40rem, 100%); }
-  dialog > button[data-ot-variant="ghost"] { position: absolute; top: var(--ot-space-2); right: var(--ot-space-2); }
-  dialog > button[data-ot-variant="ghost"] > svg { display: block; }
-  dialog > h2 { margin-top: 0; padding-right: var(--ot-space-6); }
-  dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--ot-space-4); }
+  dialog > button[data-tes-variant="ghost"] { position: absolute; top: var(--tes-space-2); right: var(--tes-space-2); }
+  dialog > button[data-tes-variant="ghost"] > svg { display: block; }
+  dialog > h2 { margin-top: 0; padding-right: var(--tes-space-6); }
+  dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--tes-space-4); }
   dialog dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
-  dialog [data-fields] { display: grid; gap: var(--ot-space-4); }
-  dialog [data-fields] > div { display: grid; gap: var(--ot-space-1); }
+  dialog [data-fields] { display: grid; gap: var(--tes-space-4); }
+  dialog [data-fields] > div { display: grid; gap: var(--tes-space-1); }
 
   /* Study: the session bar, then the flashcard, both as wide as a card and centered. */
-  [data-study] { display: grid; justify-items: center; gap: var(--ot-space-4); }
+  [data-study] { display: grid; justify-items: center; gap: var(--tes-space-4); }
   [data-session-bar] {
     box-sizing: border-box;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--ot-space-2) var(--ot-space-4);
+    gap: var(--tes-space-2) var(--tes-space-4);
     width: min(32rem, 100%);
   }
-  [data-session-bar] > p { margin: 0; color: var(--ot-muted-foreground); font-size: 0.875rem; }
-  [data-session-bar] > progress { flex: 1; min-width: 6rem; accent-color: var(--ot-primary); }
+  [data-session-bar] > p { margin: 0; color: var(--tes-muted-foreground); font-size: 0.875rem; }
+  [data-session-bar] > progress { flex: 1; min-width: 6rem; accent-color: var(--tes-primary); }
 
   /* The flashcard: the theme's card, shadow and a radius twice the theme's. */
   article[data-flashcard] {
@@ -183,47 +183,47 @@ const FLASHCARDS_STYLE = `
     margin: 0;
     padding: 0;
     overflow: hidden;
-    border-radius: calc(var(--ot-radius) * 2);
-    background-color: var(--ot-card);
-    color: var(--ot-card-foreground);
-    box-shadow: var(--ot-shadow);
+    border-radius: calc(var(--tes-radius) * 2);
+    background-color: var(--tes-card);
+    color: var(--tes-card-foreground);
+    box-shadow: var(--tes-shadow);
   }
   article[data-flashcard] > * + * { margin-top: 0; }
   [data-card-actions] {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: var(--ot-space-2);
-    margin-top: var(--ot-space-6);
+    gap: var(--tes-space-2);
+    margin-top: var(--tes-space-6);
   }
   article[data-flashcard] > footer {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: var(--ot-space-2);
+    gap: var(--tes-space-2);
     margin-top: auto;
-    padding: var(--ot-space-4) var(--ot-space-6) var(--ot-space-6);
+    padding: var(--tes-space-4) var(--tes-space-6) var(--tes-space-6);
   }
 
   /* The sides: the question under a primary stripe, the answer on the muted tint. */
-  [data-side] { padding: var(--ot-space-6); }
-  [data-side="question"] { flex: 1; border-top: 4px solid var(--ot-primary); }
+  [data-side] { padding: var(--tes-space-6); }
+  [data-side="question"] { flex: 1; border-top: 4px solid var(--tes-primary); }
   [data-side="answer"] {
     flex: 1;
-    border-top: 1px solid var(--ot-border);
-    background-color: var(--ot-muted);
+    border-top: 1px solid var(--tes-border);
+    background-color: var(--tes-muted);
     animation: flashcards-reveal 150ms ease-out;
   }
   [data-side-label] {
     display: flex;
     align-items: center;
-    gap: var(--ot-space-2);
-    margin: 0 0 var(--ot-space-4);
+    gap: var(--tes-space-2);
+    margin: 0 0 var(--tes-space-4);
     font-size: 0.875rem;
     font-weight: 600;
   }
-  [data-side="question"] > [data-side-label] { color: var(--ot-primary); }
-  [data-side="answer"] > [data-side-label] { color: var(--ot-muted-foreground); }
+  [data-side="question"] > [data-side-label] { color: var(--tes-primary); }
+  [data-side="answer"] > [data-side-label] { color: var(--tes-muted-foreground); }
   [data-side-text] {
     margin: 0;
     font-size: 1.25rem;
@@ -231,18 +231,18 @@ const FLASHCARDS_STYLE = `
     white-space: pre-line;
     overflow-wrap: anywhere;
   }
-  [data-side] > ot-tile-body { display: block; text-align: start; }
+  [data-side] > tes-tile-body { display: block; text-align: start; }
 
   /* The end of a round, in the same card. */
-  [data-round-end] { padding: var(--ot-space-6); }
+  [data-round-end] { padding: var(--tes-space-6); }
   [data-round-end] > p:not([data-side-label]) { margin: 0; font-size: 1.25rem; text-align: center; }
-  [data-round-end] > [data-side-label] { justify-content: center; margin: var(--ot-space-4) 0 0; color: var(--ot-primary); }
+  [data-round-end] > [data-side-label] { justify-content: center; margin: var(--tes-space-4) 0 0; color: var(--tes-primary); }
   [data-not-yet] {
-    padding: var(--ot-space-4) var(--ot-space-6);
-    border-top: 1px solid var(--ot-border);
-    background-color: var(--ot-muted);
+    padding: var(--tes-space-4) var(--tes-space-6);
+    border-top: 1px solid var(--tes-border);
+    background-color: var(--tes-muted);
   }
-  [data-not-yet] > [data-side-label] { margin-bottom: var(--ot-space-2); color: var(--ot-muted-foreground); }
+  [data-not-yet] > [data-side-label] { margin-bottom: var(--tes-space-2); color: var(--tes-muted-foreground); }
   [data-not-yet] > ul { margin: 0; }
 
   @keyframes flashcards-reveal {
@@ -254,7 +254,7 @@ const FLASHCARDS_STYLE = `
   }
 
   /* The base stylesheet's [hidden] is layered: a body's alert or figure would show again. */
-  ot-tile-body > [hidden] { display: none; }
+  tes-tile-body > [hidden] { display: none; }
 `;
 
 // Fields and values ----------------------------------------------------------
@@ -626,7 +626,7 @@ function buildActionButton(view, action, text, handler) {
 
 function buildPrimaryButton(view, action, text, handler) {
   const button = buildActionButton(view, action, text, handler);
-  button.dataset.otVariant = "primary";
+  button.dataset.tesVariant = "primary";
   return button;
 }
 
@@ -697,7 +697,7 @@ function buildRowButton(view, tile) {
   const name = readTileName(view, tile);
   const button = document.createElement("button");
   button.type = "button";
-  button.dataset.otVariant = "ghost";
+  button.dataset.tesVariant = "ghost";
   button.dataset.source = tile.source;
   button.setAttribute("aria-haspopup", "dialog");
   button.setAttribute("aria-expanded", String(view.openSource === tile.source));
@@ -802,7 +802,7 @@ function closeDialog(dialog) {
 function buildCloseButton(dialog) {
   const closeButton = document.createElement("button");
   closeButton.type = "button";
-  closeButton.dataset.otVariant = "ghost";
+  closeButton.dataset.tesVariant = "ghost";
   closeButton.setAttribute("aria-label", "Close");
   closeButton.append(buildIcon("x"));
   closeButton.addEventListener("click", closeDialog.bind(undefined, dialog));
@@ -864,7 +864,7 @@ function fillTileCard(view, tile) {
     view.tileCard.append(metadataList);
   }
   if (hasBody(tile)) {
-    const body = document.createElement("ot-tile-body");
+    const body = document.createElement("tes-tile-body");
     body.tile = tile;
     view.tileCard.append(document.createElement("hr"), body);
   }
@@ -1247,7 +1247,7 @@ function keepParts(body, keptParts) {
 }
 
 /**
- * The `ot-rendered` listener of a First heading question: hides everything
+ * The `tes-rendered` listener of a First heading question: hides everything
  * but the heading. It runs before the element draws its diagrams, so the
  * section's diagrams are never drawn on the question side.
  */
@@ -1257,7 +1257,7 @@ function keepOnlyHeading(event) {
   keepParts(body, [parts.heading]);
 }
 
-/** The `ot-rendered` listener of a section answer: hides everything but the heading's section. */
+/** The `tes-rendered` listener of a section answer: hides everything but the heading's section. */
 function keepOnlySection(event) {
   const body = event.currentTarget;
   const parts = findHeadingSection(body);
@@ -1266,12 +1266,12 @@ function keepOnlySection(event) {
 
 /** The whole body, or only the part of it a First heading card shows on this side. */
 function buildRenderedBody(tile, field) {
-  const body = document.createElement("ot-tile-body");
+  const body = document.createElement("tes-tile-body");
   if (field === FIRST_HEADING_FIELD) {
-    body.addEventListener("ot-rendered", keepOnlyHeading);
+    body.addEventListener("tes-rendered", keepOnlyHeading);
   }
   if (field === SECTION_FIELD) {
-    body.addEventListener("ot-rendered", keepOnlySection);
+    body.addEventListener("tes-rendered", keepOnlySection);
   }
   body.tile = tile;
   return body;
@@ -1345,7 +1345,7 @@ function buildCardActions(view) {
     "Open full tile",
     openFullTile,
   );
-  fullTileButton.dataset.otVariant = "ghost";
+  fullTileButton.dataset.tesVariant = "ghost";
   fullTileButton.setAttribute("aria-haspopup", "dialog");
   actions.append(
     addButtonIcon(knownButton, "circle-check"),
@@ -1550,7 +1550,7 @@ function buildRoundEndActions(view, missedCount) {
     startAgain,
   );
   if (missedCount === 0) {
-    startAgainButton.dataset.otVariant = "primary";
+    startAgainButton.dataset.tesVariant = "primary";
     actions.append(startAgainButton);
     return actions;
   }

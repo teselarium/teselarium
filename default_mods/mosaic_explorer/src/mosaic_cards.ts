@@ -42,7 +42,7 @@ function buildCardActions(
     inspection.title,
     openMosaic.bind(undefined, view, inspection),
   );
-  openButton.dataset.otVariant = "primary";
+  openButton.dataset.tesVariant = "primary";
   const viewButton = buildCardButton(
     "View",
     inspection.title,
@@ -93,7 +93,7 @@ function buildPlaceBadge(catalogEntry: CatalogMosaicEntry): HTMLElement {
   const badge = document.createElement("span");
   const isStored = catalogEntry.place === "browser";
   badge.textContent = isStored ? "Browser" : "Remote";
-  badge.dataset.otVariant = isStored ? "secondary" : "outline";
+  badge.dataset.tesVariant = isStored ? "secondary" : "outline";
   return badge;
 }
 
@@ -101,7 +101,7 @@ function buildPlaceBadge(catalogEntry: CatalogMosaicEntry): HTMLElement {
 function buildChangedBadge(): HTMLElement {
   const badge = document.createElement("span");
   badge.textContent = "Unexported changes";
-  badge.dataset.otVariant = "warning";
+  badge.dataset.tesVariant = "warning";
   return badge;
 }
 

@@ -1,11 +1,11 @@
 // Reads the explorer's look in the case's frame, where the theme's base
-// stylesheet is in the `opentesela` layer and the mod's own CSS is not.
+// stylesheet is in the `teselarium` layer and the mod's own CSS is not.
 
 /** The look properties: colors, backgrounds, borders, radii, fonts and shadows. */
 const LOOK_PROPERTY_PATTERN = /^(background|border|font)|color$|shadow$/;
 
 /** The theme's cascade layer in the frame. */
-const THEME_LAYER_NAME = "opentesela";
+const THEME_LAYER_NAME = "teselarium";
 
 function listStyleSheetRules(): CSSRule[] {
   const rules: CSSRule[] = [];

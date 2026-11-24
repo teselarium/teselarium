@@ -43,7 +43,7 @@ describe("ThemeControl", function describeThemeControl(): void {
 
   it("Unknown stored value", function showsSystemForUnknown(): void {
     const storage = createMemoryStorage();
-    storage.setItem("opentesela.theme-choice", "purple");
+    storage.setItem("teselarium.theme-choice", "purple");
     render(<ThemeControl appTheme={buildAppTheme(storage)} />);
 
     const select = screen.getByLabelText<HTMLSelectElement>("Theme");
@@ -64,6 +64,6 @@ describe("ThemeControl", function describeThemeControl(): void {
       choice: "dark",
       colorScheme: "dark",
     });
-    expect(storage.getItem("opentesela.theme-choice")).toBe("dark");
+    expect(storage.getItem("teselarium.theme-choice")).toBe("dark");
   });
 });

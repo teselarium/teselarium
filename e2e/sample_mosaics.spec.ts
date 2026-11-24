@@ -55,7 +55,7 @@ function buildMosaicRunLink(mosaic: string): string {
 
 /** Runs in the page before the app: "Load media linked by tiles" off, so only the mosaic's permissions allow the covers. */
 function turnOffTileLinkedMedia(): void {
-  localStorage.setItem("opentesela.tile-linked-media", "false");
+  localStorage.setItem("teselarium.tile-linked-media", "false");
 }
 
 /** Answers every host the samples' covers and portraits load from with a 1×1 PNG. */

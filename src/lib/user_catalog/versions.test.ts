@@ -7,7 +7,7 @@ import {
   readSyncedText,
 } from "./index.ts";
 
-const ADDRESS = "opentesela-browser:///r1/nobel_map.yaml";
+const ADDRESS = "teselarium-browser:///r1/nobel_map.yaml";
 
 /** The time of the `index`-th version: one minute apart, from 10:00. */
 function readTime(index: number): string {

@@ -166,9 +166,9 @@ export async function openBodyProbe(
 }
 
 /**
- * Runs in the probe's frame: appends one `ot-tile-body` per index, set to the
+ * Runs in the probe's frame: appends one `tes-tile-body` per index, set to the
  * mount context's tile at that index, and resolves once every one fired
- * `ot-rendered`. Each element gets `data-index`.
+ * `tes-rendered`. Each element gets `data-index`.
  */
 export function showTileBodies(indexes: number[]): Promise<void> {
   const probeGlobal = globalThis as unknown as {
@@ -176,13 +176,13 @@ export function showTileBodies(indexes: number[]): Promise<void> {
   };
   const rendered: Promise<void>[] = [];
   for (const index of indexes) {
-    const body = document.createElement("ot-tile-body") as HTMLElement & {
+    const body = document.createElement("tes-tile-body") as HTMLElement & {
       tile: unknown;
     };
     body.dataset.index = String(index);
     rendered.push(
       new Promise(function waitForRendered(resolve): void {
-        body.addEventListener("ot-rendered", function markRendered(): void {
+        body.addEventListener("tes-rendered", function markRendered(): void {
           resolve();
         });
       }),

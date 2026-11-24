@@ -12,7 +12,7 @@ import type { ActionAnswer } from "./app_actions.ts";
 import type { ModMethodContext } from "./mod_methods.ts";
 import { USER_CATALOG_METHODS } from "./user_catalog_methods.ts";
 
-const STORED_ADDRESS = "opentesela-browser:///r1/maps/nobel_map.yaml";
+const STORED_ADDRESS = "teselarium-browser:///r1/maps/nobel_map.yaml";
 const REMOTE_ADDRESS = "https://mosaics.example.net/maps/laureates.yml";
 const SAMPLE_MOSAIC = `${APP_BASE_URL}samples/mosaics/nobel_books_list.yaml`;
 
@@ -305,7 +305,7 @@ describe("user catalog requests in a check", function describeInCheck(): void {
 });
 
 const DRAFT = 'mosaic:\n  title: "Laureates, my way"\n  mod: "mod_viewer"\n';
-const SAVED_ADDRESS = "opentesela-browser:///r9/laureates_my_way.yaml";
+const SAVED_ADDRESS = "teselarium-browser:///r9/laureates_my_way.yaml";
 
 describe("userCatalog.save", function describeSave(): void {
   it("New mosaic saved", async function savesNewMosaic(): Promise<void> {
@@ -359,7 +359,7 @@ describe("userCatalog.save", function describeSave(): void {
 
     const error = await catchMethodError(
       sendRequest.bind(undefined, context, "userCatalog.save", {
-        mosaic: "opentesela-browser:///r1/a.yaml",
+        mosaic: "teselarium-browser:///r1/a.yaml",
       }),
     );
 

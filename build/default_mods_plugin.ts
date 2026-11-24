@@ -262,7 +262,7 @@ function configureDefaultModsServer(server: ViteDevServer): void {
  */
 export function defaultModsPlugin(): Plugin {
   const plugin: Plugin = {
-    name: "opentesela:default-mods",
+    name: "teselarium:default-mods",
     configResolved: checkOldModsFolder,
     generateBundle: generateDefaultMods,
     configureServer: configureDefaultModsServer,

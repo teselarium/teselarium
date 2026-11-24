@@ -29,7 +29,7 @@ function readStoredText(
 
 /**
  * The stage's fetch options, with the default mods folder, as a mosaic is
- * loaded when it opens, and the store's own files at `opentesela-browser:`
+ * loaded when it opens, and the store's own files at `teselarium-browser:`
  * addresses.
  */
 function readMosaicOptions(store: UserCatalogStore): ModLoadOptions {

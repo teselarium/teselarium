@@ -5,10 +5,10 @@
  *
  * It is also an example of getting the app's look without classes: each book
  * is a plain button, `<small>` mutes the authors, `<dialog>` is the card,
- * `<dl>` holds the details, `<span data-ot-variant="secondary">` makes the
- * genre badges, `<ot-tile-body>` renders the body, and `role="status"` shows
+ * `<dl>` holds the details, `<span data-tes-variant="secondary">` makes the
+ * genre badges, `<tes-tile-body>` renders the body, and `role="status"` shows
  * the empty list as a notice. This mod's own CSS sets layout, and the books'
- * corner shape and shadow, from the theme's `--ot-radius` and `--ot-shadow`.
+ * corner shape and shadow, from the theme's `--tes-radius` and `--tes-shadow`.
  * See "Write HTML, get the app's look" in
  * docs/modules/lib/core/theme/README.md.
  */
@@ -37,11 +37,11 @@ const BOOK_LIST_STYLE = `
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--ot-space-4);
-    margin-bottom: var(--ot-space-4);
+    gap: var(--tes-space-4);
+    margin-bottom: var(--tes-space-4);
   }
   main > header > h1 { margin: 0; }
-  main > header > label { display: flex; align-items: center; gap: var(--ot-space-2); }
+  main > header > label { display: flex; align-items: center; gap: var(--tes-space-2); }
 
   /*
    * N books per row: the minimum track is 1/N of the row, so auto-fill makes N
@@ -56,12 +56,12 @@ const BOOK_LIST_STYLE = `
       minmax(
         max(
           var(--book-min),
-          calc((100% - (var(--books-per-row) - 1) * var(--ot-space-4)) / var(--books-per-row) - 0.5px)
+          calc((100% - (var(--books-per-row) - 1) * var(--tes-space-4)) / var(--books-per-row) - 0.5px)
         ),
         1fr
       )
     );
-    gap: var(--ot-space-6) var(--ot-space-4);
+    gap: var(--tes-space-6) var(--tes-space-4);
     padding: 0;
     list-style: none;
   }
@@ -69,7 +69,7 @@ const BOOK_LIST_STYLE = `
   ul[data-columns="6"] { --books-per-row: 6; }
   ul[data-columns="8"] { --books-per-row: 8; }
   ul[data-columns="10"] { --books-per-row: 10; }
-  ul[data-columns] > li { display: grid; align-content: start; gap: var(--ot-space-2); min-width: 0; }
+  ul[data-columns] > li { display: grid; align-content: start; gap: var(--tes-space-2); min-width: 0; }
 
   /* The book: a 2:3 button whose left corners are square, like a book's spine. */
   li > button {
@@ -88,7 +88,7 @@ const BOOK_LIST_STYLE = `
   li > button:focus-visible,
   li > button[aria-expanded="true"] {
     transform: translateY(-2px);
-    box-shadow: var(--ot-shadow);
+    box-shadow: var(--tes-shadow);
   }
   li > button > img,
   dialog > header > figure > img { width: 100%; height: 100%; object-fit: cover; }
@@ -98,7 +98,7 @@ const BOOK_LIST_STYLE = `
     display: -webkit-box;
     max-width: 100%;
     box-sizing: border-box;
-    padding: var(--ot-space-2);
+    padding: var(--tes-space-2);
     overflow: hidden;
     overflow-wrap: anywhere;
     text-align: center;
@@ -107,20 +107,20 @@ const BOOK_LIST_STYLE = `
   }
 
   /* The text under the cover: the title cut at two lines, then the authors. */
-  li > p { display: grid; gap: var(--ot-space-1); margin: 0; overflow-wrap: anywhere; }
+  li > p { display: grid; gap: var(--tes-space-1); margin: 0; overflow-wrap: anywhere; }
   li > p > strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   ul[data-columns="8"] > li > p > small,
   ul[data-columns="10"] > li > p > small { display: none; }
 
   /* The card: the close button in its corner, the small book, when it has a cover, next to the details. */
   dialog { box-sizing: border-box; width: min(40rem, 100%); }
-  dialog > button[data-ot-variant="ghost"] { position: absolute; top: var(--ot-space-2); right: var(--ot-space-2); }
-  dialog > button[data-ot-variant="ghost"] > svg { display: block; }
+  dialog > button[data-tes-variant="ghost"] { position: absolute; top: var(--tes-space-2); right: var(--tes-space-2); }
+  dialog > button[data-tes-variant="ghost"] > svg { display: block; }
   dialog > header {
     display: flex;
     align-items: flex-start;
-    gap: var(--ot-space-4);
-    padding-right: var(--ot-space-6);
+    gap: var(--tes-space-4);
+    padding-right: var(--tes-space-6);
   }
   dialog > header > div { flex: 1; min-width: 0; }
   dialog > header > figure {
@@ -131,12 +131,12 @@ const BOOK_LIST_STYLE = `
     overflow: hidden;
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    border-top-right-radius: var(--ot-radius);
-    border-bottom-right-radius: var(--ot-radius);
+    border-top-right-radius: var(--tes-radius);
+    border-bottom-right-radius: var(--tes-radius);
   }
-  dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--ot-space-4); }
+  dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--tes-space-4); }
   dialog dd { margin: 0; }
-  dialog > header p:last-child { display: flex; flex-wrap: wrap; gap: var(--ot-space-1); margin: 0; }
+  dialog > header p:last-child { display: flex; flex-wrap: wrap; gap: var(--tes-space-1); margin: 0; }
 
   /*
    * A narrow frame, such as a phone's: the small book above the details,
@@ -401,7 +401,7 @@ function buildGenreBadges(tile) {
   const badges = document.createElement("p");
   for (const genre of readBookGenres(tile)) {
     const badge = document.createElement("span");
-    badge.dataset.otVariant = "secondary";
+    badge.dataset.tesVariant = "secondary";
     badge.textContent = genre;
     badges.append(badge);
   }
@@ -475,7 +475,7 @@ function buildCloseIcon() {
 function buildCloseButton(view) {
   const closeButton = document.createElement("button");
   closeButton.type = "button";
-  closeButton.dataset.otVariant = "ghost";
+  closeButton.dataset.tesVariant = "ghost";
   closeButton.setAttribute("aria-label", "Close");
   closeButton.append(buildCloseIcon());
   closeButton.addEventListener("click", closeBookCard.bind(undefined, view));
@@ -493,7 +493,7 @@ function fillBookCard(view, tile) {
     buildCardHeader(view, tile),
   );
   if (hasBody(tile)) {
-    const body = document.createElement("ot-tile-body");
+    const body = document.createElement("tes-tile-body");
     body.tile = tile;
     view.card.append(document.createElement("hr"), body);
   }

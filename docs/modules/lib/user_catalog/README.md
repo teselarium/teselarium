@@ -4,7 +4,7 @@
 
 The user catalog holds the mosaics users keep for themselves, next to what the instance offers: mosaics imported from their files and stored in this browser, and remote mosaics added by URL. Its mosaics join the [catalog](../core/engine/README.md#reading-the-catalog) after the instance catalog's and the default mosaics.
 
-This library is the domain logic of the user catalog: its entries, their provenance and sync state, the review that plans an import or an update, the plans of a save and a restore, the versions each stored mosaic keeps, and the archive of an exported folder. It is pure: its planning functions return new values and write nothing. The entries and the stored files live in the [browser database](../core/storage/README.md#browser-database), the app's dialogs and the user catalog store (see [main](../../main/README.md)) apply the plans, and stored files are read at their `opentesela-browser:` addresses by the [files module](../files/README.md).
+This library is the domain logic of the user catalog: its entries, their provenance and sync state, the review that plans an import or an update, the plans of a save and a restore, the versions each stored mosaic keeps, and the archive of an exported folder. It is pure: its planning functions return new values and write nothing. The entries and the stored files live in the [browser database](../core/storage/README.md#browser-database), the app's dialogs and the user catalog store (see [main](../../main/README.md)) apply the plans, and stored files are read at their `teselarium-browser:` addresses by the [files module](../files/README.md).
 
 ## Module Details
 
@@ -13,9 +13,9 @@ Implemented in `src/lib/user_catalog/`. Other modules import only from the publi
 ### Entries and provenance
 
 - `UserCatalogEntry`: `{ address, place, root, provenance, syncedAt }`.
-  - `address`: the stored file's `opentesela-browser:` address, or the remote mosaic file's `http:` or `https:` address. Two entries never have the same address.
+  - `address`: the stored file's `teselarium-browser:` address, or the remote mosaic file's `http:` or `https:` address. Two entries never have the same address.
   - `place` (`UserCatalogPlace`): `"browser"` for a stored entry, `"remote"` for one added by URL.
-  - `root`: the root of the stored file's address (`opentesela-browser:///<root>/<path>`), made once per imported folder or single file, or `null` for a remote entry.
+  - `root`: the root of the stored file's address (`teselarium-browser:///<root>/<path>`), made once per imported folder or single file, or `null` for a remote entry.
   - `provenance` (`UserCatalogProvenance`): `{ folder, path, addedAt, updatedAt, changedSinceExport, copiedFrom }`. A stored entry has the picked folder's name, or `null` for a single file or a mosaic saved in the app, and its path inside the folder or its file name. A remote entry has `null` for both. `addedAt` is when it was first imported, saved or added, `updatedAt` when it was last updated, from a file or by a save, or `null`. `changedSinceExport` says whether its text changed since it was last synced (see [Sync state](#sync-state)), and is always `false` for a remote entry. `copiedFrom` is the address a saved copy was copied from, or `null`. Times are ISO 8601 strings in UTC. Mods read it as the catalog entry's `provenance`.
   - `syncedAt`: the `savedAt` of the [version](#versions) it was last imported, updated from a file or exported with, or `null` for a remote entry and for a mosaic saved in the app and never exported. Mods do not see it.
 - `buildUserMosaicEntries(entries)`: the catalog's user mosaics, `UserMosaic` (`{ source, place, provenance }`), one per entry in order of addition.
@@ -70,7 +70,7 @@ A mosaic saved in the app and never exported has no synced text, so a matching f
 - `"take-file"` ("Take the file"): the file's text replaces the stored text at the same address, as an update. The replaced text stays in the history, as the version before the new one;
 - `"keep-both"` ("Keep both"): the stored entry stays, and the file is imported as a new single-file entry, at its own root (`keepBothRoot`), named `<name> (from file).yaml` after the file's name: `maps/nobel_map.yml` gives `nobel_map (from file).yaml`.
 
-**Warnings.** For each relative `mod` or `collection` reference that resolves to an `opentesela-browser:` address the store does not hold and that the picked files do not have, the row warns `"<reference>" is not in this browser, so the mosaic will not open until it is`, naming the reference as written. The file can still be imported.
+**Warnings.** For each relative `mod` or `collection` reference that resolves to a `teselarium-browser:` address the store does not hold and that the picked files do not have, the row warns `"<reference>" is not in this browser, so the mosaic will not open until it is`, naming the reference as written. The file can still be imported.
 
 ### Planning functions
 

@@ -88,8 +88,8 @@ Method names are looked up as own properties of the engine's handler tables, so 
 | Event | Params |
 |---|---|
 | `tiles.changed` | `{ tiles, issues }`: the reloaded tiles, with the same rules as the mount context. Pushed when the user presses "Reload tiles" for a mod opened with a collection. |
-| `theme.changed` | `{ colorScheme, tokens }`: the new theme, the same shape as `context.theme`. Pushed to every running mod, visible or hidden, once each time the app's resolved color scheme changes. A new theme choice that resolves to the same color scheme pushes nothing. The frame loader updates the frame's `data-ot-color-scheme` attribute before the mod's handlers run. |
-| `layout.changed` | `{ layout }`: the frame's new layout, `"contained"`, `"theater"` or `"fullscreen"`, the same value as `context.layout` (see [Frame layout](#frame-layout)). Pushed to a running mod, visible or hidden, once each time its layout changes. A change of theater mode that leaves the mod's layout the same, such as for a fullscreen mod, pushes nothing. The frame loader updates the frame's `data-ot-layout` attribute before the mod's handlers run. Added in mod API `0.1.9`. |
+| `theme.changed` | `{ colorScheme, tokens }`: the new theme, the same shape as `context.theme`. Pushed to every running mod, visible or hidden, once each time the app's resolved color scheme changes. A new theme choice that resolves to the same color scheme pushes nothing. The frame loader updates the frame's `data-tes-color-scheme` attribute before the mod's handlers run. |
+| `layout.changed` | `{ layout }`: the frame's new layout, `"contained"`, `"theater"` or `"fullscreen"`, the same value as `context.layout` (see [Frame layout](#frame-layout)). Pushed to a running mod, visible or hidden, once each time its layout changes. A change of theater mode that leaves the mod's layout the same, such as for a fullscreen mod, pushes nothing. The frame loader updates the frame's `data-tes-layout` attribute before the mod's handlers run. Added in mod API `0.1.9`. |
 | `catalog.changed` | `{ mods, collections, mosaics }`: the new catalog, the same shape as the result of `catalog.list`. Pushed to every running mod, visible or hidden, once each time "List the default mosaics of mods" or the user catalog changes (see [Reading the catalog](#reading-the-catalog)). Added in mod API `0.1.15`; also pushed when the user catalog changes since `0.1.18`. |
 
 Inside the frame, a mod uses them through its engine API object:
@@ -113,7 +113,7 @@ The second argument of `mount(engine, context)`. Plain data:
 | `mod` | `source`, `title`, `version`, `description`. `name` was removed in mod API `0.1.14`. |
 | `mosaic` | `source`, `title`, `description` of the mosaic the mod was opened from (see the [mosaic module](../../mosaic/README.md)), or `null` for a mod opened from a mod link. It never holds the mosaic's `config`, `aliases` or `permissions`: the mod receives their effect in `config`, `tiles` and `permissions`. Added in mod API `0.1.13`. |
 | `collection` | `source`, `title`, `description` of the collection the mod's tiles were loaded from, or `null` for a mod opened with a tile or without a collection. A collection without a `description` gives `""`. A mod opened from a mosaic gets the mosaic's collection. It does not change when the tiles are reloaded, so `tiles.changed` does not carry it. Added in mod API `0.1.17`. |
-| `api` | `version`: the app's mod API version as a string, `"0.1.19"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
+| `api` | `version`: the app's mod API version as a string, `"0.2.0"` (see [Mod API version](#mod-api-version)). Every mod gets it, whether it declares an `api` range or not. |
 | `config` | The mod's `config`. For a mod opened from a mosaic, the mod's config merged with the mosaic's: mappings are merged key by key, and any other mosaic value, `null` included, replaces the mod's (see [Config merge](../../mosaic/README.md#config-merge)). `mods.inspect` still gives the mod's own config. |
 | `params` | The link's parameters other than `mod`, `collection`, `tile` and `mosaic`, as a mapping of strings. |
 | `tiles` | The tiles of the link's collection, or its one tile, that match the mod's tile type. Metadata strings starting with `./` or `../` arrive resolved against the tile's `source` (see [Tiles](#tiles)). |
@@ -130,7 +130,7 @@ Each mod frame has one of three layouts:
 - otherwise `theater` while the user's theater mode is on;
 - otherwise `contained`, the default.
 
-In `contained`, the base stylesheet keeps the frame's `<body>` at most `--ot-content-width` wide and centered; `theater` and `fullscreen` set no width limit (see the [theme module](../theme/README.md#write-html-get-the-apps-look)). The frame itself fills the stage area in `contained` and `theater` alike. A mod learns its layout three ways: the `data-ot-layout` attribute on its `<html>`, set before `mount` and before the `layout.changed` handlers run, also for mods with `theme: "none"`; `context.layout`; and the `layout.changed` event. The stage decides the layout (see the [stage module](../stage/README.md#frame-layout)).
+In `contained`, the base stylesheet keeps the frame's `<body>` at most `--tes-content-width` wide and centered; `theater` and `fullscreen` set no width limit (see the [theme module](../theme/README.md#write-html-get-the-apps-look)). The frame itself fills the stage area in `contained` and `theater` alike. A mod learns its layout three ways: the `data-tes-layout` attribute on its `<html>`, set before `mount` and before the `layout.changed` handlers run, also for mods with `theme: "none"`; `context.layout`; and the `layout.changed` event. The stage decides the layout (see the [stage module](../stage/README.md#frame-layout)).
 
 ### Tiles
 
@@ -148,11 +148,11 @@ A tile's `body` reaches the mod as written. The engine can render it for the mod
 
 **`tiles.renderBody { source }`** answers `{ html }`, the body of the mod's tile whose `source` is `source`. The tiles are those the mod currently receives, after "Reload tiles" too. An empty body gives `""`. A `source` that is not a string is `-32602` (`tiles.renderBody: "source" must be a string`), and so is one that names no tile of the mod (`tiles.renderBody: the source https://example.org/other.md is not one of the mod's tiles`). A body renders on its first request and is kept, and two requests for one body render it once. A body that fails to render, such as when the library a formula, a code block or a shortcode needs cannot be loaded, is `-32603` with a message starting with `tiles.renderBody`; the failure is not kept, so the next request renders the body again.
 
-**`<ot-tile-body>`** is an element the frame loader defines in every mod frame, the frames of a check's tests included. Setting its `tile` property to a tile sends `tiles.renderBody` with the tile's `source`, and shows the result as the element's children, in the light DOM, so the theme and the mod's CSS style it. It then fires `ot-rendered`, which bubbles. When the request fails, the element shows the error's message as text with `role="alert"`. When `tile` is set again before the answer, the newest tile wins. After showing a body, the element draws its mermaid blocks as diagrams in the mod's frame, with the [mermaid library](#libraries), and fires `ot-diagrams-drawn`; `diagrams = "source"` keeps them as code (see [Diagrams](../tile_bodies/README.md#diagrams) in the tile bodies module).
+**`<tes-tile-body>`** is an element the frame loader defines in every mod frame, the frames of a check's tests included. Setting its `tile` property to a tile sends `tiles.renderBody` with the tile's `source`, and shows the result as the element's children, in the light DOM, so the theme and the mod's CSS style it. It then fires `tes-rendered`, which bubbles. When the request fails, the element shows the error's message as text with `role="alert"`. When `tile` is set again before the answer, the newest tile wins. After showing a body, the element draws its mermaid blocks as diagrams in the mod's frame, with the [mermaid library](#libraries), and fires `tes-diagrams-drawn`; `diagrams = "source"` keeps them as code (see [Diagrams](../tile_bodies/README.md#diagrams) in the tile bodies module).
 
 ```js
-const body = document.createElement("ot-tile-body");
-body.addEventListener("ot-rendered", function markShown() {
+const body = document.createElement("tes-tile-body");
+body.addEventListener("tes-rendered", function markShown() {
   body.dataset.shown = "true";
 });
 body.tile = tile;
@@ -161,9 +161,9 @@ document.body.append(body);
 
 **Clicks in rendered bodies.** The frame loader listens to `click` on `window`, in the bubbling phase, so a mod writes no code for the links and players of a body. For a click the mod did not cancel:
 
-- on an element with `data-ot-player`: it sends `players.open` with the attribute's value (see [Players](#players));
-- on a link with `data-ot-link`: it cancels the navigation and sends `links.open` with the link's `href`, so the action dialog asks to open it and the mod keeps running;
-- on a link with `data-ot-fragment` (`#notes`): it cancels the navigation and scrolls to the heading `user-content-notes` nearest to the link. It looks inside the link's ancestors from the nearest outward, so with several bodies on a page, a link reaches the heading of its own body. A fragment without such a heading does nothing.
+- on an element with `data-tes-player`: it sends `players.open` with the attribute's value (see [Players](#players));
+- on a link with `data-tes-link`: it cancels the navigation and sends `links.open` with the link's `href`, so the action dialog asks to open it and the mod keeps running;
+- on a link with `data-tes-fragment` (`#notes`): it cancels the navigation and scrolls to the heading `user-content-notes` nearest to the link. It looks inside the link's ancestors from the nearest outward, so with several bodies on a page, a link reaches the heading of its own body. A fragment without such a heading does nothing.
 
 A rejected request is logged with `console.warn`. To handle a body's clicks yourself, call `preventDefault()` on the click in your own listener: the frame loader then does nothing. Stopping the click's propagation without cancelling it lets a link navigate the frame, which stops the mod.
 
@@ -289,7 +289,7 @@ A draft is the full text of a mosaic file, which the mosaic viewer's edit mode k
 `mosaics.validate { content, mosaic? }` validates a draft without asking the user or opening anything:
 
 1. The params: `content` must be a non-empty string, and `mosaic`, when given, a non-empty string, resolved as `mosaics.inspect` resolves it (`-32602`, `mosaics.validate: "content" must be a non-empty string`). `mosaic` is the address the draft will be saved at, a stored mosaic's address. Without it, the draft is a new mosaic.
-2. The text is read as the loader reads a mosaic file (`parseYaml`, then `buildLoadedMosaic`), from `mosaic`, or from `opentesela-draft:///mosaic.yaml` for a new draft. A YAML error is one error at its line, such as `YAML: tab characters must not be used in indentation` at line 4, and a format error is one error without a line. Either ends the validation, with no hints.
+2. The text is read as the loader reads a mosaic file (`parseYaml`, then `buildLoadedMosaic`), from `mosaic`, or from `teselarium-draft:///mosaic.yaml` for a new draft. A YAML error is one error at its line, such as `YAML: tab characters must not be used in indentation` at line 4, and a format error is one error without a line. Either ends the validation, with no hints.
 3. In a new draft, a relative `mod` or `collection` is an error, `"collection" must be an absolute address in a new mosaic`: there is no address to resolve it against. A default mod name is not relative.
 4. The requester needs a granted `open` permission for `"*"` or the origin of the draft's mod, then of its collection, as `mods.inspect` and `collections.inspect` do (`-32002`, `mosaics.validate: Opening mods from <origin> is not allowed. …`, or `Inspecting collections from <origin> …`). This is checked before any request.
 5. The mod file and its tile type, and the collection with its tiles, are loaded through the stage's fetch options. A load that fails is an error that names its address, such as `Cannot load file "<collection>": HTTP 404 Not Found`, and the rest is still reported.
@@ -317,7 +317,7 @@ const { content } = await engine.request("mosaics.edit", {
 });
 const hints = await engine.request("mosaics.validate", {
   content,
-  mosaic: "opentesela-browser:///r1/nobel_map.yaml",
+  mosaic: "teselarium-browser:///r1/nobel_map.yaml",
 });
 // hints.tiles is { matching: 17, total: 17 } once every laureate has a country
 ```
@@ -357,7 +357,7 @@ const report = await engine.request("mosaics.check", {
 
 - `source`: the resolved address of the entry's file.
 - `listedBy`: who listed it: `"instance"` for an entry of the instance catalog, `"default"` for a default mosaic, `"user"` for a user catalog entry. Added in mod API `0.1.18`.
-- `place`: where its file lives: `"browser"` for an `opentesela-browser:` address, a file stored in this browser, or `"remote"` for any other address. Added in mod API `0.1.18`.
+- `place`: where its file lives: `"browser"` for a `teselarium-browser:` address, a file stored in this browser, or `"remote"` for any other address. Added in mod API `0.1.18`.
 - `defaultOf`: `{ source, title }` of the mod whose default mosaic it is, or `null`.
 - `provenance`: where a user mosaic came from, `{ folder, path, addedAt, updatedAt, changedSinceExport, copiedFrom }`, or `null` unless `listedBy` is `"user"`. For a stored mosaic, `folder` is the picked folder's name or `null` for a single file or a mosaic saved in the app, `path` its path inside the folder or its file name, `addedAt` when it was first imported or saved, `updatedAt` when it was last updated, or `null`, `changedSinceExport` whether its text differs from the text it was last imported, updated from a file or exported with (see the [user catalog module](../../user_catalog/README.md#sync-state)), and `copiedFrom` the address it was copied from, or `null`. For a mosaic added by URL, `folder`, `path`, `updatedAt` and `copiedFrom` are `null`, `addedAt` is when it was added, and `changedSinceExport` is `false`. Times are ISO 8601 strings in UTC. Added in mod API `0.1.18`; `changedSinceExport` and `copiedFrom` since `0.1.19`.
 
@@ -378,7 +378,7 @@ To find them, each catalog mod's mod file is fetched, in parallel, and nothing e
 The user catalog's mosaics come last, in the order the user added them. A user mosaic that an earlier mosaic of the catalog already lists appears once, at its earlier place and with its marks, and stays in the user catalog: switched off, the same default mosaic is listed at the user catalog's place, with `listedBy: "user"`. A stored mosaic, imported from the user's files:
 
 ```json
-{ "source": "opentesela-browser:///7f3a…/maps/nobel_map.yaml", "listedBy": "user", "place": "browser", "defaultOf": null, "provenance": { "folder": "my-mosaics", "path": "maps/nobel_map.yaml", "addedAt": "2026-11-20T10:00:00.000Z", "updatedAt": null } }
+{ "source": "teselarium-browser:///7f3a…/maps/nobel_map.yaml", "listedBy": "user", "place": "browser", "defaultOf": null, "provenance": { "folder": "my-mosaics", "path": "maps/nobel_map.yaml", "addedAt": "2026-11-20T10:00:00.000Z", "updatedAt": null } }
 ```
 
 When the switch changes, or the user catalog changes, the engine pushes `catalog.changed` to every running mod, visible or hidden, once, with the new catalog. A mod that lists the catalog follows it without a reload:
@@ -439,7 +439,7 @@ The `userCatalog.*` requests let a mod, such as the mosaic explorer and viewer, 
 - `userCatalog.update`, `userCatalog.export` and `userCatalog.history` need a stored mosaic, and `userCatalog.remove` a user mosaic, or they fail with `-32602` and no dialog: `userCatalog.update: the mosaic "<address>" is not stored in this browser`, `userCatalog.remove: the mosaic "<address>" is not in the user catalog`.
 - `userCatalog.save`: `content` must be a non-empty string (`userCatalog.save: "content" must be a non-empty string`). `mosaic`, when given, must be a stored mosaic, resolved as above: the save replaces its file. Without it, the draft is saved as a new mosaic. `copiedFrom`, when given, must be a non-empty string: the address a copy came from, which its provenance keeps. The dialog validates the draft itself, so a draft with errors is refused there, not with an error code (see [main](../../../main/README.md#the-user-catalog)).
 - `userCatalog.exportFolder`: `folder` must be a non-empty string that a stored mosaic has as its folder, or it fails with `-32602` and no dialog: `userCatalog.exportFolder: no stored mosaic comes from the folder "nowhere"`.
-- Each resolves with `true` once the user confirmed and the change is done, and `false` when the user cancels, presses Escape, or nothing changes, except `userCatalog.save`, which resolves with the saved mosaic's `opentesela-browser:` address, or `null`. After each change, every running mod gets `catalog.changed` (see [Reading the catalog](#reading-the-catalog)).
+- Each resolves with `true` once the user confirmed and the change is done, and `false` when the user cancels, presses Escape, or nothing changes, except `userCatalog.save`, which resolves with the saved mosaic's `teselarium-browser:` address, or `null`. After each change, every running mod gets `catalog.changed` (see [Reading the catalog](#reading-the-catalog)).
 
 ```js
 const imported = await engine.request("userCatalog.import", {});
@@ -480,7 +480,7 @@ A video or audio player from a site such as YouTube does not play inside a mod's
 
 **Player addresses.** `url` must be a player address of the mod's current tiles:
 
-- the `src` of an `<iframe>` in a tile's body, resolved against the tile, when it is `https:` and allowed by the private network guard (see the [sandbox module](../sandbox/README.md#media-linked-by-tiles)). The rendered body holds it as a placeholder's `data-ot-player`;
+- the `src` of an `<iframe>` in a tile's body, resolved against the tile, when it is `https:` and allowed by the private network guard (see the [sandbox module](../sandbox/README.md#media-linked-by-tiles)). The rendered body holds it as a placeholder's `data-tes-player`;
 - a page link or player address of a known site (YouTube, Vimeo, SoundCloud) that is a metadata string of a tile, such as `video: "https://www.youtube.com/watch?v=aqz-KE-bpKQ"`, or an image address in its body, such as `![Trailer](https://www.youtube.com/watch?v=aqz-KE-bpKQ)`.
 
 No other address is one: `homepage: "https://example.org/about"` is not a player. The [players module](../players/README.md) lists the known sites and what each plays from: YouTube plays from `youtube-nocookie.com`, and any other iframe from its own `src`.
@@ -637,7 +637,7 @@ function renderBookList(view) {
 
 function fillBookCard(view, tile) {
   // Fills view.card, the <dialog>, with the book's details, then an
-  // <ot-tile-body> whose tile is the book's tile.
+  // <tes-tile-body> whose tile is the book's tile.
 }
 
 function openBookCard(view, source) {
@@ -704,7 +704,7 @@ export default async function mount(engine, context) {
 }
 ```
 
-The page has two parts: `<main>`, which is drawn again when the tiles change, and one `<dialog>`, the book's card, which is built once, so a `tiles.changed` never destroys an open card. Opening and closing the card only change the book's `aria-expanded`, which also raises the book with the theme's shadow, so the covers are not drawn again. The body in the card is an `<ot-tile-body>` (see [Tile bodies](#tile-bodies)), so its links and players work with no code in the mod. The storage keeps the books per row under `columns`.
+The page has two parts: `<main>`, which is drawn again when the tiles change, and one `<dialog>`, the book's card, which is built once, so a `tiles.changed` never destroys an open card. Opening and closing the card only change the book's `aria-expanded`, which also raises the book with the theme's shadow, so the covers are not drawn again. The body in the card is an `<tes-tile-body>` (see [Tile bodies](#tile-bodies)), so its links and players work with no code in the mod. The storage keeps the books per row under `columns`.
 
 The mod registers its event handlers before its first `await`, so it misses no event, and keeps its state in its own frame's memory: back and forward show the frame as it was left.
 
@@ -734,7 +734,7 @@ A mod that wants to pass a location in a parameter passes an absolute one, such 
 
 ### Mod API version
 
-The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.1.19` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
+The mod API has a version of its own, separate from the app's version in `package.json`. It covers what a mod relies on: the engine's methods and events, the mount context, the mod file format (see the [mod module](../../mod/README.md)) and the test API, what a mod's test file gets (see the [guide to writing mod tests](../../../../mod_plugin_spec.md#mod-tests)). It is `MOD_API_VERSION` in `src/lib/core/engine/mod_api_version.ts`, `0.2.0` today. Mods read it as `context.api.version`, declare the range they were written for as `api` in their mod file, and the stage asks the user before starting a mod whose range does not match (see the [stage module](../stage/README.md#questions-before-a-mod-starts)).
 
 When it changes, while it is `0.x`:
 
@@ -767,12 +767,13 @@ Version notes:
 - `0.1.17` added the mount context key `collection` (`source`, `title`, `description`, or `null`), the collection the mod's tiles were loaded from, and `options.collection` for `mount(options)` in the test API. These are additions that existing mods keep working with, so it is a patch.
 - `0.1.18` added the `userCatalog.import`, `userCatalog.update`, `userCatalog.add`, `userCatalog.export` and `userCatalog.remove` requests, the catalog entry keys `listedBy`, `place` and `provenance`, and the test API's boolean answers to the five requests and the scripted catalog's new keys. `catalog.changed` keeps its form, and is also pushed when the user catalog changes. These are additions that existing mods keep working with, so it is a patch.
 - `0.1.19` added mosaic editing: the methods `mosaics.validate` and `mosaics.edit`, `content` in `mosaics.inspect`'s answer, the requests `userCatalog.save`, `userCatalog.history` and `userCatalog.exportFolder`, the provenance keys `changedSinceExport` and `copiedFrom`, and the test API's answers to the three requests (a boolean, and a mosaic address or `null` for `userCatalog.save`), with the scripted catalog completing the new provenance keys. Every key and method a mod used before is kept, and a scripted provenance without the new keys is still accepted, so these are additions that existing mods keep working with: a patch.
+- `0.2.0` renamed the project to Teselarium, and with it the names a mod relies on. What breaks: the theme variables are `--tes-*`, the attributes are `data-tes-*` (read as `dataset.tes*`), the classes are `tes-*`, and the browser file address scheme is `teselarium-browser:`. A mod that used the names of earlier versions styles nothing and reads no browser file. The surface names (methods, events, context keys, mod file keys) are the same as in `0.1.19`, so the surface guard's `0.2.0` entry repeats it. It is a minor bump because those mods break. The shipped, sample and test mods moved to `^0.2.0` in the same change, and no mod exists outside this repository.
 
 An OpenSpec proposal that changes the mod API's specs (`mod-engine-api`, `mod-loading`'s mod file format, `mod-api-version`, `mod-theme`'s context and events, `mod-app-actions`) states its bump, as `docs/code_conventions.md`, "OpenSpec changes", asks.
 
 ### Hosting note
 
-Mods run in `srcdoc` frames, which inherit the Content-Security-Policy of the page that embeds them. The app sends none on static hosts. A page that embeds OpenTesela with its own Content-Security-Policy must allow inline scripts in frames (`script-src 'unsafe-inline' blob:`), or no mod can start. The app also needs `unsafe-eval` to build tile validators (see the [tile module](../../tile/README.md)). A policy with `frame-src` (or `child-src`) must also allow the player sites, such as `https://www.youtube-nocookie.com https://player.vimeo.com https://w.soundcloud.com`, and the sites of the iframes tile bodies hold, or players stay blank. A policy with `connect-src` (or `default-src`) must also allow the [npm host](#npm-host), `https://cdn.jsdelivr.net` in the vanilla app, or `libs.load` fails for declared npm libraries.
+Mods run in `srcdoc` frames, which inherit the Content-Security-Policy of the page that embeds them. The app sends none on static hosts. A page that embeds Teselarium with its own Content-Security-Policy must allow inline scripts in frames (`script-src 'unsafe-inline' blob:`), or no mod can start. The app also needs `unsafe-eval` to build tile validators (see the [tile module](../../tile/README.md)). A policy with `frame-src` (or `child-src`) must also allow the player sites, such as `https://www.youtube-nocookie.com https://player.vimeo.com https://w.soundcloud.com`, and the sites of the iframes tile bodies hold, or players stay blank. A policy with `connect-src` (or `default-src`) must also allow the [npm host](#npm-host), `https://cdn.jsdelivr.net` in the vanilla app, or `libs.load` fails for declared npm libraries.
 
 ## Module Details
 
@@ -795,7 +796,7 @@ So two mods from different sources never read each other's values, and a mod kee
 - `writeModValue(storage, slot, key, value)`: stores the value as JSON. Storing `null` removes the key. Storage errors propagate.
 - Types: `ModSlot`; `ModStorage`, the `getItem`, `setItem` and `removeItem` part of `Storage`. The app passes `localStorage`, and tests pass a `createMemoryStorage()` (see the [storage module](../storage/README.md)).
 
-The storage key is `"opentesela.mod-storage:" + JSON.stringify([mod, context, key])`, so keys made of `:` parts never collide. Before mod API `0.1.14`, slots had no context and the key was `JSON.stringify([modSource, key])`. A three-element key never equals one of those, so values stored before are no longer read, and they are not deleted.
+The storage key is `"teselarium.mod-storage:" + JSON.stringify([mod, context, key])`, so keys made of `:` parts never collide. Before mod API `0.1.14`, slots had no context and the key was `JSON.stringify([modSource, key])`. A three-element key never equals one of those, so values stored before are no longer read, and they are not deleted.
 
 Example:
 
@@ -847,7 +848,7 @@ const inspection = await inspectMod(
   { baseUrl: "https://example.org/" },
 );
 // inspection.title === "Book List"
-// inspection.api === "^0.1.0" and inspection.apiCompatible === true
+// inspection.api === "^0.2.0" and inspection.apiCompatible === true
 // inspection.permissions.granted holds the show permission for https://upload.wikimedia.org
 ```
 
@@ -855,7 +856,7 @@ const inspection = await inspectMod(
 
 Implemented in `mod_api_version.ts`. The mod library only checks that a mod's `api` is a valid range; the engine matches it, so the library never knows which app runs it.
 
-- `MOD_API_VERSION`: `"0.1.19"`, the app's mod API version.
+- `MOD_API_VERSION`: `"0.2.0"`, the app's mod API version.
 - `matchModApiRange(range)`: `null` when `range` is `null`, otherwise whether `MOD_API_VERSION` satisfies the range by npm's semver rules (`satisfies` from `semver`). A caret range on a `0.x` version allows only patch updates: `^0.1.0` matches `0.1.10` but not `0.2.0`.
 - `describeMissingApiRange()`: the message of the warning of a mod without `api`, naming `"api"` and `MOD_API_VERSION`.
 - `describeCancelledApiMismatch(range)`: the error of a sandbox whose mod the user did not run, naming the range and `MOD_API_VERSION`.

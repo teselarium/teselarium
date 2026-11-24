@@ -23,12 +23,12 @@ The mod SHALL show its title as a heading, then one list item per tile, in the t
 - **THEN** the book shows the tile's `source` as its title
 
 ### Requirement: Book shape
-Each book's cover area SHALL have square left corners and right corners rounded with the theme's radius (`--ot-radius`).
+Each book's cover area SHALL have square left corners and right corners rounded with the theme's radius (`--tes-radius`).
 
 #### Scenario: Corners of a book
 - **WHEN** the mod runs with the sample collection
 - **THEN** the top-left and bottom-left corner radii of each book's button are `0px`
-- **AND** its top-right and bottom-right corner radii are the value of `--ot-radius`
+- **AND** its top-right and bottom-right corner radii are the value of `--tes-radius`
 
 ### Requirement: Title and authors under each cover
 Each book SHALL show its title and its authors, joined with `, `, as text under its cover. A title longer than two lines SHALL be cut at two lines. At 8 and 10 books per row, the authors SHALL be left out of the text under the cover, and SHALL stay in the button's accessible name.
@@ -193,16 +193,16 @@ While a card is open, it SHALL stay open when the tiles change and its book is s
 - **THEN** no dialog is open
 
 ### Requirement: Raised book
-A book SHALL be raised, moved up a little and given the theme's shadow (`--ot-shadow`), while the pointer is over it, while it has keyboard focus, and while its card is open. When the user prefers reduced motion, a raised book SHALL get the shadow without moving.
+A book SHALL be raised, moved up a little and given the theme's shadow (`--tes-shadow`), while the pointer is over it, while it has keyboard focus, and while its card is open. When the user prefers reduced motion, a raised book SHALL get the shadow without moving.
 
 #### Scenario: Raised on hover
 - **WHEN** the pointer is over Kallocain's book
-- **THEN** Kallocain's button has the computed `box-shadow` of `--ot-shadow` and its computed transform moves it up
+- **THEN** Kallocain's button has the computed `box-shadow` of `--tes-shadow` and its computed transform moves it up
 - **AND** the other books' buttons have no `box-shadow`
 
 #### Scenario: Raised while the card is open
 - **WHEN** Kallocain's card is open
-- **THEN** Kallocain's button has the computed `box-shadow` of `--ot-shadow` and its computed transform moves it up
+- **THEN** Kallocain's button has the computed `box-shadow` of `--tes-shadow` and its computed transform moves it up
 
 #### Scenario: Back after closing
 - **WHEN** the user opens and closes Kallocain's card, moves the pointer off the books and clicks the heading
@@ -210,7 +210,7 @@ A book SHALL be raised, moved up a little and given the theme's shadow (`--ot-sh
 
 #### Scenario: Reduced motion
 - **WHEN** the user prefers reduced motion and the pointer is over Kallocain's book
-- **THEN** Kallocain's button has the computed `box-shadow` of `--ot-shadow` and its computed transform is `none`
+- **THEN** Kallocain's button has the computed `box-shadow` of `--tes-shadow` and its computed transform is `none`
 
 ### Requirement: The open book's state
 Each book's button SHALL have `aria-haspopup="dialog"`. The button of the book whose card is open SHALL have `aria-expanded="true"`, and every other book's button SHALL have `aria-expanded="false"`.
@@ -246,15 +246,15 @@ The mod's test file SHALL have, among its cases, `lists the sample books`, which
 - **THEN** the report's tests are the cases of the sample's test file, among them `lists the sample books` and `remembers the books per row`, each with status `"pass"`
 
 ### Requirement: Theme look
-The mod SHALL take its colors and fonts from the theme, and SHALL only add styles for what the base stylesheet does not cover: layout, the corner shape of its books, taken from `--ot-radius`, and their shadow, taken from `--ot-shadow`.
+The mod SHALL take its colors and fonts from the theme, and SHALL only add styles for what the base stylesheet does not cover: layout, the corner shape of its books, taken from `--tes-radius`, and their shadow, taken from `--tes-shadow`.
 
 #### Scenario: Dark sample mod
 - **WHEN** the color scheme is `dark` and the sample book list mod runs with the sample collection
-- **THEN** the computed background color of its frame's `<body>` is the dark value of `--ot-background`
+- **THEN** the computed background color of its frame's `<body>` is the dark value of `--tes-background`
 
 #### Scenario: Sample mod's own styles
 - **WHEN** the sample book list mod runs with the sample collection
-- **THEN** the rules of its own styles set no background, color or font property, no shadow other than `var(--ot-shadow)`, and no border property other than corner radii
+- **THEN** the rules of its own styles set no background, color or font property, no shadow other than `var(--tes-shadow)`, and no border property other than corner radii
 
 ### Requirement: Card in a narrow frame
 When the mod's frame is narrower than 30rem, the card SHALL show the book's cover above its title, centered, and its labeled values below the title across the card's width, so that each value has room for its text. No word of a value that fits the card's width SHALL be split across lines. In a frame 30rem or wider, the cover SHALL stay beside the title.

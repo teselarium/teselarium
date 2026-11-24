@@ -7,7 +7,7 @@ const FLASHCARDS = "https://example.org/samples/mods/flashcards";
 const LAUREATES = "https://example.org/samples/collections/laureates.yaml";
 const MAP_MOSAIC = "https://example.org/samples/mosaics/nobel_map.yaml";
 const BOOKS_MOSAIC = "https://example.org/samples/mosaics/nobel_books.yaml";
-const STORED_MOSAIC = "opentesela-browser:///r1/nobel_map.yaml";
+const STORED_MOSAIC = "teselarium-browser:///r1/nobel_map.yaml";
 const TILE = "https://example.org/samples/tiles/laureate.yaml";
 
 function buildLink(fields: Partial<SandboxLink>): SandboxLink {

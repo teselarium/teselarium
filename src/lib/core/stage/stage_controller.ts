@@ -147,7 +147,7 @@ export interface StageOptions {
   catalogDefaultMosaics: boolean;
   /** The user catalog's entries as the app starts, read from the browser database. Empty by default. */
   userCatalog?: readonly UserCatalogEntry[];
-  /** Reads the files stored in the browser, at `opentesela-browser:` addresses. None are stored without it. */
+  /** Reads the files stored in the browser, at `teselarium-browser:` addresses. None are stored without it. */
   browserFiles?: BrowserFileReader;
   /** Whether theater mode is on as the app starts. */
   theaterMode: boolean;

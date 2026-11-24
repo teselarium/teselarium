@@ -20,8 +20,8 @@ export interface CatalogSetting {
   snapshot: boolean;
 }
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const CATALOG_SETTING_KEY = "opentesela.catalog-default-mosaics";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const CATALOG_SETTING_KEY = "teselarium.catalog-default-mosaics";
 
 /**
  * Whether the setting is on as the app starts, for the stage created before

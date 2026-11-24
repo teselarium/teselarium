@@ -11,10 +11,10 @@ import { buildLoadedMosaic } from "./mosaic_loader.ts";
  * The address a draft without one is read at. Relative references resolve
  * against it, so they can be read, but they name nothing a launch could load.
  */
-export const DRAFT_ADDRESS = "opentesela-draft:///mosaic.yaml";
+export const DRAFT_ADDRESS = "teselarium-draft:///mosaic.yaml";
 
 /** The default mods folder a draft's default mod name is read against when it is checked. */
-const DRAFT_DEFAULT_MODS_FOLDER = "opentesela-draft:///default_mods/";
+const DRAFT_DEFAULT_MODS_FOLDER = "teselarium-draft:///default_mods/";
 
 /** A `show` line of a draft, as the form edits it. */
 export interface MosaicShowLine {

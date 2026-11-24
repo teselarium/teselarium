@@ -20,7 +20,7 @@ export async function drawsCardBackground(context: CaseContext): Promise<void> {
 
   context
     .expect(getComputedStyle(findElement(context, "article")).backgroundColor)
-    .toBe(readTokenAs("--ot-card", "color"));
+    .toBe(readTokenAs("--tes-card", "color"));
 }
 
 export async function drawsIssueBadges(context: CaseContext): Promise<void> {
@@ -28,18 +28,18 @@ export async function drawsIssueBadges(context: CaseContext): Promise<void> {
 
   const errorBadge = findElement(
     context,
-    'section[aria-label="Entry issues"] span[data-ot-variant="destructive"]',
+    'section[aria-label="Entry issues"] span[data-tes-variant="destructive"]',
   );
   const warningBadge = findElement(
     context,
-    'section[aria-label="Entry issues"] span[data-ot-variant="warning"]',
+    'section[aria-label="Entry issues"] span[data-tes-variant="warning"]',
   );
   context
     .expect(getComputedStyle(errorBadge).borderTopColor)
-    .toBe(readTokenAs("--ot-destructive", "color"));
+    .toBe(readTokenAs("--tes-destructive", "color"));
   context
     .expect(getComputedStyle(warningBadge).borderTopColor)
-    .toBe(readTokenAs("--ot-warning", "color"));
+    .toBe(readTokenAs("--tes-warning", "color"));
 }
 
 export async function drawsTilesInCard(context: CaseContext): Promise<void> {
@@ -50,7 +50,7 @@ export async function drawsTilesInCard(context: CaseContext): Promise<void> {
   context.expect(card !== null).toBe(true);
   context
     .expect(card === null ? null : getComputedStyle(card).backgroundColor)
-    .toBe(readTokenAs("--ot-card", "color"));
+    .toBe(readTokenAs("--tes-card", "color"));
   const headings: (string | null)[] = [];
   for (const heading of table.querySelectorAll("th")) {
     headings.push(heading.textContent);

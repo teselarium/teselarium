@@ -117,7 +117,7 @@ function finishLink(link: Element, tileSource: string): void {
     return;
   }
   if (href.startsWith("#")) {
-    link.properties.dataOtFragment = "";
+    link.properties.dataTesFragment = "";
     return;
   }
   const url = resolveBodyAddress(href, tileSource);
@@ -126,7 +126,7 @@ function finishLink(link: Element, tileSource: string): void {
   }
   link.properties.href = url.href;
   if (isWebUrl(url)) {
-    link.properties.dataOtLink = "";
+    link.properties.dataTesLink = "";
   }
 }
 
@@ -182,7 +182,7 @@ function finishElementsIn(
 /**
  * The finishing pass, after sanitizing: resolves `src`, `poster`, each
  * `srcset` candidate and `href` against the tile; marks links to `#…` with
- * `data-ot-fragment` and `http:`/`https:` links with `data-ot-link`; loads
+ * `data-tes-fragment` and `http:`/`https:` links with `data-tes-link`; loads
  * images lazily; forces `controls` and `preload="metadata"` on video and
  * audio, without `autoplay`. Media addresses that are not `http:` or
  * `https:` once resolved are dropped. Changes the tree in place, and returns

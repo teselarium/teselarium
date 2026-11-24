@@ -1,7 +1,7 @@
 mod:
   title: "Tile Viewer"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Shows a tile's metadata and body and, when it is opened from a collection, its place in it, with the previous and next tiles."
   entrypoint: "./main.js"
   test_path: "./test.js"

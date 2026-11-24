@@ -70,11 +70,11 @@ Each heading of a rendered body SHALL have an `id` made of `user-content-` and t
 Every mod frame, including the frames of a check, SHALL define the element `tes-tile-body`. Setting its `tile` property to a tile of the mod SHALL send `tiles.renderBody` with the tile's `source` and show the result as the element's children, then fire a bubbling `tes-rendered` event. When the request fails, the element SHALL show the error's message as text with `role="alert"`.
 
 #### Scenario: Show a body with no code
-- **WHEN** a mod appends an `tes-tile-body` element and sets its `tile` to a tile whose body holds `# Notes`
-- **THEN** the element holds an `<h1>` with `Notes`, and an `tes-rendered` event reached the mod's listener on `document`
+- **WHEN** a mod appends a `tes-tile-body` element and sets its `tile` to a tile whose body holds `# Notes`
+- **THEN** the element holds an `<h1>` with `Notes`, and a `tes-rendered` event reached the mod's listener on `document`
 
 #### Scenario: Tile that is not the mod's
-- **WHEN** a mod sets an `tes-tile-body` element's `tile` to `{ "source": "https://example.org/other.md" }`
+- **WHEN** a mod sets a `tes-tile-body` element's `tile` to `{ "source": "https://example.org/other.md" }`
 - **THEN** the element shows the message of the `-32602` error with `role="alert"`
 
 ### Requirement: Rendered bodies follow the theme
@@ -99,7 +99,7 @@ The base stylesheet SHALL draw `button.tes-player` as a box of the same size wha
 After showing a body, the `tes-tile-body` element SHALL replace each `<pre>` whose `<code>` has the class `language-mermaid` with the diagram mermaid draws from the code's text, in a `<figure>` that keeps the text in `data-mermaid-source`. It SHALL draw with mermaid's strict security level, so labels are text and diagrams hold no click handlers. The rest of the body SHALL be shown before any diagram is drawn.
 
 #### Scenario: Body with a diagram
-- **WHEN** a mod shows, in an `tes-tile-body` element, a body with a paragraph and a mermaid block `flowchart LR` with `Tile --> Mod`
+- **WHEN** a mod shows, in a `tes-tile-body` element, a body with a paragraph and a mermaid block `flowchart LR` with `Tile --> Mod`
 - **THEN** the paragraph is shown while the block is still code, and then the block is replaced by a `<figure>` holding an SVG with the labels `Tile` and `Mod`
 
 #### Scenario: Markup in a label

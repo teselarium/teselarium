@@ -21,7 +21,7 @@ export interface AppThemeOptions {
   storage: ThemeStorage;
   systemQuery: SystemColorSchemeQuery;
   stage: Stage;
-  /** The element that gets `data-ot-color-scheme`: the page's `<html>`. */
+  /** The element that gets `data-tes-color-scheme`: the page's `<html>`. */
   root: HTMLElement;
 }
 
@@ -67,7 +67,7 @@ function applyAppTheme(appTheme: AppTheme): void {
     appTheme.choice,
     appTheme.systemQuery.matches,
   );
-  appTheme.root.dataset.otColorScheme = colorScheme;
+  appTheme.root.dataset.tesColorScheme = colorScheme;
   changeStageColorScheme(appTheme.stage, colorScheme);
   appTheme.snapshot = buildSnapshot(appTheme.choice, colorScheme);
   for (const listener of appTheme.listeners) {

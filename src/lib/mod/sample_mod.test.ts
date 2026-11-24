@@ -25,19 +25,19 @@ interface ShippedSample {
 
 const SHIPPED_BOOK_LIST: ShippedSample = {
   folder: `${APP_BASE_URL}samples/mods/book_list/`,
-  api: "^0.1.14",
+  api: "^0.2.0",
   caseNames: ["lists the sample books", "remembers the books per row"],
 };
 
 const SHIPPED_FLASHCARDS: ShippedSample = {
   folder: `${APP_BASE_URL}samples/mods/flashcards/`,
-  api: "^0.1.14",
+  api: "^0.2.0",
   caseNames: ["lists the sample tiles", "remembers the chosen fields"],
 };
 
 const SHIPPED_COUNTRY_MAP: ShippedSample = {
   folder: `${APP_BASE_URL}samples/mods/country_map/`,
-  api: "^0.1.14",
+  api: "^0.2.0",
   caseNames: [
     "shows a marker per country",
     "opens a country",

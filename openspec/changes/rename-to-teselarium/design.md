@@ -46,15 +46,16 @@ Alternatives: `sed` one-liners (no tests, and the lookbehind rules need PCRE), a
 | 6 | `(?<![A-Za-z0-9_])ot-` | `tes-` |
 | 7 | `(?<![A-Za-z0-9_])ot(?=[A-Z][a-z])` | `tes` |
 | 8 | `(?<![A-Za-z])tesela_spec\.md` | `teselarium_spec.md` (the stale links) |
+| 9 | `(?<=data)Ot(?=[A-Z][a-z])` | `Tes` (the property form of an attribute, as hast and React name it: `dataOtAlert`, `dataOtVariant`) |
 
-The lookbehind on 5 to 7 keeps `slot-`, `not-`, `data-testid` and `latest-` intact, and still matches `--ot-` and `data-ot-` because `-` is not in the class. Rule 7 needs a lowercase letter after the capital, so `OTHER_API_RANGE` and `OTHERWISE` never match. Rule 5 has no lookahead, so a bare `--ot-` prefix in prose is renamed too. A failure the script cannot see (a word ending in `ot` after `_`) is covered by the dry-run report of every distinct changed token, which the reviewer reads.
+The lookbehind on 5 to 7 keeps `slot-`, `not-`, `data-testid` and `latest-` intact, and still matches `--ot-` and `data-ot-` because `-` is not in the class. Rule 7 needs a lowercase letter after the capital, so `OTHER_API_RANGE` and `OTHERWISE` never match. Rule 7 does not cover `dataOtAlert`, because its `ot` is capitalized and follows a letter: rule 9 covers that form. It was added after the first run, when the unit tests failed on the tile body sanitizer's property names. Rule 5 has no lookahead, so a bare `--ot-` prefix in prose is renamed too. A failure the script cannot see (a word ending in `ot` after `_`) is covered by the dry-run report of every distinct changed token, which the reviewer reads.
 
-Rule 1 runs first so `an OpenTesela` does not become `an Teselarium`.
+Rule 1 runs first so `an OpenTesela` does not become `an Teselarium`. It does not match an article before a backticked name, such as ``an `opentesela-browser:` ``, which rules 4 and 6 turn into ``an `teselarium-browser:` ``. About 20 of these were fixed by hand after the script, with one `sed` (``an `teselarium…``, ``an `--tes-…`` and ``an `tes-…`` become ``a …``), in live files and in the main and delta specs. The script does not do it.
 
 ### D3. File selection and safety checks
 
 - Included: every tracked text file except the exclusions below. A file that does not decode as UTF-8 is skipped and reported.
-- Excluded: `openspec/changes/archive/**`, `openspec/discarded-changes/**`, `openspec/changes/rename-to-teselarium/**`, `.changeset/**`, `CHANGELOG.md`, `e2e/npm_files/**`, `package-lock.json` (D5).
+- Excluded: `openspec/changes/archive/**`, `openspec/discarded-changes/**`, `openspec/changes/rename-to-teselarium/**`, `.changeset/**`, `CHANGELOG.md`, `e2e/npm_files/**`, `package-lock.json` (D5). The script leaves `.changeset/` alone, but the pending entries need one hand edit after it: the package name in their frontmatter changes from `opentesela` to `teselarium`, because `changeset status` and `changeset version` fail on a package that is not in the workspace. Their summaries keep the old name.
 - Before writing, the script aborts if the new names already exist in the included files (`tes-`, `--tes-`, `data-tes-`, `Teselarium`, `teselarium`), because a merge would be silent. The check ignores `test-` and `latest-` by the same lookbehind.
 - The dry run prints, per rule, the file count and the distinct tokens it changes with their counts. The reviewer reads this short list instead of the diff.
 
@@ -75,7 +76,7 @@ The bump is not mechanical, so it is not in the script. Order matters, because `
 3. Set `MOD_API_VERSION` and `APP_MOD_API_VERSION` to `0.2.0`, and add the `0.2.0` entry to `SURFACE_BY_VERSION` (the surface names are the same as `0.1.19`).
 4. Add the `0.2.0` version note to the engine README, and update `default_mods/mod_api.d.ts` if it states the version.
 
-Only `api:` lines change. A mod's own `version: "0.1.0"` is unrelated and must stay. The delta specs already say this: the "other API" examples use `^0.3.0`, and the semver examples in `mod-api-version` that test the range function itself (`0.1.0` against `^0.1.0`) are left alone because they do not depend on the app's version.
+The `api:` examples in the docs (`docs/mod_plugin_spec.md` and the module READMEs) move to `^0.2.0` too, so no document shows a range that the app no longer matches. The generic range examples stay: the semver explanations in the engine README and the `"api" must be a semver range, such as "^0.1.0"` message of the mod format. Only `api:` lines change. A mod's own `version: "0.1.0"` is unrelated and must stay. The delta specs already say this: the "other API" examples use `^0.3.0`, and the semver examples in `mod-api-version` that test the range function itself (`0.1.0` against `^0.1.0`) are left alone because they do not depend on the app's version.
 
 ### D7. Delta specs are generated, not written
 
@@ -89,6 +90,7 @@ The 22 delta specs restate the 67 affected requirements. They were generated fro
 - [Old names remain in an ignored folder] → `dist*`, `test-results` and `local_tests` are untracked; a clean `npm ci` and build regenerate them, and the user clears `local_tests` if it has old names.
 - [Old stored data in a browser used during development] → accepted: it is ignored and the app starts empty (no users).
 - [Mods with `api: "^0.1.x"` no longer match] → accepted: the shipped, sample and test mods move to `^0.2.0` in this change, and there are no other mods.
+- [Tests that already failed before the rename block the final verification] → the page drafts and the flashcards mosaic had left `instance_catalog.test.ts` and several e2e expectations out of date (the `Home` heading, the "work in progress" status, the sample mosaic lists). They were fixed minimally here so the verification could pass, and the change `decouple-e2e-from-shipped-pages` replaces the page-wording tests with fixture pages.
 - [A reviewer wants the history renamed too] → the exclusion list is the only place to change, and a second dry run would show the extra files.
 
 ## Migration Plan

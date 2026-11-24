@@ -14,7 +14,7 @@ import { renderMessage } from "./viewer_page.ts";
 import type { ViewerView } from "./viewer_view.ts";
 
 /** The scheme of the mosaics stored in this browser, the only ones edit mode saves over. */
-const BROWSER_FILE_PROTOCOL = "opentesela-browser:";
+const BROWSER_FILE_PROTOCOL = "teselarium-browser:";
 
 /** The first text of a new mosaic, which `mosaics.edit` fills with the combination's title, mod, collection and sites. Its title stays when the combination's titles cannot be read. */
 const NEW_DRAFT_TEXT = 'mosaic:\n  title: "Untitled mosaic"\n';

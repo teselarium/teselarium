@@ -5,7 +5,7 @@ import type { UserCatalogEntry } from "./index.ts";
 
 const SAVE_TIME = new Date("2026-11-22T10:00:00.000Z");
 const IMPORT_TIME = "2026-11-20T10:00:00.000Z";
-const STORED_ADDRESS = "opentesela-browser:///r1/maps/nobel_map.yaml";
+const STORED_ADDRESS = "teselarium-browser:///r1/maps/nobel_map.yaml";
 const SAMPLE_ADDRESS =
   "https://example.org/samples/mosaics/nobel_laureates_map.yaml";
 
@@ -74,7 +74,7 @@ describe("planSave", function describePlanSave(): void {
       createRoot: createFixedRoot,
     });
 
-    const address = "opentesela-browser:///new-root/laureates_my_way.yaml";
+    const address = "teselarium-browser:///new-root/laureates_my_way.yaml";
     expect(plan.address).toBe(address);
     expect(plan.changes).toEqual({
       putFiles: [{ address, text: draft }],
@@ -120,7 +120,7 @@ describe("planSave", function describePlanSave(): void {
     });
 
     expect(plan.address).toBe(
-      "opentesela-browser:///new-root/untitled_mosaic.yaml",
+      "teselarium-browser:///new-root/untitled_mosaic.yaml",
     );
     expect(plan.changes.putEntries[0].provenance.copiedFrom).toBeNull();
   });

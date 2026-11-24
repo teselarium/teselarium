@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This library implements the following components based on [tesela_spec.md](../../../tesela_spec.md). The file fetcher, the md parser and the yaml parser it uses live in the [files module](../files/README.md).
+This library implements the following components based on [teselarium_spec.md](../../../teselarium_spec.md). The file fetcher, the md parser and the yaml parser it uses live in the [files module](../files/README.md).
 
 - A tile loader that takes as input a path or URL and chains the file fetcher and the md parser. The output is called a tile. It has additional properties:
   - Types. A list of types for which the tile has been validated against. When first loaded this list is empty.

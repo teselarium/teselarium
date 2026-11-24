@@ -136,8 +136,8 @@ function selectTab(view: EditView, tab: EditTab): void {
   const isForm = tab === "form";
   view.nodes.formTab.setAttribute("aria-selected", String(isForm));
   view.nodes.yamlTab.setAttribute("aria-selected", String(!isForm));
-  view.nodes.formTab.dataset.otVariant = isForm ? "secondary" : "ghost";
-  view.nodes.yamlTab.dataset.otVariant = isForm ? "ghost" : "secondary";
+  view.nodes.formTab.dataset.tesVariant = isForm ? "secondary" : "ghost";
+  view.nodes.yamlTab.dataset.tesVariant = isForm ? "ghost" : "secondary";
   view.nodes.formPanel.hidden = !isForm;
   view.nodes.yamlPanel.hidden = isForm;
   if (isForm) {
@@ -273,7 +273,7 @@ function buildPanel(id: string): HTMLElement {
 function buildTextarea(): HTMLTextAreaElement {
   const textarea = document.createElement("textarea");
   textarea.name = "content";
-  textarea.dataset.otVariant = "code";
+  textarea.dataset.tesVariant = "code";
   textarea.rows = 18;
   textarea.spellcheck = false;
   textarea.setAttribute("aria-label", "Mosaic file");
@@ -417,12 +417,12 @@ async function offerKeptDraft(view: EditView): Promise<void> {
     "Restore draft",
     restoreDraft.bind(undefined, view, kept),
   );
-  restoreButton.dataset.otVariant = "outline";
+  restoreButton.dataset.tesVariant = "outline";
   const discardButton = buildButton(
     "Discard",
     discardKeptDraft.bind(undefined, view),
   );
-  discardButton.dataset.otVariant = "outline";
+  discardButton.dataset.tesVariant = "outline";
   const form = document.createElement("form");
   form.setAttribute("aria-label", "Kept draft");
   form.append(restoreButton, discardButton);

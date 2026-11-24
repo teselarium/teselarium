@@ -77,7 +77,7 @@ Once the libraries are loaded, the mod SHALL show a world map in the Equal Earth
 - **THEN** the map fills the frame's width in both layouts
 
 ### Requirement: Map look
-The sea SHALL be a gray, a tint of the theme's `--ot-muted-foreground` over `--ot-card`, distinct from every country. The countries without tiles SHALL be filled with `--ot-muted`, the countries with tiles with a tint of `--ot-primary` over `--ot-card`, and the selected country with `--ot-accent`, each outlined with `--ot-border`. The map SHALL follow a change of color scheme without reloading the frame. The map SHALL send no request other than the libraries' files.
+The sea SHALL be a gray, a tint of the theme's `--tes-muted-foreground` over `--tes-card`, distinct from every country. The countries without tiles SHALL be filled with `--tes-muted`, the countries with tiles with a tint of `--tes-primary` over `--tes-card`, and the selected country with `--tes-accent`, each outlined with `--tes-border`. The map SHALL follow a change of color scheme without reloading the frame. The map SHALL send no request other than the libraries' files.
 
 #### Scenario: Countries with tiles stand out
 - **WHEN** the mod runs with its sample collection
@@ -85,7 +85,7 @@ The sea SHALL be a gray, a tint of the theme's `--ot-muted-foreground` over `--o
 
 #### Scenario: Dark map
 - **WHEN** the mod runs and the user switches the color scheme to dark
-- **THEN** the computed fill of a country without tiles is the dark value of `--ot-muted`, and the frame was not reloaded
+- **THEN** the computed fill of a country without tiles is the dark value of `--tes-muted`, and the frame was not reloaded
 
 #### Scenario: No map tiles
 - **WHEN** the mod runs with its sample collection and the user pans and zooms the map
@@ -125,7 +125,7 @@ The map SHALL show one marker for each map country that has at least one tile, a
 - **THEN** the tip of France's marker is in mainland France, between latitudes 42 and 51.5 and longitudes -5 and 8
 
 ### Requirement: Marker shape
-A marker SHALL be a speech bubble: a box with rounded corners and a pin in the middle of its bottom edge whose tip is the marker's point. It SHALL hold the country's number of tiles, centered, and its box SHALL widen with the number's digits. It SHALL be filled with `--ot-primary` and its number SHALL use `--ot-primary-foreground`.
+A marker SHALL be a speech bubble: a box with rounded corners and a pin in the middle of its bottom edge whose tip is the marker's point. It SHALL hold the country's number of tiles, centered, and its box SHALL widen with the number's digits. It SHALL be filled with `--tes-primary` and its number SHALL use `--tes-primary-foreground`.
 
 #### Scenario: Wider for more digits
 - **WHEN** one country has 7 tiles and another has 12
@@ -187,11 +187,11 @@ Selecting a country SHALL show a sidebar on the right of the map with the countr
 - **THEN** no sidebar is shown, China's marker has `aria-expanded="false"`, and it has focus
 
 ### Requirement: Sidebar look
-The sidebar's background SHALL be the theme's `--ot-card`, apart from the frame's `--ot-background`, and the tile buttons' background SHALL differ from the sidebar's.
+The sidebar's background SHALL be the theme's `--tes-card`, apart from the frame's `--tes-background`, and the tile buttons' background SHALL differ from the sidebar's.
 
 #### Scenario: Sidebar colors
 - **WHEN** China's sidebar is open
-- **THEN** the sidebar's computed background is the value of `--ot-card`, and the button "Great Wall of China" has another background
+- **THEN** the sidebar's computed background is the value of `--tes-card`, and the button "Great Wall of China" has another background
 
 ### Requirement: Narrow frames
 When the frame is narrower than 40rem, the sidebar SHALL be shown below the map, across the frame's width, instead of on its right, and the map SHALL stay visible.
@@ -259,7 +259,7 @@ The mod SHALL take its colors and fonts from the theme. Its own styles SHALL set
 
 #### Scenario: Mod's own styles
 - **WHEN** the sample country map mod runs with its sample collection
-- **THEN** the rules of its own styles set every color, background, fill and stroke from `--ot-*` variables
+- **THEN** the rules of its own styles set every color, background, fill and stroke from `--tes-*` variables
 
 ### Requirement: Mod tests
 The mod's test file SHALL have, among its cases, `shows a marker per country`, which mounts the mod with the sample sites and expects 10 markers with their numbers, `opens a country`, which selects China and expects its two titles, and `groups tiles not on the map`, which mounts tiles of an unknown country and expects the "Not on the map" button.

@@ -1,4 +1,4 @@
-/** The text of a file stored in the browser, at its `opentesela-browser:` address. */
+/** The text of a file stored in the browser, at its `teselarium-browser:` address. */
 export interface StoredFile {
   address: string;
   text: string;
@@ -56,7 +56,7 @@ export interface BrowserDatabase<Entry extends AddressedEntry> {
 }
 
 /** The IndexedDB database of the app. A later store raises the version. */
-export const BROWSER_DATABASE_NAME = "opentesela";
+export const BROWSER_DATABASE_NAME = "teselarium";
 /** Version 2 added `versions`. */
 export const BROWSER_DATABASE_VERSION = 2;
 /** Keyed by address, `{ address, text }` as value. */

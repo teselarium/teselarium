@@ -142,7 +142,7 @@ test.describe(
       const frame = await openThemeProbe(page, "light");
       await frame.evaluate(
         addModHtml,
-        '<p id="primary" style="color: var(--ot-primary)">Primary</p>',
+        '<p id="primary" style="color: var(--tes-primary)">Primary</p>',
       );
       const lightColor = (await frame.evaluate(readElementColors, "#primary"))
         .color;
@@ -161,7 +161,7 @@ test.describe(
     }): Promise<void> {
       const frame = await openThemeProbe(page, "dark");
 
-      expect(await frame.evaluate(readRootTokenValue, "--ot-primary")).toBe(
+      expect(await frame.evaluate(readRootTokenValue, "--tes-primary")).toBe(
         DARK_COLORS.primary.value,
       );
     });
@@ -172,7 +172,7 @@ test.describe(
       const frame = await openThemeProbe(page, "light");
 
       expect(
-        await frame.evaluate(readRootTokenValue, "--ot-color-accent"),
+        await frame.evaluate(readRootTokenValue, "--tes-color-accent"),
       ).toBe("");
     });
   },
@@ -189,7 +189,7 @@ test.describe(
 
       await frame.evaluate(
         addModHtml,
-        '<section data-ot-color-scheme="dark"><p style="color: var(--ot-foreground)">Dark</p></section>',
+        '<section data-tes-color-scheme="dark"><p style="color: var(--tes-foreground)">Dark</p></section>',
       );
 
       expect(
@@ -206,7 +206,7 @@ test.describe(
       const frame = await openThemeProbe(page, "light");
       await frame.evaluate(
         addModHtml,
-        '<section data-ot-color-scheme="light"><p>Light</p></section>',
+        '<section data-tes-color-scheme="light"><p>Light</p></section>',
       );
 
       await chooseTheme(page, "Dark");
@@ -246,7 +246,7 @@ test.describe(
 
       await frame.evaluate(
         addModStyle,
-        ":root { --ot-primary: rgb(255, 0, 0); }",
+        ":root { --tes-primary: rgb(255, 0, 0); }",
       );
       await frame.evaluate(
         addModHtml,
@@ -269,7 +269,9 @@ test.describe(
     }): Promise<void> {
       const frame = await openThemeProbe(page, "dark", ['  theme: "none"']);
 
-      expect(await frame.evaluate(readRootTokenValue, "--ot-primary")).toBe("");
+      expect(await frame.evaluate(readRootTokenValue, "--tes-primary")).toBe(
+        "",
+      );
       expect(await frame.evaluate(readBodyMargin)).toBe("8px");
     });
 
@@ -510,9 +512,9 @@ async function expectPlainButton(
   selector: string,
 ): Promise<void> {
   const look = await frame.evaluate(readElementLook, selector);
-  expect(look.background).toBe(await readToken(frame, "--ot-background"));
-  expect(look.borderColor).toBe(await readToken(frame, "--ot-border"));
-  expect(look.color).toBe(await readToken(frame, "--ot-foreground"));
+  expect(look.background).toBe(await readToken(frame, "--tes-background"));
+  expect(look.borderColor).toBe(await readToken(frame, "--tes-border"));
+  expect(look.color).toBe(await readToken(frame, "--tes-foreground"));
 }
 
 function describeSemanticHtml(colorScheme: "light" | "dark"): void {
@@ -530,9 +532,9 @@ function describeSemanticHtml(colorScheme: "light" | "dark"): void {
       readElementLook,
       'button[type="submit"]',
     );
-    expect(submit.background).toBe(await readToken(frame, "--ot-primary"));
+    expect(submit.background).toBe(await readToken(frame, "--tes-primary"));
     expect(submit.color).toBe(
-      await readToken(frame, "--ot-primary-foreground"),
+      await readToken(frame, "--tes-primary-foreground"),
     );
   });
 
@@ -544,10 +546,10 @@ function describeSemanticHtml(colorScheme: "light" | "dark"): void {
     );
 
     const look = await frame.evaluate(readElementLook, "article");
-    expect(look.background).toBe(await readToken(frame, "--ot-card"));
-    expect(look.borderColor).toBe(await readToken(frame, "--ot-border"));
+    expect(look.background).toBe(await readToken(frame, "--tes-card"));
+    expect(look.borderColor).toBe(await readToken(frame, "--tes-border"));
     expect(look.borderRadius).toBe(
-      await readToken(frame, "--ot-radius", "border-top-left-radius"),
+      await readToken(frame, "--tes-radius", "border-top-left-radius"),
     );
   });
 
@@ -558,13 +560,13 @@ function describeSemanticHtml(colorScheme: "light" | "dark"): void {
       '<div role="alert">Failed</div><div role="status">Saved</div>',
     );
 
-    const destructive = await readToken(frame, "--ot-destructive");
+    const destructive = await readToken(frame, "--tes-destructive");
     const alert = await frame.evaluate(readElementLook, '[role="alert"]');
     expect(alert.borderColor).toBe(destructive);
     expect(alert.color).toBe(destructive);
     const status = await frame.evaluate(readElementLook, '[role="status"]');
-    expect(status.borderColor).toBe(await readToken(frame, "--ot-border"));
-    expect(status.color).toBe(await readToken(frame, "--ot-foreground"));
+    expect(status.borderColor).toBe(await readToken(frame, "--tes-border"));
+    expect(status.color).toBe(await readToken(frame, "--tes-foreground"));
   });
 
   test("Switch", async function drawsSwitch({ page }): Promise<void> {
@@ -576,7 +578,7 @@ function describeSemanticHtml(colorScheme: "light" | "dark"): void {
 
     const look = await frame.evaluate(readElementLook, '[role="switch"]');
     expect(look.appearance).toBe("none");
-    expect(look.background).toBe(await readToken(frame, "--ot-primary"));
+    expect(look.background).toBe(await readToken(frame, "--tes-primary"));
   });
 
   test("Invalid field", async function drawsInvalidField({
@@ -589,7 +591,7 @@ function describeSemanticHtml(colorScheme: "light" | "dark"): void {
     );
 
     expect((await frame.evaluate(readElementLook, "input")).borderColor).toBe(
-      await readToken(frame, "--ot-destructive"),
+      await readToken(frame, "--tes-destructive"),
     );
   });
 
@@ -617,11 +619,11 @@ function describeVariantAttributes(colorScheme: "light" | "dark"): void {
     const frame = await showInProbe(
       page,
       colorScheme,
-      '<button type="button" data-ot-variant="destructive">Delete</button>',
+      '<button type="button" data-tes-variant="destructive">Delete</button>',
     );
 
     expect((await frame.evaluate(readElementLook, "button")).background).toBe(
-      await readToken(frame, "--ot-destructive"),
+      await readToken(frame, "--tes-destructive"),
     );
   });
 
@@ -631,12 +633,12 @@ function describeVariantAttributes(colorScheme: "light" | "dark"): void {
     const frame = await showInProbe(
       page,
       colorScheme,
-      '<button type="button" data-ot-variant="primary">Run</button>',
+      '<button type="button" data-tes-variant="primary">Run</button>',
     );
 
     const look = await frame.evaluate(readElementLook, "button");
-    expect(look.background).toBe(await readToken(frame, "--ot-primary"));
-    expect(look.color).toBe(await readToken(frame, "--ot-primary-foreground"));
+    expect(look.background).toBe(await readToken(frame, "--tes-primary"));
+    expect(look.color).toBe(await readToken(frame, "--tes-primary-foreground"));
   });
 
   test("Outline submit button", async function drawsOutlineSubmit({
@@ -645,7 +647,7 @@ function describeVariantAttributes(colorScheme: "light" | "dark"): void {
     const frame = await showInProbe(
       page,
       colorScheme,
-      '<button type="submit" data-ot-variant="outline">Run</button>',
+      '<button type="submit" data-tes-variant="outline">Run</button>',
     );
 
     await expectPlainButton(frame, "button");
@@ -655,10 +657,10 @@ function describeVariantAttributes(colorScheme: "light" | "dark"): void {
     const frame = await showInProbe(
       page,
       colorScheme,
-      '<span data-ot-variant="success">granted</span>',
+      '<span data-tes-variant="success">granted</span>',
     );
 
-    const success = await readToken(frame, "--ot-success");
+    const success = await readToken(frame, "--tes-success");
     const look = await frame.evaluate(readElementLook, "span");
     expect(look.color).toBe(success);
     expect(look.borderColor).toBe(success);
@@ -671,7 +673,7 @@ function describeVariantAttributes(colorScheme: "light" | "dark"): void {
     const frame = await showInProbe(
       page,
       colorScheme,
-      '<button type="button" data-ot-variant="sparkly">Odd</button><span data-ot-variant="sparkly">odd</span>',
+      '<button type="button" data-tes-variant="sparkly">Odd</button><span data-tes-variant="sparkly">odd</span>',
     );
 
     await expectPlainButton(frame, "button");

@@ -9,7 +9,7 @@ import {
 } from "./case_helpers.ts";
 
 function readBodyText(context: CaseContext): string {
-  const body = context.root.querySelector("ot-tile-body");
+  const body = context.root.querySelector("tes-tile-body");
   return body?.textContent ?? "";
 }
 
@@ -62,7 +62,7 @@ export async function putsTheBodyInTheCard(
 
   context
     .expect(listCardChildren(context))
-    .toEqual(["H1", "SMALL", "HR", "SECTION", "HR", "OT-TILE-BODY"]);
+    .toEqual(["H1", "SMALL", "HR", "SECTION", "HR", "TES-TILE-BODY"]);
   context
     .expect(
       findElement(context, "article > section").getAttribute("aria-label"),
@@ -140,7 +140,7 @@ export async function linksWebAddresses(context: CaseContext): Promise<void> {
   context
     .expect(link?.getAttribute("href"))
     .toBe("https://example.org/books/kallocain");
-  context.expect(link?.hasAttribute("data-ot-link")).toBe(true);
+  context.expect(link?.hasAttribute("data-tes-link")).toBe(true);
   context.expect(link?.textContent).toBe("https://example.org/books/kallocain");
   context.expect(link?.querySelector("img")).toBe(null);
   context
@@ -209,7 +209,7 @@ export async function rendersNoEmptyBody(context: CaseContext): Promise<void> {
     collection: null,
   });
 
-  context.expect(context.root.querySelector("ot-tile-body")).toBe(null);
+  context.expect(context.root.querySelector("tes-tile-body")).toBe(null);
   context
     .expect(listCardChildren(context))
     .toEqual(["H1", "SMALL", "HR", "SECTION"]);

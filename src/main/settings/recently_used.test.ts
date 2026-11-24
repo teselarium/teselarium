@@ -262,8 +262,8 @@ describe("createRecentlyUsed", function describeCreateRecentlyUsed(): void {
   });
 
   it("Mods cannot reach it", function keepsKeyApart(): void {
-    expect(RECENTLY_USED_KEY).toBe("opentesela.recently-used");
-    expect(RECENTLY_USED_KEY.startsWith("opentesela.mod-storage:")).toBe(false);
+    expect(RECENTLY_USED_KEY).toBe("teselarium.recently-used");
+    expect(RECENTLY_USED_KEY.startsWith("teselarium.mod-storage:")).toBe(false);
   });
 });
 

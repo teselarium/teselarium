@@ -101,14 +101,14 @@ export async function showsEntryIssues(context: CaseContext): Promise<void> {
   context.expect(issues.length).toBe(2);
   const errorBadge = issues[0].querySelector<HTMLElement>("span");
   context.expect(errorBadge?.textContent).toBe("error");
-  context.expect(errorBadge?.dataset.otVariant).toBe("destructive");
+  context.expect(errorBadge?.dataset.tesVariant).toBe("destructive");
   context.expect(issues[0].textContent).toContain("entry 2");
   context
     .expect(issues[0].querySelector("code")?.textContent)
     .toBe(readInspection(context).source);
   const warningBadge = issues[1].querySelector<HTMLElement>("span");
   context.expect(warningBadge?.textContent).toBe("warning");
-  context.expect(warningBadge?.dataset.otVariant).toBe("warning");
+  context.expect(warningBadge?.dataset.tesVariant).toBe("warning");
   context.expect(listShownLabels(context)).toEqual(["2024__han_kang.md"]);
 }
 

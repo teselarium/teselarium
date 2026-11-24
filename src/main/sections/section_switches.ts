@@ -18,8 +18,8 @@ export interface SectionSwitches {
   snapshot: SectionSwitchesSnapshot;
 }
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const SECTION_SWITCHES_KEY = "opentesela.sidebar-sections";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const SECTION_SWITCHES_KEY = "teselarium.sidebar-sections";
 
 function readStoredValue(storage: SwitchesStorage): unknown {
   try {

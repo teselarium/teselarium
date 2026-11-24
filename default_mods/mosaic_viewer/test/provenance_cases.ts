@@ -79,7 +79,7 @@ export async function showsStoredProvenance(
   context.expect(findButton(context, "Update from file…")).toBeTruthy();
   context.expect(findButton(context, "Export")).toBeTruthy();
   context
-    .expect(findButton(context, "Remove")?.getAttribute("data-ot-variant"))
+    .expect(findButton(context, "Remove")?.getAttribute("data-tes-variant"))
     .toBe("destructive");
 }
 
@@ -174,9 +174,9 @@ export async function showsChangedSinceExport(
   });
 
   const section = findSection(context, "Where it comes from");
-  const badge = section.querySelector("[data-ot-variant]");
+  const badge = section.querySelector("[data-tes-variant]");
   context.expect(badge?.textContent).toBe("Unexported changes");
-  context.expect(badge?.getAttribute("data-ot-variant")).toBe("warning");
+  context.expect(badge?.getAttribute("data-tes-variant")).toBe("warning");
   context.expect(findButton(context, "Export folder")).toBeTruthy();
   context.expect(findButton(context, "History…")).toBeTruthy();
 }

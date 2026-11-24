@@ -13,7 +13,7 @@ export interface ModSlot {
   context: string;
 }
 
-const STORAGE_KEY_PREFIX = "opentesela.mod-storage:";
+const STORAGE_KEY_PREFIX = "teselarium.mod-storage:";
 
 /**
  * A JSON array cannot collide the way `source + ":" + key` could, since each

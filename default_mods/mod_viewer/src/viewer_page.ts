@@ -4,13 +4,13 @@ import type { ViewerView } from "./viewer_view.ts";
 
 // Layout only: the colors, borders and fonts come from the theme.
 const VIEWER_STYLE = `
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); margin-bottom: var(--ot-space-4); }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tes-space-2); margin-bottom: var(--tes-space-4); }
   header h1 { margin: 0; }
-  dd + dt { margin-top: var(--ot-space-2); }
+  dd + dt { margin-top: var(--tes-space-2); }
   dd { overflow-wrap: anywhere; }
   pre { margin: 0; }
   td { overflow-wrap: anywhere; }
-  form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ot-space-2); margin-top: var(--ot-space-4); }
+  form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tes-space-2); margin-top: var(--tes-space-4); }
   input[type="text"] { flex: 1; min-width: 16rem; }
   /*
    * A narrow frame, such as a phone's: each permission is a small grid, its

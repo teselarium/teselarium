@@ -40,7 +40,7 @@ export const SIDEBAR_ID = "app-sidebar";
 /** The id the hamburger button's `aria-controls` points to: the rail's navigation. */
 export const SIDEBAR_NAV_ID = "app-sidebar-nav";
 
-const APP_NAME = "OpenTesela";
+const APP_NAME = "Teselarium";
 
 /** The list classes: no padding of their own, so every row starts at the rail's icon axis. */
 const LIST_CLASS = "flex flex-col gap-1";

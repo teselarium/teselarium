@@ -1,7 +1,7 @@
 import { defaultSchema } from "rehype-sanitize";
 import type { Options as SanitizeSchema } from "rehype-sanitize";
 
-/** The badge variants of the base stylesheet's `span[data-ot-variant]`. */
+/** The badge variants of the base stylesheet's `span[data-tes-variant]`. */
 const BADGE_VARIANTS = [
   "primary",
   "secondary",
@@ -20,8 +20,8 @@ const defaultAttributes = defaultSchema.attributes ?? {};
  * frames, forms, `style` or event handlers, `javascript:` and `data:` URLs
  * stripped, ids prefixed), plus the elements and attributes the base
  * stylesheet gives the mods' look to: the sectioning elements (`<article>` is
- * a card), `role` as `alert` or `status`, badges (`data-ot-variant` on
- * `<span>`) and color scheme sections (`data-ot-color-scheme`).
+ * a card), `role` as `alert` or `status`, badges (`data-tes-variant` on
+ * `<span>`) and color scheme sections (`data-tes-color-scheme`).
  */
 export const PAGE_SANITIZE_SCHEMA: SanitizeSchema = {
   ...defaultSchema,
@@ -31,11 +31,11 @@ export const PAGE_SANITIZE_SCHEMA: SanitizeSchema = {
     "*": [
       ...(defaultAttributes["*"] ?? []),
       ["role", "alert", "status"],
-      ["dataOtColorScheme", "light", "dark"],
+      ["dataTesColorScheme", "light", "dark"],
     ],
     span: [
       ...(defaultAttributes.span ?? []),
-      ["dataOtVariant", ...BADGE_VARIANTS],
+      ["dataTesVariant", ...BADGE_VARIANTS],
     ],
   },
 };

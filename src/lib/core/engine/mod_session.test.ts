@@ -330,7 +330,7 @@ describe("connectModSession", function describeConnectModSession(): void {
 
     const context = readSentContext(fakeFrame.posted[0].message);
     expect(context.theme.colorScheme).toBe("dark");
-    expect(context.theme.tokens["--ot-background"]).toBe("#0f141d");
+    expect(context.theme.tokens["--tes-background"]).toBe("#0f141d");
   });
 
   it("Structured clone of the theme", async function clonesTheme(): Promise<void> {

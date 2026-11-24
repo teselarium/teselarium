@@ -162,7 +162,7 @@ describe("mods.inspect", function describeModsInspect(): void {
       title: "Book List",
       defaultMosaic: SAMPLE_DEFAULT_MOSAIC_SOURCE,
       permissions: { granted: [SAMPLE_COVERS_PERMISSION], denied: [] },
-      api: "^0.1.0",
+      api: "^0.2.0",
       apiCompatible: true,
     });
   });

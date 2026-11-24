@@ -168,7 +168,7 @@ function findBodyLink(
   context: CaseContext,
   fileName: string,
 ): HTMLAnchorElement | null {
-  for (const link of context.root.querySelectorAll("ot-tile-body a")) {
+  for (const link of context.root.querySelectorAll("tes-tile-body a")) {
     if (link instanceof HTMLAnchorElement && link.href.endsWith(fileName)) {
       return link;
     }

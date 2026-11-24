@@ -2,28 +2,28 @@
  * The base stylesheet of mod frames: plain HTML styled from the theme tokens,
  * with element and attribute selectors only. Plain elements take the look of
  * the app's shadcn/ui components, so a mod gets the app's look without
- * classes. It sits in the layer `opentesela`, so any style a mod adds outside
+ * classes. It sits in the layer `teselarium`, so any style a mod adds outside
  * a layer wins. Inlined as text in the frame document, so it must never
  * contain a closing style tag.
  */
-@layer opentesela {
+@layer teselarium {
   html {
     height: 100%;
-    background-color: var(--ot-background);
-    color: var(--ot-foreground);
-    accent-color: var(--ot-primary);
-    font-family: var(--ot-font-sans);
-    font-size: var(--ot-font-size);
-    line-height: var(--ot-line-height);
+    background-color: var(--tes-background);
+    color: var(--tes-foreground);
+    accent-color: var(--tes-primary);
+    font-family: var(--tes-font-sans);
+    font-size: var(--tes-font-size);
+    line-height: var(--tes-line-height);
   }
 
   body {
     box-sizing: border-box;
     min-height: 100%;
     margin: 0;
-    padding: var(--ot-space-4);
-    background-color: var(--ot-background);
-    color: var(--ot-foreground);
+    padding: var(--tes-space-4);
+    background-color: var(--tes-background);
+    color: var(--tes-foreground);
     /*
      * A word that does not fit on a line, such as a bare URL, breaks at the
      * line's end instead of making the document scroll sideways. `break-word`
@@ -40,15 +40,15 @@
    * scrolls the document. Theater and fullscreen set no limit. A mod keeps
    * the full width with `body { max-width: none; }`.
    */
-  html[data-ot-layout="contained"] body {
-    max-width: var(--ot-content-width);
+  html[data-tes-layout="contained"] body {
+    max-width: var(--tes-content-width);
     margin-inline: auto;
   }
 
   /* A color scheme section: the element gets its own color scheme's colors. */
-  [data-ot-color-scheme] {
-    background-color: var(--ot-background);
-    color: var(--ot-foreground);
+  [data-tes-color-scheme] {
+    background-color: var(--tes-background);
+    color: var(--tes-foreground);
   }
 
   h1,
@@ -57,7 +57,7 @@
   h4,
   h5,
   h6 {
-    margin: var(--ot-space-6) 0 var(--ot-space-2);
+    margin: var(--tes-space-6) 0 var(--tes-space-2);
     font-weight: 600;
     line-height: 1.25;
   }
@@ -102,11 +102,11 @@
   table,
   figure,
   blockquote {
-    margin: 0 0 var(--ot-space-4);
+    margin: 0 0 var(--tes-space-4);
   }
 
   a {
-    color: var(--ot-secondary);
+    color: var(--tes-secondary);
     font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 0.25em;
@@ -117,27 +117,27 @@
   }
 
   hr {
-    margin: var(--ot-space-6) 0;
+    margin: var(--tes-space-6) 0;
     border: 0;
-    border-top: 1px solid var(--ot-border);
+    border-top: 1px solid var(--tes-border);
   }
 
   small {
-    color: var(--ot-muted-foreground);
+    color: var(--tes-muted-foreground);
     font-size: 0.875em;
   }
 
   blockquote {
-    padding-left: var(--ot-space-4);
-    border-left: 3px solid var(--ot-border);
-    color: var(--ot-muted-foreground);
+    padding-left: var(--tes-space-4);
+    border-left: 3px solid var(--tes-border);
+    color: var(--tes-muted-foreground);
   }
 
   code,
   kbd,
   samp,
   pre {
-    font-family: var(--ot-font-mono);
+    font-family: var(--tes-font-mono);
     font-size: 0.875em;
   }
 
@@ -145,19 +145,19 @@
   kbd,
   samp {
     padding: 0.1em 0.3em;
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-muted);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-muted);
   }
 
   kbd {
-    border: 1px solid var(--ot-border);
+    border: 1px solid var(--tes-border);
   }
 
   pre {
     overflow: auto;
-    padding: var(--ot-space-3) var(--ot-space-4);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-muted);
+    padding: var(--tes-space-3) var(--tes-space-4);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-muted);
   }
 
   pre code {
@@ -172,13 +172,13 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--ot-space-2);
+    gap: var(--tes-space-2);
     min-height: 2.25rem;
-    padding: var(--ot-space-2) var(--ot-space-4);
-    border: 1px solid var(--ot-border);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-background);
-    color: var(--ot-foreground);
+    padding: var(--tes-space-2) var(--tes-space-4);
+    border: 1px solid var(--tes-border);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-background);
+    color: var(--tes-foreground);
     font: inherit;
     font-size: 0.875rem;
     font-weight: 500;
@@ -187,8 +187,8 @@
   }
 
   button:hover:not(:disabled) {
-    background-color: var(--ot-accent);
-    color: var(--ot-accent-foreground);
+    background-color: var(--tes-accent);
+    color: var(--tes-accent-foreground);
   }
 
   /* On a hover fill, muted or colored text inside the button would lose its contrast. */
@@ -198,14 +198,14 @@
 
   /* A submit button is the app's default (primary) button. */
   button[type="submit"] {
-    border-color: var(--ot-primary);
-    background-color: var(--ot-primary);
-    color: var(--ot-primary-foreground);
+    border-color: var(--tes-primary);
+    background-color: var(--tes-primary);
+    color: var(--tes-primary-foreground);
   }
 
   button[type="submit"]:hover:not(:disabled) {
-    background-color: var(--ot-primary);
-    color: var(--ot-primary-foreground);
+    background-color: var(--tes-primary);
+    color: var(--tes-primary-foreground);
     opacity: 0.9;
   }
 
@@ -214,11 +214,11 @@
   select,
   textarea {
     box-sizing: border-box;
-    padding: var(--ot-space-1) var(--ot-space-3);
-    border: 1px solid var(--ot-input);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-card);
-    color: var(--ot-foreground);
+    padding: var(--tes-space-1) var(--tes-space-3);
+    border: 1px solid var(--tes-input);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-card);
+    color: var(--tes-foreground);
     font: inherit;
   }
 
@@ -229,7 +229,7 @@
 
   input::placeholder,
   textarea::placeholder {
-    color: var(--ot-muted-foreground);
+    color: var(--tes-muted-foreground);
   }
 
   :disabled {
@@ -238,7 +238,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--ot-ring);
+    outline: 2px solid var(--tes-ring);
     outline-offset: 2px;
   }
 
@@ -247,8 +247,8 @@
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    border-color: var(--ot-ring);
-    outline: 3px solid var(--ot-ring);
+    border-color: var(--tes-ring);
+    outline: 3px solid var(--tes-ring);
     outline-offset: 0;
   }
 
@@ -256,13 +256,13 @@
   button[aria-pressed="true"],
   [role="tab"][aria-selected="true"],
   [aria-current]:not([aria-current="false"]) {
-    outline: 3px solid var(--ot-primary);
+    outline: 3px solid var(--tes-primary);
     outline-offset: 1px;
   }
 
   ul,
   ol {
-    padding-left: var(--ot-space-6);
+    padding-left: var(--tes-space-6);
   }
 
   dt {
@@ -270,7 +270,7 @@
   }
 
   dd {
-    margin: 0 0 var(--ot-space-2) var(--ot-space-4);
+    margin: 0 0 var(--tes-space-2) var(--tes-space-4);
   }
 
   table {
@@ -280,7 +280,7 @@
 
   th,
   td {
-    padding: var(--ot-space-2);
+    padding: var(--tes-space-2);
     text-align: start;
   }
 
@@ -292,11 +292,11 @@
    * `tr { border-bottom: none; }`.
    */
   tr {
-    border-bottom: 1px solid var(--ot-border);
+    border-bottom: 1px solid var(--tes-border);
   }
 
   th {
-    color: var(--ot-muted-foreground);
+    color: var(--tes-muted-foreground);
     font-weight: 500;
   }
 
@@ -306,7 +306,7 @@
   }
 
   tr:hover > td {
-    background-color: var(--ot-muted);
+    background-color: var(--tes-muted);
   }
 
   img,
@@ -322,16 +322,16 @@
   }
 
   dialog {
-    padding: var(--ot-space-6);
-    border: 1px solid var(--ot-border);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-popover);
-    color: var(--ot-popover-foreground);
-    box-shadow: var(--ot-shadow);
+    padding: var(--tes-space-6);
+    border: 1px solid var(--tes-border);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-popover);
+    color: var(--tes-popover-foreground);
+    box-shadow: var(--tes-shadow);
   }
 
   dialog::backdrop {
-    background-color: var(--ot-background);
+    background-color: var(--tes-background);
     opacity: 0.75;
   }
 
@@ -342,12 +342,12 @@
 
   /* An article is a card. */
   article {
-    margin: 0 0 var(--ot-space-4);
-    padding: var(--ot-space-6);
-    border: 1px solid var(--ot-border);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-card);
-    color: var(--ot-card-foreground);
+    margin: 0 0 var(--tes-space-4);
+    padding: var(--tes-space-6);
+    border: 1px solid var(--tes-border);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-card);
+    color: var(--tes-card-foreground);
   }
 
   article > * {
@@ -356,24 +356,24 @@
   }
 
   article > * + * {
-    margin-top: var(--ot-space-2);
+    margin-top: var(--tes-space-2);
   }
 
   /* An alert is the destructive alert, a status the default one. Empty live regions draw nothing. */
   [role="alert"]:not(:empty),
   [role="status"]:not(:empty) {
     box-sizing: border-box;
-    margin: 0 0 var(--ot-space-4);
-    padding: var(--ot-space-3) var(--ot-space-4);
-    border: 1px solid var(--ot-border);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-card);
-    color: var(--ot-foreground);
+    margin: 0 0 var(--tes-space-4);
+    padding: var(--tes-space-3) var(--tes-space-4);
+    border: 1px solid var(--tes-border);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-card);
+    color: var(--tes-foreground);
   }
 
   [role="alert"]:not(:empty) {
-    border-color: var(--ot-destructive);
-    color: var(--ot-destructive);
+    border-color: var(--tes-destructive);
+    color: var(--tes-destructive);
   }
 
   /* A checkbox with role="switch" is a switch. Its thumb is drawn with ::before. */
@@ -385,7 +385,7 @@
     margin: 0;
     border: 0;
     border-radius: 9999px;
-    background-color: var(--ot-input);
+    background-color: var(--tes-input);
     vertical-align: middle;
     cursor: pointer;
     appearance: none;
@@ -399,44 +399,44 @@
     width: 1rem;
     height: 1rem;
     border-radius: 9999px;
-    background-color: var(--ot-background);
+    background-color: var(--tes-background);
     transition: transform 150ms;
   }
 
   /* The dark track is dark too: the thumb takes the text color, as in the app. */
-  [data-ot-color-scheme="dark"] input[type="checkbox"][role="switch"]::before {
-    background-color: var(--ot-foreground);
+  [data-tes-color-scheme="dark"] input[type="checkbox"][role="switch"]::before {
+    background-color: var(--tes-foreground);
   }
 
   input[type="checkbox"][role="switch"]:checked {
-    background-color: var(--ot-primary);
+    background-color: var(--tes-primary);
   }
 
   input[type="checkbox"][role="switch"]:checked::before {
-    background-color: var(--ot-primary-foreground);
+    background-color: var(--tes-primary-foreground);
     transform: translateX(0.85rem);
   }
 
   input[aria-invalid="true"],
   select[aria-invalid="true"],
   textarea[aria-invalid="true"] {
-    border-color: var(--ot-destructive);
+    border-color: var(--tes-destructive);
   }
 
   input[aria-invalid="true"]:focus-visible,
   select[aria-invalid="true"]:focus-visible,
   textarea[aria-invalid="true"]:focus-visible {
-    border-color: var(--ot-destructive);
-    outline-color: var(--ot-destructive);
+    border-color: var(--tes-destructive);
+    outline-color: var(--tes-destructive);
   }
 
   /* Details are an accordion item. */
   details {
-    border-bottom: 1px solid var(--ot-border);
+    border-bottom: 1px solid var(--tes-border);
   }
 
   summary {
-    padding: var(--ot-space-4) 0;
+    padding: var(--tes-space-4) 0;
     font-weight: 500;
     cursor: pointer;
   }
@@ -448,124 +448,124 @@
   /* A busy element is loading: it pulses slowly. */
   [aria-busy="true"] {
     cursor: progress;
-    animation: ot-busy-pulse 2s ease-in-out infinite;
+    animation: tes-busy-pulse 2s ease-in-out infinite;
   }
 
-  @keyframes ot-busy-pulse {
+  @keyframes tes-busy-pulse {
     50% {
       opacity: 0.5;
     }
   }
 
   /*
-   * Variants: `data-ot-variant` picks an app variant that has no semantic
+   * Variants: `data-tes-variant` picks an app variant that has no semantic
    * HTML. Only the exact values below match, so any other value keeps the
    * plain look. The filled variants dim on hover, since a lighter fill would
    * need a color literal.
    */
-  button[data-ot-variant="primary"] {
-    border-color: var(--ot-primary);
-    background-color: var(--ot-primary);
-    color: var(--ot-primary-foreground);
+  button[data-tes-variant="primary"] {
+    border-color: var(--tes-primary);
+    background-color: var(--tes-primary);
+    color: var(--tes-primary-foreground);
   }
 
   /* A secondary action is drawn as an outline in the secondary role. */
-  button[data-ot-variant="secondary"] {
-    border-color: var(--ot-secondary);
-    background-color: var(--ot-background);
-    color: var(--ot-secondary);
+  button[data-tes-variant="secondary"] {
+    border-color: var(--tes-secondary);
+    background-color: var(--tes-background);
+    color: var(--tes-secondary);
   }
 
-  button[data-ot-variant="destructive"] {
-    border-color: var(--ot-destructive);
-    background-color: var(--ot-destructive);
-    color: var(--ot-destructive-foreground);
+  button[data-tes-variant="destructive"] {
+    border-color: var(--tes-destructive);
+    background-color: var(--tes-destructive);
+    color: var(--tes-destructive-foreground);
   }
 
   /* Also turns a submit button back into an outline button. */
-  button[data-ot-variant="outline"] {
-    border-color: var(--ot-border);
-    background-color: var(--ot-background);
-    color: var(--ot-foreground);
+  button[data-tes-variant="outline"] {
+    border-color: var(--tes-border);
+    background-color: var(--tes-background);
+    color: var(--tes-foreground);
   }
 
-  button[data-ot-variant="ghost"] {
+  button[data-tes-variant="ghost"] {
     border: 0;
     background: none;
-    color: var(--ot-foreground);
+    color: var(--tes-foreground);
   }
 
   /* A field for code, such as a YAML file's text: the monospace font. */
-  textarea[data-ot-variant="code"] {
-    font-family: var(--ot-font-mono);
+  textarea[data-tes-variant="code"] {
+    font-family: var(--tes-font-mono);
   }
 
-  button[data-ot-variant="primary"]:hover:not(:disabled) {
-    background-color: var(--ot-primary);
-    color: var(--ot-primary-foreground);
+  button[data-tes-variant="primary"]:hover:not(:disabled) {
+    background-color: var(--tes-primary);
+    color: var(--tes-primary-foreground);
     opacity: 0.9;
   }
 
-  button[data-ot-variant="destructive"]:hover:not(:disabled) {
-    background-color: var(--ot-destructive);
-    color: var(--ot-destructive-foreground);
+  button[data-tes-variant="destructive"]:hover:not(:disabled) {
+    background-color: var(--tes-destructive);
+    color: var(--tes-destructive-foreground);
     opacity: 0.9;
   }
 
-  button[data-ot-variant="secondary"]:hover:not(:disabled),
-  button[data-ot-variant="outline"]:hover:not(:disabled),
-  button[data-ot-variant="ghost"]:hover:not(:disabled) {
-    background-color: var(--ot-accent);
-    color: var(--ot-accent-foreground);
+  button[data-tes-variant="secondary"]:hover:not(:disabled),
+  button[data-tes-variant="outline"]:hover:not(:disabled),
+  button[data-tes-variant="ghost"]:hover:not(:disabled) {
+    background-color: var(--tes-accent);
+    color: var(--tes-accent-foreground);
     opacity: 1;
   }
 
   /* A span with a variant is a badge. */
-  span[data-ot-variant="primary"],
-  span[data-ot-variant="secondary"],
-  span[data-ot-variant="outline"],
-  span[data-ot-variant="destructive"],
-  span[data-ot-variant="success"],
-  span[data-ot-variant="warning"] {
+  span[data-tes-variant="primary"],
+  span[data-tes-variant="secondary"],
+  span[data-tes-variant="outline"],
+  span[data-tes-variant="destructive"],
+  span[data-tes-variant="success"],
+  span[data-tes-variant="warning"] {
     display: inline-flex;
     align-items: center;
-    padding: 0.125rem var(--ot-space-2);
-    border: 1px solid var(--ot-border);
+    padding: 0.125rem var(--tes-space-2);
+    border: 1px solid var(--tes-border);
     border-radius: 9999px;
-    color: var(--ot-foreground);
+    color: var(--tes-foreground);
     font-size: 0.75rem;
     font-weight: 500;
     line-height: 1rem;
     white-space: nowrap;
   }
 
-  span[data-ot-variant="primary"] {
-    border-color: var(--ot-primary);
-    background-color: var(--ot-primary);
-    color: var(--ot-primary-foreground);
+  span[data-tes-variant="primary"] {
+    border-color: var(--tes-primary);
+    background-color: var(--tes-primary);
+    color: var(--tes-primary-foreground);
   }
 
   /* A secondary badge is a tag, filled with the highlight color. */
-  span[data-ot-variant="secondary"] {
-    border-color: var(--ot-highlight);
-    background-color: var(--ot-highlight);
-    color: var(--ot-highlight-foreground);
+  span[data-tes-variant="secondary"] {
+    border-color: var(--tes-highlight);
+    background-color: var(--tes-highlight);
+    color: var(--tes-highlight-foreground);
   }
 
   /* No fill: status badges keep their role's color as text. */
-  span[data-ot-variant="destructive"] {
-    border-color: var(--ot-destructive);
-    color: var(--ot-destructive);
+  span[data-tes-variant="destructive"] {
+    border-color: var(--tes-destructive);
+    color: var(--tes-destructive);
   }
 
-  span[data-ot-variant="success"] {
-    border-color: var(--ot-success);
-    color: var(--ot-success);
+  span[data-tes-variant="success"] {
+    border-color: var(--tes-success);
+    color: var(--tes-success);
   }
 
-  span[data-ot-variant="warning"] {
-    border-color: var(--ot-warning);
-    color: var(--ot-warning);
+  span[data-tes-variant="warning"] {
+    border-color: var(--tes-warning);
+    color: var(--tes-warning);
   }
 
   /*
@@ -573,12 +573,12 @@
    * same whatever its title, whose span is the visible box: a play mark, two
    * lines for the player's title and one for its site.
    */
-  button[data-ot-player] {
+  button[data-tes-player] {
     position: relative;
     display: inline-block;
     width: min(100%, 20rem);
-    height: calc(3 * 1.25rem + 2 * var(--ot-space-2) + 2px);
-    margin: 0 0 var(--ot-space-4);
+    height: calc(3 * 1.25rem + 2 * var(--tes-space-2) + 2px);
+    margin: 0 0 var(--tes-space-4);
     padding: 0;
     border: none;
     background: none;
@@ -587,12 +587,12 @@
   }
 
   /* A pasted player stands alone, spaced as a paragraph; one in a paragraph uses the paragraph's spacing. */
-  p > button[data-ot-player] {
+  p > button[data-tes-player] {
     margin: 0;
   }
 
   /* The visible box, which fills the slot and grows over the content below. */
-  button[data-ot-player] > span {
+  button[data-tes-player] > span {
     position: absolute;
     top: 0;
     right: 0;
@@ -602,20 +602,20 @@
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
     /* The play mark gets half a step more room on both sides than the text's right edge. */
-    column-gap: calc(var(--ot-space-3) * 1.5);
+    column-gap: calc(var(--tes-space-3) * 1.5);
     min-height: 100%;
-    padding: var(--ot-space-2) var(--ot-space-3) var(--ot-space-2)
-      calc(var(--ot-space-3) * 1.5);
-    border: 1px solid var(--ot-border);
-    border-radius: var(--ot-radius);
-    background-color: var(--ot-background);
-    color: var(--ot-foreground);
+    padding: var(--tes-space-2) var(--tes-space-3) var(--tes-space-2)
+      calc(var(--tes-space-3) * 1.5);
+    border: 1px solid var(--tes-border);
+    border-radius: var(--tes-radius);
+    background-color: var(--tes-background);
+    color: var(--tes-foreground);
     line-height: 1.25rem;
     overflow-wrap: anywhere;
   }
 
   /* The title: two lines, the second one empty for a short title, cut with "…" for a long one. */
-  button[data-ot-player] > span > span:first-child {
+  button[data-tes-player] > span > span:first-child {
     grid-column: 2;
     display: -webkit-box;
     min-height: 2.5rem;
@@ -624,109 +624,109 @@
     -webkit-line-clamp: 2;
   }
 
-  button[data-ot-player] > span > span:last-child {
+  button[data-tes-player] > span > span:last-child {
     grid-column: 2;
     overflow: hidden;
-    color: var(--ot-muted-foreground);
+    color: var(--tes-muted-foreground);
     font-weight: 400;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
   /* The play mark: a triangle cut out of a box in the text color. */
-  button[data-ot-player] > span::before {
+  button[data-tes-player] > span::before {
     content: "";
     grid-row: 1 / span 2;
     align-self: center;
     width: 0.9375rem;
     height: 1.125rem;
-    background-color: var(--ot-foreground);
+    background-color: var(--tes-foreground);
     clip-path: polygon(0 0, 100% 50%, 0 100%);
   }
 
   /* Hover and keyboard focus show the whole title, over the content below. */
-  button[data-ot-player]:hover > span,
-  button[data-ot-player]:focus-visible > span {
+  button[data-tes-player]:hover > span,
+  button[data-tes-player]:focus-visible > span {
     z-index: 1;
-    background-color: var(--ot-accent);
-    color: var(--ot-accent-foreground);
-    box-shadow: var(--ot-shadow);
+    background-color: var(--tes-accent);
+    color: var(--tes-accent-foreground);
+    box-shadow: var(--tes-shadow);
   }
 
-  button[data-ot-player]:hover > span > span:first-child,
-  button[data-ot-player]:focus-visible > span > span:first-child {
+  button[data-tes-player]:hover > span > span:first-child,
+  button[data-tes-player]:focus-visible > span > span:first-child {
     display: block;
     overflow: visible;
   }
 
-  button[data-ot-player]:hover > span::before,
-  button[data-ot-player]:focus-visible > span::before {
-    background-color: var(--ot-accent-foreground);
+  button[data-tes-player]:hover > span::before,
+  button[data-tes-player]:focus-visible > span::before {
+    background-color: var(--tes-accent-foreground);
   }
 
   /* The focus ring goes around the visible box, not the slot. */
-  button[data-ot-player]:focus-visible {
+  button[data-tes-player]:focus-visible {
     outline: none;
   }
 
-  button[data-ot-player]:focus-visible > span {
-    border-color: var(--ot-ring);
-    outline: 3px solid var(--ot-ring);
+  button[data-tes-player]:focus-visible > span {
+    border-color: var(--tes-ring);
+    outline: 3px solid var(--tes-ring);
   }
 
   /* An alert of a rendered tile body: a left border and a bold title in its kind's color. */
-  aside[data-ot-alert] {
-    margin: 0 0 var(--ot-space-4);
-    padding: var(--ot-space-2) var(--ot-space-4);
-    border-left: 3px solid var(--ot-border);
+  aside[data-tes-alert] {
+    margin: 0 0 var(--tes-space-4);
+    padding: var(--tes-space-2) var(--tes-space-4);
+    border-left: 3px solid var(--tes-border);
   }
 
-  aside[data-ot-alert] > p:first-child {
+  aside[data-tes-alert] > p:first-child {
     font-weight: 600;
   }
 
-  aside[data-ot-alert] > :last-child {
+  aside[data-tes-alert] > :last-child {
     margin-bottom: 0;
   }
 
-  aside[data-ot-alert="note"] {
-    border-left-color: var(--ot-primary);
+  aside[data-tes-alert="note"] {
+    border-left-color: var(--tes-primary);
   }
 
-  aside[data-ot-alert="note"] > p:first-child {
-    color: var(--ot-primary);
+  aside[data-tes-alert="note"] > p:first-child {
+    color: var(--tes-primary);
   }
 
-  aside[data-ot-alert="tip"] {
-    border-left-color: var(--ot-success);
+  aside[data-tes-alert="tip"] {
+    border-left-color: var(--tes-success);
   }
 
-  aside[data-ot-alert="tip"] > p:first-child {
-    color: var(--ot-success);
+  aside[data-tes-alert="tip"] > p:first-child {
+    color: var(--tes-success);
   }
 
-  aside[data-ot-alert="important"] {
-    border-left-color: var(--ot-secondary);
+  aside[data-tes-alert="important"] {
+    border-left-color: var(--tes-secondary);
   }
 
-  aside[data-ot-alert="important"] > p:first-child {
-    color: var(--ot-secondary);
+  aside[data-tes-alert="important"] > p:first-child {
+    color: var(--tes-secondary);
   }
 
-  aside[data-ot-alert="warning"] {
-    border-left-color: var(--ot-warning);
+  aside[data-tes-alert="warning"] {
+    border-left-color: var(--tes-warning);
   }
 
-  aside[data-ot-alert="warning"] > p:first-child {
-    color: var(--ot-warning);
+  aside[data-tes-alert="warning"] > p:first-child {
+    color: var(--tes-warning);
   }
 
-  aside[data-ot-alert="caution"] {
-    border-left-color: var(--ot-destructive);
+  aside[data-tes-alert="caution"] {
+    border-left-color: var(--tes-destructive);
   }
 
-  aside[data-ot-alert="caution"] > p:first-child {
-    color: var(--ot-destructive);
+  aside[data-tes-alert="caution"] > p:first-child {
+    color: var(--tes-destructive);
   }
 
   /* A diagram the tile body element drew: centered, and scrolling sideways when wider than its container. */
@@ -750,7 +750,7 @@
   /* Display math: a block of its own, scrolling sideways when wider than its container. */
   math[display="block"] {
     display: block math;
-    margin: var(--ot-space-3) 0;
+    margin: var(--tes-space-3) 0;
     overflow-x: auto;
   }
 
@@ -760,33 +760,33 @@
   span[class~="hljs-keyword"],
   span[class~="hljs-built_in"],
   span[class~="hljs-literal"] {
-    color: var(--ot-primary);
+    color: var(--tes-primary);
   }
 
   span[class~="hljs-string"],
   span[class~="hljs-regexp"],
   span[class~="hljs-addition"] {
-    color: var(--ot-success);
+    color: var(--tes-success);
   }
 
   span[class~="hljs-number"] {
-    color: var(--ot-warning);
+    color: var(--tes-warning);
   }
 
   span[class~="hljs-title"],
   span[class~="hljs-function"],
   span[class~="hljs-class"] {
-    color: var(--ot-secondary);
+    color: var(--tes-secondary);
   }
 
   span[class~="hljs-comment"],
   span[class~="hljs-quote"] {
-    color: var(--ot-muted-foreground);
+    color: var(--tes-muted-foreground);
     font-style: italic;
   }
 
   span[class~="hljs-deletion"] {
-    color: var(--ot-destructive);
+    color: var(--tes-destructive);
   }
 
   a,

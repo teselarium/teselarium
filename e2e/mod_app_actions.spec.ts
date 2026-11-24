@@ -385,7 +385,7 @@ test.describe(
         "catalog.list",
         {},
       ]);
-      expect(JSON.stringify(catalog)).not.toContain("opentesela-browser:");
+      expect(JSON.stringify(catalog)).not.toContain("teselarium-browser:");
     });
   },
 );

@@ -7,7 +7,7 @@ import { parseMarkdown } from "./markdown_parser.ts";
 
 const TEST_SOURCE = "https://example.org/tiles/test.md";
 const FAHRENHEIT_PATH = "tiles/books/farenheit_451.md";
-const CODE_RAN_MARKER = "openTeselaTileCodeRan";
+const CODE_RAN_MARKER = "teselariumTileCodeRan";
 
 function buildFetchedFile(content: string): FetchedFile {
   const fetchedFile: FetchedFile = { source: TEST_SOURCE, content };

@@ -125,7 +125,7 @@ describe("createSiteDecisions", function describeCreateSiteDecisions(): void {
   it("reads a decision of a mosaic stored in this browser", function readsStoredMosaicDecision(): void {
     const storedMosaicAllow: SiteDecision = {
       ...MOSAIC_COVERS_ALLOW,
-      mosaic: "opentesela-browser:///r1/nobel_books.yaml",
+      mosaic: "teselarium-browser:///r1/nobel_books.yaml",
     };
     const storage = buildStoredStorage([storedMosaicAllow]);
 
@@ -136,7 +136,7 @@ describe("createSiteDecisions", function describeCreateSiteDecisions(): void {
 
   it("drops a mod decision whose mod is stored in this browser", function dropsBrowserMod(): void {
     const storage = buildStoredStorage([
-      { ...COVERS_ALLOW, mod: "opentesela-browser:///r1/mod_conf.yaml" },
+      { ...COVERS_ALLOW, mod: "teselarium-browser:///r1/mod_conf.yaml" },
     ]);
 
     const store = createSiteDecisions({ storage });
@@ -205,8 +205,8 @@ describe("createSiteDecisions", function describeCreateSiteDecisions(): void {
   });
 
   it("keeps its key outside the mod storage slots", function keepsKeyApart(): void {
-    expect(SITE_DECISIONS_KEY).toBe("opentesela.site-decisions");
-    expect(SITE_DECISIONS_KEY.startsWith("opentesela.mod-storage:")).toBe(
+    expect(SITE_DECISIONS_KEY).toBe("teselarium.site-decisions");
+    expect(SITE_DECISIONS_KEY.startsWith("teselarium.mod-storage:")).toBe(
       false,
     );
   });

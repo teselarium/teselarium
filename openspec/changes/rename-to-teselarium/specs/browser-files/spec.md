@@ -12,7 +12,7 @@ Each stored file SHALL have an absolute address of the scheme `teselarium-browse
 - **THEN** the stored file's address is `teselarium-browser:///<root>/nobel_map.yaml`, with a root of its own
 
 ### Requirement: Stored files are read like other files
-Wherever the app reads a file, an `teselarium-browser:` address SHALL be read from the store and never requested from the network. A relative reference in a stored file SHALL resolve against the stored file's address, as for a file from a site. An address the store does not hold SHALL fail with an error that names the address and says it is not stored in this browser.
+Wherever the app reads a file, a `teselarium-browser:` address SHALL be read from the store and never requested from the network. A relative reference in a stored file SHALL resolve against the stored file's address, as for a file from a site. An address the store does not hold SHALL fail with an error that names the address and says it is not stored in this browser.
 
 #### Scenario: Stored mosaic opens
 - **WHEN** a run link opens `#/run?mosaic=teselarium-browser:///<root>/nobel_map.yaml`, a stored mosaic whose `mod` and `collection` are `https:` addresses
@@ -23,7 +23,7 @@ Wherever the app reads a file, an `teselarium-browser:` address SHALL be read fr
 - **THEN** opening it fails with an error that names `teselarium-browser:///<root>/tiles/laureates/collection.yaml` and says it is not stored in this browser
 
 ### Requirement: Stored files are not content hosts
-An `teselarium-browser:` address SHALL NOT be a content host of a sandbox, SHALL NOT be granted as the app's origin, and SHALL add no source to a mod frame's content policy.
+A `teselarium-browser:` address SHALL NOT be a content host of a sandbox, SHALL NOT be granted as the app's origin, and SHALL add no source to a mod frame's content policy.
 
 #### Scenario: Stored mosaic's sandbox
 - **WHEN** a stored mosaic opens

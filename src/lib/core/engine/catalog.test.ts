@@ -65,7 +65,7 @@ function buildInstanceCatalog(
 const BOOK_LIST_MARK = { source: SAMPLE_MOD_SOURCE, title: "Book List" };
 
 const STORED_ENTRY: UserCatalogEntry = {
-  address: "opentesela-browser:///r1/maps/nobel_map.yaml",
+  address: "teselarium-browser:///r1/maps/nobel_map.yaml",
   place: "browser",
   root: "r1",
   provenance: {
@@ -350,7 +350,7 @@ describe("buildCatalog", function describeBuildCatalog(): void {
       "https://example.org/samples/mosaics/nobel_laureates_map.yaml";
     const copy: UserCatalogEntry = {
       ...STORED_ENTRY,
-      address: "opentesela-browser:///r9/laureates_my_way.yaml",
+      address: "teselarium-browser:///r9/laureates_my_way.yaml",
       provenance: {
         ...STORED_ENTRY.provenance,
         folder: null,

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-A tile's body reaches a mod as raw markdown, as written. This module renders it for every mod, to HTML that is safe and works inside the mod's sandbox: the engine answers `tiles.renderBody` with it, and the frame loader's `<ot-tile-body>` element shows it (see the [engine module](../engine/README.md)). The renderer never trusts the body: everything it outputs is built by it or allowed by its schema.
+A tile's body reaches a mod as raw markdown, as written. This module renders it for every mod, to HTML that is safe and works inside the mod's sandbox: the engine answers `tiles.renderBody` with it, and the frame loader's `<tes-tile-body>` element shows it (see the [engine module](../engine/README.md)). The renderer never trusts the body: everything it outputs is built by it or allowed by its schema.
 
 ### What a rendered body holds
 
@@ -10,14 +10,14 @@ GitHub-flavored markdown (tables, task lists, strikethrough, autolinks, footnote
 
 ### Links
 
-- A link to a fragment of the same body (`#heading`) keeps its `href` as written and gets `data-ot-fragment`.
-- Any other link is resolved against the tile's `source`. A link to an `http:` or `https:` address gets `data-ot-link`.
+- A link to a fragment of the same body (`#heading`) keeps its `href` as written and gets `data-tes-fragment`.
+- Any other link is resolved against the tile's `source`. A link to an `http:` or `https:` address gets `data-tes-link`.
 
 In a mod's frame, the frame loader handles clicks on both, so a body link never navigates the frame (see the [engine module](../engine/README.md#tile-bodies)).
 
 ```html
-<p><a href="https://example.org/films/stalker.md" data-ot-link="">Next</a></p>
-<p><a href="#notes" data-ot-fragment="">See notes</a></p>
+<p><a href="https://example.org/films/stalker.md" data-tes-link="">Next</a></p>
+<p><a href="#notes" data-tes-fragment="">See notes</a></p>
 ```
 
 ### Heading ids
@@ -45,32 +45,32 @@ These addresses are the body's media: they count as media linked by tiles (see t
 An `<iframe>` whose `src`, resolved against the tile, is an `https:` address that the private network guard allows becomes a placeholder, and so does an image whose address is a page link of a known site, such as `![Trailer](https://www.youtube.com/watch?v=aqz-KE-bpKQ)` (see the [players module](../players/README.md)). Rendering requests nothing from the site. The placeholder holds the address as written in the body, resolved; the engine turns it into a player when the reader clicks. `<iframe src="https://www.youtube.com/embed/aqz-KE-bpKQ" title="Big Buck Bunny"></iframe>` gives:
 
 ```html
-<button type="button" class="ot-player" data-ot-player="https://www.youtube.com/embed/aqz-KE-bpKQ"><span class="ot-player-box"><span class="ot-player-title">Big Buck Bunny</span><span class="ot-player-host">youtube.com</span></span></button>
+<button type="button" class="tes-player" data-tes-player="https://www.youtube.com/embed/aqz-KE-bpKQ"><span class="tes-player-box"><span class="tes-player-title">Big Buck Bunny</span><span class="tes-player-host">youtube.com</span></span></button>
 ```
 
-- `ot-player-box` is the box the theme draws, inside the button (see the [theme module](../theme/README.md#write-html-get-the-apps-look)).
-- `ot-player-title` holds the iframe's `title` or the image's alt text, otherwise the site's name, otherwise `Player`.
-- `ot-player-host` holds the address's host, without `www.`.
-- An `http:` iframe becomes a link to it, with `data-ot-link`, showing its `title` or its address.
+- `tes-player-box` is the box the theme draws, inside the button (see the [theme module](../theme/README.md#write-html-get-the-apps-look)).
+- `tes-player-title` holds the iframe's `title` or the image's alt text, otherwise the site's name, otherwise `Player`.
+- `tes-player-host` holds the address's host, without `www.`.
+- An `http:` iframe becomes a link to it, with `data-tes-link`, showing its `title` or its address.
 - An iframe to the user's computer or network, from a tile that is not there, is left out, with the guard's warning: `Not loading https://192.168.1.1/: tiles from other sites cannot link addresses on your computer or network.`
 - Any other iframe is left out.
 
 Each player address is recorded with the title the body gives it, the iframe's `title` or the image's alt text, or `null` without one: the player dialog shows it in full, since the placeholder may cut it.
 
-The renderer reads only the iframe's `src`, `title`, `width` and `height`, and the image's `src` and `alt`. A body can write a `button.ot-player` itself, but only the addresses of the placeholders the renderer built are player addresses.
+The renderer reads only the iframe's `src`, `title`, `width` and `height`, and the image's `src` and `alt`. A body can write a `button.tes-player` itself, but only the addresses of the placeholders the renderer built are player addresses.
 
 ### Alerts
 
 As on GitHub, a blockquote whose first line is only `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, in any letter case, becomes an alert, without the marker line. Any other blockquote, such as `[!TODO]`, stays a blockquote. `> [!NOTE]` then `> Tiles are markdown files.` gives:
 
 ```html
-<aside class="ot-alert" data-ot-alert="note">
-<p class="ot-alert-title">Note</p>
+<aside class="tes-alert" data-tes-alert="note">
+<p class="tes-alert-title">Note</p>
 <p>Tiles are markdown files.</p>
 </aside>
 ```
 
-`data-ot-alert` holds the kind in lower case, and the title the kind's name: `Note`, `Tip`, `Important`, `Warning` or `Caution`.
+`data-tes-alert` holds the kind in lower case, and the title the kind's name: `Note`, `Tip`, `Important`, `Warning` or `Caution`.
 
 ### Math
 
@@ -86,10 +86,10 @@ Dollars follow the rule of GitHub and Pandoc: inline math needs an opening `$` f
 
 - **What the MathML may hold.** The MathML Core elements Temml writes, with their presentation attributes and `class` values starting with `tml-`. Temml's `style` attributes are dropped, as any `style` is; MathML written in a body is sanitized the same way, so `<mi href="…">` loses its `href`.
 - **Untrusted commands.** Commands that could link or style outside the formula, such as `\href`, `\url`, `\htmlClass` and `\includegraphics`, are never trusted: a formula using one fails, as below. Sizes such as `\rule{100em}{1em}` are capped at 20em, and macros at 1000 expansions, so a self-recursive macro fails instead of running forever.
-- **Failing formulas.** A formula Temml cannot read stays as written, as code, with the reason in `data-ot-math-error`; the rest of the body renders as usual. `Before $\frac{a}{$ after.` gives:
+- **Failing formulas.** A formula Temml cannot read stays as written, as code, with the reason in `data-tes-math-error`; the rest of the body renders as usual. `Before $\frac{a}{$ after.` gives:
 
 ```html
-<p>Before <code class="language-math math-inline" data-ot-math-error="Unexpected end of input in a macro argument, expected &#x27;}&#x27; at end of input: \frac{a}{">\frac{a}{</code> after.</p>
+<p>Before <code class="language-math math-inline" data-tes-math-error="Unexpected end of input in a macro argument, expected &#x27;}&#x27; at end of input: \frac{a}{">\frac{a}{</code> after.</p>
 ```
 
 Failed display math is `<pre><code class="language-math math-display">`, and a failed `math` block `<pre><code class="language-math">`.
@@ -125,9 +125,9 @@ The engine scans bodies at launch and renders them only when a mod asks. The sca
 
 ### Diagrams
 
-The renderer keeps a fenced `mermaid` block as code, `<pre><code class="language-mermaid">`, so the HTML of `tiles.renderBody` holds no diagram. The `<ot-tile-body>` element draws it afterwards, in the mod's frame, with the copy of mermaid the app ships (see [Libraries](../engine/README.md#libraries) in the engine module): a diagram source is untrusted tile content, so it is parsed only in a mod's sandbox, never in the app's page.
+The renderer keeps a fenced `mermaid` block as code, `<pre><code class="language-mermaid">`, so the HTML of `tiles.renderBody` holds no diagram. The `<tes-tile-body>` element draws it afterwards, in the mod's frame, with the copy of mermaid the app ships (see [Libraries](../engine/README.md#libraries) in the engine module): a diagram source is untrusted tile content, so it is parsed only in a mod's sandbox, never in the app's page.
 
-- **Text first.** The element shows the body and fires `ot-rendered` before any diagram is drawn. Each block stays as code until its diagram replaces it.
+- **Text first.** The element shows the body and fires `tes-rendered` before any diagram is drawn. Each block stays as code until its diagram replaces it.
 - **When in view.** A block is drawn when it comes into the frame's view, one block at a time, with a paint and a task between two, so the frame and the app keep responding. The library is requested with the first block in view: a body whose blocks are never seen never loads it.
 - **The diagram** replaces the `<pre>` with a `<figure>` holding the SVG, which keeps the block's text in `data-mermaid-source`. Mermaid draws at its `strict` security level and without HTML labels, so labels are text and a diagram holds no click handler; `<img src=x onerror=alert(1)>` in a label is shown as text. The layout and the look are mermaid 12's defaults, ELK and neo, which a diagram may change in its front matter or an `%%{init}%%` directive; it cannot turn HTML labels on there.
 - **Labels** are SVG text, so a label holds no element: markup in a tile's diagram cannot add an image, which would send a request to any address the tile's author wrote, nor anything else. Line breaks (`<br>`) and mermaid's markdown strings (`` "`**bold** and *italic*`" ``) still work; other tags, such as `<b>`, show as written.
@@ -136,18 +136,18 @@ The renderer keeps a fenced `mermaid` block as code, `<pre><code class="language
 - **Colors.** Diagrams take the theme's colors (`background`, `card` for the nodes, `foreground`, `border`, `muted-foreground` for the lines, `muted`, `accent`, the `font-sans` font, and `border` for the neo look's shadow), and are drawn again from their kept text when the color scheme changes, without reloading the frame. The theme styles the figure (see the [theme module](../theme/README.md#write-html-get-the-apps-look)).
 - **Busy.** A block in view has `aria-busy="true"` from the moment it waits to be drawn until its figure replaces it, and the base stylesheet pulses it (dimmed and still under `prefers-reduced-motion: reduce`); the first diagram of a frame waits for the library's download and install. The new figure has no `aria-busy`. After a color scheme change, a figure in view is busy until its new drawing replaces it. A block that fails, or that the element drops, loses the mark; a block out of view, and every block with `diagrams = "source"`, never gets it. The pulse is an opacity animation, which keeps moving while mermaid draws in Chromium and Firefox, and stops until the frame is free in WebKit.
 - **Failures.** A block mermaid cannot draw, such as `A -->`, stays as code, is logged with `console.warn`, and the element goes on with the next one.
-- **`ot-diagrams-drawn`**, a bubbling event, fires on the element each time every block in view has been drawn or has failed: once for a body whose blocks are all in view, and again when the user scrolls to more blocks or the color scheme changes. A body without mermaid blocks fires none. When `tile` is set again, or the element leaves the document, before its diagrams are drawn, it draws none of them and fires no event for that body.
+- **`tes-diagrams-drawn`**, a bubbling event, fires on the element each time every block in view has been drawn or has failed: once for a body whose blocks are all in view, and again when the user scrolls to more blocks or the color scheme changes. A body without mermaid blocks fires none. When `tile` is set again, or the element leaves the document, before its diagrams are drawn, it draws none of them and fires no event for that body.
 - **`diagrams`**, a property of the element: `"draw"` by default, or `"source"`, which keeps every block as code and never loads the library. Any other value throws a `TypeError`.
 
 ```html
 <figure data-mermaid-source="flowchart LR
   Tile --> Mod
-"><svg id="ot-mermaid-1" …>…</svg></figure>
+"><svg id="tes-mermaid-1" …>…</svg></figure>
 ```
 
 ### What stays as written
 
-- Fenced code blocks are `<pre><code class="language-<name>">` with the block's text, including `mermaid` blocks, highlighted only for the common languages of highlight.js (see [Highlighted code](#highlighted-code)). The `<ot-tile-body>` element draws mermaid blocks afterwards (see [Diagrams](#diagrams)); a mod that places the HTML itself shows them as code.
+- Fenced code blocks are `<pre><code class="language-<name>">` with the block's text, including `mermaid` blocks, highlighted only for the common languages of highlight.js (see [Highlighted code](#highlighted-code)). The `<tes-tile-body>` element draws mermaid blocks afterwards (see [Diagrams](#diagrams)); a mod that places the HTML itself shows them as code.
 - Unlabeled code is never highlighted.
 - Unknown emoji names stay text.
 
@@ -168,7 +168,7 @@ The pipeline, from `unified` packages:
 The scan runs the same steps without the detection, the emoji, math and highlighting passes, and `rehype-stringify`.
 
 - `dollar_pass.ts`: turns inline math that breaks the dollar rule back into the markdown it was.
-- `alerts_pass.ts`: turns alert blockquotes into `aside.ot-alert`.
+- `alerts_pass.ts`: turns alert blockquotes into `aside.tes-alert`.
 - `body_extras.ts`: the detection walk, which finds the extras a body needs, and their loaders, each an `import()` of its pass kept once per renderer, and forgotten when it fails. `buildTileBodyRenderer(loaders)` in `render_body.ts` builds a renderer from other loaders, which tests use.
 - `emoji_pass.ts`: turns shortcodes into emoji with `remark-gemoji`, in a chunk of its own.
 - `math_pass.ts`: replaces the math code with Temml's MathML as raw HTML, which `rehype-raw` parses, in a chunk of its own.

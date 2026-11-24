@@ -2,7 +2,7 @@
 
 You will open a mosaic, see the same data in another way, save your version and share it.
 
-You only need OpenTesela open in your browser.
+You only need Teselarium open in your browser.
 
 ## Small glossary
 

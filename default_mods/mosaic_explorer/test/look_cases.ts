@@ -27,7 +27,7 @@ export async function drawsCardBackground(context: CaseContext): Promise<void> {
   const card = findElement(context, "li > article");
   context
     .expect(getComputedStyle(card).backgroundColor)
-    .toBe(readTokenAs("--ot-card", "color"));
+    .toBe(readTokenAs("--tes-card", "color"));
 }
 
 export async function drawsFailureBorder(context: CaseContext): Promise<void> {
@@ -36,7 +36,7 @@ export async function drawsFailureBorder(context: CaseContext): Promise<void> {
   const alert = findElement(context, 'li > [role="alert"]');
   context
     .expect(getComputedStyle(alert).borderTopColor)
-    .toBe(readTokenAs("--ot-destructive", "color"));
+    .toBe(readTokenAs("--tes-destructive", "color"));
 }
 
 export async function drawsOpenAsPrimary(context: CaseContext): Promise<void> {
@@ -47,13 +47,13 @@ export async function drawsOpenAsPrimary(context: CaseContext): Promise<void> {
       getComputedStyle(findButton(context, "Open Listed mosaic"))
         .backgroundColor,
     )
-    .toBe(readTokenAs("--ot-primary", "color"));
+    .toBe(readTokenAs("--tes-primary", "color"));
   context
     .expect(
       getComputedStyle(findButton(context, "View Listed mosaic"))
         .backgroundColor,
     )
-    .toBe(readTokenAs("--ot-background", "color"));
+    .toBe(readTokenAs("--tes-background", "color"));
 }
 
 /**

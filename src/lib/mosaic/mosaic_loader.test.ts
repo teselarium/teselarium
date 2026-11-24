@@ -503,7 +503,7 @@ const README_MOSAIC_EXAMPLE = [
   "",
 ].join("\n");
 
-/** The example of "Mosaic" in docs/opentesela_spec.md, without its comments. */
+/** The example of "Mosaic" in docs/teselarium_spec.md, without its comments. */
 const SPEC_MOSAIC_EXAMPLE = [
   "mosaic:",
   '  title: "Science Fiction Books Around the World"',

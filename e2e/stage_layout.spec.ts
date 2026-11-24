@@ -367,7 +367,7 @@ test.describe(
       for (const key of [
         THEATER_MODE_KEY,
         "theater-mode",
-        "../opentesela.theater-mode",
+        "../teselarium.theater-mode",
       ]) {
         answers.push(
           await frame.evaluate(requestFromProbe, ["storage.get", { key }]),

@@ -1,10 +1,10 @@
-# OpenTesela
+# Teselarium
 
 Modular and reusable knowledge.
 
 Bring your notes. Choose a visualization. Share the result with a link.
 
-<div role="status">OpenTesela is in an early phase of its development and some features are not ready yet. Your feedback is welcome.</div>
+<div role="status">Teselarium is in an early phase of its development and some features are not ready yet. Your feedback is welcome.</div>
 
 ## Try it now
 

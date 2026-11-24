@@ -33,7 +33,7 @@ function defineSharedToken(name: string, value: string): Readonly<ThemeToken> {
 
 /**
  * The only source of the app's and the mods' colors, fonts and spacing. The
- * color tokens are shadcn/ui's role names under `--ot-`, plus `highlight`
+ * color tokens are shadcn/ui's role names under `--tes-`, plus `highlight`
  * (the secondary badge's fill), `warning` and `success`. Gaudí's trencadís:
  * cobalt and turquoise glazes, saffron and leaf-green shards, on stone and
  * white ceramic by day and on night blue by night. Every text role has a
@@ -42,51 +42,51 @@ function defineSharedToken(name: string, value: string): Readonly<ThemeToken> {
  * contrast").
  */
 export const THEME_TOKENS: readonly Readonly<ThemeToken>[] = Object.freeze([
-  defineColorToken("--ot-background", "#f6f1e7", "#0f141d"),
-  defineColorToken("--ot-foreground", "#1d2433", "#f2ede3"),
-  defineColorToken("--ot-card", "#ffffff", "#18202c"),
-  defineColorToken("--ot-card-foreground", "#1d2433", "#f2ede3"),
-  defineColorToken("--ot-popover", "#ffffff", "#18202c"),
-  defineColorToken("--ot-popover-foreground", "#1d2433", "#f2ede3"),
-  defineColorToken("--ot-primary", "#1f4e9c", "#78a6f2"),
-  defineColorToken("--ot-primary-foreground", "#ffffff", "#0f141d"),
-  defineColorToken("--ot-secondary", "#0b6f6c", "#4fc3bb"),
-  defineColorToken("--ot-secondary-foreground", "#ffffff", "#0f141d"),
-  defineColorToken("--ot-muted", "#f9f5ee", "#141a25"),
-  defineColorToken("--ot-muted-foreground", "#5b6170", "#a4abb9"),
-  defineColorToken("--ot-accent", "#f2c14e", "#e9b949"),
-  defineColorToken("--ot-accent-foreground", "#1d2433", "#0f141d"),
-  defineColorToken("--ot-highlight", "#9cc46f", "#8fbb62"),
-  defineColorToken("--ot-highlight-foreground", "#1d2433", "#0f141d"),
-  defineColorToken("--ot-destructive", "#b3261e", "#f08a7a"),
-  defineColorToken("--ot-destructive-foreground", "#ffffff", "#0f141d"),
-  defineColorToken("--ot-warning", "#8a5a00", "#f5b04a"),
-  defineColorToken("--ot-success", "#3a6f22", "#8fd18a"),
-  defineColorToken("--ot-border", "#e3d9c6", "#283245"),
-  defineColorToken("--ot-input", "#cbbfa8", "#3a465c"),
-  defineColorToken("--ot-ring", "#1f4e9c", "#78a6f2"),
+  defineColorToken("--tes-background", "#f6f1e7", "#0f141d"),
+  defineColorToken("--tes-foreground", "#1d2433", "#f2ede3"),
+  defineColorToken("--tes-card", "#ffffff", "#18202c"),
+  defineColorToken("--tes-card-foreground", "#1d2433", "#f2ede3"),
+  defineColorToken("--tes-popover", "#ffffff", "#18202c"),
+  defineColorToken("--tes-popover-foreground", "#1d2433", "#f2ede3"),
+  defineColorToken("--tes-primary", "#1f4e9c", "#78a6f2"),
+  defineColorToken("--tes-primary-foreground", "#ffffff", "#0f141d"),
+  defineColorToken("--tes-secondary", "#0b6f6c", "#4fc3bb"),
+  defineColorToken("--tes-secondary-foreground", "#ffffff", "#0f141d"),
+  defineColorToken("--tes-muted", "#f9f5ee", "#141a25"),
+  defineColorToken("--tes-muted-foreground", "#5b6170", "#a4abb9"),
+  defineColorToken("--tes-accent", "#f2c14e", "#e9b949"),
+  defineColorToken("--tes-accent-foreground", "#1d2433", "#0f141d"),
+  defineColorToken("--tes-highlight", "#9cc46f", "#8fbb62"),
+  defineColorToken("--tes-highlight-foreground", "#1d2433", "#0f141d"),
+  defineColorToken("--tes-destructive", "#b3261e", "#f08a7a"),
+  defineColorToken("--tes-destructive-foreground", "#ffffff", "#0f141d"),
+  defineColorToken("--tes-warning", "#8a5a00", "#f5b04a"),
+  defineColorToken("--tes-success", "#3a6f22", "#8fd18a"),
+  defineColorToken("--tes-border", "#e3d9c6", "#283245"),
+  defineColorToken("--tes-input", "#cbbfa8", "#3a465c"),
+  defineColorToken("--tes-ring", "#1f4e9c", "#78a6f2"),
   defineSharedToken(
-    "--ot-font-sans",
+    "--tes-font-sans",
     'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   ),
   defineSharedToken(
-    "--ot-font-mono",
+    "--tes-font-mono",
     'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
   ),
-  defineSharedToken("--ot-font-size", "1rem"),
-  defineSharedToken("--ot-line-height", "1.5"),
-  defineSharedToken("--ot-space-1", "0.25rem"),
-  defineSharedToken("--ot-space-2", "0.5rem"),
-  defineSharedToken("--ot-space-3", "0.75rem"),
-  defineSharedToken("--ot-space-4", "1rem"),
-  defineSharedToken("--ot-space-6", "1.5rem"),
-  defineSharedToken("--ot-radius", "0.625rem"),
+  defineSharedToken("--tes-font-size", "1rem"),
+  defineSharedToken("--tes-line-height", "1.5"),
+  defineSharedToken("--tes-space-1", "0.25rem"),
+  defineSharedToken("--tes-space-2", "0.5rem"),
+  defineSharedToken("--tes-space-3", "0.75rem"),
+  defineSharedToken("--tes-space-4", "1rem"),
+  defineSharedToken("--tes-space-6", "1.5rem"),
+  defineSharedToken("--tes-radius", "0.625rem"),
   defineSharedToken(
-    "--ot-shadow",
+    "--tes-shadow",
     "0 10px 15px -3px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.12)",
   ),
-  defineSharedToken("--ot-content-width", "65rem"),
-  defineSharedToken("--ot-reading-width", "55rem"),
+  defineSharedToken("--tes-content-width", "65rem"),
+  defineSharedToken("--tes-reading-width", "55rem"),
 ]);
 
 /** The value of a token for a color scheme. */

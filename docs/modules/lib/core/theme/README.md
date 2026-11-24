@@ -8,42 +8,42 @@ A mod gets all of it by default and needs to learn nothing: plain HTML in its fr
 
 ### Theme tokens
 
-Each token is a CSS custom property. The color tokens are roles, named like shadcn/ui's under the `--ot-` prefix, and have a different value in each color scheme. The other tokens are the same in both. The app's own interface uses the same tokens: shadcn's variables in the app are aliases of them.
+Each token is a CSS custom property. The color tokens are roles, named like shadcn/ui's under the `--tes-` prefix, and have a different value in each color scheme. The other tokens are the same in both. The app's own interface uses the same tokens: shadcn's variables in the app are aliases of them.
 
 | Token | Light | Dark | For |
 |---|---|---|---|
-| `--ot-background` | `#f6f1e7` | `#0f141d` | the page |
-| `--ot-foreground` | `#1d2433` | `#f2ede3` | text on the page |
-| `--ot-card` | `#ffffff` | `#18202c` | cards (`<article>`), alerts, form fields |
-| `--ot-card-foreground` | `#1d2433` | `#f2ede3` | text on `card` |
-| `--ot-popover` | `#ffffff` | `#18202c` | dialogs |
-| `--ot-popover-foreground` | `#1d2433` | `#f2ede3` | text on `popover` |
-| `--ot-primary` | `#1f4e9c` | `#78a6f2` | selection, pressed buttons, the primary button |
-| `--ot-primary-foreground` | `#ffffff` | `#0f141d` | text on `primary` |
-| `--ot-secondary` | `#0b6f6c` | `#4fc3bb` | links, secondary buttons (as outlines) |
-| `--ot-secondary-foreground` | `#ffffff` | `#0f141d` | text on a filled `secondary` (the app's shadcn variant) |
-| `--ot-muted` | `#f9f5ee` | `#141a25` | quiet fills: code, `pre`, table row hover |
-| `--ot-muted-foreground` | `#5b6170` | `#a4abb9` | secondary text, table headers, placeholders |
-| `--ot-accent` | `#f2c14e` | `#e9b949` | the hover fill of buttons, always behind dark text |
-| `--ot-accent-foreground` | `#1d2433` | `#0f141d` | text on `accent` |
-| `--ot-highlight` | `#9cc46f` | `#8fbb62` | tag badges (`data-ot-variant="secondary"` on a `<span>`) |
-| `--ot-highlight-foreground` | `#1d2433` | `#0f141d` | text on `highlight` |
-| `--ot-destructive` | `#b3261e` | `#f08a7a` | errors, alerts, invalid fields, destructive buttons |
-| `--ot-destructive-foreground` | `#ffffff` | `#0f141d` | text on a filled destructive button |
-| `--ot-warning` | `#8a5a00` | `#f5b04a` | warnings |
-| `--ot-success` | `#3a6f22` | `#8fd18a` | success |
-| `--ot-border` | `#e3d9c6` | `#283245` | borders and separators |
-| `--ot-input` | `#cbbfa8` | `#3a465c` | field borders, the switch's track |
-| `--ot-ring` | `#1f4e9c` | `#78a6f2` | focus rings |
-| `--ot-font-sans` | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` | same | text |
-| `--ot-font-mono` | `ui-monospace, "SF Mono", Menlo, Consolas, monospace` | same | code |
-| `--ot-font-size` | `1rem` | same | |
-| `--ot-line-height` | `1.5` | same | |
-| `--ot-space-1` / `-2` / `-3` / `-4` / `-6` | `0.25rem` / `0.5rem` / `0.75rem` / `1rem` / `1.5rem` | same | spacing |
-| `--ot-radius` | `0.625rem` | same | corners |
-| `--ot-shadow` | `0 10px 15px -3px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.12)` | same | dialogs, player placeholders on hover |
-| `--ot-content-width` | `65rem` | same | the most a mod's `<body>` is wide in the `contained` layout |
-| `--ot-reading-width` | `55rem` | same | the most a page's content is wide; mods can use it for long text |
+| `--tes-background` | `#f6f1e7` | `#0f141d` | the page |
+| `--tes-foreground` | `#1d2433` | `#f2ede3` | text on the page |
+| `--tes-card` | `#ffffff` | `#18202c` | cards (`<article>`), alerts, form fields |
+| `--tes-card-foreground` | `#1d2433` | `#f2ede3` | text on `card` |
+| `--tes-popover` | `#ffffff` | `#18202c` | dialogs |
+| `--tes-popover-foreground` | `#1d2433` | `#f2ede3` | text on `popover` |
+| `--tes-primary` | `#1f4e9c` | `#78a6f2` | selection, pressed buttons, the primary button |
+| `--tes-primary-foreground` | `#ffffff` | `#0f141d` | text on `primary` |
+| `--tes-secondary` | `#0b6f6c` | `#4fc3bb` | links, secondary buttons (as outlines) |
+| `--tes-secondary-foreground` | `#ffffff` | `#0f141d` | text on a filled `secondary` (the app's shadcn variant) |
+| `--tes-muted` | `#f9f5ee` | `#141a25` | quiet fills: code, `pre`, table row hover |
+| `--tes-muted-foreground` | `#5b6170` | `#a4abb9` | secondary text, table headers, placeholders |
+| `--tes-accent` | `#f2c14e` | `#e9b949` | the hover fill of buttons, always behind dark text |
+| `--tes-accent-foreground` | `#1d2433` | `#0f141d` | text on `accent` |
+| `--tes-highlight` | `#9cc46f` | `#8fbb62` | tag badges (`data-tes-variant="secondary"` on a `<span>`) |
+| `--tes-highlight-foreground` | `#1d2433` | `#0f141d` | text on `highlight` |
+| `--tes-destructive` | `#b3261e` | `#f08a7a` | errors, alerts, invalid fields, destructive buttons |
+| `--tes-destructive-foreground` | `#ffffff` | `#0f141d` | text on a filled destructive button |
+| `--tes-warning` | `#8a5a00` | `#f5b04a` | warnings |
+| `--tes-success` | `#3a6f22` | `#8fd18a` | success |
+| `--tes-border` | `#e3d9c6` | `#283245` | borders and separators |
+| `--tes-input` | `#cbbfa8` | `#3a465c` | field borders, the switch's track |
+| `--tes-ring` | `#1f4e9c` | `#78a6f2` | focus rings |
+| `--tes-font-sans` | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` | same | text |
+| `--tes-font-mono` | `ui-monospace, "SF Mono", Menlo, Consolas, monospace` | same | code |
+| `--tes-font-size` | `1rem` | same | |
+| `--tes-line-height` | `1.5` | same | |
+| `--tes-space-1` / `-2` / `-3` / `-4` / `-6` | `0.25rem` / `0.5rem` / `0.75rem` / `1rem` / `1.5rem` | same | spacing |
+| `--tes-radius` | `0.625rem` | same | corners |
+| `--tes-shadow` | `0 10px 15px -3px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.12)` | same | dialogs, player placeholders on hover |
+| `--tes-content-width` | `65rem` | same | the most a mod's `<body>` is wide in the `contained` layout |
+| `--tes-reading-width` | `55rem` | same | the most a page's content is wide; mods can use it for long text |
 
 The palette comes from Gaudí's trencadís mosaics: cobalt and turquoise glazes, saffron and leaf-green shards, on stone and white ceramic, or on night blue in dark. `accent` follows shadcn's meaning, the hover fill, not a brand color. Links are `secondary`; selection and the main action are `primary`.
 
@@ -53,29 +53,29 @@ The palette comes from Gaudí's trencadís mosaics: cobalt and turquoise glazes,
 
 | Old name | New name |
 |---|---|
-| `--ot-color-background` | `--ot-background` |
-| `--ot-color-surface` | `--ot-card` for cards and fields, `--ot-muted` for quiet fills, `--ot-popover` for dialogs |
-| `--ot-color-text` | `--ot-foreground` |
-| `--ot-color-text-muted` | `--ot-muted-foreground` |
-| `--ot-color-border` | `--ot-border` (fields: `--ot-input`) |
-| `--ot-color-accent` | `--ot-primary` (for links: `--ot-secondary`) |
-| `--ot-color-accent-text` | `--ot-primary-foreground` |
-| `--ot-color-focus` | `--ot-ring` |
-| `--ot-color-danger` | `--ot-destructive` |
-| `--ot-color-warning` | `--ot-warning` |
-| `--ot-color-success` | `--ot-success` |
-| `--ot-font-body` | `--ot-font-sans` |
+| `--tes-color-background` | `--tes-background` |
+| `--tes-color-surface` | `--tes-card` for cards and fields, `--tes-muted` for quiet fills, `--tes-popover` for dialogs |
+| `--tes-color-text` | `--tes-foreground` |
+| `--tes-color-text-muted` | `--tes-muted-foreground` |
+| `--tes-color-border` | `--tes-border` (fields: `--tes-input`) |
+| `--tes-color-accent` | `--tes-primary` (for links: `--tes-secondary`) |
+| `--tes-color-accent-text` | `--tes-primary-foreground` |
+| `--tes-color-focus` | `--tes-ring` |
+| `--tes-color-danger` | `--tes-destructive` |
+| `--tes-color-warning` | `--tes-warning` |
+| `--tes-color-success` | `--tes-success` |
+| `--tes-font-body` | `--tes-font-sans` |
 
 ### The base stylesheet
 
 Unless the mod opts out, its frame gets the tokens and a base stylesheet before the mod runs. The base stylesheet styles plain HTML elements, with no classes to learn, and gives them the look of the app's components:
 
-- the page: background, text color, font, size and line height; `<body>` has no margin, padding `--ot-space-4` and fills the frame, at most `--ot-content-width` wide and centered in the `contained` layout (see [Write HTML, get the app's look](#write-html-get-the-apps-look));
+- the page: background, text color, font, size and line height; `<body>` has no margin, padding `--tes-space-4` and fills the frame, at most `--tes-content-width` wide and centered in the `contained` layout (see [Write HTML, get the app's look](#write-html-get-the-apps-look));
 - headings (`h1` and `h2` slightly tightened), paragraphs, links (`secondary`, underlined), `hr`, `small`, `blockquote`, `code`, `kbd`, `samp`, `pre`;
 - buttons: a plain `<button>` is an outline button, a `<button type="submit">` a primary button; hover (an `accent` fill, with everything inside the button in its text color) and `:disabled`;
 - form fields (`input`, `select`, `textarea`): the `card` surface, `input` border, radius, padding, the page's font, a placeholder in `muted-foreground`;
 - focus rings: a solid 3px `ring` outline on buttons and fields, a 2px one with a small offset on anything else (links, `[tabindex]`);
-- pressed buttons (`button[aria-pressed="true"]`) and current items (`[aria-current]`): a 3px outline in `--ot-primary`;
+- pressed buttons (`button[aria-pressed="true"]`) and current items (`[aria-current]`): a 3px outline in `--tes-primary`;
 - lists, description lists, tables (full width, headers in `muted-foreground`, a `muted` row on hover, and a separator under the header row and under each row but the last). The separator is drawn on the row (`tr`), not on its cells, so a row a mod stacks in a narrow frame, as a block or a grid, keeps one line under the whole row instead of one under each value. A mod drops it with `tr { border-bottom: none; }`;
 - `img`, `video`, `canvas`, `svg`: never wider than their container;
 - `<dialog>` (`popover`, border, radius, shadow, padding) and its backdrop;
@@ -94,19 +94,19 @@ It sets no layout beyond spacing and the body's width in the `contained` layout.
 
 ### Write HTML, get the app's look
 
-Mods don't get Tailwind or shadcn/ui, and need no classes. Well-written, accessible HTML already looks like OpenTesela: the base stylesheet styles elements by their meaning. The [default mods](../../../mods/README.md) are short examples of it, and so is the sample book list mod (`public/samples/mods/book_list/main.js`): its grid of books, its select, its card in a `<dialog>` and its badges all take the theme's look, and its own CSS sets layout, and the books' corner shape and shadow, from `--ot-radius` and `--ot-shadow`.
+Mods don't get Tailwind or shadcn/ui, and need no classes. Well-written, accessible HTML already looks like Teselarium: the base stylesheet styles elements by their meaning. The [default mods](../../../mods/README.md) are short examples of it, and so is the sample book list mod (`public/samples/mods/book_list/main.js`): its grid of books, its select, its card in a `<dialog>` and its badges all take the theme's look, and its own CSS sets layout, and the books' corner shape and shadow, from `--tes-radius` and `--tes-shadow`.
 
-**Width.** The frame fills the stage area, but in the `contained` layout, the default, the base stylesheet keeps `<body>` at most `--ot-content-width` wide (65rem) and centered, so a cover grid or a line of text does not run across a wide screen. The space beside the body still belongs to the frame: the wheel scrolls the mod there, and the scrollbar stays at the frame's edge. In theater mode, which the user turns on from the stage bar, and in fullscreen, the body has no limit:
+**Width.** The frame fills the stage area, but in the `contained` layout, the default, the base stylesheet keeps `<body>` at most `--tes-content-width` wide (65rem) and centered, so a cover grid or a line of text does not run across a wide screen. The space beside the body still belongs to the frame: the wheel scrolls the mod there, and the scrollbar stays at the frame's edge. In theater mode, which the user turns on from the stage bar, and in fullscreen, the body has no limit:
 
 ```css
-/* What the base stylesheet does, in the layer `opentesela`. */
-html[data-ot-layout="contained"] body {
-  max-width: var(--ot-content-width);
+/* What the base stylesheet does, in the layer `teselarium`. */
+html[data-tes-layout="contained"] body {
+  max-width: var(--tes-content-width);
   margin-inline: auto;
 }
 ```
 
-The layout is the attribute `data-ot-layout` on the frame's `<html>`, `"contained"`, `"theater"` or `"fullscreen"`. The frame loader sets it before `mount` is called and updates it on every `layout.changed`, before the mod's handlers run; mods that opt out of the theme styles get it too. The same value is `context.layout`, and the event `layout.changed` pushes `{ layout }` each time it changes (see [Frame layout](../engine/README.md#frame-layout)). A mod that draws to its width, such as a canvas or a map, redraws on the event:
+The layout is the attribute `data-tes-layout` on the frame's `<html>`, `"contained"`, `"theater"` or `"fullscreen"`. The frame loader sets it before `mount` is called and updates it on every `layout.changed`, before the mod's handlers run; mods that opt out of the theme styles get it too. The same value is `context.layout`, and the event `layout.changed` pushes `{ layout }` each time it changes (see [Frame layout](../engine/README.md#frame-layout)). A mod that draws to its width, such as a canvas or a map, redraws on the event:
 
 ```js
 export default function mount(engine, context) {
@@ -123,10 +123,10 @@ A mod that needs the full width in every layout, such as media, a map or a game,
 body { max-width: none; }
 ```
 
-A mod can keep long text at a reading width with `--ot-reading-width` (55rem), the width of the app's pages:
+A mod can keep long text at a reading width with `--tes-reading-width` (55rem), the width of the app's pages:
 
 ```css
-.notes { max-width: var(--ot-reading-width); }
+.notes { max-width: var(--tes-reading-width); }
 ```
 
 **Plain elements**
@@ -168,44 +168,44 @@ A mod can keep long text at a reading width with `--ot-reading-width` (55rem), t
 
 An empty `role="status"` or `role="alert"` element draws nothing, so a live region can wait for its text without showing an empty box.
 
-**Variant attributes.** For the app's variants that have no semantic HTML, the attribute `data-ot-variant` picks one:
+**Variant attributes.** For the app's variants that have no semantic HTML, the attribute `data-tes-variant` picks one:
 
 - on a `<button>`: `primary`, `secondary`, `outline`, `ghost` or `destructive`. `secondary` is a secondary action, drawn as an outline in `secondary`. `outline` also turns a submit button back into an outline button, so a page can keep one primary action;
 - on a `<span>`, which makes it a badge: `primary`, `secondary`, `outline`, `destructive`, `success` or `warning`. `primary` is filled with `primary`, `secondary` is a tag filled with `highlight`, and the others are statuses, drawn as outlines in their role.
-- on a `<textarea>`: `code`, a field for code, such as a mosaic file's text, in `--ot-font-mono`.
+- on a `<textarea>`: `code`, a field for code, such as a mosaic file's text, in `--tes-font-mono`.
 
 A tab, an element with `role="tab"`, gets the pressed button's outline while it has `aria-selected="true"`, so a tab list of buttons shows its selected tab.
 
 ```html
-<button type="button" data-ot-variant="primary">Run</button>
-<button type="button" data-ot-variant="destructive">Delete</button>
-<button type="button" data-ot-variant="ghost" aria-label="Close">×</button>
-<button type="submit" data-ot-variant="outline">Run with this collection</button>
+<button type="button" data-tes-variant="primary">Run</button>
+<button type="button" data-tes-variant="destructive">Delete</button>
+<button type="button" data-tes-variant="ghost" aria-label="Close">×</button>
+<button type="submit" data-tes-variant="outline">Run with this collection</button>
 
-<span data-ot-variant="success">granted</span>
-<span data-ot-variant="outline">not granted</span>
-<span data-ot-variant="secondary">1.0.0</span>
+<span data-tes-variant="success">granted</span>
+<span data-tes-variant="outline">not granted</span>
+<span data-tes-variant="secondary">1.0.0</span>
 
-<textarea data-ot-variant="code" aria-label="Mosaic file"></textarea>
+<textarea data-tes-variant="code" aria-label="Mosaic file"></textarea>
 ```
 
 Any other value leaves the element's plain look, and so does an unprefixed `data-variant`, which shadcn/ui and other libraries use for their own components.
 
 **Rendered tile bodies.** A tile body the engine renders (see [Tile bodies](../engine/README.md#tile-bodies)) is plain HTML, styled like any other, plus two elements of its own, which the stylesheet selects by attribute, and the diagrams the tile body element draws:
 
-- A player placeholder, `button[data-ot-player]`, is a slot of fixed size, the same whatever its title: at most 20rem wide (never wider than its container) and three lines high. Its `<span>` is the visible box, with the outline button's look: a play mark, then the player's title (its first inner `<span>`) on two lines, cut with "…" when it is longer, the second line left empty for a short title, then the player's site (its last inner `<span>`) on one line in `muted-foreground`. On hover and keyboard focus, the box takes the accent colors and a shadow and grows to show the whole title, over the content below, so the page does not move; the focus ring goes around the box.
-- An alert, `aside[data-ot-alert]`, has a left border and a bold title, its first `<p>`, both in its kind's color: `note` in `primary`, `tip` in `success`, `important` in `secondary`, `warning` in `warning` and `caution` in `destructive`.
+- A player placeholder, `button[data-tes-player]`, is a slot of fixed size, the same whatever its title: at most 20rem wide (never wider than its container) and three lines high. Its `<span>` is the visible box, with the outline button's look: a play mark, then the player's title (its first inner `<span>`) on two lines, cut with "…" when it is longer, the second line left empty for a short title, then the player's site (its last inner `<span>`) on one line in `muted-foreground`. On hover and keyboard focus, the box takes the accent colors and a shadow and grows to show the whole title, over the content below, so the page does not move; the focus ring goes around the box.
+- An alert, `aside[data-tes-alert]`, has a left border and a bold title, its first `<p>`, both in its kind's color: `note` in `primary`, `tip` in `success`, `important` in `secondary`, `warning` in `warning` and `caution` in `destructive`.
 
 ```html
-<button type="button" class="ot-player" data-ot-player="https://www.youtube.com/embed/aqz-KE-bpKQ"><span class="ot-player-box"><span class="ot-player-title">Big Buck Bunny</span><span class="ot-player-host">youtube.com</span></span></button>
+<button type="button" class="tes-player" data-tes-player="https://www.youtube.com/embed/aqz-KE-bpKQ"><span class="tes-player-box"><span class="tes-player-title">Big Buck Bunny</span><span class="tes-player-host">youtube.com</span></span></button>
 
-<aside class="ot-alert" data-ot-alert="warning">
-  <p class="ot-alert-title">Warning</p>
+<aside class="tes-alert" data-tes-alert="warning">
+  <p class="tes-alert-title">Warning</p>
   <p>Spoilers below.</p>
 </aside>
 ```
 
-A diagram the `<ot-tile-body>` element drew, `figure[data-mermaid-source]` (see [Diagrams](../tile_bodies/README.md#diagrams)), is centered and never wider than its container: a diagram wider than that scrolls sideways. Its colors come from the theme tokens when it is drawn, not from the stylesheet.
+A diagram the `<tes-tile-body>` element drew, `figure[data-mermaid-source]` (see [Diagrams](../tile_bodies/README.md#diagrams)), is centered and never wider than its container: a diagram wider than that scrolls sideways. Its colors come from the theme tokens when it is drawn, not from the stylesheet.
 
 Display math, `math[display="block"]` (see [Math](../tile_bodies/README.md#math)), is a block of its own with a vertical margin, and scrolls sideways when the formula is wider than its container, so the page does not widen. Inline math flows with the text. Every `<math>` gets the font family `"STIX Two Math", "STIX Math", "Cambria Math", "Latin Modern Math", math`: browsers stretch brackets and enlarge `∑` and `∫` only with a font that has an OpenType `MATH` table, and Chromium on Linux resolves the generic `math` family to a text font, such as FreeSerif, even when a math font is installed. Naming the common ones first lets each browser use the math font the system has: STIX Two Math on macOS and iOS, Cambria Math on Windows, STIX Math or Latin Modern Math from Linux packages such as `fonts-stix` and `fonts-lmodern`. On a system with none of them, Chromium and WebKit draw formulas with one-line brackets and small operators; Firefox builds them from Unicode parts. The app ships no math font. A formula that failed, kept as code (`code.language-math`), looks like code; the math classes are for the mod's own CSS.
 
@@ -234,7 +234,7 @@ article {
 
 ### The layer: your CSS always wins
 
-The tokens and the base stylesheet are in the cascade layer `opentesela`. Any style a mod adds outside a layer takes precedence over them, whatever its specificity:
+The tokens and the base stylesheet are in the cascade layer `teselarium`. Any style a mod adds outside a layer takes precedence over them, whatever its specificity:
 
 ```css
 /* Wins over the base stylesheet's button rule. */
@@ -256,30 +256,30 @@ A mod overrides a token the same way, for the whole frame or for one part of it.
 
 ```css
 :root {
-  --ot-primary: #db2777;
+  --tes-primary: #db2777;
 }
 ```
 
-A mod that puts its own styles in a layer must declare its layer after `opentesela` to win, for example with `@layer opentesela, mod;` at the top of its style.
+A mod that puts its own styles in a layer must declare its layer after `teselarium` to win, for example with `@layer teselarium, mod;` at the top of its style.
 
 ### The color scheme attribute
 
-The frame's `<html>` element has `data-ot-color-scheme="light"` or `"dark"`. The frame loader sets it before `mount` is called and updates it on every `theme.changed`, before the mod's handlers run. Mods that opt out of the theme styles get it too.
+The frame's `<html>` element has `data-tes-color-scheme="light"` or `"dark"`. The frame loader sets it before `mount` is called and updates it on every `theme.changed`, before the mod's handlers run. Mods that opt out of the theme styles get it too.
 
 The tokens follow the attribute, so a mod's own CSS can use it for anything the tokens do not cover:
 
 ```css
-[data-ot-color-scheme="dark"] .map {
+[data-tes-color-scheme="dark"] .map {
   filter: brightness(0.8);
 }
 ```
 
 ### Color scheme sections
 
-The attribute works on any element, not only `<html>`. An element with `data-ot-color-scheme="light"` or `"dark"` uses that color scheme's tokens for itself and its contents, whatever the frame's color scheme, and the base stylesheet gives it that color scheme's background and text colors. It keeps its color scheme when the frame's changes:
+The attribute works on any element, not only `<html>`. An element with `data-tes-color-scheme="light"` or `"dark"` uses that color scheme's tokens for itself and its contents, whatever the frame's color scheme, and the base stylesheet gives it that color scheme's background and text colors. It keeps its color scheme when the frame's changes:
 
 ```html
-<section data-ot-color-scheme="dark">
+<section data-tes-color-scheme="dark">
   <h2>Always dark</h2>
   <p>Even when the app is light.</p>
 </section>
@@ -291,9 +291,9 @@ Mods that draw with JavaScript (canvas, maps, charts) get the resolved values in
 
 ```js
 export default function mount(engine, context) {
-  drawChart(context.theme.tokens["--ot-primary"]);
+  drawChart(context.theme.tokens["--tes-primary"]);
   engine.on("theme.changed", function redraw(theme) {
-    drawChart(theme.tokens["--ot-primary"]);
+    drawChart(theme.tokens["--tes-primary"]);
   });
 }
 ```
@@ -306,7 +306,7 @@ The value in effect for an element, including the mod's own overrides, can also 
 
 ```js
 const primary = getComputedStyle(document.documentElement)
-  .getPropertyValue("--ot-primary")
+  .getPropertyValue("--tes-primary")
   .trim();
 ```
 
@@ -330,16 +330,16 @@ Inside a frame, `@media (prefers-color-scheme: dark)` and `matchMedia("(prefers-
 
 ```css
 /* Instead of @media (prefers-color-scheme: dark) { … } */
-[data-ot-color-scheme="dark"] .photo {
+[data-tes-color-scheme="dark"] .photo {
   opacity: 0.85;
 }
 ```
 
 ### The theme choice
 
-The Settings page has a Theme control with System, Light and Dark (see [Settings](../../../main/settings/README.md)). System, the default, follows the operating system and changes with it while the app is open. The choice is kept in the app's storage under the key `opentesela.theme-choice`, outside the `opentesela.mod-storage:` keys, so no mod can read or change it. A missing or unknown stored value counts as System. When the storage cannot be read or written, the choice still applies until the page is closed.
+The Settings page has a Theme control with System, Light and Dark (see [Settings](../../../main/settings/README.md)). System, the default, follows the operating system and changes with it while the app is open. The choice is kept in the app's storage under the key `teselarium.theme-choice`, outside the `teselarium.mod-storage:` keys, so no mod can read or change it. A missing or unknown stored value counts as System. When the storage cannot be read or written, the choice still applies until the page is closed.
 
-The app's own interface (header, sidebar, Settings page, stage bar, issue list, load errors, action dialog) uses the same tokens, through Tailwind CSS and shadcn/ui, so it always matches the mods. Markdown pages get the frames' own base stylesheet in a shadow root (see [Pages](../../../main/homepage/README.md#pages-look-like-mods)). A page's content is at most `--ot-reading-width` wide and centered in the page area, and fills the page area when it is narrower; pages have no theater mode. The sidebar's colors are the app-only aliases `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`, `--sidebar-accent-foreground`, `--sidebar-border` and `--sidebar-ring` in `src/main/app.css`, from `--ot-card`, `--ot-card-foreground`, `--ot-accent`, `--ot-accent-foreground`, `--ot-border` and `--ot-ring`; mods do not get them.
+The app's own interface (header, sidebar, Settings page, stage bar, issue list, load errors, action dialog) uses the same tokens, through Tailwind CSS and shadcn/ui, so it always matches the mods. Markdown pages get the frames' own base stylesheet in a shadow root (see [Pages](../../../main/homepage/README.md#pages-look-like-mods)). A page's content is at most `--tes-reading-width` wide and centered in the page area, and fills the page area when it is narrower; pages have no theater mode. The sidebar's colors are the app-only aliases `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`, `--sidebar-accent-foreground`, `--sidebar-border` and `--sidebar-ring` in `src/main/app.css`, from `--tes-card`, `--tes-card-foreground`, `--tes-accent`, `--tes-accent-foreground`, `--tes-border` and `--tes-ring`; mods do not get them.
 
 ## Module Details
 
@@ -349,7 +349,7 @@ Implemented in `src/lib/core/theme/`. Other modules import only from the public 
 
 - `THEME_TOKENS`: the frozen token table, a list of `ThemeToken` (`name`, `light`, `dark`).
 - `buildTheme(colorScheme)`: the `Theme` (`colorScheme`, `tokens`) for a color scheme. Plain data.
-- `buildThemeTokenStyles()`: the tokens as CSS in the layer `opentesela`: the light values on `:root` and `[data-ot-color-scheme="light"]`, then the dark values on `[data-ot-color-scheme="dark"]`, each block with its `color-scheme`. The app adds it to its page.
+- `buildThemeTokenStyles()`: the tokens as CSS in the layer `teselarium`: the light values on `:root` and `[data-tes-color-scheme="light"]`, then the dark values on `[data-tes-color-scheme="dark"]`, each block with its `color-scheme`. The app adds it to its page.
 - `THEME_FRAME_STYLES`: the token styles followed by the base stylesheet (`base_stylesheet.css`), the text the frame document puts in a `<style>`. It never contains a closing style tag.
 - Types: `ColorScheme` (`"light" | "dark"`), `ThemeToken`, `ThemeTokens`, `Theme`.
 
@@ -359,12 +359,12 @@ Example:
 import { buildTheme, buildThemeTokenStyles } from "./lib/core/theme/index.ts";
 
 const theme = buildTheme("dark");
-// theme.tokens["--ot-background"] is "#1c1917"
+// theme.tokens["--tes-background"] is "#1c1917"
 
 const style = document.createElement("style");
 style.textContent = buildThemeTokenStyles();
 document.head.append(style);
-document.documentElement.dataset.otColorScheme = theme.colorScheme;
+document.documentElement.dataset.tesColorScheme = theme.colorScheme;
 ```
 
 ### Theme choice
@@ -372,7 +372,7 @@ document.documentElement.dataset.otColorScheme = theme.colorScheme;
 - `resolveColorScheme(choice, systemPrefersDark)`: the `ColorScheme` of a `ThemeChoice` (`"system" | "light" | "dark"`).
 - `readThemeChoice(storage)`: the stored choice, or `"system"` when it is missing, unknown or cannot be read.
 - `writeThemeChoice(storage, choice)`: stores the choice and ignores a storage that cannot be written.
-- `THEME_CHOICE_KEY`: `"opentesela.theme-choice"`.
+- `THEME_CHOICE_KEY`: `"teselarium.theme-choice"`.
 - Types: `ThemeChoice`, `ThemeStorage` (the `getItem` and `setItem` of `Storage`; the app passes `localStorage`).
 
 Example:

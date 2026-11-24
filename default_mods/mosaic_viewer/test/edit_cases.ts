@@ -381,7 +381,7 @@ export async function leavesWithoutChanges(
 
 /** The address a case answers `userCatalog.save` with: a fixture, which nothing opens. */
 const SAVED_FIXTURE_ADDRESS =
-  "opentesela-browser:///fixture/shown_mosaic_copy.yaml";
+  "teselarium-browser:///fixture/shown_mosaic_copy.yaml";
 
 export async function savesCopy(context: CaseContext): Promise<void> {
   await mountCopy(context);

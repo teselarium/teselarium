@@ -13,7 +13,7 @@ const PORTRAITS = {
 
 function buildMosaic(overrides: Partial<LoadedMosaic>): LoadedMosaic {
   const mosaic: LoadedMosaic = {
-    source: "opentesela-browser:///r1/nobel_map.yaml",
+    source: "teselarium-browser:///r1/nobel_map.yaml",
     title: "Nobel map",
     description: "",
     mod: MOD,

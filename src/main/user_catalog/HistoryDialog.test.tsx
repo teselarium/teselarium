@@ -11,7 +11,7 @@ import type { DialogFixture } from "../../test/user_catalog_dialogs.tsx";
 import type { UserCatalogEntry } from "../../lib/user_catalog/index.ts";
 import { readUserCatalogSnapshot } from "./user_catalog_store.ts";
 
-const ADDRESS = "opentesela-browser:///r1/maps/nobel_map.yaml";
+const ADDRESS = "teselarium-browser:///r1/maps/nobel_map.yaml";
 const IMPORT_TIME = "2026-11-20T10:00:00.000Z";
 const SAVE_TIME = "2026-11-21T10:00:00.000Z";
 

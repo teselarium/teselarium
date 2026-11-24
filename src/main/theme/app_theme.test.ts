@@ -55,12 +55,12 @@ describe("app theme", function describeAppTheme(): void {
       choice: "system",
       colorScheme: "light",
     });
-    expect(fixture.root.dataset.otColorScheme).toBe("light");
+    expect(fixture.root.dataset.tesColorScheme).toBe("light");
   });
 
   it("restores the stored choice", function restoresChoice(): void {
     const storage = createMemoryStorage();
-    storage.setItem("opentesela.theme-choice", "dark");
+    storage.setItem("teselarium.theme-choice", "dark");
 
     const fixture = buildFixture(storage);
 
@@ -76,7 +76,7 @@ describe("app theme", function describeAppTheme(): void {
 
     chooseTheme(fixture.appTheme, "dark");
 
-    expect(fixture.storage.getItem("opentesela.theme-choice")).toBe("dark");
+    expect(fixture.storage.getItem("teselarium.theme-choice")).toBe("dark");
   });
 
   it("applies a choice to the page and the stage", function appliesChoice(): void {
@@ -88,7 +88,7 @@ describe("app theme", function describeAppTheme(): void {
       choice: "dark",
       colorScheme: "dark",
     });
-    expect(fixture.root.dataset.otColorScheme).toBe("dark");
+    expect(fixture.root.dataset.tesColorScheme).toBe("dark");
     expect(fixture.stage.theme.colorScheme).toBe("dark");
   });
 
@@ -98,7 +98,7 @@ describe("app theme", function describeAppTheme(): void {
     changeSystemPreference(fixture.systemQuery, true);
 
     expect(readAppThemeSnapshot(fixture.appTheme).colorScheme).toBe("dark");
-    expect(fixture.root.dataset.otColorScheme).toBe("dark");
+    expect(fixture.root.dataset.tesColorScheme).toBe("dark");
     expect(fixture.stage.theme.colorScheme).toBe("dark");
   });
 
@@ -120,7 +120,7 @@ describe("app theme", function describeAppTheme(): void {
       choice: "dark",
       colorScheme: "dark",
     });
-    expect(fixture.root.dataset.otColorScheme).toBe("dark");
+    expect(fixture.root.dataset.tesColorScheme).toBe("dark");
   });
 
   it("notifies every change with a new frozen snapshot", function notifiesChanges(): void {
@@ -149,7 +149,7 @@ describe("readStartColorScheme", function describeReadStartColorScheme(): void {
     expect(
       readStartColorScheme(storage, createFakeColorSchemeQuery(true)),
     ).toBe("dark");
-    storage.setItem("opentesela.theme-choice", "light");
+    storage.setItem("teselarium.theme-choice", "light");
     expect(
       readStartColorScheme(storage, createFakeColorSchemeQuery(true)),
     ).toBe("light");

@@ -39,7 +39,7 @@ describe("resolveColorScheme", function describeResolveColorScheme(): void {
 describe("readThemeChoice", function describeReadThemeChoice(): void {
   it("reads a stored choice", function readsChoice(): void {
     const storage = createMemoryStorage();
-    storage.setItem("opentesela.theme-choice", "dark");
+    storage.setItem("teselarium.theme-choice", "dark");
 
     expect(readThemeChoice(storage)).toBe("dark");
   });
@@ -67,12 +67,12 @@ describe("writeThemeChoice", function describeWriteThemeChoice(): void {
     writeThemeChoice(storage, "light");
 
     expect(storage.items).toEqual(
-      new Map([["opentesela.theme-choice", "light"]]),
+      new Map([["teselarium.theme-choice", "light"]]),
     );
   });
 
   it("uses a key outside the mod storage slots", function separatesKey(): void {
-    expect(THEME_CHOICE_KEY.startsWith("opentesela.mod-storage:")).toBe(false);
+    expect(THEME_CHOICE_KEY.startsWith("teselarium.mod-storage:")).toBe(false);
   });
 
   it("swallows a write error", function swallowsWriteError(): void {

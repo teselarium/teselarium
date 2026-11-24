@@ -8,10 +8,10 @@ import {
 
 describe("readHistoryPosition", function describeReadHistoryPosition(): void {
   it("reads the stage's position", function readsPosition(): void {
-    expect(readHistoryPosition({ opentesela: { position: 3 } })).toBe(3);
-    expect(readHistoryPosition({ opentesela: { position: 0 } })).toBe(0);
+    expect(readHistoryPosition({ teselarium: { position: 3 } })).toBe(3);
+    expect(readHistoryPosition({ teselarium: { position: 0 } })).toBe(0);
     expect(
-      readHistoryPosition({ opentesela: { position: 2, section: "mods" } }),
+      readHistoryPosition({ teselarium: { position: 2, section: "mods" } }),
     ).toBe(2);
   });
 
@@ -21,10 +21,10 @@ describe("readHistoryPosition", function describeReadHistoryPosition(): void {
       undefined,
       "position",
       { key: "router-key" },
-      { opentesela: null },
-      { opentesela: { position: "3" } },
-      { opentesela: { position: -1 } },
-      { opentesela: { position: 1.5 } },
+      { teselarium: null },
+      { teselarium: { position: "3" } },
+      { teselarium: { position: -1 } },
+      { teselarium: { position: 1.5 } },
     ];
 
     for (const otherState of otherStates) {
@@ -36,20 +36,20 @@ describe("readHistoryPosition", function describeReadHistoryPosition(): void {
 describe("readHistorySection", function describeReadHistorySection(): void {
   it("reads the stage's section", function readsSection(): void {
     expect(
-      readHistorySection({ opentesela: { position: 1, section: "mods" } }),
+      readHistorySection({ teselarium: { position: 1, section: "mods" } }),
     ).toBe("mods");
   });
 
   it("gives null for a missing or invalid section", function readsInvalidSections(): void {
     const otherStates = [
       null,
-      { opentesela: null },
-      { opentesela: { position: 1 } },
-      { opentesela: { position: 1, section: null } },
-      { opentesela: { position: 1, section: 3 } },
-      { opentesela: { position: 1, section: "" } },
-      { opentesela: { position: 1, section: ["mods"] } },
-      { opentesela: { position: 1, section: { id: "mods" } } },
+      { teselarium: null },
+      { teselarium: { position: 1 } },
+      { teselarium: { position: 1, section: null } },
+      { teselarium: { position: 1, section: 3 } },
+      { teselarium: { position: 1, section: "" } },
+      { teselarium: { position: 1, section: ["mods"] } },
+      { teselarium: { position: 1, section: { id: "mods" } } },
     ];
 
     for (const otherState of otherStates) {
@@ -71,7 +71,7 @@ describe("writeStageEntry", function describeWriteStageEntry(): void {
     expect(history.entries).toEqual([
       { state: null, hash: "#/" },
       {
-        state: { opentesela: { position: 1, section: "mods" } },
+        state: { teselarium: { position: 1, section: "mods" } },
         hash: "#/run?mod=mod_explorer",
       },
     ]);
@@ -88,7 +88,7 @@ describe("writeStageEntry", function describeWriteStageEntry(): void {
 
     expect(history.entries).toEqual([
       {
-        state: { opentesela: { position: 0, section: null } },
+        state: { teselarium: { position: 0, section: null } },
         hash: "#/run?mod=a",
       },
     ]);

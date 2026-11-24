@@ -20,32 +20,32 @@ const OPEN_LINK_METHOD = "links.open";
 const OPEN_PLAYER_METHOD = "players.open";
 const LOAD_LIBRARY_METHOD = "libs.load";
 
-const TILE_BODY_ELEMENT = "ot-tile-body";
-const RENDERED_EVENT = "ot-rendered";
-const DIAGRAMS_DRAWN_EVENT = "ot-diagrams-drawn";
+const TILE_BODY_ELEMENT = "tes-tile-body";
+const RENDERED_EVENT = "tes-rendered";
+const DIAGRAMS_DRAWN_EVENT = "tes-diagrams-drawn";
 // The values of the element's `diagrams` property.
 const DRAW_DIAGRAMS = "draw";
 const KEEP_DIAGRAM_SOURCES = "source";
 const MERMAID_BLOCK_SELECTOR = "pre > code.language-mermaid";
 const DIAGRAM_SELECTOR = "figure[data-mermaid-source]";
 const MERMAID_LIBRARY = Object.freeze({ name: "mermaid", version: "12" });
-const DIAGRAM_ID_PREFIX = "ot-mermaid-";
+const DIAGRAM_ID_PREFIX = "tes-mermaid-";
 // Marks a block in the queue, which the base stylesheet pulses.
 const BUSY_ATTRIBUTE = "aria-busy";
 // The mermaid theme variables, each drawn from a theme token.
 const MERMAID_THEME_TOKENS = Object.freeze({
-  background: "--ot-background",
-  primaryColor: "--ot-card",
-  primaryTextColor: "--ot-foreground",
-  primaryBorderColor: "--ot-border",
-  lineColor: "--ot-muted-foreground",
-  secondaryColor: "--ot-muted",
-  tertiaryColor: "--ot-accent",
-  fontFamily: "--ot-font-sans",
+  background: "--tes-background",
+  primaryColor: "--tes-card",
+  primaryTextColor: "--tes-foreground",
+  primaryBorderColor: "--tes-border",
+  lineColor: "--tes-muted-foreground",
+  secondaryColor: "--tes-muted",
+  tertiaryColor: "--tes-accent",
+  fontFamily: "--tes-font-sans",
 });
 // The token of the shadow mermaid's neo look draws under nodes: its base
 // theme's light gray would glow on a dark background.
-const MERMAID_SHADOW_TOKEN = "--ot-border";
+const MERMAID_SHADOW_TOKEN = "--tes-border";
 // The option kept out of a diagram's own configuration, besides mermaid's own list.
 const MERMAID_SECURE_OPTION = "htmlLabels";
 // The prefix of the ids of a rendered body, which its `#…` links leave out.
@@ -402,7 +402,7 @@ function applyColorScheme(theme) {
   if (!isTheme(theme)) {
     return;
   }
-  document.documentElement.dataset.otColorScheme = theme.colorScheme;
+  document.documentElement.dataset.tesColorScheme = theme.colorScheme;
 }
 
 // Before the mod's handlers run: they read the new attribute, a mod still
@@ -430,7 +430,7 @@ function applyLayout(layout) {
   if (!isFrameLayout(layout)) {
     return;
   }
-  document.documentElement.dataset.otLayout = layout;
+  document.documentElement.dataset.tesLayout = layout;
 }
 
 // Before the mod's handlers run: they read the new attribute, and a mod still
@@ -735,7 +735,7 @@ async function drawWaitingDiagrams() {
   }
 }
 
-// Mermaid needs color values, not `var(--ot-…)`, so they come from the theme object.
+// Mermaid needs color values, not `var(--tes-…)`, so they come from the theme object.
 function buildMermaidThemeVariables(theme) {
   const themeVariables = {};
   if (!isTheme(theme)) {
@@ -995,18 +995,18 @@ function handleBodyClick(event) {
   if (event.defaultPrevented) {
     return;
   }
-  const placeholder = findClickedElement(event, "[data-ot-player]");
+  const placeholder = findClickedElement(event, "[data-tes-player]");
   if (placeholder !== null) {
-    sendBodyRequest(OPEN_PLAYER_METHOD, { url: placeholder.dataset.otPlayer });
+    sendBodyRequest(OPEN_PLAYER_METHOD, { url: placeholder.dataset.tesPlayer });
     return;
   }
-  const link = findClickedElement(event, "a[data-ot-link]");
+  const link = findClickedElement(event, "a[data-tes-link]");
   if (link !== null) {
     event.preventDefault();
     sendBodyRequest(OPEN_LINK_METHOD, { url: link.href });
     return;
   }
-  const fragmentLink = findClickedElement(event, "a[data-ot-fragment]");
+  const fragmentLink = findClickedElement(event, "a[data-tes-fragment]");
   if (fragmentLink !== null) {
     event.preventDefault();
     scrollToFragment(fragmentLink);

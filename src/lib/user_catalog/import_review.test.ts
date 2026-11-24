@@ -192,7 +192,7 @@ describe("planImport", function describePlanImport(): void {
         title: "Nobel map",
         error: null,
         warnings: [],
-        address: "opentesela-browser:///root-1/maps/nobel_map.yaml",
+        address: "teselarium-browser:///root-1/maps/nobel_map.yaml",
         root: "root-1",
         text: NOBEL_TEXT,
         entry: null,
@@ -247,7 +247,7 @@ describe("planImport", function describePlanImport(): void {
     expect(findRow(review, "nobel_map.yaml").address).toBe(storedEntry.address);
     expect(findRow(review, "nobel_map.yaml").entry).toEqual(storedEntry);
     expect(findRow(review, "poets.yaml").address).toBe(
-      "opentesela-browser:///root-1/poets.yaml",
+      "teselarium-browser:///root-1/poets.yaml",
     );
   });
 
@@ -264,10 +264,10 @@ describe("planImport", function describePlanImport(): void {
     );
 
     expect(review.rows[0].address).toBe(
-      "opentesela-browser:///root-1/nobel_map.yaml",
+      "teselarium-browser:///root-1/nobel_map.yaml",
     );
     expect(review.rows[1].address).toBe(
-      "opentesela-browser:///root-2/poets.yaml",
+      "teselarium-browser:///root-2/poets.yaml",
     );
   });
 
@@ -505,7 +505,7 @@ describe("Status of a matching file", function describeMatchingStatus(): void {
     const copyRoot = conflictReview.rows[0].keepBothRoot;
     expect(copy.root).toBe(copyRoot);
     expect(copy.address).toBe(
-      `opentesela-browser:///${copyRoot}/nobel_map%20(from%20file).yaml`,
+      `teselarium-browser:///${copyRoot}/nobel_map%20(from%20file).yaml`,
     );
     expect(copy.provenance).toMatchObject({
       folder: null,
@@ -715,7 +715,7 @@ describe("applyReview", function describeApplyReview(): void {
 
     const changes = applyReview(review, new Set([0]), IMPORT_TIME);
 
-    const address = "opentesela-browser:///root-1/maps/nobel_map.yaml";
+    const address = "teselarium-browser:///root-1/maps/nobel_map.yaml";
     expect(changes).toEqual({
       putFiles: [{ address, text: NOBEL_TEXT }],
       putEntries: [

@@ -90,8 +90,8 @@ describe("createPlayerSites", function describeCreatePlayerSites(): void {
   });
 
   it("keeps its key outside the mod storage slots", function keepsKeyApart(): void {
-    expect(PLAYER_SITES_KEY).toBe("opentesela.player-sites");
-    expect(PLAYER_SITES_KEY.startsWith("opentesela.mod-storage:")).toBe(false);
+    expect(PLAYER_SITES_KEY).toBe("teselarium.player-sites");
+    expect(PLAYER_SITES_KEY.startsWith("teselarium.mod-storage:")).toBe(false);
   });
 });
 

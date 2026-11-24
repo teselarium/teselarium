@@ -30,10 +30,10 @@ function renderApp(fixture: AppFixture): RenderResult {
 }
 
 describe("App", function describeApp(): void {
-  it("renders the OpenTesela title", async function rendersTitle(): Promise<void> {
+  it("renders the Teselarium title", async function rendersTitle(): Promise<void> {
     renderApp(await startTestApp(""));
 
-    const title = screen.getByRole("heading", { name: "OpenTesela" });
+    const title = screen.getByRole("heading", { name: "Teselarium" });
 
     expect(title).toBeInTheDocument();
   });
@@ -44,7 +44,7 @@ describe("App", function describeApp(): void {
     renderApp(fixture);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "OpenTesela" }),
+      screen.getByRole("heading", { level: 1, name: "Teselarium" }),
     ).toBeTruthy();
     const catalog = await readStageCatalog(fixture.stage);
     for (const mosaic of catalog.mosaics) {
@@ -62,7 +62,7 @@ describe("App", function describeApp(): void {
       within(sidebar).getByRole("button", { name: "Hide sidebar" }),
     ).toBeInTheDocument();
     expect(
-      within(sidebar).getByRole("heading", { name: "OpenTesela" }),
+      within(sidebar).getByRole("heading", { name: "Teselarium" }),
     ).toBeInTheDocument();
   });
 
@@ -83,7 +83,7 @@ describe("App", function describeApp(): void {
     const { container } = renderApp(await startTestApp(""));
 
     expect(
-      screen.getByRole("heading", { name: "OpenTesela" }),
+      screen.getByRole("heading", { name: "Teselarium" }),
     ).toBeInTheDocument();
     expect(container.querySelector("iframe")).toBeNull();
     expect(

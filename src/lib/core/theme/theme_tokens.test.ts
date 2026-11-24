@@ -4,74 +4,74 @@ import type { ColorScheme, ThemeTokens } from "./index.ts";
 
 /** The role colors: the only tokens with different light and dark values. */
 const COLOR_TOKEN_NAMES = [
-  "--ot-background",
-  "--ot-foreground",
-  "--ot-card",
-  "--ot-card-foreground",
-  "--ot-popover",
-  "--ot-popover-foreground",
-  "--ot-primary",
-  "--ot-primary-foreground",
-  "--ot-secondary",
-  "--ot-secondary-foreground",
-  "--ot-muted",
-  "--ot-muted-foreground",
-  "--ot-accent",
-  "--ot-accent-foreground",
-  "--ot-highlight",
-  "--ot-highlight-foreground",
-  "--ot-destructive",
-  "--ot-destructive-foreground",
-  "--ot-warning",
-  "--ot-success",
-  "--ot-border",
-  "--ot-input",
-  "--ot-ring",
+  "--tes-background",
+  "--tes-foreground",
+  "--tes-card",
+  "--tes-card-foreground",
+  "--tes-popover",
+  "--tes-popover-foreground",
+  "--tes-primary",
+  "--tes-primary-foreground",
+  "--tes-secondary",
+  "--tes-secondary-foreground",
+  "--tes-muted",
+  "--tes-muted-foreground",
+  "--tes-accent",
+  "--tes-accent-foreground",
+  "--tes-highlight",
+  "--tes-highlight-foreground",
+  "--tes-destructive",
+  "--tes-destructive-foreground",
+  "--tes-warning",
+  "--tes-success",
+  "--tes-border",
+  "--tes-input",
+  "--tes-ring",
 ];
 
 const TOKEN_NAMES = [
   ...COLOR_TOKEN_NAMES,
-  "--ot-font-sans",
-  "--ot-font-mono",
-  "--ot-font-size",
-  "--ot-line-height",
-  "--ot-space-1",
-  "--ot-space-2",
-  "--ot-space-3",
-  "--ot-space-4",
-  "--ot-space-6",
-  "--ot-radius",
-  "--ot-shadow",
-  "--ot-content-width",
-  "--ot-reading-width",
+  "--tes-font-sans",
+  "--tes-font-mono",
+  "--tes-font-size",
+  "--tes-line-height",
+  "--tes-space-1",
+  "--tes-space-2",
+  "--tes-space-3",
+  "--tes-space-4",
+  "--tes-space-6",
+  "--tes-radius",
+  "--tes-shadow",
+  "--tes-content-width",
+  "--tes-reading-width",
 ];
 
 /** The tokens for widths, the same in each color scheme. */
-const WIDTH_TOKEN_NAMES = ["--ot-content-width", "--ot-reading-width"];
+const WIDTH_TOKEN_NAMES = ["--tes-content-width", "--tes-reading-width"];
 
 /** The text roles, drawn on each of the surfaces. */
 const TEXT_ROLE_NAMES = [
-  "--ot-foreground",
-  "--ot-muted-foreground",
-  "--ot-primary",
-  "--ot-secondary",
-  "--ot-destructive",
-  "--ot-warning",
-  "--ot-success",
+  "--tes-foreground",
+  "--tes-muted-foreground",
+  "--tes-primary",
+  "--tes-secondary",
+  "--tes-destructive",
+  "--tes-warning",
+  "--tes-success",
 ];
 
-const SURFACE_NAMES = ["--ot-background", "--ot-card", "--ot-muted"];
+const SURFACE_NAMES = ["--tes-background", "--tes-card", "--tes-muted"];
 
 /** Each `-foreground` token and the role it is drawn on. */
 const FOREGROUND_PAIRS = [
-  ["--ot-card-foreground", "--ot-card"],
-  ["--ot-popover-foreground", "--ot-popover"],
-  ["--ot-primary-foreground", "--ot-primary"],
-  ["--ot-secondary-foreground", "--ot-secondary"],
-  ["--ot-accent-foreground", "--ot-accent"],
-  ["--ot-highlight-foreground", "--ot-highlight"],
-  ["--ot-destructive-foreground", "--ot-destructive"],
-  ["--ot-muted-foreground", "--ot-muted"],
+  ["--tes-card-foreground", "--tes-card"],
+  ["--tes-popover-foreground", "--tes-popover"],
+  ["--tes-primary-foreground", "--tes-primary"],
+  ["--tes-secondary-foreground", "--tes-secondary"],
+  ["--tes-accent-foreground", "--tes-accent"],
+  ["--tes-highlight-foreground", "--tes-highlight"],
+  ["--tes-destructive-foreground", "--tes-destructive"],
+  ["--tes-muted-foreground", "--tes-muted"],
 ];
 
 const COLOR_SCHEMES: ColorScheme[] = ["light", "dark"];
@@ -175,9 +175,9 @@ describe("theme tokens", function describeThemeTokens(): void {
     const tokenNames = Object.keys(buildTheme("light").tokens);
 
     for (const tokenName of tokenNames) {
-      expect(tokenName).not.toMatch(/^--ot-color-/);
+      expect(tokenName).not.toMatch(/^--tes-color-/);
     }
-    expect(tokenNames).not.toContain("--ot-font-body");
+    expect(tokenNames).not.toContain("--tes-font-body");
   });
 
   it("Resolved tokens are plain data", function resolvesPlainData(): void {
@@ -197,8 +197,8 @@ describe("theme tokens", function describeThemeTokens(): void {
   });
 
   it("uses the light and dark values of the table", function readsTable(): void {
-    expect(buildTheme("light").tokens["--ot-background"]).toBe("#f6f1e7");
-    expect(buildTheme("dark").tokens["--ot-background"]).toBe("#0f141d");
+    expect(buildTheme("light").tokens["--tes-background"]).toBe("#f6f1e7");
+    expect(buildTheme("dark").tokens["--tes-background"]).toBe("#0f141d");
   });
 
   it("has a frozen table", function freezesTable(): void {

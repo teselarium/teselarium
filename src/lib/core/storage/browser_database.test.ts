@@ -7,8 +7,8 @@ interface TestEntry {
   title: string;
 }
 
-const NOBEL_ADDRESS = "opentesela-browser:///r1/nobel_map.yaml";
-const POETS_ADDRESS = "opentesela-browser:///r1/poets.yaml";
+const NOBEL_ADDRESS = "teselarium-browser:///r1/nobel_map.yaml";
+const POETS_ADDRESS = "teselarium-browser:///r1/poets.yaml";
 const REMOTE_ADDRESS = "https://mosaics.example.net/maps/laureates.yml";
 
 function buildNobelChanges(): BrowserDatabaseChanges<TestEntry> {
@@ -259,7 +259,7 @@ describe("openBrowserDatabase", function describeOpenBrowserDatabase(): void {
 
     void openBrowserDatabase<TestEntry>({ factory });
 
-    expect(factory.open).toHaveBeenCalledWith("opentesela", 2);
+    expect(factory.open).toHaveBeenCalledWith("teselarium", 2);
   });
 
   it("resolves to null when the upgrade fails", async function failsUpgrade(): Promise<void> {

@@ -20,18 +20,18 @@ export async function drawsTheTileAsACard(context: CaseContext): Promise<void> {
   const card = findElement(context, "article");
   context
     .expect(getComputedStyle(card).backgroundColor)
-    .toBe(readTokenAs("--ot-card", "color"));
+    .toBe(readTokenAs("--tes-card", "color"));
   context.expect(card.querySelector("h1")).toBeTruthy();
   context.expect(card.querySelector("small")).toBeTruthy();
   context
     .expect(card.querySelector('section[aria-label="Metadata"] dl'))
     .toBeTruthy();
   context.expect(card.querySelector(":scope > hr")).toBeTruthy();
-  context.expect(card.querySelector(":scope > ot-tile-body")).toBeTruthy();
+  context.expect(card.querySelector(":scope > tes-tile-body")).toBeTruthy();
   context
     .expect(getComputedStyle(findButton(context, "Next")).backgroundColor)
-    .toBe(readTokenAs("--ot-primary", "color"));
+    .toBe(readTokenAs("--tes-primary", "color"));
   context
     .expect(getComputedStyle(findButton(context, "Previous")).backgroundColor)
-    .not.toBe(readTokenAs("--ot-primary", "color"));
+    .not.toBe(readTokenAs("--tes-primary", "color"));
 }

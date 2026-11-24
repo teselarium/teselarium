@@ -108,8 +108,8 @@ describe("catalog setting", function describeCatalogSetting(): void {
   });
 
   it("Mods cannot reach the switch", function keepsKeyOutOfModStorage(): void {
-    expect(CATALOG_SETTING_KEY).toBe("opentesela.catalog-default-mosaics");
-    expect(CATALOG_SETTING_KEY.startsWith("opentesela.mod-storage:")).toBe(
+    expect(CATALOG_SETTING_KEY).toBe("teselarium.catalog-default-mosaics");
+    expect(CATALOG_SETTING_KEY.startsWith("teselarium.mod-storage:")).toBe(
       false,
     );
   });

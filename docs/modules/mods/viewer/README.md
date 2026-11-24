@@ -24,8 +24,8 @@ The [mosaic viewer](../../mosaics/viewer/README.md) shows a mosaic check's repor
 Its TypeScript source, in `default_mods/mod_viewer/src/`, is a short example of how a mod gets the app's look from semantic HTML, with no classes and no styling library:
 
 - the metadata is an `<article>`, drawn as a card, and the permissions a plain `<table>` whose parts carry explicit table roles (`table`, `rowgroup`, `row`, `columnheader`, `cell`). In a frame narrower than 30rem, such as a phone's, each permission is a block: its category with its status badge at the end, then its host, then its reason, without the header row. The header row is hidden visually, not removed, and the roles keep the table's semantics for assistive technology whatever its layout. The [mosaic viewer](../../mosaics/viewer/README.md) has a copy of these rules: a change to one belongs in the other;
-- the version, the API range's match, the permission statuses, the check status, the test cases' statuses and the findings' levels are badges: `<span>`s with `data-ot-variant` (`secondary`, `success`, `warning`, `destructive`, `outline`);
-- "Open default mosaic" is a `<button type="submit">`, drawn as the primary button, and "Run with this collection" a submit button with `data-ot-variant="outline"`, so the page has one primary action;
+- the version, the API range's match, the permission statuses, the check status, the test cases' statuses and the findings' levels are badges: `<span>`s with `data-tes-variant` (`secondary`, `success`, `warning`, `destructive`, `outline`);
+- "Open default mosaic" is a `<button type="submit">`, drawn as the primary button, and "Run with this collection" a submit button with `data-tes-variant="outline"`, so the page has one primary action;
 - errors and notices are `role="alert"` and `role="status"` elements.
 
 The mod's own CSS sets layout only. The frame has no `allow-forms`, so its forms are never submitted: the submit buttons handle their clicks and call `preventDefault()`, and Enter in the address field still clicks the form's submit button. See "Write HTML, get the app's look" in the [theme module](../../lib/core/theme/README.md).
@@ -38,7 +38,7 @@ The mod's own CSS sets layout only. The frame has no `allow-forms`, so its forms
 mod:
   title: "Mod Viewer"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Shows a mod's metadata and runs it with or without tiles."
   entrypoint: "./main.js"
   test_path: "./test.js"

@@ -33,7 +33,7 @@ import type {
   UserCatalogStore,
 } from "./user_catalog_store.ts";
 
-const STORED_ADDRESS = "opentesela-browser:///r1/nobel_map.yaml";
+const STORED_ADDRESS = "teselarium-browser:///r1/nobel_map.yaml";
 const REMOTE_ADDRESS = "https://mosaics.example.net/maps/laureates.yml";
 
 const STORED_ENTRY: UserCatalogEntry = {

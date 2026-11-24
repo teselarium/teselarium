@@ -26,7 +26,7 @@ export interface UserCatalogSeed {
 /** A stored entry imported from `path` of the folder `my-mosaics`. */
 export function buildStoredSeedEntry(path: string): SeededEntry {
   const entry: SeededEntry = {
-    address: `opentesela-browser:///seeded/${path}`,
+    address: `teselarium-browser:///seeded/${path}`,
     place: "browser",
     root: "seeded",
     provenance: {
@@ -63,7 +63,7 @@ export function buildRemoteSeedEntry(address: string): SeededEntry {
 
 /**
  * Runs in the page: writes the entries and files into the app's database
- * `opentesela`, version 2, as its stores keep them, with the "imported"
+ * `teselarium`, version 2, as its stores keep them, with the "imported"
  * version each stored entry is synced with, and resolves once written.
  */
 function writeSeed(seed: UserCatalogSeed): Promise<void> {
@@ -107,7 +107,7 @@ function writeSeed(seed: UserCatalogSeed): Promise<void> {
     resolve: () => void,
     reject: (error: unknown) => void,
   ): void {
-    const request = indexedDB.open("opentesela", 2);
+    const request = indexedDB.open("teselarium", 2);
     request.onupgradeneeded = function createStores(): void {
       request.result.createObjectStore("files", { keyPath: "address" });
       request.result.createObjectStore("user-catalog");

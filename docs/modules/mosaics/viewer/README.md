@@ -40,12 +40,12 @@ Edit mode edits a draft: the full text of a mosaic file. The text is the draft, 
 | `copy` | a copy of the `target` | `content`, then `mosaics.edit` with the inspection's resolved `mod` and `collection`, so they are absolute | `userCatalog.save` with `copiedFrom`, the target's source |
 | `new` | a new mosaic from `draft_mod`, `draft_collection` and `draft_sites` | `mosaic:\n  title: "Untitled mosaic"\n`, then `mosaics.edit` with the mod, the collection, the `show` lines of the `draft_sites` mosaic, read with `mosaics.inspect`, and the combination's name as title, `<mod> + <collection>` or `<mod>` without a collection, from the titles of `mods.inspect` and `collections.inspect`. The skeleton's title stays when either cannot be inspected | `userCatalog.save` with neither |
 
-The viewer knows its target is stored from its `opentesela-browser:` address and a `mosaics.inspect` that succeeded, never from a `catalog.list` read at start, which can be empty until the browser database is open. `mode=edit` for any other mosaic shows the mosaic with the alert "Only mosaics stored in this browser can be edited. Use "Edit a copy" to save a copy of your own.", and any other `mode` value with `The mode "<mode>" is not one of edit, copy, new.` The stage bar's edit button opens these links (see [the main module](../../main/README.md#the-stage-bar)).
+The viewer knows its target is stored from its `teselarium-browser:` address and a `mosaics.inspect` that succeeded, never from a `catalog.list` read at start, which can be empty until the browser database is open. `mode=edit` for any other mosaic shows the mosaic with the alert "Only mosaics stored in this browser can be edited. Use "Edit a copy" to save a copy of your own.", and any other `mode` value with `The mode "<mode>" is not one of edit, copy, new.` The stage bar's edit button opens these links (see [the main module](../../main/README.md#the-stage-bar)).
 
 **The page.** The heading (`Edit "<title>"`, `Copy of "<title>"` or "New mosaic"), then two tabs, `role="tab"` buttons in a `role="tablist"`:
 
 - **Form**: "Title", "Description", "Mod address" and "Collection address (empty for none)"; "Aliases", one row per field of the mod's tile type, `<field> (required)` for a required one, whose names are separated by commas and whose suggestions are the collection's field names (a `<datalist>`), then the fields the draft renames that the type does not declare; "Sites", one row per `show` line with its host, its reason and "Remove", and "Add"; and "Config", the draft's own config read-only beside the mod's default config, read with `mods.inspect`, with "Config is edited in the YAML tab." A field sends its change when it is left (`change`), and a site row only once it has both a host and a reason. The form is drawn again from each validation, unless the focus is in it.
-- **YAML**: the draft's text in a `<textarea data-ot-variant="code">`, monospace. While the text cannot be read (a YAML error, or no `mosaic` mapping), the Form tab is disabled and the page says "The form is unavailable until the YAML can be read: Line <n>: <error>".
+- **YAML**: the draft's text in a `<textarea data-tes-variant="code">`, monospace. While the text cannot be read (a YAML error, or no `mosaic` mapping), the Form tab is disabled and the page says "The form is unavailable until the YAML can be read: Line <n>: <error>".
 
 Under the tabs, "Problems" lists the latest validation's errors and warnings, each with an "Error" or "Warning" badge and "Line <n>: " when it has a line, then the hint "<matching> of <total> tiles match", "No collection: the mod gets no tiles." or "Count unavailable". Then "Save", the page's primary action, and "Cancel".
 
@@ -62,11 +62,11 @@ Under the tabs, "Problems" lists the latest validation's errors and warnings, ea
 Its TypeScript source, in `default_mods/mosaic_viewer/src/`, gets the app's look from semantic HTML as the mod viewer does:
 
 - the mosaic is an `<article>`, drawn as a card, and the permissions a plain `<table>` whose parts carry explicit table roles, laid out as the [mod viewer](../../mods/viewer/README.md)'s: below 30rem, each permission is a block, its category and status, then its host, then its reason, with the header row hidden visually. A copy of the mod viewer's rules: a change to one belongs in the other;
-- the mod's version, the API range's match, the permission statuses, the check status and the findings' levels are badges: `<span>`s with `data-ot-variant`;
-- the mod's and the collection's titles are buttons with `data-ot-variant="ghost"`, "Open mosaic" a `<button type="submit">`, drawn as the primary button, and "Check mosaic" and "Download" plain `<button>`s, drawn as outline buttons, so the page has one primary action;
+- the mod's version, the API range's match, the permission statuses, the check status and the findings' levels are badges: `<span>`s with `data-tes-variant`;
+- the mod's and the collection's titles are buttons with `data-tes-variant="ghost"`, "Open mosaic" a `<button type="submit">`, drawn as the primary button, and "Check mosaic" and "Download" plain `<button>`s, drawn as outline buttons, so the page has one primary action;
 - errors and notices are `role="alert"` and `role="status"` elements.
 
-In edit mode, the selected tab gets the pressed button's outline (`aria-selected="true"`) and `data-ot-variant="secondary"`, the other `ghost`, the YAML is a `<textarea data-ot-variant="code">`, and the problems' levels are badges.
+In edit mode, the selected tab gets the pressed button's outline (`aria-selected="true"`) and `data-tes-variant="secondary"`, the other `ghost`, the YAML is a `<textarea data-tes-variant="code">`, and the problems' levels are badges.
 
 The mod's own CSS sets layout only. The frame has no `allow-forms`, so its form is never submitted: "Open mosaic" handles its click and calls `preventDefault()`. See "Write HTML, get the app's look" in the [theme module](../../lib/core/theme/README.md).
 
@@ -78,7 +78,7 @@ The mod's own CSS sets layout only. The frame has no `allow-forms`, so its form 
 mod:
   title: "Mosaic Viewer"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Shows a mosaic's mod, collection, config, aliases and permissions, opens it and checks it."
   entrypoint: "./main.js"
   test_path: "./test.js"

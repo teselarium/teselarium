@@ -22,7 +22,7 @@ const CHANGED_TEXT = writeTestMosaic(
 const REMOTE_ADDRESS = "https://mosaics.example.net/maps/laureates.yml";
 
 const STORED_ENTRY: UserCatalogEntry = {
-  address: "opentesela-browser:///r1/maps/nobel_map.yaml",
+  address: "teselarium-browser:///r1/maps/nobel_map.yaml",
   place: "browser",
   root: "r1",
   provenance: {

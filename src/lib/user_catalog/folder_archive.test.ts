@@ -12,7 +12,7 @@ function buildStoredEntry(
   isChanged: boolean,
 ): UserCatalogEntry {
   const entry: UserCatalogEntry = {
-    address: `opentesela-browser:///r1/${path}`,
+    address: `teselarium-browser:///r1/${path}`,
     place: "browser",
     root: "r1",
     provenance: {

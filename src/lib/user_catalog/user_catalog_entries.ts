@@ -25,7 +25,7 @@ export interface UserCatalogProvenance {
 }
 
 /**
- * A mosaic of the user catalog. `address` is its `opentesela-browser:`
+ * A mosaic of the user catalog. `address` is its `teselarium-browser:`
  * address when stored, or its `http:` or `https:` address when remote.
  * `root` is the root of the stored file's address, or `null` when remote.
  */

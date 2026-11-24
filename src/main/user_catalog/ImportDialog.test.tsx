@@ -18,7 +18,7 @@ const NOBEL_TEXT = writeTestMosaic("Nobel map", "https://tiles.example.net/a/");
 const POETS_TEXT = writeTestMosaic("Poets", "https://tiles.example.net/b/");
 
 const STORED_NOBEL: UserCatalogEntry = {
-  address: "opentesela-browser:///r1/nobel_map.yaml",
+  address: "teselarium-browser:///r1/nobel_map.yaml",
   place: "browser",
   root: "r1",
   provenance: {

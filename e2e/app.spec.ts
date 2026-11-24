@@ -23,6 +23,8 @@ test("renders the app shell without browser errors", async function rendersAppSh
 
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "OpenTesela" })).toBeVisible();
+  await expect(
+    page.getByRole("main").getByRole("heading", { name: "Teselarium" }),
+  ).toBeVisible();
   expect(browserErrors).toEqual([]);
 });

@@ -5,7 +5,7 @@
  * It is also an example of getting the app's look without classes: the
  * theme's base stylesheet styles semantic HTML like the app's components (a
  * submit button is the primary button, an `<article>` a card, `role="alert"`
- * an alert), `data-ot-variant` picks the variants that have no semantic HTML
+ * an alert), `data-tes-variant` picks the variants that have no semantic HTML
  * (badges, an outline submit button), and this mod's own CSS sets layout only.
  * See "Write HTML, get the app's look" in docs/modules/lib/core/theme/README.md.
  */

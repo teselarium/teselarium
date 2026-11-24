@@ -2,14 +2,14 @@
 
 ## Introduction
 
-A mod is community JavaScript that OpenTesela runs in a sandbox (see [sandbox](../core/sandbox/README.md)). This library reads what a mod is, as plain data: its mod file, the references that name it, the permissions it declares and the code of its entrypoint. It decides nothing about trust: what a mod is granted lives in [permissions](../core/permissions/README.md).
+A mod is community JavaScript that Teselarium runs in a sandbox (see [sandbox](../core/sandbox/README.md)). This library reads what a mod is, as plain data: its mod file, the references that name it, the permissions it declares and the code of its entrypoint. It decides nothing about trust: what a mod is granted lives in [permissions](../core/permissions/README.md).
 
 ### Mod file format
 
 A mod is a folder with a `mod_conf.yaml` file. By default, a mod bundles its tile type, its default mosaic and its test file in that folder, so it can be copied or shared as one folder, and its tests go with it. The app ships three sample mods in `public/samples/mods/`, written in plain JavaScript and served as they are:
 
 - The book list (`book_list/`) shows its books as a grid of covers, with a card for each one. It holds `mod_conf.yaml`, `main.js`, `test.js` (its tests, see the [guide to writing mod tests](../../../mod_plugin_spec.md#mod-tests)), `book_type.md`, `book_collection.yaml` and the `books/` it lists, and `mosaic.yaml`, its default mosaic, which opens it with those books and declares the `show` permissions their covers need.
-- The flashcards mod (`flashcards/`) lists any collection in a table and studies it as question and answer cards, with a score for each round that lasts as long as the session. It holds `mod_conf.yaml`, `main.js`, `test.js`, `flashcard_type.md`, whose properties are all optional so every collection matches it, `flashcard_collection.yaml` and the `cards/` of its sample deck about markdown, and `mosaic.yaml`, its default mosaic with that deck. It is a second example of the mod API: it reads each tile's first heading from `tiles.renderBody`, hides a rendered body around that heading after `ot-rendered`, and keeps the chosen fields with `storage.set`. Unlike the book list, whose own CSS is layout only, it also sets the study card's look from the theme's tokens, with Lucide icons drawn as inline SVG.
+- The flashcards mod (`flashcards/`) lists any collection in a table and studies it as question and answer cards, with a score for each round that lasts as long as the session. It holds `mod_conf.yaml`, `main.js`, `test.js`, `flashcard_type.md`, whose properties are all optional so every collection matches it, `flashcard_collection.yaml` and the `cards/` of its sample deck about markdown, and `mosaic.yaml`, its default mosaic with that deck. It is a second example of the mod API: it reads each tile's first heading from `tiles.renderBody`, hides a rendered body around that heading after `tes-rendered`, and keeps the chosen fields with `storage.set`. Unlike the book list, whose own CSS is layout only, it also sets the study card's look from the theme's tokens, with Lucide icons drawn as inline SVG.
 - The country map (`country_map/`) shows any collection on a world map, with a marker per country holding its number of tiles, a sidebar with a country's tiles and a card for each tile, and lists the tiles whose country the map cannot place under "Not on the map". It holds `mod_conf.yaml`, `main.js`, `test.js`, `country_tile_type.md`, which requires a string `title` and `country`, `mosaic.yaml`, its default mosaic, and `sites/`, the default mosaic's collection: eleven UNESCO World Heritage Sites in ten countries, each with its image and the first paragraph of its English Wikipedia article. It is the example of [declared libraries](#library-declarations): its mod file declares Leaflet, topojson-client, proj4 and world-atlas from npm, `libs.load` installs them, and `main.js` holds only the mod's own logic. proj4 projects the countries in Equal Earth, an equal-area projection, and Leaflet draws them on its flat CRS, with no tile server: the countries are shapes styled from the theme's tokens, and each marker stands on its country's land. Its default mosaic declares `show` for `https://upload.wikimedia.org`, the host of the images its cards show; the mod file declares none, since the images belong to the data. The app's standalone mosaic `samples/mosaics/nobel_laureates_map.yaml` shows it with the Nobel laureates instead (see [Mosaics](../../mosaics/README.md)).
 
 The book list's `mod_conf.yaml`:
@@ -18,7 +18,7 @@ The book list's `mod_conf.yaml`:
 mod:
   title: "Book List"
   version: "1.1.0"
-  api: "^0.1.14"
+  api: "^0.2.0"
   description: "A grid of book covers, with a card for each book that shows its details and text."
   entrypoint: "./main.js"
   type_path: "./book_type.md"
@@ -61,7 +61,7 @@ Every key lives under a `mod` mapping:
 mod:
   title: "country_map"
   version: "0.1.0"
-  api: "^0.1.10"
+  api: "^0.2.0"
   entrypoint: "./main.js"
   libraries:
     leaflet:

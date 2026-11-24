@@ -8,7 +8,7 @@
  * Like the collection explorer, it gets the app's look without classes: the
  * theme's base stylesheet styles semantic HTML like the app's components (an
  * `<article>` is a card, `role="alert"` an alert, `aria-busy` a loading
- * state), `data-ot-variant="primary"` makes "Open" the card's primary
+ * state), `data-tes-variant="primary"` makes "Open" the card's primary
  * button, and this mod's own CSS sets layout only. See "Write HTML, get the
  * app's look" in docs/modules/lib/core/theme/README.md.
  */

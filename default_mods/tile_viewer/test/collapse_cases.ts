@@ -197,7 +197,7 @@ export async function drawsTheButtonAsAButton(
   context.expect(parseFloat(look.borderTopWidth) > 0).toBe(true);
   context
     .expect(look.backgroundColor)
-    .toBe(readTokenAs("--ot-background", "color"));
+    .toBe(readTokenAs("--tes-background", "color"));
   const heading = findElement(
     context,
     'section[aria-label="Metadata"] > header > h2',

@@ -53,10 +53,10 @@ function buildPlaceholder(url: URL, title: string): Element {
   const box: Element = {
     type: "element",
     tagName: "span",
-    properties: { className: ["ot-player-box"] },
+    properties: { className: ["tes-player-box"] },
     children: [
-      buildTextSpan("ot-player-title", title),
-      buildTextSpan("ot-player-host", readShownHost(url)),
+      buildTextSpan("tes-player-title", title),
+      buildTextSpan("tes-player-host", readShownHost(url)),
     ],
   };
   const placeholder: Element = {
@@ -64,8 +64,8 @@ function buildPlaceholder(url: URL, title: string): Element {
     tagName: "button",
     properties: {
       type: "button",
-      className: ["ot-player"],
-      dataOtPlayer: url.href,
+      className: ["tes-player"],
+      dataTesPlayer: url.href,
     },
     children: [box],
   };

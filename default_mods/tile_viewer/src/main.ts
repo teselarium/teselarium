@@ -9,7 +9,7 @@
  *
  * It is also an example of getting the app's look without classes: the
  * theme's base stylesheet styles semantic HTML like the app's components (an
- * `<article>` is a card, a `<dl>` a list of details), `data-ot-variant`
+ * `<article>` is a card, a `<dl>` a list of details), `data-tes-variant`
  * picks the button variants, and this mod's own CSS sets layout only. See
  * "Write HTML, get the app's look" in docs/modules/lib/core/theme/README.md.
  */

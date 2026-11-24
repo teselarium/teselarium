@@ -21,7 +21,7 @@ It is an ordinary sandboxed mod. It uses only the engine API: `catalog.list` to 
   Both open in a new sandbox, and the explorer stays open behind it, so back returns to it as it was left. When a mosaic or the viewer cannot be opened, for example because the viewer is switched off, the error goes to a `role="status"` region and the explorer stays visible.
 - It requests no mod, collection or tile: a card holds only the mosaic's own data. The [mosaic viewer](../viewer/README.md) shows the mosaic's mod and collection.
 
-It gets the app's look as the [collection explorer](../../tiles/explorer/README.md) does: each mosaic is an `<article>`, drawn as a card, "Open" a button with `data-ot-variant="primary"` and "View", "Export" and "Download" plain `<button>`s, drawn as outline buttons, a failure is a `role="alert"` element, the loading list is `aria-busy`, and the mod's own CSS sets layout only.
+It gets the app's look as the [collection explorer](../../tiles/explorer/README.md) does: each mosaic is an `<article>`, drawn as a card, "Open" a button with `data-tes-variant="primary"` and "View", "Export" and "Download" plain `<button>`s, drawn as outline buttons, a failure is a `role="alert"` element, the loading list is `aria-busy`, and the mod's own CSS sets layout only.
 
 ## Config
 
@@ -31,7 +31,7 @@ It gets the app's look as the [collection explorer](../../tiles/explorer/README.
 mod:
   title: "Mosaics"
   version: "0.1.0"
-  api: "^0.1.0"
+  api: "^0.2.0"
   description: "Lists mosaics, opens them, and opens them in the mosaic viewer."
   entrypoint: "./main.js"
   test_path: "./test.js"

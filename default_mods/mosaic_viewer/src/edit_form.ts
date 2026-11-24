@@ -208,7 +208,7 @@ function buildShowRow(
     "Remove",
     removeShowRow.bind(undefined, view, row),
   );
-  removeButton.dataset.otVariant = "outline";
+  removeButton.dataset.tesVariant = "outline";
   removeButton.setAttribute("aria-label", `Remove site ${position}`);
   row.append(
     buildField(`Host of site ${position}`, host),
@@ -240,7 +240,7 @@ function buildShowSection(
     rows.append(buildShowRow(view, line, index + 1));
   }
   const addButton = buildButton("Add", addShowRow.bind(undefined, view, rows));
-  addButton.dataset.otVariant = "outline";
+  addButton.dataset.tesVariant = "outline";
   addButton.setAttribute("aria-label", "Add a site");
   fieldset.append(legend, hint, rows, addButton);
   return fieldset;

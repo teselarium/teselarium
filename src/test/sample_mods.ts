@@ -135,11 +135,11 @@ export const TWO_BOOKS_SOURCE = `${FIXTURES_BASE_URL}tiles/two_books.yaml`;
 export const TWO_BOOKS_REFERENCE = `${FIXTURES_REFERENCE}tiles/two_books.yaml`;
 
 /**
- * `^0.1.0`: the `api` range the test mods declare unless a test asks for
+ * `^0.2.0`: the `api` range the test mods declare unless a test asks for
  * another one, so they match the mod API version and get no missing-range
  * warning. A breaking bump of the mod API updates it with the shipped mods.
  */
-export const TEST_MOD_API_RANGE = "^0.1.0";
+export const TEST_MOD_API_RANGE = "^0.2.0";
 
 const MOUNT_CODE = "export default function mount() {}\n";
 
@@ -181,8 +181,8 @@ export function serveTestMod(
   testTexts.set(new URL("./main.js", source).href, MOUNT_CODE);
 }
 
-/** `^0.2.0`: an `api` range for a later mod API, which the mod API version does not match. */
-export const OTHER_API_RANGE = "^0.2.0";
+/** `^0.3.0`: an `api` range for a later mod API, which the mod API version does not match. */
+export const OTHER_API_RANGE = "^0.3.0";
 
 /** A mod written for `OTHER_API_RANGE`, served by `fetchTestFile` once `serveOtherApiMod` ran. */
 export const OTHER_API_MOD_SOURCE = `${FIXTURES_BASE_URL}mods/other_api/mod_conf.yaml`;

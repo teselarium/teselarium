@@ -12,9 +12,10 @@ The project is renamed from OpenTesela to Teselarium while it is still private a
   - Names in shared namespaces rename in place: storage keys (`opentesela.theme-choice`), the browser file URL scheme (`opentesela-browser:` becomes `teselarium-browser:`), the IndexedDB name, and the custom icon names (`lucide-opentesela-mosaic`).
 - Rename `docs/opentesela_spec.md` to `docs/teselarium_spec.md`, and fix the links to the nonexistent `tesela_spec.md`.
 - Update the "Prefixes" convention in `docs/code_conventions.md` to `teselarium.`, `teselarium-` and `tes-`.
-- Leave the history alone: `openspec/changes/archive/`, `openspec/discarded-changes/`, `.changeset/` entries and `CHANGELOG.md` keep the old name, because they record what was true when they were written. Third-party files (`e2e/npm_files/`, `node_modules/`) are never touched.
+- Leave the history alone: `openspec/changes/archive/`, `openspec/discarded-changes/`, `.changeset/` entries and `CHANGELOG.md` keep the old name in their text, because they record what was true when they were written. The one exception is the package name in the frontmatter of the pending changesets, which becomes `teselarium` so the changeset tooling still finds the package. Third-party files (`e2e/npm_files/`, `node_modules/`) are never touched.
 - **BREAKING** for mods: the theme variables, the `data-ot-*` attributes, the `ot-*` classes and the `opentesela-browser:` address scheme are part of what a mod relies on. The mod API version goes from `0.1.19` to `0.2.0`, and the shipped and sample mods and the test mod ranges follow.
 - No migration for stored data: the renamed storage keys and the renamed database start empty. Nothing is read from the old names.
+- Fix the tests that already failed before the rename and blocked its verification, with the smallest edits: `src/main/instance_catalog.test.ts` and the e2e expectations of the page drafts and the flashcards mosaic. The change `decouple-e2e-from-shipped-pages` replaces the page-wording tests.
 - Out of scope: renaming the GitHub repository and the `origin` remote (the user does it), and any visual or behavioral change. The UI looks and works the same on a phone viewport and in both color schemes; the existing e2e tests for both prove it, so the change adds no new layout or color tests.
 
 ## Capabilities

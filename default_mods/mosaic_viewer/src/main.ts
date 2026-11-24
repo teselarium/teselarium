@@ -9,7 +9,7 @@
  * Like the mod viewer, it gets the app's look without classes: the theme's
  * base stylesheet styles semantic HTML like the app's components (a submit
  * button is the primary button, an `<article>` a card, `role="alert"` an
- * alert), `data-ot-variant` picks the variants that have no semantic HTML
+ * alert), `data-tes-variant` picks the variants that have no semantic HTML
  * (badges, ghost buttons), and this mod's own CSS sets layout only. See
  * "Write HTML, get the app's look" in docs/modules/lib/core/theme/README.md.
  */
@@ -113,7 +113,7 @@ function startInMode(
 function dropGoneDraft(engine: ModEngine, target: string): void {
   if (
     URL.canParse(target) &&
-    new URL(target).protocol === "opentesela-browser:"
+    new URL(target).protocol === "teselarium-browser:"
   ) {
     void dropDraft(engine, buildDraftKey("edit", target));
   }

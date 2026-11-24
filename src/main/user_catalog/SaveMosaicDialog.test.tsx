@@ -17,7 +17,7 @@ import { readUserCatalogSnapshot } from "./user_catalog_store.ts";
 
 const SAMPLE_ADDRESS =
   "https://example.org/samples/mosaics/nobel_laureates_map.yaml";
-const STORED_ADDRESS = "opentesela-browser:///r1/books.yaml";
+const STORED_ADDRESS = "teselarium-browser:///r1/books.yaml";
 const PORTRAITS_HOST = "https://upload.wikimedia.org";
 
 function writeDraft(lines: string[]): string {
@@ -193,7 +193,7 @@ describe("SaveMosaicDialog", function describeSaveMosaicDialog(): void {
     const [id, answer] = fixture.onAnswer.mock.calls[0];
     expect(id).toBe(SHOWN_ID);
     expect(answer).toMatch(
-      /^opentesela-browser:\/\/\/[^/]+\/laureates_my_way\.yaml$/,
+      /^teselarium-browser:\/\/\/[^/]+\/laureates_my_way\.yaml$/,
     );
     const [entry] = readUserCatalogSnapshot(fixture.store).entries;
     expect(entry.address).toBe(answer);

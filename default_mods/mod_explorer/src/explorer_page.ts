@@ -4,7 +4,7 @@ import type { ModEntry } from "./mod_entries.ts";
 
 // Layout only: the colors, borders and fonts come from the theme.
 const EXPLORER_STYLE = `
-  ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: var(--ot-space-4); }
+  ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: var(--tes-space-4); }
   li { display: grid; }
   li > * { margin: 0; }
   article { display: grid; grid-template-rows: auto 1fr auto; }

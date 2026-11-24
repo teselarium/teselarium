@@ -60,8 +60,8 @@ export interface SidebarLayoutStore {
   snapshot: SidebarSnapshot;
 }
 
-/** Outside the `opentesela.mod-storage:` keys, so no mod storage slot can reach it. */
-export const SIDEBAR_LAYOUT_KEY = "opentesela.sidebar";
+/** Outside the `teselarium.mod-storage:` keys, so no mod storage slot can reach it. */
+export const SIDEBAR_LAYOUT_KEY = "teselarium.sidebar";
 
 /** Viewports narrower than 768px. */
 export const NARROW_VIEWPORT_QUERY = "(max-width: 767.98px)";

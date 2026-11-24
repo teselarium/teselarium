@@ -20,7 +20,7 @@
 
 #### Scenario: New mosaic saved
 - **WHEN** the visible mod sends `userCatalog.save` with a valid new draft and the user presses "Save"
-- **THEN** the request resolves with an `teselarium-browser:` address, which the catalog lists as a user mosaic
+- **THEN** the request resolves with a `teselarium-browser:` address, which the catalog lists as a user mosaic
 
 #### Scenario: Missing content
 - **WHEN** a mod sends `userCatalog.save` with `{ "mosaic": "teselarium-browser:///r1/a.yaml" }`

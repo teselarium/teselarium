@@ -50,7 +50,7 @@ In each color scheme, every text role SHALL have a contrast ratio of at least 4.
 - **THEN** `--tes-card-foreground` on `--tes-card`, `--tes-popover-foreground` on `--tes-popover`, `--tes-primary-foreground` on `--tes-primary`, `--tes-secondary-foreground` on `--tes-secondary`, `--tes-accent-foreground` on `--tes-accent`, `--tes-highlight-foreground` on `--tes-highlight`, `--tes-destructive-foreground` on `--tes-destructive` and `--tes-muted-foreground` on `--tes-muted` each have a contrast ratio of at least 4.5
 
 ### Requirement: App canvas and panels
-The app's canvas, behind its panels and pages, SHALL be `--tes-card` in the light color scheme and `--tes-background` in the dark one. The sidebar, the stage bar and the visible sandbox's frame SHALL be panels apart from each other and from the viewport's edges, each with an `--tes-border` border and a shadow. Pages SHALL be drawn on the canvas, not in a panel. No theme token SHALL change for this.
+The app's canvas, behind its panels and pages, SHALL be `--tes-card` in the light color scheme and `--tes-background` in the dark one. The sidebar, the stage bar and the visible sandbox's frame SHALL be panels apart from each other and from the viewport's edges, each with a `--tes-border` border and a shadow. Pages SHALL be drawn on the canvas, not in a panel. No theme token SHALL change for this.
 
 #### Scenario: White canvas in light
 - **WHEN** the color scheme is `light` and a mod is visible

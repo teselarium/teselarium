@@ -1,8 +1,8 @@
-# About OpenTesela
+# About Teselarium
 
 Modular and reusable knowledge.
 
-OpenTesela turns plain notes into views you can share with a link. It runs as static files, with no server and no account.
+Teselarium turns plain notes into views you can share with a link. It runs as static files, with no server and no account.
 
 ## Made with AI in mind
 

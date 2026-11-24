@@ -438,7 +438,7 @@ test.describe(
       const frame = await openFlashcards(page, "No title");
       const button = rowButton(frame, "No title");
       const mutedColor = await frame.evaluate(readTokenAs, [
-        "--ot-muted-foreground",
+        "--tes-muted-foreground",
         "color",
       ]);
 
@@ -657,15 +657,15 @@ test.describe(
         const frame = await startSampleSession(page, colorScheme);
         const expected: CardLook = {
           background: await frame.evaluate(readTokenAs, [
-            "--ot-card",
+            "--tes-card",
             "background-color",
           ]),
           shadow: await frame.evaluate(readTokenAs, [
-            "--ot-shadow",
+            "--tes-shadow",
             "box-shadow",
           ]),
           radius: await frame.evaluate(readValueAs, [
-            "calc(var(--ot-radius) * 2)",
+            "calc(var(--tes-radius) * 2)",
             "border-top-left-radius",
           ]),
         };
@@ -682,11 +682,11 @@ test.describe(
       }): Promise<void> {
         const frame = await startSampleSession(page, colorScheme);
         const primary = await frame.evaluate(readTokenAs, [
-          "--ot-primary",
+          "--tes-primary",
           "border-top-color",
         ]);
         const muted = await frame.evaluate(readTokenAs, [
-          "--ot-muted",
+          "--tes-muted",
           "background-color",
         ]);
 
@@ -706,7 +706,7 @@ test.describe(
     test("The position", async function showsPosition({ page }): Promise<void> {
       const frame = await startSampleSession(page, "light");
       const mutedText = await frame.evaluate(readTokenAs, [
-        "--ot-muted-foreground",
+        "--tes-muted-foreground",
         "color",
       ]);
 

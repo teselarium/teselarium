@@ -32,7 +32,7 @@ export function buildTypeText(frontmatterLines: string[]): string {
   return typeText;
 }
 
-/** The `simple_event` type of `docs/tesela_spec.md`, without `additionalProperties`. */
+/** The `simple_event` type of `docs/teselarium_spec.md`, without `additionalProperties`. */
 export const SIMPLE_EVENT_TYPE_TEXT = buildTypeText([
   "schema:",
   "  definitions:",

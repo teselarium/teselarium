@@ -21,12 +21,12 @@ export async function drawsOpenAsPrimary(context: CaseContext): Promise<void> {
 
   context
     .expect(readButtonBackground(context, "Open mosaic"))
-    .toBe(readTokenAs("--ot-primary", "color"));
+    .toBe(readTokenAs("--tes-primary", "color"));
   context
     .expect(readButtonBackground(context, "Check mosaic"))
-    .toBe(readTokenAs("--ot-background", "color"));
+    .toBe(readTokenAs("--tes-background", "color"));
   context
-    .expect(findButton(context, "Fixture Mod")?.dataset.otVariant)
+    .expect(findButton(context, "Fixture Mod")?.dataset.tesVariant)
     .toBe("ghost");
 }
 
@@ -35,7 +35,7 @@ export async function drawsMosaicCard(context: CaseContext): Promise<void> {
 
   context
     .expect(getComputedStyle(findElement(context, "article")).backgroundColor)
-    .toBe(readTokenAs("--ot-card", "color"));
+    .toBe(readTokenAs("--tes-card", "color"));
 }
 
 export async function drawsFailureBorder(context: CaseContext): Promise<void> {
@@ -46,7 +46,7 @@ export async function drawsFailureBorder(context: CaseContext): Promise<void> {
   ) as HTMLElement;
   context
     .expect(getComputedStyle(alert).borderTopColor)
-    .toBe(readTokenAs("--ot-destructive", "color"));
+    .toBe(readTokenAs("--tes-destructive", "color"));
 }
 
 export async function keepsOwnStylesToLayout(

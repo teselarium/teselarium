@@ -138,7 +138,7 @@ export function readBadge(badge: Element | null): BadgeLook | null {
   }
   const badgeLook: BadgeLook = {
     text: badge.textContent,
-    variant: badge.dataset.otVariant,
+    variant: badge.dataset.tesVariant,
   };
   return badgeLook;
 }

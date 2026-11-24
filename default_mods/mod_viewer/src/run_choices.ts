@@ -98,7 +98,7 @@ export function buildCollectionForm(view: ViewerView): HTMLElement {
   view.collectionInput = input;
   const runButton = document.createElement("button");
   runButton.type = "submit";
-  runButton.dataset.otVariant = "outline";
+  runButton.dataset.tesVariant = "outline";
   runButton.textContent = "Run with this collection";
   runButton.addEventListener(
     "click",
