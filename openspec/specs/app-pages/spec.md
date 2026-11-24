@@ -108,11 +108,15 @@ When a page's file cannot be loaded, the page SHALL show an error alert that nam
 - **THEN** the page shows an alert that names the resolved address of `pages/guides/missing.md` and `404`, and the sidebar can still open Home
 
 ### Requirement: Vanilla pages
-The vanilla app SHALL ship an index page for Home, Guides and About, each with a level 1 heading naming its section and a status note saying that the section is a work in progress.
+The vanilla app SHALL ship an index page for Home, Guides and About, each with a level 1 heading and listed in the sidebar, and each loading without browser errors. The requirement says nothing about the pages' wording, which the instance owner may change freely.
 
 #### Scenario: Vanilla Home
 - **WHEN** the vanilla app is opened with no hash
-- **THEN** the Home page shows a level 1 heading and an element with `role="status"` saying the page is a work in progress
+- **THEN** the Home page shows a level 1 heading and no browser error occurs
+
+#### Scenario: Vanilla Guides and About
+- **WHEN** the vanilla app is opened at `#/guides` and at `#/about`
+- **THEN** each page shows a level 1 heading and its sidebar item is the current one
 
 ### Requirement: Pages keep a reading width
 A page's content SHALL be at most `--tes-reading-width` wide and centered in the page area. When the page area is narrower, the content SHALL fill it. Pages SHALL have no theater mode.
