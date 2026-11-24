@@ -54,6 +54,7 @@ import {
   TILES_VERSION,
 } from "./test_mods.ts";
 import { openModsSection, openSection, pageBody } from "./app_layout.ts";
+import { servePage } from "./page_routes.ts";
 
 const VIEWER_LINK = "#/run?mod=mod_viewer";
 const EXPLORER_LINK = "#/run?mod=mod_explorer";
@@ -538,6 +539,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
     page,
   }): Promise<void> {
     await serveAppOriginMod(page, buildProbeFiles("probe"));
+    await servePage(page, "home/index", "# Fixture page\n");
     await page.goto("/");
     await followLink(page, PROBE_HASH);
     await expect(stageBar(page)).toContainText("probe");
@@ -549,7 +551,7 @@ test.describe("Pages in the history", function describePagesInHistory(): void {
     await expect(stageBar(page)).toContainText("probe");
     await page.goBack();
     await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Teselarium" }),
+      pageBody(page).getByRole("heading", { level: 1, name: "Fixture page" }),
     ).toBeVisible();
 
     await openModsSection(page);

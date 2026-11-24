@@ -36,6 +36,7 @@ import {
   stageBar,
   waitForProbe,
 } from "./mod_routes.ts";
+import { servePage } from "./page_routes.ts";
 import { openProbe, serveExplorerOfTilesMod } from "./test_mods.ts";
 import { DARK_COLORS, LIGHT_COLORS } from "./theme_probes.ts";
 
@@ -333,6 +334,7 @@ test.describe("Section navigation", function describeNavigation(): void {
   test("Back after switching sections", async function goesBackAcrossSections({
     page,
   }): Promise<void> {
+    await servePage(page, "home/index", "# Fixture page\n");
     await page.goto("/");
     await openModsSection(page);
     await openSection(page, "Home");
@@ -341,7 +343,7 @@ test.describe("Section navigation", function describeNavigation(): void {
 
     await page.goBack();
     await expect(
-      pageBody(page).getByRole("heading", { level: 1, name: "Teselarium" }),
+      pageBody(page).getByRole("heading", { level: 1, name: "Fixture page" }),
     ).toBeVisible();
     await page.goBack();
 

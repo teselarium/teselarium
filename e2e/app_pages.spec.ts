@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
-import type { Locator, Page, Route } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import {
+  currentItem,
   hamburgerButton,
   openSection,
   pageBody,
@@ -16,6 +17,8 @@ import {
   waitForProbe,
 } from "./mod_routes.ts";
 import { storeTheaterBeforeLoad } from "./layout_probes.ts";
+import { collectBrowserErrors } from "./browser_errors.ts";
+import { servePage } from "./page_routes.ts";
 import { PROBE_LINK } from "./test_mods.ts";
 import {
   addModHtml,
@@ -141,24 +144,11 @@ function readPageMarker(): boolean {
   return (globalThis as { testMarker?: boolean }).testMarker === true;
 }
 
-async function answerMarkdown(markdown: string, route: Route): Promise<void> {
-  await route.fulfill({
-    status: 200,
-    contentType: "text/markdown",
-    body: markdown,
-  });
-}
+const FIXTURE_HEADING = "Fixture page";
 
-/** Serves `markdown` as the file of a page, e.g. `home/index` for `pages/home/index.md`. */
-async function servePage(
-  page: Page,
-  pagePath: string,
-  markdown: string,
-): Promise<void> {
-  await page.route(
-    `**/pages/${pagePath}.md`,
-    answerMarkdown.bind(undefined, markdown),
-  );
+/** Serves a Home page of the test's own, so the test does not read the shipped one. */
+async function serveFixtureHome(page: Page): Promise<void> {
+  await servePage(page, "home/index", `# ${FIXTURE_HEADING}\n`);
 }
 
 function pageHeading(page: Page, name: string): Locator {
@@ -247,6 +237,7 @@ test.describe("Pages look like mods", function describeLook(): void {
       "about/index",
       "# About\n\n| Name | Year |\n|---|---|\n| Kallocain | 1940 |\n",
     );
+    await servePage(page, "guides/index", "# Guides\n");
     await page.goto("/#/guides");
     await expect(pageHeading(page, "Guides")).toBeVisible();
     const withoutTable = await readInterfaceLooks(page);
@@ -259,8 +250,9 @@ test.describe("Pages look like mods", function describeLook(): void {
 
   test("Dark page", async function followsColorScheme({ page }): Promise<void> {
     await page.emulateMedia({ colorScheme: "light" });
+    await serveFixtureHome(page);
     await page.goto("/");
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
+    await expect(pageHeading(page, FIXTURE_HEADING)).toBeVisible();
     expect(await pageBody(page).evaluate(readTextColor)).toBe(
       LIGHT_COLORS.foreground.computed,
     );
@@ -283,10 +275,11 @@ test.describe("Pages are drawn on the canvas", function describeCanvas(): void {
   }): Promise<void> {
     await page.setViewportSize({ width: 2560, height: 1080 });
     await page.emulateMedia({ colorScheme: "light" });
+    await serveFixtureHome(page);
 
     await page.goto("/");
 
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
+    await expect(pageHeading(page, FIXTURE_HEADING)).toBeVisible();
     expect(await pageBody(page).evaluate(readBackgroundColor)).toBe(
       "rgba(0, 0, 0, 0)",
     );
@@ -301,8 +294,9 @@ test.describe("Pages keep clear of the hamburger chip", function describeChip():
     page,
   }): Promise<void> {
     await page.setViewportSize({ width: 600, height: 800 });
+    await serveFixtureHome(page);
     await page.goto("/");
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
+    await expect(pageHeading(page, FIXTURE_HEADING)).toBeVisible();
 
     await hamburgerButton(page).click();
 
@@ -316,8 +310,9 @@ test.describe("Pages keep clear of the hamburger chip", function describeChip():
     page,
   }): Promise<void> {
     await page.setViewportSize({ width: 2560, height: 1080 });
+    await serveFixtureHome(page);
     await page.goto("/");
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
+    await expect(pageHeading(page, FIXTURE_HEADING)).toBeVisible();
 
     await hamburgerButton(page).click();
 
@@ -333,9 +328,11 @@ test.describe("Pages keep a reading width", function describeReadingWidth(): voi
   }): Promise<void> {
     await page.setViewportSize({ width: 2560, height: 1080 });
 
+    await serveFixtureHome(page);
+
     await page.goto("/");
 
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
+    await expect(pageHeading(page, FIXTURE_HEADING)).toBeVisible();
     const box = await pageBody(page).evaluate(readPageContentBox);
     expect(box.readingWidth).toBeGreaterThan(0);
     expect(box.areaWidth).toBeGreaterThan(box.readingWidth);
@@ -348,9 +345,11 @@ test.describe("Pages keep a reading width", function describeReadingWidth(): voi
   }): Promise<void> {
     await page.setViewportSize({ width: 600, height: 800 });
 
+    await serveFixtureHome(page);
+
     await page.goto("/");
 
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
+    await expect(pageHeading(page, FIXTURE_HEADING)).toBeVisible();
     const box = await pageBody(page).evaluate(readPageContentBox);
     expect(box.areaWidth).toBeLessThan(box.readingWidth);
     expect(box.contentWidth).toBeCloseTo(box.areaWidth, 0);
@@ -361,9 +360,11 @@ test.describe("Pages keep a reading width", function describeReadingWidth(): voi
     await page.setViewportSize({ width: 2560, height: 1080 });
     await storeTheaterBeforeLoad(page, "true");
 
+    await serveFixtureHome(page);
+
     await page.goto("/");
 
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
+    await expect(pageHeading(page, FIXTURE_HEADING)).toBeVisible();
     const box = await pageBody(page).evaluate(readPageContentBox);
     expect(box.contentWidth).toBeCloseTo(box.readingWidth, 0);
   });
@@ -407,6 +408,7 @@ test.describe("Page load failures", function describeFailures(): void {
   test("Missing page", async function showsMissingPage({
     page,
   }): Promise<void> {
+    await serveFixtureHome(page);
     await page.goto("/#/guides/missing");
     const missingUrl = new URL("/pages/guides/missing.md", page.url()).href;
 
@@ -414,31 +416,30 @@ test.describe("Page load failures", function describeFailures(): void {
     await expect(page.getByRole("alert")).toContainText("404");
     await openSection(page, "Home");
 
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
+    await expect(pageHeading(page, FIXTURE_HEADING)).toBeVisible();
   });
 });
 
 test.describe("Vanilla pages", function describeVanillaPages(): void {
-  test("Vanilla Home", async function showsVanillaHome({
-    page,
-  }): Promise<void> {
-    await page.goto("/");
+  const SHIPPED_PAGES = [
+    { section: "Home", hash: "" },
+    { section: "Guides", hash: "#/guides" },
+    { section: "About", hash: "#/about" },
+  ];
 
-    await expect(pageHeading(page, "Teselarium")).toBeVisible();
-    await expect(pageBody(page).getByRole("status")).toContainText(
-      "early phase",
-    );
-  });
+  for (const shipped of SHIPPED_PAGES) {
+    test(`Vanilla ${shipped.section}`, async function showsVanillaPage({
+      page,
+    }): Promise<void> {
+      const browserErrors = collectBrowserErrors(page);
 
-  test("ships a Guides and an About page", async function showsVanillaPages({
-    page,
-  }): Promise<void> {
-    for (const [hash, name] of [
-      ["#/guides", "Guides"],
-      ["#/about", "About Teselarium"],
-    ]) {
-      await page.goto(`/${hash}`);
-      await expect(pageHeading(page, name)).toBeVisible();
-    }
-  });
+      await page.goto(`/${shipped.hash}`);
+
+      await expect(
+        pageBody(page).getByRole("heading", { level: 1 }),
+      ).toBeVisible();
+      await expect(currentItem(page)).toHaveText(shipped.section);
+      expect(browserErrors).toEqual([]);
+    });
+  }
 });

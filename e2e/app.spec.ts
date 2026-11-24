@@ -1,20 +1,5 @@
-import { expect, test, type ConsoleMessage, type Page } from "@playwright/test";
-
-function collectBrowserErrors(page: Page): string[] {
-  const browserErrors: string[] = [];
-  page.on(
-    "console",
-    function recordConsoleError(message: ConsoleMessage): void {
-      if (message.type() === "error") {
-        browserErrors.push(message.text());
-      }
-    },
-  );
-  page.on("pageerror", function recordPageError(error: Error): void {
-    browserErrors.push(error.message);
-  });
-  return browserErrors;
-}
+import { expect, test } from "@playwright/test";
+import { collectBrowserErrors } from "./browser_errors.ts";
 
 test("renders the app shell without browser errors", async function rendersAppShell({
   page,

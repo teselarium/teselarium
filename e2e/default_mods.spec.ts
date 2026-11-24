@@ -58,6 +58,7 @@ import {
   EXPLORER_OFF_PREVIEW_URL,
   TEST_CATALOG_PREVIEW_URL,
 } from "./app_servers.ts";
+import { readVanillaMosaicTitles } from "./vanilla_mosaics.ts";
 import { buildStoredSeedEntry, seedUserCatalog } from "./user_catalog_seeds.ts";
 import type { UserCatalogSeed } from "./user_catalog_seeds.ts";
 import {
@@ -142,7 +143,7 @@ test.describe(
       await page.goto("/");
 
       await expect(
-        pageBody(page).getByRole("heading", { level: 1, name: "Teselarium" }),
+        pageBody(page).getByRole("heading", { level: 1 }),
       ).toBeVisible();
       await expect(page.locator("[data-sandbox-id]")).toHaveCount(0);
       await expect(page.locator("iframe")).toHaveCount(0);
@@ -1560,12 +1561,10 @@ test.describe(
 
 const MOSAIC_EXPLORER_RUN_LINK = "/#/run?mod=mosaic_explorer";
 
-/** The sample mosaics of the vanilla mosaic explorer's config, in order. */
+/** Sample mosaics the tests need as data: the books and the map. */
 const BOOKS_MOSAIC_REFERENCE = "./samples/mosaics/nobel_books_list.yaml";
 const BOOKS_MOSAIC_TITLE = "Books by Nobel laureates";
 const MAP_MOSAIC_TITLE = "Nobel laureates on the map";
-const FLASHCARDS_MOSAIC_TITLE =
-  "Flashcards: Nobel Prize in Literature laureates";
 
 /** The default mosaics of the vanilla catalog's mods, in mod order: Book List, Flashcards, Country Map. */
 const DEFAULT_MOSAIC_TITLES = [
@@ -1654,15 +1653,18 @@ test.describe(
       "Vanilla explorer lists the sample mosaics",
       { tag: "@sample" },
       async function listsSampleMosaics({ page }): Promise<void> {
+        const vanillaTitles = await readVanillaMosaicTitles();
         const bundleUrls = recordBundleRequests(page);
         await page.goto(MOSAIC_EXPLORER_RUN_LINK);
         const cards = mosaicExplorerCards(page);
 
-        await expect(cards.getByRole("heading")).toHaveText([
+        await expect(cards.getByRole("heading")).toHaveText(vanillaTitles);
+        await expect(cards.getByRole("heading").nth(0)).toHaveText(
           BOOKS_MOSAIC_TITLE,
+        );
+        await expect(cards.getByRole("heading").nth(1)).toHaveText(
           MAP_MOSAIC_TITLE,
-          FLASHCARDS_MOSAIC_TITLE,
-        ]);
+        );
         await expect(cards.nth(0)).toContainText(
           "The book list with the books of the Nobel Prize in Literature laureates, eight per row.",
         );
@@ -1678,17 +1680,14 @@ test.describe(
       "Only the sample mosaics",
       { tag: "@sample" },
       async function listsOnlySampleMosaics({ page }): Promise<void> {
+        const vanillaTitles = await readVanillaMosaicTitles();
         await page.goto(MOSAIC_EXPLORER_RUN_LINK);
         await waitForMosaicList(page);
 
         const titles = await mosaicExplorerCards(page)
           .getByRole("heading")
           .allTextContents();
-        expect(titles).toEqual([
-          BOOKS_MOSAIC_TITLE,
-          MAP_MOSAIC_TITLE,
-          FLASHCARDS_MOSAIC_TITLE,
-        ]);
+        expect(titles).toEqual(vanillaTitles);
         for (const defaultMosaicTitle of DEFAULT_MOSAIC_TITLES) {
           expect(titles).not.toContain(defaultMosaicTitle);
         }
@@ -1699,25 +1698,21 @@ test.describe(
       "Vanilla default mosaics",
       { tag: "@sample" },
       async function listsDefaultMosaics({ page }): Promise<void> {
+        const vanillaTitles = await readVanillaMosaicTitles();
         await page.goto("/#/settings");
         await switchDefaultMosaics(page, true);
         await openSection(page, "Mosaics");
 
         await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
-          [
-            BOOKS_MOSAIC_TITLE,
-            MAP_MOSAIC_TITLE,
-            FLASHCARDS_MOSAIC_TITLE,
-            ...DEFAULT_MOSAIC_TITLES,
-          ],
+          [...vanillaTitles, ...DEFAULT_MOSAIC_TITLES],
         );
         const cards = mosaicExplorerCards(page);
-        await expect(cards.nth(3).locator("small")).toHaveText(
-          "Default mosaic of Book List",
-        );
-        await expect(cards.nth(0).locator("small")).toHaveCount(0);
-        await expect(cards.nth(1).locator("small")).toHaveCount(0);
-        await expect(cards.nth(2).locator("small")).toHaveCount(0);
+        await expect(
+          cards.nth(vanillaTitles.length).locator("small"),
+        ).toHaveText("Default mosaic of Book List");
+        for (let index = 0; index < vanillaTitles.length; index += 1) {
+          await expect(cards.nth(index).locator("small")).toHaveCount(0);
+        }
       },
     );
 
@@ -1725,13 +1720,10 @@ test.describe(
       "Switch turned on behind the explorer",
       { tag: "@sample" },
       async function followsSwitch({ page }): Promise<void> {
+        const vanillaTitles = await readVanillaMosaicTitles();
         await page.goto("/");
         await openSection(page, "Mosaics");
-        expect(await readMosaicTitles(page)).toEqual([
-          BOOKS_MOSAIC_TITLE,
-          MAP_MOSAIC_TITLE,
-          FLASHCARDS_MOSAIC_TITLE,
-        ]);
+        expect(await readMosaicTitles(page)).toEqual(vanillaTitles);
         const explorer = await findModFrame(page, "Mosaics");
         await markFrame(explorer);
 
@@ -1739,12 +1731,7 @@ test.describe(
         await openSection(page, "Mosaics");
 
         await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
-          [
-            BOOKS_MOSAIC_TITLE,
-            MAP_MOSAIC_TITLE,
-            FLASHCARDS_MOSAIC_TITLE,
-            ...DEFAULT_MOSAIC_TITLES,
-          ],
+          [...vanillaTitles, ...DEFAULT_MOSAIC_TITLES],
         );
         expect(await isFrameMarked(explorer)).toBe(true);
 
@@ -1752,7 +1739,7 @@ test.describe(
         await openSection(page, "Mosaics");
 
         await expect(mosaicExplorerCards(page).getByRole("heading")).toHaveText(
-          [BOOKS_MOSAIC_TITLE, MAP_MOSAIC_TITLE, FLASHCARDS_MOSAIC_TITLE],
+          vanillaTitles,
         );
         expect(await isFrameMarked(explorer)).toBe(true);
       },
