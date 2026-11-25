@@ -34,7 +34,6 @@ import {
   unreadItems,
   waitForProbe,
 } from "./mod_routes.ts";
-import { routeNpmFiles } from "./sample_mod.ts";
 import type { MessageLevelName, ProbeAnswer } from "./mod_routes.ts";
 import {
   buildLabelsCollection,
@@ -2225,23 +2224,16 @@ test.describe("Edit button of the stage bar", function describeEditButton(): voi
   test("Back to the mosaic", async function goesBackToMosaic({
     page,
   }): Promise<void> {
-    await routeNpmFiles(page);
-    await page.goto(NOBEL_MAP_MOSAIC_LINK);
-    await expect(
-      page.frameLocator("iframe").locator(".leaflet-container"),
-    ).toBeVisible();
+    await openLabelsMosaic(page);
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
 
     await editButton(page, "Edit a copy").click();
 
     await expect(
       mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
-    ).toHaveText(`Copy of "${MAP_MOSAIC_TITLE}"`);
+    ).toHaveText(`Copy of "${LABELS_MOSAIC_TITLE}"`);
     await page.goBack();
-    await expect(
-      stageBar(page).getByRole("button", {
-        name: `Mosaic: ${MAP_MOSAIC_TITLE}`,
-      }),
-    ).toBeVisible();
+    await expect(capsule(page, `Mosaic: ${LABELS_MOSAIC_TITLE}`)).toBeVisible();
   });
 
   test("Edit button on a phone", async function laysOutEditButton({
@@ -2280,7 +2272,8 @@ test.describe("Edit button of the stage bar", function describeEditButton(): voi
     page,
   }): Promise<void> {
     await page.setViewportSize({ width: 320, height: 640 });
-    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    await openLabelsMosaic(page);
+    await waitForProbe(await findModFrame(page, TILES_TITLE));
     await expect(capsule(page, /^Combination: /)).toBeVisible();
     await expect(editButton(page, "Edit a copy")).toHaveCount(0);
     expect(await page.evaluate(canScrollSideways)).toBe(false);
@@ -2290,7 +2283,7 @@ test.describe("Edit button of the stage bar", function describeEditButton(): voi
 
     await expect(
       mosaicViewerFrame(page).getByRole("heading", { level: 1 }),
-    ).toHaveText(`Copy of "${MAP_MOSAIC_TITLE}"`);
+    ).toHaveText(`Copy of "${LABELS_MOSAIC_TITLE}"`);
   });
 });
 
@@ -2351,12 +2344,13 @@ test.describe("Folded capsule of a combination", function describeFoldedCombinat
   test("Folded unsaved combination keeps the mosaic's look", async function keepsMosaicLook({
     page,
   }): Promise<void> {
-    await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    await openSwapMosaic(page);
     await setBarWidth(page, 400);
-    await capsule(page, `Combination: ${MAP_MOSAIC_TITLE}`).click();
+    await capsule(page, `Combination: ${LABELS_MOSAIC_TITLE}`).click();
     await page.getByRole("menuitem", { name: /^Mod: / }).click();
 
-    await listOption(page, "Flashcards").first().click();
+    await listOption(page, "probe").first().click();
+    await waitForProbe(await findModFrame(page, "probe"));
 
     await setBarWidth(page, 400);
     const folded = capsule(page, "Combination: Unsaved combination");
@@ -2368,7 +2362,7 @@ test.describe("Folded capsule of a combination", function describeFoldedCombinat
       page.getByRole("menuitem", { name: "Mosaic: Unsaved combination" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("menuitem", { name: "Mod: Flashcards" }),
+      page.getByRole("menuitem", { name: "Mod: probe" }),
     ).toBeVisible();
   });
 });
