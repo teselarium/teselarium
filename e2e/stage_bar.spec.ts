@@ -34,6 +34,7 @@ import {
   unreadItems,
   waitForProbe,
 } from "./mod_routes.ts";
+import { routeNpmFiles } from "./sample_mod.ts";
 import type { MessageLevelName, ProbeAnswer } from "./mod_routes.ts";
 import {
   buildLabelsCollection,
@@ -2224,7 +2225,11 @@ test.describe("Edit button of the stage bar", function describeEditButton(): voi
   test("Back to the mosaic", async function goesBackToMosaic({
     page,
   }): Promise<void> {
+    await routeNpmFiles(page);
     await page.goto(NOBEL_MAP_MOSAIC_LINK);
+    await expect(
+      page.frameLocator("iframe").locator(".leaflet-container"),
+    ).toBeVisible();
 
     await editButton(page, "Edit a copy").click();
 
