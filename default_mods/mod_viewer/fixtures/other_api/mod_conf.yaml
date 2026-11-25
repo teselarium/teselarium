@@ -1,0 +1,7 @@
+# A fixture mod for the viewer's tests, with an API range that does not match the app's mod API version.
+mod:
+  title: "Other API"
+  version: "1.0.0"
+  api: "^0.3.0"
+  description: "A fixture mod for another mod API."
+  entrypoint: "./main.js"

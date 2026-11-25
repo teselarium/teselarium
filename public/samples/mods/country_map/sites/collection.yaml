@@ -1,0 +1,15 @@
+collection:
+  title: "UNESCO World Heritage Sites"
+  description: "Eleven UNESCO World Heritage Sites in ten countries, at least one per UNESCO region. Each tile's text and image come from its English Wikipedia article (https://en.wikipedia.org), under the CC BY-SA 4.0 license (https://creativecommons.org/licenses/by-sa/4.0/)."
+  tiles:
+    - path: "./serengeti_national_park.md"
+    - path: "./giza_pyramid_complex.md"
+    - path: "./petra.md"
+    - path: "./great_wall_of_china.md"
+    - path: "./forbidden_city.md"
+    - path: "./taj_mahal.md"
+    - path: "./acropolis_of_athens.md"
+    - path: "./mont_saint_michel.md"
+    - path: "./grand_canyon.md"
+    - path: "./machu_picchu.md"
+    - path: "./galapagos_islands.md"

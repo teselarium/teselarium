@@ -1,0 +1,15 @@
+mosaic:
+  title: "Science fiction books"
+  description: "The book list with its sample books and their covers."
+  mod: "./"
+  collection: "./book_collection.yaml"
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the book covers"
+      - host: "https://covers.openlibrary.org"
+        reason: "Shows the book covers"
+      - host: "https://*.archive.org"
+        reason: "Shows the book covers"
+      - host: "https://archive.org"
+        reason: "Shows the book covers"

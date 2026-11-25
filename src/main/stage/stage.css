@@ -1,0 +1,54 @@
+/*
+ * The stage's layout contracts, which the components' utilities do not
+ * express. The look is in the components, from the theme tokens.
+ */
+
+/* A sandbox's `display` would otherwise show hidden sandboxes. */
+.sandbox[hidden] {
+  display: none;
+}
+
+/* Fills the stage area whatever the mod's content: the frame's own document scrolls. */
+.sandbox-frame {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 16rem;
+}
+
+/* Fullscreen shows the frame alone, edge to edge (see stage_fullscreen.ts). */
+.sandbox-frame:fullscreen {
+  border: 0;
+  border-radius: 0;
+}
+
+/* Until the frame is connected and has its color scheme (see SandboxFrame). */
+.sandbox-frame-loading {
+  visibility: hidden;
+}
+
+/* The full address, broken anywhere, so no part of it can be pushed out of sight. */
+.action-dialog-url {
+  word-break: break-all;
+}
+
+/* Keeps the mod's line breaks, and scrolls a long message. */
+.action-dialog-message {
+  max-height: 50vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* One flash of a message button's icon when a message arrives (see MessageButton). */
+@keyframes stage-bar-flash {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 0.4;
+    transform: scale(1.35);
+  }
+}

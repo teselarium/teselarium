@@ -1,0 +1,14 @@
+mod:
+  title: "Book List"
+  version: "1.0.0"
+  api: "^0.2.0"
+  description: "A very simple list of books with their covers."
+  entrypoint: "./main.js"
+  type_path: "../../types/book.md"
+  default_mosaic: "./mosaic.yaml"
+  config:
+    show_covers: true
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the book covers"

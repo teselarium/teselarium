@@ -1,0 +1,102 @@
+import { useMemo } from "react";
+import type { ReactElement } from "react";
+import {
+  readStageSnapshot,
+  subscribeStage,
+} from "../../lib/core/stage/index.ts";
+import type { Stage } from "../../lib/core/stage/index.ts";
+import { SETTINGS_SECTION_ID } from "../sections/section_registry.ts";
+import type { SectionDefinition } from "../sections/section_registry.ts";
+import type { SectionSwitches } from "../sections/section_switches.ts";
+import type { PlayerSites } from "../settings/player_sites.ts";
+import type { RecentlyUsed } from "../settings/recently_used.ts";
+import type { SiteDecisions } from "../settings/site_decisions.ts";
+import { SettingsPage } from "../settings/SettingsPage.tsx";
+import type { CatalogSetting } from "../settings/catalog_setting.ts";
+import type { TileMediaSetting } from "../settings/tile_media_setting.ts";
+import type { AppTheme } from "../theme/app_theme.ts";
+import type { UserCatalogStore } from "../user_catalog/user_catalog_store.ts";
+import { useStoreSnapshot } from "../use_store_snapshot.ts";
+import { MarkdownPage } from "./MarkdownPage.tsx";
+import { buildPageFileUrl } from "./page_links.ts";
+import type { PageFile } from "./page_links.ts";
+
+interface PageViewProps {
+  stage: Stage;
+  appTheme: AppTheme;
+  sections: readonly SectionDefinition[];
+  switches: SectionSwitches;
+  tileMedia: TileMediaSetting;
+  catalogSetting: CatalogSetting;
+  recentlyUsed: RecentlyUsed;
+  userCatalog: UserCatalogStore;
+  siteDecisions: SiteDecisions;
+  playerSites: PlayerSites;
+}
+
+function buildPageFile(
+  baseUrl: string,
+  section: string,
+  page: string | null,
+): PageFile {
+  const file: PageFile = {
+    section,
+    url: buildPageFileUrl(baseUrl, section, page),
+  };
+  return file;
+}
+
+/**
+ * The page the stage shows, if any: the Settings page for the Settings
+ * section, or the markdown page of any other page section. Renders nothing
+ * while a sandbox or nothing is shown.
+ */
+export function PageView({
+  stage,
+  appTheme,
+  sections,
+  switches,
+  tileMedia,
+  catalogSetting,
+  recentlyUsed,
+  userCatalog,
+  siteDecisions,
+  playerSites,
+}: PageViewProps): ReactElement | null {
+  const snapshot = useStoreSnapshot(stage, subscribeStage, readStageSnapshot);
+  const visible = snapshot.visible;
+  const baseUrl = stage.fetchOptions.baseUrl ?? document.baseURI;
+  const section = visible?.kind === "page" ? visible.section : null;
+  const page = visible?.kind === "page" ? visible.page : null;
+  const file = useMemo(
+    function buildVisibleFile(): PageFile | null {
+      return section === null ? null : buildPageFile(baseUrl, section, page);
+    },
+    [baseUrl, section, page],
+  );
+  if (file === null) {
+    return null;
+  }
+  if (file.section === SETTINGS_SECTION_ID) {
+    return (
+      <SettingsPage
+        appTheme={appTheme}
+        sections={sections}
+        switches={switches}
+        tileMedia={tileMedia}
+        catalogSetting={catalogSetting}
+        recentlyUsed={recentlyUsed}
+        userCatalog={userCatalog}
+        siteDecisions={siteDecisions}
+        playerSites={playerSites}
+      />
+    );
+  }
+  return (
+    <MarkdownPage
+      key={file.url}
+      file={file}
+      fetchOptions={stage.fetchOptions}
+    />
+  );
+}

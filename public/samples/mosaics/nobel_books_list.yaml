@@ -1,0 +1,17 @@
+mosaic:
+  title: "Books by Nobel laureates"
+  description: "The book list with the books of the Nobel Prize in Literature laureates, eight per row."
+  mod: "../mods/book_list"
+  collection: "../tiles/literature_nobel_laureates_books"
+  config:
+    columns: 8
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the book covers"
+      - host: "https://covers.openlibrary.org"
+        reason: "Shows the book covers"
+      - host: "https://*.archive.org"
+        reason: "Shows the book covers"
+      - host: "https://archive.org"
+        reason: "Shows the book covers"

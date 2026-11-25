@@ -1,0 +1,12 @@
+# A fixture collection for the viewer's tests (test/viewer_cases.ts), which only inspect it: its tiles are never requested.
+collection:
+  title: "Shown collection"
+  description: "A fixture collection that the viewer's tests show."
+  tiles:
+    - path: "./tiles/2024__han_kang.md"
+    - path: "./tiles/2016__bob_dylan.md"
+    - path: "./tiles/caf%C3%A9.md"
+    - path: "./a/index.md"
+    - path: "./b/index.md"
+    - path: "./tiles/1944__johannes_v_jensen.md"
+    - path: "./tiles/2021__abdulrazak_gurnah.md"

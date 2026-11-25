@@ -1,0 +1,7 @@
+# A fixture mod for the explorer's tests (test/explorer_cases.ts), which only inspect it: it has no code.
+mod:
+  title: "Listed Mod"
+  version: "1.0.0"
+  api: "^0.2.0"
+  description: "A fixture mod that the explorer's tests list."
+  entrypoint: "./main.js"

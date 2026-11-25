@@ -1,0 +1,13 @@
+mod:
+  title: "Mosaics"
+  version: "0.1.0"
+  api: "^0.2.0"
+  description: "Lists mosaics, opens them, and opens them in the mosaic viewer."
+  entrypoint: "./main.js"
+  test_path: "./test.js"
+  config:
+    viewer: "mosaic_viewer"
+  permissions:
+    open:
+      - host: "*"
+        reason: "Lists the app's mosaics and opens the one you pick"

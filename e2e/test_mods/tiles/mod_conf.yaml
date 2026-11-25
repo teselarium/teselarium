@@ -1,0 +1,16 @@
+mod:
+  api: "^0.2.0"
+  title: "Tiles"
+  version: "1.0.0"
+  description: "The e2e tests' own mod: lists its tiles with their titles and images."
+  entrypoint: "./main.js"
+  type_path: "./item_type.md"
+  default_mosaic: "./mosaic.yaml"
+  test_path: "./test.js"
+  config:
+    show_images: true
+    empty_text: "There are no tiles to show."
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the item images"

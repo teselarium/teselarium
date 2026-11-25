@@ -1,0 +1,179 @@
+# Spec Delta
+
+## MODIFIED Requirements
+
+### Requirement: Default content policy
+Without granted permissions, a mod SHALL be able to run its own code and inline styles. It SHALL load images, video, audio, fonts and stylesheets only from `data:` and `blob:` URLs and from the content hosts, and images, video and audio also from the files its tiles link (see "Media linked by tiles"). Every other web request SHALL be blocked: connections, frames and scripts from any host.
+
+#### Scenario: Image from a content host
+- **WHEN** a running mod shows an image from the origin its tiles were loaded from
+- **THEN** the image loads
+
+#### Scenario: Image from another host
+- **WHEN** a mod without permissions shows an image from `https://images.example.net` that none of its tiles links
+- **THEN** the request is blocked before it is sent
+
+#### Scenario: Connections are blocked
+- **WHEN** a mod without permissions calls `fetch` on the origin of its own collection
+- **THEN** the request is blocked before it is sent
+
+#### Scenario: Remote scripts are blocked
+- **WHEN** a mod without permissions imports a module from `https://cdn.example.net/library.js`
+- **THEN** the request is blocked before it is sent
+
+## ADDED Requirements
+
+### Requirement: Media linked by tiles
+When "Load media linked by tiles" is on as a mod starts, the system SHALL let the mod load, as images, video and audio, each file whose `http:` or `https:` URL is a metadata string of a tile the mod receives, inside lists and nested mappings too. Mods from the app's origin and from other origins SHALL get them alike. Tiles the mod does not receive, and the tile body, SHALL allow nothing.
+
+#### Scenario: Image linked by a tile
+- **WHEN** a mod from the app's origin without permissions is opened with a collection whose tile has `image: "https://media.example.net/covers/kallocain.jpg"`, and shows that URL as an image
+- **THEN** the image loads and no issue is reported
+
+#### Scenario: Audio linked by a tile
+- **WHEN** a mod without permissions is opened with a tile that has `audio: "https://media.example.net/sound/theme.mp3"`, and plays that URL in an `<audio>` element
+- **THEN** the request for `https://media.example.net/sound/theme.mp3` is sent and no issue is reported
+
+#### Scenario: URL inside a nested value
+- **WHEN** a mod is opened with a tile that has `gallery: [{ src: "https://media.example.net/a.jpg" }]`, and shows `https://media.example.net/a.jpg`
+- **THEN** the image loads
+
+#### Scenario: URL with a query
+- **WHEN** a mod is opened with a tile that has `image: "https://media.example.net/cover.jpg?size=large#top"`, and shows that URL
+- **THEN** the image loads
+
+#### Scenario: Mod from another origin
+- **WHEN** the mod at `https://mods.example.net/probe/mod_conf.yaml`, which declares no permissions, is opened with a tile that has `image: "https://media.example.net/cover.jpg"`, and shows that URL
+- **THEN** the image loads
+
+#### Scenario: Tile of another type
+- **WHEN** a mod with a tile type is opened with a collection in which only a tile of another type has `image: "https://media.example.net/other.jpg"`, and the mod shows that URL
+- **THEN** the request is blocked before it is sent
+
+#### Scenario: URL in the body
+- **WHEN** a mod is opened with a tile whose body, and not its metadata, holds `https://media.example.net/body.jpg`, and the mod shows that URL
+- **THEN** the request is blocked before it is sent
+
+#### Scenario: Setting switched off
+- **WHEN** "Load media linked by tiles" is off and a mod is opened with a tile that has `image: "https://media.example.net/cover.jpg"`, and shows that URL
+- **THEN** the request is blocked before it is sent
+- **AND** no issue names the tile
+
+### Requirement: A tile link allows only the linked file
+Each linked file SHALL be allowed by its address without query and fragment, and SHALL NOT allow any other file of its host. A URL whose path ends with `/` names a folder or a page: it SHALL allow nothing and SHALL NOT be reported.
+
+#### Scenario: Other file of the same host
+- **WHEN** a mod is opened with a tile that has `image: "https://media.example.net/covers/kallocain.jpg"`, and shows `https://media.example.net/covers/other.jpg`
+- **THEN** the request is blocked before it is sent
+- **AND** a warning issue is reported that names `https://media.example.net`
+
+#### Scenario: Link to a folder
+- **WHEN** a mod is opened with a tile that has `homepage: "https://media.example.net/covers/"`, and shows `https://media.example.net/covers/kallocain.jpg`
+- **THEN** the request is blocked before it is sent
+- **AND** no issue names the tile
+
+### Requirement: Tile links allow only images, video and audio
+A tile link SHALL NOT let a mod load fonts or stylesheets, send connections, embed pages or load scripts, whatever the linked file is.
+
+#### Scenario: Linked stylesheet
+- **WHEN** a mod is opened with a tile that has `theme: "https://media.example.net/theme.css"`, and adds a `<link rel="stylesheet">` with that URL
+- **THEN** the request is blocked before it is sent
+
+#### Scenario: Linked file fetched
+- **WHEN** a mod is opened with a tile that has `image: "https://media.example.net/cover.jpg"`, and calls `fetch` on that URL
+- **THEN** the request is blocked before it is sent
+
+#### Scenario: Linked script
+- **WHEN** a mod is opened with a tile that has `code: "https://media.example.net/library.js"`, and imports that URL
+- **THEN** the request is blocked before it is sent
+
+### Requirement: Tile links the sandbox cannot express
+A linked URL that a sandbox policy cannot express SHALL allow nothing: one with a user name or password, an IPv6 address as host, a host name with a character other than letters, digits, `-` and `.`, or a path character other than letters, digits and `-._~!$&'()*+=:@%/`. Each SHALL be reported once per tile as a warning issue whose source is the tile, naming the URL and saying that the sandbox cannot allow this address.
+
+#### Scenario: Link with a password
+- **WHEN** a mod is opened with the tile `https://tiles.example.net/books/kallocain.md` that has `image: "https://user:secret@media.example.net/cover.jpg"`
+- **THEN** a warning issue whose source is `https://tiles.example.net/books/kallocain.md` names the URL and says that the sandbox cannot allow this address
+
+#### Scenario: Link with an IPv6 address
+- **WHEN** a mod is opened with a tile that has `image: "https://[2001:db8::1]/cover.jpg"`
+- **THEN** a warning issue whose source is the tile says that the sandbox cannot allow this address
+
+#### Scenario: Semicolon in the path
+- **WHEN** a mod is opened with a tile that has `image: "https://media.example.net/a;b.jpg"`, and shows that URL
+- **THEN** the request is blocked before it is sent
+- **AND** a warning issue whose source is the tile says that the sandbox cannot allow this address
+
+#### Scenario: Same link twice in one tile
+- **WHEN** a mod is opened with a tile that has `image` and `thumbnail` both set to `"https://[2001:db8::1]/cover.jpg"`
+- **THEN** exactly one issue names that URL
+
+### Requirement: Private network guard
+A linked URL whose host is on the user's computer or network SHALL allow nothing, unless the tile was loaded over `http:` or `https:` from such a host. A tile picked from the user's computer SHALL get the guard. Each left-out URL SHALL be reported once per tile as a warning issue whose source is the tile, naming the URL and saying that tiles from other sites cannot link addresses on the user's computer or network.
+
+#### Scenario: Router address in a tile from the web
+- **WHEN** a mod is opened with the tile `https://tiles.example.net/books/kallocain.md` that has `image: "http://192.168.1.1/logo.png"`, and shows that URL
+- **THEN** the request is blocked before it is sent
+- **AND** a warning issue whose source is `https://tiles.example.net/books/kallocain.md` names `http://192.168.1.1/logo.png` and says that tiles from other sites cannot link addresses on the user's computer or network
+
+#### Scenario: Tile from a private host
+- **WHEN** a mod is opened with the tile `http://localhost:8080/books/kallocain.md` that has `image: "http://192.168.1.20/cover.png"`, and shows that URL
+- **THEN** the image loads and no issue names the tile
+
+#### Scenario: Tile picked from the user's computer
+- **WHEN** a mod is opened with a picked tile at `file:///books/kallocain.md` that has `image: "http://localhost:3000/cover.png"`
+- **THEN** a warning issue whose source is `file:///books/kallocain.md` says that tiles from other sites cannot link addresses on the user's computer or network
+
+### Requirement: Hosts on the user's computer or network
+A host SHALL count as on the user's computer or network when, after dropping a trailing `.`, it is `localhost`, a name without a dot, a name ending with `.localhost`, `.local`, `.internal`, `.lan` or `.home.arpa`, or an IPv4 address in `0.0.0.0/8`, `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16` or `100.64.0.0/10`, written in any form the browser reads as one.
+
+#### Scenario: Names
+- **WHEN** tiles from `https://tiles.example.net` link `http://localhost/a.png`, `http://printer.localhost/a.png`, `http://router/a.png`, `http://nas.local./a.png`, `http://db.internal/a.png`, `http://pc.lan/a.png` and `http://hub.home.arpa/a.png`
+- **THEN** each is left out by the private network guard
+
+#### Scenario: Addresses
+- **WHEN** tiles from `https://tiles.example.net` link `http://0.0.0.0/a.png`, `http://127.0.0.1/a.png`, `http://10.1.2.3/a.png`, `http://172.31.0.1/a.png`, `http://192.168.0.1/a.png`, `http://169.254.169.254/a.png` and `http://100.64.0.1/a.png`
+- **THEN** each is left out by the private network guard
+
+#### Scenario: Other forms of an address
+- **WHEN** a tile from `https://tiles.example.net` links `http://2130706433/a.png` or `http://0x7f.1/a.png`
+- **THEN** each is left out by the private network guard
+
+#### Scenario: Public hosts
+- **WHEN** tiles from `https://tiles.example.net` link `http://172.32.0.1/a.png`, `http://8.8.8.8/a.png` and `https://localhost.example.net/a.png`
+- **THEN** none is left out by the private network guard
+
+### Requirement: Tile links are fixed when the mod starts
+The files allowed by tile links SHALL be fixed when the mod's frame starts. After "Reload tiles", the left-out URL reports SHALL be replaced by those of the reloaded tiles, and when the reloaded tiles link files the frame does not allow, one warning issue whose source is the collection SHALL give their number and say that the mod must be opened again to show them.
+
+#### Scenario: New link after reloading the tiles
+- **WHEN** a mod runs with a collection, a tile now has `image: "https://media.example.net/new.jpg"`, and the user presses "Reload tiles"
+- **THEN** the stage bar shows a warning whose source is the collection and that says `The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.`
+- **AND** an image from `https://media.example.net/new.jpg` is blocked in the running mod
+
+#### Scenario: Opened again
+- **WHEN** after that reload the user closes the mod and opens the same link again
+- **THEN** the image from `https://media.example.net/new.jpg` loads and the warning is gone
+
+#### Scenario: Nothing new
+- **WHEN** a mod runs with a collection and the user presses "Reload tiles" without the tiles linking any new file
+- **THEN** no warning says that the mod must be opened again
+
+#### Scenario: Left-out link removed
+- **WHEN** a tile that linked `http://192.168.1.1/logo.png` no longer links it and the user presses "Reload tiles"
+- **THEN** the issue naming `http://192.168.1.1/logo.png` is gone
+
+### Requirement: Redirect hint for tile authors
+When "Load media linked by tiles" was on as the mod started, the report of a blocked image or media request whose host is not declared SHALL end with a sentence for tile authors that says to link the file's final address, because a link that redirects to another site is blocked.
+
+#### Scenario: Tile link that redirects
+- **WHEN** a mod is opened with a tile that has `image: "https://media.example.net/cover.jpg"`, which redirects to `https://cdn.example.org/cover.jpg`, and shows that URL
+- **THEN** the image does not load
+- **AND** a warning issue is reported that says to add the blocked origin to `permissions.show` in `mod_conf.yaml` and ends with `If a tile links this file, link its final address: links that redirect to another site are blocked.`
+
+#### Scenario: No hint for other categories
+- **WHEN** a mod without permissions calls `fetch("https://api.example.net/data")`
+- **THEN** the warning issue has no sentence for tile authors
+
+#### Scenario: No hint with the setting off
+- **WHEN** "Load media linked by tiles" is off and a mod without permissions shows an image from `https://images.example.net/cover.jpg`
+- **THEN** the warning issue is `Blocked image request to https://images.example.net. Add it to permissions.show in mod_conf.yaml.`

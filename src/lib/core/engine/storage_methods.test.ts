@@ -1,0 +1,222 @@
+import { describe, expect, it } from "vitest";
+import { createFullStorage } from "../../../test/memory_storage.ts";
+import { buildMethodContext } from "../../../test/method_contexts.ts";
+import { FIXTURES_BASE_URL } from "../../../test/sample_files.ts";
+import {
+  SAMPLE_COLLECTION_REFERENCE,
+  SAMPLE_COLLECTION_SOURCE,
+  SAMPLE_MOD_REFERENCE,
+  SAMPLE_MOD_SOURCE,
+  SAMPLE_MOSAIC_REFERENCE,
+  SAMPLE_MOSAIC_SOURCE,
+  SAMPLE_TILE_SOURCES,
+} from "../../../test/sample_mods.ts";
+import { launchTestMod } from "../../../test/test_launches.ts";
+import { ModMethodError } from "./engine_errors.ts";
+import { INVALID_PARAMS, STORAGE_FAILED } from "./mod_messages.ts";
+import type { ModMethodContext } from "./mod_methods.ts";
+import { buildLaunchSlot, STORAGE_METHODS } from "./storage_methods.ts";
+
+const SELECTED_VALUE = {
+  source: `${FIXTURES_BASE_URL}tiles/books/kallocain.md`,
+};
+
+function getValue(context: ModMethodContext, params: object): Promise<unknown> {
+  return STORAGE_METHODS["storage.get"](context, params as never);
+}
+
+function setValue(context: ModMethodContext, params: object): Promise<unknown> {
+  return STORAGE_METHODS["storage.set"](context, params as never);
+}
+
+async function catchMethodError(
+  calling: Promise<unknown>,
+): Promise<ModMethodError> {
+  try {
+    await calling;
+  } catch (error) {
+    if (error instanceof ModMethodError) {
+      return error;
+    }
+    throw error;
+  }
+  throw new Error("Expected the request to fail, but it passed");
+}
+
+describe("storage methods", function describeStorageMethods(): void {
+  it("Store and read a value", async function storesValue(): Promise<void> {
+    const context = buildMethodContext([]);
+
+    const setResult = await setValue(context, {
+      key: "selected",
+      value: SELECTED_VALUE,
+    });
+    const value = await getValue(context, { key: "selected" });
+
+    expect(setResult).toBeNull();
+    expect(value).toEqual(SELECTED_VALUE);
+  });
+
+  it("Missing key", async function readsMissingKey(): Promise<void> {
+    const context = buildMethodContext([]);
+
+    expect(await getValue(context, { key: "selected" })).toBeNull();
+  });
+
+  it("Remove a value", async function removesValue(): Promise<void> {
+    const context = buildMethodContext([]);
+    await setValue(context, { key: "selected", value: "kallocain" });
+
+    await setValue(context, { key: "selected", value: null });
+
+    expect(await getValue(context, { key: "selected" })).toBeNull();
+  });
+
+  it("Wrong params", async function rejectsWrongKey(): Promise<void> {
+    const context = buildMethodContext([]);
+
+    const error = await catchMethodError(getValue(context, { key: 3 }));
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toBe('storage.get: "key" must be a non-empty string');
+  });
+
+  it("rejects an empty key for storage.set", async function rejectsEmptyKey(): Promise<void> {
+    const context = buildMethodContext([]);
+
+    const error = await catchMethodError(
+      setValue(context, { key: "", value: 1 }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toContain("storage.set");
+  });
+
+  it("Value that is not plain data", async function rejectsDate(): Promise<void> {
+    const context = buildMethodContext([]);
+
+    const error = await catchMethodError(
+      setValue(context, { key: "selected", value: new Date() }),
+    );
+
+    expect(error.code).toBe(INVALID_PARAMS);
+    expect(error.message).toContain('storage.set: "value" must be plain data');
+  });
+
+  it("rejects values that are not plain data at any depth", async function rejectsNestedValues(): Promise<void> {
+    const context = buildMethodContext([]);
+    const cyclicValue: Record<string, unknown> = {};
+    cyclicValue.self = cyclicValue;
+    const values = [
+      undefined,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      [1, new Map()],
+      { nested: { at: new Date() } },
+      cyclicValue,
+    ];
+
+    for (const value of values) {
+      const error = await catchMethodError(
+        setValue(context, { key: "selected", value }),
+      );
+      expect(error.code).toBe(INVALID_PARAMS);
+    }
+  });
+
+  it("accepts nested plain data", async function acceptsNestedData(): Promise<void> {
+    const context = buildMethodContext([]);
+    const value = {
+      list: [1, "two", true, null, { deep: [] }],
+      empty: Object.create(null) as object,
+    };
+
+    await setValue(context, { key: "selected", value });
+
+    expect(await getValue(context, { key: "selected" })).toEqual({
+      list: [1, "two", true, null, { deep: [] }],
+      empty: {},
+    });
+  });
+
+  it("Storage fails", async function reportsStorageError(): Promise<void> {
+    const context = buildMethodContext([]);
+    context.storage = createFullStorage();
+
+    const error = await catchMethodError(
+      setValue(context, { key: "selected", value: "kallocain" }),
+    );
+
+    expect(error.code).toBe(STORAGE_FAILED);
+    expect(error.message).toBe("The quota has been exceeded.");
+  });
+});
+
+describe("Storage slot of a launch", function describeLaunchSlot(): void {
+  it("is the mosaic file for a mod opened from a mosaic", async function readsMosaicContext(): Promise<void> {
+    const launch = await launchTestMod({
+      mod: "",
+      collection: null,
+      mosaic: SAMPLE_MOSAIC_REFERENCE,
+      params: {},
+    });
+
+    expect(buildLaunchSlot(launch)).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_MOSAIC_SOURCE,
+    });
+  });
+
+  it("is the collection for a mod opened with one", async function readsCollectionContext(): Promise<void> {
+    const launch = await launchTestMod({
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: SAMPLE_COLLECTION_REFERENCE,
+      params: {},
+    });
+
+    expect(buildLaunchSlot(launch)).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_COLLECTION_SOURCE,
+    });
+  });
+
+  it("is the tile for a mod opened with one", async function readsTileContext(): Promise<void> {
+    const launch = await launchTestMod({
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: null,
+      tile: SAMPLE_TILE_SOURCES[1],
+      params: {},
+    });
+
+    expect(buildLaunchSlot(launch)).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_TILE_SOURCES[1],
+    });
+  });
+
+  it("has no context for a mod opened without tiles", async function readsNoContext(): Promise<void> {
+    const launch = await launchTestMod({
+      mod: SAMPLE_MOD_REFERENCE,
+      collection: null,
+      params: {},
+    });
+
+    expect(buildLaunchSlot(launch)).toEqual({
+      mod: SAMPLE_MOD_SOURCE,
+      context: "",
+    });
+  });
+
+  it("reads and writes the session's slot", async function usesContextSlot(): Promise<void> {
+    const context = buildMethodContext([]);
+    context.storageSlot = {
+      mod: SAMPLE_MOD_SOURCE,
+      context: SAMPLE_COLLECTION_SOURCE,
+    };
+    await setValue(context, { key: "selected", value: "kallocain" });
+
+    context.storageSlot = { mod: SAMPLE_MOD_SOURCE, context: "" };
+
+    expect(await getValue(context, { key: "selected" })).toBeNull();
+  });
+});

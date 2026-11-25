@@ -1,0 +1,14 @@
+mosaic:
+  title: "Nobel laureates on the map"
+  description: "The Nobel Prize in Literature laureates on the country map, by their country of birth."
+  mod: "../mods/country_map"
+  collection: "../tiles/literature_nobel_laureates"
+  # The laureates' tiles have `name` and `birth_country`, where the country
+  # map's tile type has `title` and `country`.
+  aliases:
+    title: ["name"]
+    country: ["birth_country"]
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the laureates' portraits"

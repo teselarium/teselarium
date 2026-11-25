@@ -1,0 +1,1292 @@
+import { expect, test } from "@playwright/test";
+import { TEST_CATALOG_PREVIEW_URL } from "./app_servers.ts";
+import type { Dialog, Frame, Page, Request, Route } from "@playwright/test";
+import {
+  addFullscreenButton,
+  answerSiteConsent,
+  buildProbeFiles,
+  COVER_HOST,
+  embedObject,
+  expectMessageCount,
+  expectMessages,
+  expectNoIssues,
+  fetchFromFrame,
+  findModFrame,
+  FOREIGN_HOST,
+  ICON_SVG,
+  importFromFrame,
+  isPageFullscreen,
+  isPopupBlocked,
+  LINKED_APP_PROBE_LINK,
+  LINKED_COLLECTION_PARAM,
+  LINKED_COLLECTION_URL,
+  LINKED_COVER_URL,
+  LINKED_TILE_URL,
+  MEDIA_HOST,
+  navigateFrame,
+  navigateTop,
+  openMessages,
+  readFrameOrigin,
+  readFullscreenOutcome,
+  readLoadedCovers,
+  readParentDocumentError,
+  readProbeContext,
+  readStorageError,
+  recordHost,
+  reloadTiles,
+  requestFromProbe,
+  routeCovers,
+  routeImages,
+  serveAppOriginMod,
+  serveForeignMod,
+  serveLinkedTiles,
+  showAssetNextToMod,
+  showImage,
+  stageBar,
+  visibleSandbox,
+  waitForProbe,
+} from "./mod_routes.ts";
+import { openBodyProbe, showTileBodies } from "./tile_body_routes.ts";
+import {
+  openTilesMod,
+  serveExplorerOfTilesMod,
+  serveTilesMod,
+  TILES_COLLECTION_RUN_HASH,
+  TILES_ENTRYPOINT_PATH,
+  TILES_ITEM_TITLES,
+  TILES_TITLE,
+} from "./test_mods.ts";
+
+/** An address on the app's origin that no test mod serves, for a connection a test records. */
+const APP_ORIGIN_RECORDED_PATH = "/recorded/connection.json";
+
+const EXPLORER_RUN_LINK = "/#/run?mod=mod_explorer";
+const APP_PROBE_LINK = "/#/run?mod=./test-mods/probe/";
+const FOREIGN_PROBE_LINK = `/#/run?mod=${encodeURIComponent(`${FOREIGN_HOST}/probe/`)}`;
+const IMAGES_HOST = "https://images.example.net";
+const OTHER_MODS_HOST = "https://other.example.net";
+const API_HOST = "https://api.example.net";
+const SHOW_COVERS_LINES = [
+  "  permissions:",
+  "    show:",
+  `      - host: "${COVER_HOST}"`,
+  '        reason: "Shows the book covers"',
+];
+const WILDCARD_COVERS_HOST = "https://*.covers.example.net";
+const WILDCARD_COVERS_OWN_HOST = "https://covers.example.net";
+const WILDCARD_COVERS_SUBDOMAIN = "https://a.covers.example.net";
+const SHOW_WILDCARD_COVERS_LINES = buildPermissionLines(
+  "show",
+  WILDCARD_COVERS_HOST,
+);
+
+/** The `permissions` lines of a probe's mod file that declare one host in one category. */
+function buildPermissionLines(category: string, host: string): string[] {
+  const lines = [
+    "  permissions:",
+    `    ${category}:`,
+    `      - host: "${host}"`,
+    '        reason: "Test reason"',
+  ];
+  return lines;
+}
+
+async function openAppProbe(
+  page: Page,
+  extraLines: string[] = [],
+  link: string = APP_PROBE_LINK,
+): Promise<Frame> {
+  await serveAppOriginMod(page, buildProbeFiles("probe", extraLines));
+  await page.goto(link);
+  const frame = await findModFrame(page, "probe");
+  await waitForProbe(frame);
+  return frame;
+}
+
+/** Whether a probe's extra mod lines declare permissions, so a foreign probe asks for consent. */
+function declaresPermissions(extraLines: string[]): boolean {
+  return extraLines.includes("  permissions:");
+}
+
+/**
+ * Opens the probe from the foreign host. When it declares permissions, the
+ * site consent dialog is answered with `answer`, Show without them unless
+ * given, so the probe runs as a foreign mod without its permissions.
+ */
+async function openForeignProbe(
+  page: Page,
+  extraLines: string[] = [],
+  answer: "Allow" | "Show without them" = "Show without them",
+): Promise<{ frame: Frame; seenUrls: string[] }> {
+  const seenUrls = await serveForeignMod(
+    page,
+    buildProbeFiles("probe", extraLines),
+  );
+  await page.goto(FOREIGN_PROBE_LINK);
+  if (declaresPermissions(extraLines)) {
+    await answerSiteConsent(page, answer);
+  }
+  const frame = await findModFrame(page, "probe");
+  await waitForProbe(frame);
+  const openedProbe = { frame, seenUrls };
+  return openedProbe;
+}
+
+test.describe(
+  "Each mod runs in its own sandboxed frame",
+  { tag: "@frames" },
+  function describeFrames(): void {
+    test("Frame sandbox", async function checksFrameSandbox({
+      page,
+    }): Promise<void> {
+      const frame = await openAppProbe(page);
+      const frameElement = page.locator('iframe[title="probe"]');
+
+      await expect(frameElement).toHaveAttribute("sandbox", "allow-scripts");
+      await expect(frameElement).not.toHaveAttribute("src");
+      expect(await frame.evaluate(readFrameOrigin)).toBe("null");
+    });
+
+    test("No storage access", async function blocksStorage({
+      page,
+    }): Promise<void> {
+      await page.goto(EXPLORER_RUN_LINK);
+      await page.evaluate(setAppStorageItem);
+      const frame = await openAppProbe(page);
+
+      expect(await frame.evaluate(readStorageError)).toBe("SecurityError");
+      expect(await page.evaluate(readAppStorageItem)).toBe("kept");
+    });
+
+    test("No access to the app page", async function blocksParentDocument({
+      page,
+    }): Promise<void> {
+      const frame = await openAppProbe(page);
+
+      expect(await frame.evaluate(readParentDocumentError)).toBe(
+        "SecurityError",
+      );
+    });
+
+    test("Mod opened by another mod", async function opensSiblingFrame({
+      page,
+    }): Promise<void> {
+      await serveExplorerOfTilesMod(page);
+      await page.goto(`${TEST_CATALOG_PREVIEW_URL}${EXPLORER_RUN_LINK}`);
+      const explorer = await findModFrame(page, "Mods");
+
+      await explorer.getByRole("button", { name: /Tiles/ }).click();
+      await expect(stageBar(page)).toContainText("Mod Viewer");
+
+      expect(page.mainFrame().childFrames()).toHaveLength(2);
+      expect(explorer.childFrames()).toHaveLength(0);
+      const viewer = await findModFrame(page, "Mod Viewer");
+      expect(viewer.parentFrame()).toBe(page.mainFrame());
+    });
+  },
+);
+
+function setAppStorageItem(): void {
+  localStorage.setItem("app-item", "kept");
+}
+
+function readAppStorageItem(): string | null {
+  return localStorage.getItem("app-item");
+}
+
+test.describe(
+  "A mod cannot navigate the app or open windows",
+  { tag: "@frames" },
+  function describeNavigation(): void {
+    test("Top navigation is blocked", async function blocksTopNavigation({
+      page,
+    }): Promise<void> {
+      const frame = await openAppProbe(page);
+      const appUrl = page.url();
+
+      const errorName = await frame.evaluate(
+        navigateTop,
+        "https://example.org/",
+      );
+
+      expect(errorName).toBe("SecurityError");
+      expect(page.url()).toBe(appUrl);
+    });
+
+    test("Popups are blocked", async function blocksPopups({
+      page,
+      context,
+    }): Promise<void> {
+      const frame = await openAppProbe(page);
+
+      expect(await frame.evaluate(isPopupBlocked, "https://example.org/")).toBe(
+        true,
+      );
+      expect(context.pages()).toHaveLength(1);
+    });
+  },
+);
+
+test.describe(
+  "The engine delivers the mod code",
+  { tag: "@frames" },
+  function describeDelivery(): void {
+    test("Entrypoint requested by the app", async function requestsEntrypoint({
+      page,
+    }): Promise<void> {
+      const entrypointRequests: Request[] = [];
+      page.on(
+        "request",
+        recordEntrypointRequest.bind(undefined, entrypointRequests),
+      );
+      await serveTilesMod(page);
+
+      await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
+      await expect(
+        page
+          .frameLocator(`iframe[title="${TILES_TITLE}"]`)
+          .getByText(TILES_ITEM_TITLES[0]),
+      ).toBeVisible();
+
+      expect(entrypointRequests).toHaveLength(1);
+      expect(entrypointRequests[0].frame()).toBe(page.mainFrame());
+    });
+  },
+);
+
+function recordEntrypointRequest(requests: Request[], request: Request): void {
+  if (request.url().endsWith(TILES_ENTRYPOINT_PATH)) {
+    requests.push(request);
+  }
+}
+
+test.describe(
+  "The mod entrypoint is mounted",
+  { tag: "@frames" },
+  function describeMount(): void {
+    test("Sample mod mounts", async function mountsMod({
+      page,
+    }): Promise<void> {
+      const frame = await openTilesMod(page);
+
+      await expect(frame.getByRole("listitem")).toHaveText(TILES_ITEM_TITLES);
+      const context = await frame.evaluate(readProbeContext);
+      expect(context.tiles).toHaveLength(3);
+    });
+
+    test("No default export function", async function reportsMissingMount({
+      page,
+    }): Promise<void> {
+      await serveAppOriginMod(page, {
+        "broken/mod_conf.yaml":
+          'mod:\n  title: "broken"\n  version: "0.1.0"\n  entrypoint: "./main.js"',
+        "broken/main.js": "export const notMount = 1;\n",
+      });
+
+      await page.goto("/#/run?mod=./test-mods/broken/");
+
+      await expectMessages(
+        page,
+        "Errors",
+        "the entrypoint has no default export function",
+      );
+    });
+
+    test("Mount throws", async function reportsMountError({
+      page,
+    }): Promise<void> {
+      await serveAppOriginMod(page, {
+        "broken/mod_conf.yaml":
+          'mod:\n  title: "broken"\n  version: "0.1.0"\n  entrypoint: "./main.js"',
+        "broken/main.js":
+          'export default function mount() { throw new Error("map failed"); }\n',
+      });
+
+      await page.goto("/#/run?mod=./test-mods/broken/");
+
+      await expectMessages(
+        page,
+        "Errors",
+        "map failed",
+        "/test-mods/broken/mod_conf.yaml",
+      );
+    });
+  },
+);
+
+test.describe(
+  "Default content policy",
+  { tag: "@frames" },
+  function describeDefaultPolicy(): void {
+    test("Image from a content host", async function loadsContentHostImage({
+      page,
+    }): Promise<void> {
+      const frame = await openAppProbe(page);
+      const appOrigin = new URL(page.url()).origin;
+
+      expect(await frame.evaluate(showImage, `${appOrigin}/favicon.svg`)).toBe(
+        true,
+      );
+    });
+
+    test("Image from another host", async function blocksOtherImage({
+      page,
+    }): Promise<void> {
+      const seenUrls = await recordHost(page, `${IMAGES_HOST}/**`);
+      const frame = await openAppProbe(page);
+
+      expect(await frame.evaluate(showImage, `${IMAGES_HOST}/cover.jpg`)).toBe(
+        false,
+      );
+      await expectMessages(page, "Warnings", IMAGES_HOST);
+      expect(seenUrls).toEqual([]);
+    });
+
+    test("Connections are blocked", async function blocksConnections({
+      page,
+    }): Promise<void> {
+      const seenUrls = await recordHost(page, `**${APP_ORIGIN_RECORDED_PATH}`);
+      const frame = await openAppProbe(page);
+      const appOrigin = new URL(page.url()).origin;
+
+      const outcome = await frame.evaluate(
+        fetchFromFrame,
+        `${appOrigin}${APP_ORIGIN_RECORDED_PATH}`,
+      );
+
+      expect(outcome).not.toBe("sent");
+      expect(seenUrls).toEqual([]);
+    });
+
+    test("Remote scripts are blocked", async function blocksRemoteScripts({
+      page,
+    }): Promise<void> {
+      const seenUrls = await recordHost(page, "https://cdn.example.net/**");
+      const frame = await openAppProbe(page);
+
+      const outcome = await frame.evaluate(
+        importFromFrame,
+        "https://cdn.example.net/library.js",
+      );
+
+      expect(outcome).not.toBe("imported");
+      expect(seenUrls).toEqual([]);
+      await expectMessages(page, "Warnings", "permissions.code");
+    });
+  },
+);
+
+test.describe(
+  "Content hosts",
+  { tag: "@frames" },
+  function describeContentHosts(): void {
+    test("Tile from another host", async function allowsTileHost({
+      page,
+    }): Promise<void> {
+      await page.route("https://tiles.example.net/**", answerRemoteTile);
+      await serveAppOriginMod(page, {
+        ...buildProbeFiles("probe"),
+        "remote_tiles.yaml": [
+          "collection:",
+          '  title: "Remote tiles"',
+          "  tiles:",
+          '    - url: "https://tiles.example.net/books/kallocain.md"',
+        ].join("\n"),
+      });
+      await page.goto(
+        `${APP_PROBE_LINK}&collection=./test-mods/remote_tiles.yaml`,
+      );
+      const frame = await findModFrame(page, "probe");
+      await waitForProbe(frame);
+
+      const context = await frame.evaluate(readProbeContext);
+
+      expect(context.tiles).toHaveLength(1);
+      expect(
+        await frame.evaluate(showImage, "https://tiles.example.net/cover.png"),
+      ).toBe(true);
+    });
+  },
+);
+
+async function answerRemoteTile(route: Route): Promise<void> {
+  const url = route.request().url();
+  if (url.endsWith(".md")) {
+    await route.fulfill({
+      status: 200,
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: '---\ntitle: "Kallocain"\n---\n\nA remote tile.\n',
+    });
+    return;
+  }
+  await route.fulfill({
+    status: 200,
+    contentType: "image/svg+xml",
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>',
+  });
+}
+
+/** A mosaic of the probe on the app's origin that declares `show` for `IMAGES_HOST`, and nothing the probe needs. */
+const SITES_MOSAIC_FILE = [
+  "mosaic:",
+  '  title: "Images"',
+  '  mod: "../probe/"',
+  "  config:",
+  "    from_mosaic: true",
+  "  permissions:",
+  "    show:",
+  `      - host: "${IMAGES_HOST}"`,
+  '        reason: "Shows the images"',
+].join("\n");
+
+test.describe(
+  "Sites from a mosaic",
+  { tag: "@frames" },
+  function describeSites(): void {
+    test("Sites link from the app's origin", async function grantsSitesLines({
+      page,
+    }): Promise<void> {
+      await routeImages(page, `${IMAGES_HOST}/**`);
+      await serveAppOriginMod(page, {
+        ...buildProbeFiles("other"),
+        "mosaics/images.yaml": SITES_MOSAIC_FILE,
+      });
+
+      await page.goto(
+        "/#/run?mod=./test-mods/other/&sites=./test-mods/mosaics/images.yaml",
+      );
+      const frame = await findModFrame(page, "other");
+      await waitForProbe(frame);
+
+      expect(await frame.evaluate(showImage, `${IMAGES_HOST}/other.jpg`)).toBe(
+        true,
+      );
+      const context = await frame.evaluate(readProbeContext);
+      expect(context.mosaic).toBeNull();
+      expect(context.params).toEqual({});
+      expect(context.config).not.toHaveProperty("from_mosaic");
+      expect(context.permissions).toEqual({
+        granted: [
+          { category: "show", host: IMAGES_HOST, reason: "Shows the images" },
+        ],
+        denied: [],
+      });
+      await expectNoIssues(page);
+    });
+  },
+);
+
+test.describe(
+  "Grant declared permissions to mods from the app's origin",
+  { tag: "@frames" },
+  function describeGrants(): void {
+    test("Sample covers are shown", async function showsCovers({
+      page,
+    }): Promise<void> {
+      await serveTilesMod(page);
+      const coverUrls = await routeCovers(page);
+      await page.goto(`/${TILES_COLLECTION_RUN_HASH}`);
+      const frame = await findModFrame(page, TILES_TITLE);
+      await expect(frame.getByRole("img")).toHaveCount(3);
+
+      await expect
+        .poll(function countCovers(): Promise<number> {
+          return frame.evaluate(readLoadedCovers).then(countItems);
+        })
+        .toBe(3);
+      expect(coverUrls).toHaveLength(3);
+    });
+
+    test("Declared connection", async function sendsDeclaredConnection({
+      page,
+    }): Promise<void> {
+      const seenUrls = await recordHost(page, `${API_HOST}/**`);
+      const frame = await openAppProbe(page, [
+        "  permissions:",
+        "    connect:",
+        `      - host: "${API_HOST}"`,
+        '        reason: "Reads the data"',
+      ]);
+
+      expect(await frame.evaluate(fetchFromFrame, `${API_HOST}/data`)).toBe(
+        "sent",
+      );
+      expect(seenUrls).toEqual([`${API_HOST}/data`]);
+    });
+  },
+);
+
+function countItems(items: unknown[]): number {
+  return items.length;
+}
+
+test.describe(
+  "Mods from other origins get the permissions the user allows",
+  { tag: "@frames" },
+  function describeForeignMods(): void {
+    test("Foreign mod with a show permission", async function deniesForeignShow({
+      page,
+    }): Promise<void> {
+      const coverUrls = await routeCovers(page);
+      const { frame } = await openForeignProbe(page, SHOW_COVERS_LINES);
+
+      await expectMessages(
+        page,
+        "Warnings",
+        `Permission not granted: show content from ${COVER_HOST} ("Shows the book covers"). Mods from other sites get only the permissions you allow.`,
+      );
+      expect(await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`)).toBe(
+        false,
+      );
+      expect(coverUrls).toEqual([]);
+    });
+
+    test("Foreign mod with an allowed show permission", async function grantsForeignShow({
+      page,
+    }): Promise<void> {
+      const coverUrls = await routeCovers(page);
+      const { frame } = await openForeignProbe(
+        page,
+        SHOW_COVERS_LINES,
+        "Allow",
+      );
+
+      expect(await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`)).toBe(
+        true,
+      );
+      expect(coverUrls).toEqual([`${COVER_HOST}/cover.jpg`]);
+      await expectNoIssues(page);
+    });
+
+    test("Foreign mod with an allowed open permission", async function grantsForeignOpen({
+      page,
+    }): Promise<void> {
+      const clockUrls = await serveForeignMod(
+        page,
+        buildProbeFiles("clock"),
+        OTHER_MODS_HOST,
+      );
+      const { frame } = await openForeignProbe(
+        page,
+        buildPermissionLines("open", "*"),
+        "Allow",
+      );
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "mods.inspect",
+        { mod: `${OTHER_MODS_HOST}/clock/` },
+      ]);
+
+      expect(answer.code).toBeUndefined();
+      expect(answer.result).toMatchObject({ title: "clock" });
+      expect(clockUrls).toEqual([`${OTHER_MODS_HOST}/clock/mod_conf.yaml`]);
+    });
+
+    test("Foreign mod without permissions", async function reportsNothing({
+      page,
+    }): Promise<void> {
+      await openForeignProbe(page);
+
+      await expectNoIssues(page);
+    });
+  },
+);
+
+test.describe(
+  "Report blocked requests with the fix",
+  { tag: "@frames" },
+  function describeReports(): void {
+    test("Undeclared image host", async function reportsImageHost({
+      page,
+    }): Promise<void> {
+      await recordHost(page, `${IMAGES_HOST}/**`);
+      const frame = await openAppProbe(page);
+
+      await frame.evaluate(showImage, `${IMAGES_HOST}/cover.jpg`);
+
+      await expectMessages(
+        page,
+        "Warnings",
+        `Blocked image request to ${IMAGES_HOST}. Add it to permissions.show in mod_conf.yaml.`,
+      );
+    });
+
+    test("Undeclared connection", async function reportsConnection({
+      page,
+    }): Promise<void> {
+      await recordHost(page, `${API_HOST}/**`);
+      const frame = await openAppProbe(page);
+
+      await frame.evaluate(fetchFromFrame, `${API_HOST}/data`);
+
+      await expectMessages(
+        page,
+        "Warnings",
+        `Blocked connection request to ${API_HOST}. Add it to permissions.connect in mod_conf.yaml.`,
+      );
+    });
+
+    test("Declared but not granted", async function reportsDenied({
+      page,
+    }): Promise<void> {
+      await routeCovers(page);
+      const { frame } = await openForeignProbe(page, SHOW_COVERS_LINES);
+
+      await frame.evaluate(showImage, `${COVER_HOST}/cover.jpg`);
+
+      await expectMessages(
+        page,
+        "Warnings",
+        `Blocked image request to ${COVER_HOST}: the mod declares it in permissions.show, but the permission was not granted.`,
+      );
+    });
+
+    test("Request blocked by another rule", async function reportsObjectSrc({
+      page,
+    }): Promise<void> {
+      await recordHost(page, "https://example.org/**");
+      const frame = await openAppProbe(page);
+
+      await frame.evaluate(embedObject, "https://example.org/file.pdf");
+
+      await expectMessages(
+        page,
+        "Warnings",
+        "Blocked by the sandbox policy (object-src).",
+      );
+    });
+
+    test("Repeated block is reported once", async function reportsOnce({
+      page,
+    }): Promise<void> {
+      await recordHost(page, `${IMAGES_HOST}/**`);
+      const frame = await openAppProbe(page);
+
+      await frame.evaluate(showImage, `${IMAGES_HOST}/a.jpg`);
+      await frame.evaluate(showImage, `${IMAGES_HOST}/b.jpg`);
+      await frame.evaluate(showImage, `${IMAGES_HOST}/c.jpg`);
+      await expectMessages(page, "Warnings", IMAGES_HOST);
+
+      await expectMessageCount(page, "Warnings", 1);
+    });
+  },
+);
+
+const ROUTER_LOGO_URL = "http://192.168.1.1/logo.png";
+/** A linked cover whose path has a comma, as some real covers' paths have. */
+const COMMA_COVER_URL = `${MEDIA_HOST}/covers/chronicles,_volume_1.jpg`;
+
+const REDIRECT_HINT =
+  "If a tile links this file, link its final address: links that redirect to another site are blocked.";
+
+/** Opens the app's probe with the linked collection. */
+async function openLinkedAppProbe(page: Page): Promise<Frame> {
+  const frame = await openAppProbe(page, [], LINKED_APP_PROBE_LINK);
+  return frame;
+}
+
+/** Runs in a mod frame: starts loading `url` in an `<audio>` element. */
+function loadAudio(url: string): void {
+  const audio = document.createElement("audio");
+  audio.preload = "auto";
+  audio.src = url;
+  document.body.append(audio);
+  audio.load();
+}
+
+async function answerRedirect(location: string, route: Route): Promise<void> {
+  await route.fulfill({ status: 302, headers: { Location: location } });
+}
+
+/** Runs in a mod frame: whether the image of the rendered body loaded. */
+function isBodyImageLoaded(): boolean {
+  const image = document.querySelector("tes-tile-body img") as HTMLImageElement;
+  return image.complete && image.naturalWidth > 0;
+}
+
+/**
+ * Opens the app's probe, without permissions, with a linked tile whose
+ * `image` is `imageUrl`, and shows that image in the probe. Returns whether
+ * it loaded.
+ */
+async function showLinkedImage(page: Page, imageUrl: string): Promise<boolean> {
+  await serveLinkedTiles(page, [`image: "${imageUrl}"`]);
+  await routeImages(page, `${MEDIA_HOST}/**`);
+  const frame = await openLinkedAppProbe(page);
+  const isLoaded = await frame.evaluate(showImage, imageUrl);
+  return isLoaded;
+}
+
+test.describe(
+  "Media linked by tiles",
+  { tag: "@frames" },
+  function describeLinkedMedia(): void {
+    test("Image linked by a tile", async function loadsLinkedImage({
+      page,
+    }): Promise<void> {
+      await serveLinkedTiles(page, [`image: "${LINKED_COVER_URL}"`]);
+      const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+      const frame = await openLinkedAppProbe(page);
+
+      expect(await frame.evaluate(showImage, LINKED_COVER_URL)).toBe(true);
+      expect(seenUrls).toEqual([LINKED_COVER_URL]);
+      await expectNoIssues(page);
+    });
+
+    test("Audio linked by a tile", async function sendsLinkedAudio({
+      page,
+    }): Promise<void> {
+      const audioUrl = `${MEDIA_HOST}/sound/theme.mp3`;
+      await serveLinkedTiles(page, [`audio: "${audioUrl}"`]);
+      const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+      const frame = await openLinkedAppProbe(page);
+
+      await frame.evaluate(loadAudio, audioUrl);
+
+      await expect
+        .poll(function readSeenUrls(): string[] {
+          return seenUrls;
+        })
+        .toContain(audioUrl);
+      await expectNoIssues(page);
+    });
+
+    test("Image in the body", async function loadsBodyImage({
+      page,
+    }): Promise<void> {
+      const imageUrl = `${MEDIA_HOST}/body.jpg`;
+      const { frame, mediaUrls } = await openBodyProbe(page, [
+        { name: "still", body: `![Still](${imageUrl})` },
+      ]);
+
+      await frame.evaluate(showTileBodies, [0]);
+
+      await expect
+        .poll(frame.evaluate.bind(frame, isBodyImageLoaded))
+        .toBe(true);
+      expect(mediaUrls).toEqual([imageUrl]);
+      await expectNoIssues(page);
+    });
+
+    test("Video and poster in the body", async function sendsBodyVideo({
+      page,
+    }): Promise<void> {
+      const videoUrl = `${MEDIA_HOST}/trailer.mp4`;
+      const posterUrl = `${MEDIA_HOST}/still.jpg`;
+      const { frame, mediaUrls } = await openBodyProbe(page, [
+        {
+          name: "trailer",
+          body: `<video src="${videoUrl}" poster="${posterUrl}"></video>`,
+        },
+      ]);
+
+      await frame.evaluate(showTileBodies, [0]);
+
+      await expect
+        .poll(function readMediaUrls(): string[] {
+          return [...mediaUrls].sort();
+        })
+        .toEqual([posterUrl, videoUrl]);
+      await expectNoIssues(page);
+    });
+
+    test("URL in the body", async function blocksBodyText({
+      page,
+    }): Promise<void> {
+      const textUrl = `${MEDIA_HOST}/text.jpg`;
+      const { frame, mediaUrls } = await openBodyProbe(page, [
+        { name: "text", body: `See ${textUrl}` },
+      ]);
+
+      expect(await frame.evaluate(showImage, textUrl)).toBe(false);
+      expect(mediaUrls).toEqual([]);
+    });
+
+    test("Mod from another origin", async function loadsLinkForForeignMod({
+      page,
+    }): Promise<void> {
+      const coverUrl = `${MEDIA_HOST}/cover.jpg`;
+      await serveLinkedTiles(page, [`image: "${coverUrl}"`]);
+      await routeImages(page, `${MEDIA_HOST}/**`);
+      await serveForeignMod(page, buildProbeFiles("probe"));
+      await page.goto(`${FOREIGN_PROBE_LINK}${LINKED_COLLECTION_PARAM}`);
+      const frame = await findModFrame(page, "probe");
+      await waitForProbe(frame);
+
+      expect(await frame.evaluate(showImage, coverUrl)).toBe(true);
+    });
+  },
+);
+
+test.describe(
+  "A tile link allows only the linked file",
+  { tag: "@frames" },
+  function describeOnlyLinkedFile(): void {
+    test("Other file of the same host", async function blocksOtherFile({
+      page,
+    }): Promise<void> {
+      const otherUrl = `${MEDIA_HOST}/covers/other.jpg`;
+      await serveLinkedTiles(page, [`image: "${LINKED_COVER_URL}"`]);
+      const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+      const frame = await openLinkedAppProbe(page);
+
+      expect(await frame.evaluate(showImage, otherUrl)).toBe(false);
+      expect(seenUrls).toEqual([]);
+      await expectMessages(page, "Warnings", MEDIA_HOST);
+    });
+
+    test("Comma in the path", async function loadsCommaPath({
+      page,
+    }): Promise<void> {
+      const isLoaded = await showLinkedImage(page, COMMA_COVER_URL);
+
+      expect(isLoaded).toBe(true);
+      await expectNoIssues(page);
+    });
+
+    test("Brackets and vertical bar in the path", async function loadsBracketsAndBarPath({
+      page,
+    }): Promise<void> {
+      const isLoaded = await showLinkedImage(page, `${MEDIA_HOST}/a[1]|b.jpg`);
+
+      expect(isLoaded).toBe(true);
+      await expectNoIssues(page);
+    });
+
+    test("Other file next to a link with a comma", async function blocksFileNextToComma({
+      page,
+    }): Promise<void> {
+      const otherUrl = `${MEDIA_HOST}/covers/chronicles.jpg`;
+      await serveLinkedTiles(page, [`image: "${COMMA_COVER_URL}"`]);
+      const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+      const frame = await openLinkedAppProbe(page);
+
+      expect(await frame.evaluate(showImage, otherUrl)).toBe(false);
+      expect(seenUrls).toEqual([]);
+    });
+  },
+);
+
+test.describe(
+  "Tile links allow only images, video and audio",
+  { tag: "@frames" },
+  function describeOnlyMedia(): void {
+    test("Linked file fetched", async function blocksLinkedFetch({
+      page,
+    }): Promise<void> {
+      await serveLinkedTiles(page, [`image: "${LINKED_COVER_URL}"`]);
+      const seenUrls = await recordHost(page, `${MEDIA_HOST}/**`);
+      const frame = await openLinkedAppProbe(page);
+
+      const outcome = await frame.evaluate(fetchFromFrame, LINKED_COVER_URL);
+
+      expect(outcome).not.toBe("sent");
+      expect(seenUrls).toEqual([]);
+    });
+  },
+);
+
+test.describe(
+  "Tile links the sandbox cannot express",
+  { tag: "@frames" },
+  function describeUnexpressibleLinks(): void {
+    test("Semicolon in the path", async function loadsSemicolonPath({
+      page,
+    }): Promise<void> {
+      const isLoaded = await showLinkedImage(page, `${MEDIA_HOST}/a;b.jpg`);
+
+      expect(isLoaded).toBe(true);
+      await expectNoIssues(page);
+    });
+  },
+);
+
+test.describe(
+  "Private network guard",
+  { tag: "@frames" },
+  function describePrivateNetworkGuard(): void {
+    test("Router address in a tile from the web", async function leavesOutRouter({
+      page,
+    }): Promise<void> {
+      await serveLinkedTiles(page, [`logo: "${ROUTER_LOGO_URL}"`]);
+      const seenUrls = await recordHost(page, "http://192.168.1.1/**");
+      const frame = await openLinkedAppProbe(page);
+
+      expect(await frame.evaluate(showImage, ROUTER_LOGO_URL)).toBe(false);
+      await expectMessages(
+        page,
+        "Warnings",
+        `Not loading ${ROUTER_LOGO_URL}: tiles from other sites cannot link addresses on your computer or network.`,
+        LINKED_TILE_URL,
+      );
+      expect(seenUrls).toEqual([]);
+    });
+  },
+);
+
+test.describe(
+  "Redirect hint for tile authors",
+  { tag: "@frames" },
+  function describeRedirectHint(): void {
+    test("Tile link that redirects", async function hintsRedirect({
+      page,
+      browserName,
+    }): Promise<void> {
+      // Playwright's WebKit cannot fulfill a route with a redirect status. The
+      // hint does not depend on the browser: sandbox_reports.test.ts covers it.
+      test.skip(
+        browserName === "webkit",
+        "Playwright cannot fulfill a route with a 302 in WebKit",
+      );
+      const coverUrl = `${MEDIA_HOST}/cover.jpg`;
+      await serveLinkedTiles(page, [`image: "${coverUrl}"`]);
+      await page.route(
+        `${MEDIA_HOST}/**`,
+        answerRedirect.bind(undefined, "https://cdn.example.org/cover.jpg"),
+      );
+      const seenUrls = await routeImages(page, "https://cdn.example.org/**");
+      const frame = await openLinkedAppProbe(page);
+
+      expect(await frame.evaluate(showImage, coverUrl)).toBe(false);
+      await expectMessages(
+        page,
+        "Warnings",
+        "Add it to permissions.show in mod_conf.yaml.",
+        REDIRECT_HINT,
+      );
+      expect(seenUrls).toEqual([]);
+    });
+  },
+);
+
+test.describe(
+  "Tile links are fixed when the mod starts",
+  { tag: "@frames" },
+  function describeFixedTileLinks(): void {
+    test("New link after reloading the tiles", async function reportsNewLink({
+      page,
+    }): Promise<void> {
+      const newUrl = `${MEDIA_HOST}/new.jpg`;
+      const linkedTile = await serveLinkedTiles(page, [
+        `image: "${LINKED_COVER_URL}"`,
+      ]);
+      const seenUrls = await routeImages(page, `${MEDIA_HOST}/**`);
+      const frame = await openLinkedAppProbe(page);
+      linkedTile.metadataLines = [`image: "${newUrl}"`];
+
+      await reloadTiles(page);
+
+      await expectMessages(
+        page,
+        "Warnings",
+        "The reloaded tiles link 1 file that this mod does not allow yet. Open the mod again to show it.",
+        LINKED_COLLECTION_URL,
+      );
+      expect(await frame.evaluate(showImage, newUrl)).toBe(false);
+      expect(seenUrls).toEqual([]);
+    });
+  },
+);
+
+test.describe(
+  "Wildcard hosts cover subdomains",
+  { tag: "@frames" },
+  function describeWildcardHosts(): void {
+    test("Image from a subdomain of a granted wildcard host", async function showsWildcardImage({
+      page,
+    }): Promise<void> {
+      const seenUrls = await routeImages(
+        page,
+        `${WILDCARD_COVERS_SUBDOMAIN}/**`,
+      );
+      const frame = await openAppProbe(page, SHOW_WILDCARD_COVERS_LINES);
+
+      expect(
+        await frame.evaluate(
+          showImage,
+          `${WILDCARD_COVERS_SUBDOMAIN}/cover.jpg`,
+        ),
+      ).toBe(true);
+      expect(seenUrls).toEqual([`${WILDCARD_COVERS_SUBDOMAIN}/cover.jpg`]);
+    });
+
+    test("Deeper subdomain", async function sendsDeeperConnection({
+      page,
+    }): Promise<void> {
+      const deeperHost = "https://a.b.example.net";
+      const seenUrls = await recordHost(page, `${deeperHost}/**`);
+      const frame = await openAppProbe(
+        page,
+        buildPermissionLines("connect", "https://*.example.net"),
+      );
+
+      expect(await frame.evaluate(fetchFromFrame, `${deeperHost}/data`)).toBe(
+        "sent",
+      );
+      expect(seenUrls).toEqual([`${deeperHost}/data`]);
+    });
+
+    test("The wildcard's own host name is not covered", async function blocksWildcardOwnHost({
+      page,
+    }): Promise<void> {
+      const seenUrls = await recordHost(page, `${WILDCARD_COVERS_OWN_HOST}/**`);
+      const frame = await openAppProbe(page, SHOW_WILDCARD_COVERS_LINES);
+
+      expect(
+        await frame.evaluate(
+          showImage,
+          `${WILDCARD_COVERS_OWN_HOST}/cover.jpg`,
+        ),
+      ).toBe(false);
+      await expectMessages(
+        page,
+        "Warnings",
+        `Blocked image request to ${WILDCARD_COVERS_OWN_HOST}. Add it to permissions.show in mod_conf.yaml.`,
+      );
+      expect(seenUrls).toEqual([]);
+    });
+
+    test("Other scheme is not covered", async function blocksWildcardOtherScheme({
+      page,
+    }): Promise<void> {
+      const httpSubdomain = "http://a.covers.example.net";
+      const seenUrls = await recordHost(page, `${httpSubdomain}/**`);
+      const frame = await openAppProbe(page, SHOW_WILDCARD_COVERS_LINES);
+
+      expect(
+        await frame.evaluate(showImage, `${httpSubdomain}/cover.jpg`),
+      ).toBe(false);
+      expect(seenUrls).toEqual([]);
+    });
+
+    test("Wildcard host declared but not granted", async function reportsDeniedWildcard({
+      page,
+    }): Promise<void> {
+      await routeImages(page, `${WILDCARD_COVERS_SUBDOMAIN}/**`);
+      const { frame } = await openForeignProbe(
+        page,
+        SHOW_WILDCARD_COVERS_LINES,
+      );
+
+      await frame.evaluate(showImage, `${WILDCARD_COVERS_SUBDOMAIN}/cover.jpg`);
+
+      await expectMessages(
+        page,
+        "Warnings",
+        `Blocked image request to ${WILDCARD_COVERS_SUBDOMAIN}: the mod declares it in permissions.show, but the permission was not granted.`,
+      );
+    });
+  },
+);
+
+test.describe(
+  "Stop a mod that navigates its frame",
+  { tag: "@frames" },
+  function describeNavigatingMod(): void {
+    test("Mod navigates its frame", async function stopsNavigatingMod({
+      page,
+    }): Promise<void> {
+      await page.route("https://example.org/**", answerBlankPage);
+      const frame = await openAppProbe(page);
+
+      await frame
+        .evaluate(navigateFrame, "https://example.org/")
+        .catch(ignoreError);
+
+      await expect(visibleSandbox(page).locator("iframe")).toHaveCount(0);
+      await expectMessages(
+        page,
+        "Errors",
+        "The mod left its page and was stopped.",
+      );
+    });
+  },
+);
+
+async function answerBlankPage(route: Route): Promise<void> {
+  await route.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: "<!doctype html><title>Elsewhere</title>",
+  });
+}
+
+function ignoreError(): void {
+  // The frame's document is replaced while the evaluation runs.
+}
+
+/** Records every browser dialog the page or its frames show. */
+function recordDialogs(page: Page): Dialog[] {
+  const dialogs: Dialog[] = [];
+  page.on("dialog", Array.prototype.push.bind(dialogs));
+  return dialogs;
+}
+
+function callConfirm(): boolean {
+  return confirm("Delete?");
+}
+
+function callAlertThreeTimes(): void {
+  alert("a");
+  alert("a");
+  alert("a");
+}
+
+function callPromptAndPrint(): string | null {
+  const answer = prompt("Name?");
+  print();
+  return answer;
+}
+
+test.describe(
+  "Blocked browser dialogs are reported",
+  { tag: "@frames" },
+  function describeBlockedDialogs(): void {
+    test("Confirm", async function reportsConfirm({ page }): Promise<void> {
+      const dialogs = recordDialogs(page);
+      const frame = await openAppProbe(page);
+
+      const answer = await frame.evaluate(callConfirm);
+
+      expect(answer).toBe(false);
+      await expectMessages(
+        page,
+        "Warnings",
+        'confirm() is not available in mods and always returns false. Use a <dialog> element, or request "ui.confirm" for a confirmation shown by the app.',
+        "/test-mods/probe/mod_conf.yaml",
+      );
+      expect(dialogs).toEqual([]);
+    });
+
+    test("Reported once", async function reportsAlertOnce({
+      page,
+    }): Promise<void> {
+      const frame = await openAppProbe(page);
+
+      await frame.evaluate(callAlertThreeTimes);
+
+      await expectMessages(page, "Warnings", "alert()");
+      await expectMessageCount(page, "Warnings", 1);
+    });
+
+    test("Each function is named", async function namesEachFunction({
+      page,
+    }): Promise<void> {
+      const dialogs = recordDialogs(page);
+      const frame = await openAppProbe(page);
+
+      const answer = await frame.evaluate(callPromptAndPrint);
+
+      expect(answer).toBeNull();
+      await expectMessageCount(page, "Warnings", 2);
+      const items = (await openMessages(page, "Warnings")).getByRole(
+        "listitem",
+      );
+      await expect(items.filter({ hasText: "prompt()" })).toHaveCount(1);
+      await expect(items.filter({ hasText: "print()" })).toHaveCount(1);
+      expect(dialogs).toEqual([]);
+    });
+  },
+);
+
+const OPEN_ANY_SITE_LINES = [
+  "  permissions:",
+  "    open:",
+  '      - host: "*"',
+  '        reason: "Opens mods"',
+];
+
+async function goFullscreen(page: Page, frame: Frame): Promise<void> {
+  await frame.evaluate(addFullscreenButton);
+  await page
+    .frameLocator('iframe[title="probe"]')
+    .getByRole("button", { name: "Fullscreen" })
+    .click();
+}
+
+test.describe(
+  "Mods can go fullscreen",
+  { tag: "@frames" },
+  function describeFullscreen(): void {
+    test("Fullscreen after a click", async function goesFullscreen({
+      page,
+    }): Promise<void> {
+      const frame = await openAppProbe(page);
+
+      await goFullscreen(page, frame);
+
+      expect(await frame.evaluate(readFullscreenOutcome)).toBe("BODY");
+      expect(await page.evaluate(isPageFullscreen)).toBe(true);
+    });
+
+    test("Opening another mod leaves fullscreen", async function leavesFullscreen({
+      page,
+    }): Promise<void> {
+      const frame = await openAppProbe(page, OPEN_ANY_SITE_LINES);
+      await goFullscreen(page, frame);
+      expect(await frame.evaluate(readFullscreenOutcome)).toBe("BODY");
+
+      const answer = await frame.evaluate(requestFromProbe, [
+        "mods.open",
+        { mod: "mod_viewer" },
+      ]);
+
+      expect(answer).toEqual({ result: null });
+      await expect(stageBar(page)).toContainText("Mod Viewer");
+      await expect.poll(readPageFullscreen.bind(undefined, page)).toBe(false);
+    });
+  },
+);
+
+function readPageFullscreen(page: Page): Promise<boolean> {
+  return page.evaluate(isPageFullscreen);
+}
+
+test.describe(
+  "Assets next to the mod",
+  { tag: "@frames" },
+  function describeAssets(): void {
+    test("Asset of a mod from the app's origin", async function loadsAppAsset({
+      page,
+    }): Promise<void> {
+      const seenUrls = await serveAppOriginMod(page, {
+        ...buildProbeFiles("probe"),
+        "probe/icon.svg": ICON_SVG,
+      });
+      await page.goto(APP_PROBE_LINK);
+      const frame = await findModFrame(page, "probe");
+      await waitForProbe(frame);
+      const appOrigin = new URL(page.url()).origin;
+
+      const asset = await frame.evaluate(showAssetNextToMod, "./icon.svg");
+
+      expect(asset).toEqual({
+        url: `${appOrigin}/test-mods/probe/icon.svg`,
+        loaded: true,
+      });
+      expect(seenUrls).toContain(`${appOrigin}/test-mods/probe/icon.svg`);
+      await expectNoIssues(page);
+    });
+
+    test("Asset of a mod from another origin", async function loadsForeignAsset({
+      page,
+    }): Promise<void> {
+      const seenUrls = await serveForeignMod(page, {
+        ...buildProbeFiles("probe"),
+        "probe/icon.svg": ICON_SVG,
+      });
+      await page.goto(FOREIGN_PROBE_LINK);
+      const frame = await findModFrame(page, "probe");
+      await waitForProbe(frame);
+
+      const asset = await frame.evaluate(showAssetNextToMod, "./icon.svg");
+
+      expect(asset).toEqual({
+        url: `${FOREIGN_HOST}/probe/icon.svg`,
+        loaded: true,
+      });
+      expect(seenUrls).toContain(`${FOREIGN_HOST}/probe/icon.svg`);
+      await expectNoIssues(page);
+    });
+  },
+);

@@ -1,0 +1,12 @@
+mod:
+  title: "Book List"
+  version: "1.1.0"
+  api: "^0.2.0"
+  description: "A grid of book covers, with a card for each book that shows its details and text."
+  entrypoint: "./main.js"
+  type_path: "./book_type.md"
+  default_mosaic: "./mosaic.yaml"
+  test_path: "./test.js"
+  config:
+    show_covers: true
+    columns: 6

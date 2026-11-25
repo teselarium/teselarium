@@ -1,0 +1,5 @@
+mosaic:
+  title: "Markdown flashcards"
+  description: "The flashcards with their sample deck about markdown."
+  mod: "./"
+  collection: "./flashcard_collection.yaml"

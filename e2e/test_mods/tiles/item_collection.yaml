@@ -1,0 +1,7 @@
+collection:
+  title: "Three items"
+  description: "The collection of the tiles mod's default mosaic."
+  tiles:
+    - path: "./items/first.md"
+    - path: "./items/second.md"
+    - path: "./items/third.md"

@@ -1,0 +1,9 @@
+mosaic:
+  title: "UNESCO World Heritage Sites Example"
+  description: "Eleven UNESCO World Heritage Sites, by their country, with their images and the start of their Wikipedia articles."
+  mod: "./"
+  collection: "./sites/collection.yaml"
+  permissions:
+    show:
+      - host: "https://upload.wikimedia.org"
+        reason: "Shows the sites' images"

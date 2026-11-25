@@ -1,0 +1,8 @@
+# A fixture collection with entry issues for the viewer's tests: an entry with both "path" and "url", and a repeated tile.
+collection:
+  title: "Collection with issues"
+  tiles:
+    - path: "./tiles/2024__han_kang.md"
+    - path: "./tiles/2016__bob_dylan.md"
+      url: "https://example.org/tiles/2016__bob_dylan.md"
+    - path: "./tiles/2024__han_kang.md"

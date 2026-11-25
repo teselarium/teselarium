@@ -1,0 +1,6 @@
+# A fixture mosaic for the viewer's tests, whose collection file does not exist.
+mosaic:
+  title: "Missing collection"
+  description: "A fixture mosaic whose collection answers 404."
+  mod: "./fixture_mod"
+  collection: "./no_such_collection.yaml"

@@ -1,0 +1,196 @@
+import { isYamlMapping } from "../files/index.ts";
+import type { ParsedYaml, YamlMapping, YamlValue } from "../files/index.ts";
+import { ModFormatError } from "./mod_errors.ts";
+import { readModLibraries } from "./mod_libraries.ts";
+import type { LibraryFormat } from "./mod_libraries.ts";
+import { readModPermissions } from "./mod_permissions.ts";
+import type { ModPermission } from "./mod_permissions.ts";
+import validRange from "semver/ranges/valid.js";
+
+/** Whether the mod's frame gets the theme styles (`"default"`) or none (`"none"`). */
+export type ModThemeSetting = "default" | "none";
+
+/** The keys of the `mod` mapping that `readModFormat` reads. Other keys are ignored. */
+export const MOD_FILE_KEYS: readonly string[] = [
+  "version",
+  "entrypoint",
+  "title",
+  "description",
+  "api",
+  "type_path",
+  "default_mosaic",
+  "test_path",
+  "config",
+  "permissions",
+  "theme",
+  "libraries",
+];
+
+/** The checked content of a mod file. Paths are not resolved yet. */
+export interface ModFormat {
+  title: string;
+  version: string;
+  /** The mod API range the mod was written for, as written, or `null`. */
+  api: string | null;
+  description: string;
+  entrypoint: string;
+  typePath: string | null;
+  defaultMosaic: string | null;
+  testPath: string | null;
+  config: YamlMapping;
+  permissions: ModPermission[];
+  theme: ModThemeSetting;
+  /** The declared libraries, in the order of the file. */
+  libraries: LibraryFormat[];
+}
+
+function readModMapping(parsedYaml: ParsedYaml): YamlMapping {
+  const mod = parsedYaml.content.mod;
+  if (!isYamlMapping(mod)) {
+    throw new ModFormatError(parsedYaml.source, 'a "mod" mapping is required');
+  }
+  return mod;
+}
+
+function isNonEmptyString(value: YamlValue | undefined): value is string {
+  return typeof value === "string" && value !== "";
+}
+
+function readRequiredText(
+  mod: YamlMapping,
+  fieldName: string,
+  source: string,
+): string {
+  const value = mod[fieldName];
+  if (!isNonEmptyString(value)) {
+    throw new ModFormatError(
+      source,
+      `"${fieldName}" must be a non-empty string`,
+    );
+  }
+  return value;
+}
+
+function readOptionalText(
+  mod: YamlMapping,
+  fieldName: string,
+  defaultText: string,
+  source: string,
+): string {
+  const value = mod[fieldName];
+  if (value === undefined) {
+    return defaultText;
+  }
+  if (typeof value !== "string") {
+    throw new ModFormatError(source, `"${fieldName}" must be a string`);
+  }
+  return value;
+}
+
+function readOptionalPath(
+  mod: YamlMapping,
+  fieldName: string,
+  source: string,
+): string | null {
+  if (mod[fieldName] === undefined) {
+    return null;
+  }
+  return readRequiredText(mod, fieldName, source);
+}
+
+function readModConfig(mod: YamlMapping, source: string): YamlMapping {
+  const config = mod.config;
+  if (config === undefined) {
+    const emptyConfig: YamlMapping = {};
+    return emptyConfig;
+  }
+  if (!isYamlMapping(config)) {
+    throw new ModFormatError(source, '"config" must be a mapping');
+  }
+  return config;
+}
+
+/** Reads `theme`: missing gives `"default"`, and only `"default"` and `"none"` are accepted. */
+function readModTheme(mod: YamlMapping, source: string): ModThemeSetting {
+  const theme = mod.theme;
+  if (theme === undefined) {
+    return "default";
+  }
+  if (theme !== "default" && theme !== "none") {
+    throw new ModFormatError(source, '"theme" must be "default" or "none"');
+  }
+  return theme;
+}
+
+/**
+ * Reads `api`: missing gives `null`, and anything else must be a non-empty
+ * semver range in npm's syntax. `validRange` takes blank text as `*`, so blank
+ * text is refused first.
+ */
+function readModApiRange(mod: YamlMapping, source: string): string | null {
+  const api = mod.api;
+  if (api === undefined) {
+    return null;
+  }
+  if (
+    typeof api !== "string" ||
+    api.trim() === "" ||
+    validRange(api) === null
+  ) {
+    throw new ModFormatError(
+      source,
+      '"api" must be a semver range, such as "^0.1.0"',
+    );
+  }
+  return api;
+}
+
+function checkNoInlineSchema(mod: YamlMapping, source: string): void {
+  if (Object.hasOwn(mod, "schema")) {
+    throw new ModFormatError(
+      source,
+      'inline "schema" is not supported yet, use "type_path" with the path of a tile type file',
+    );
+  }
+}
+
+/**
+ * Checks the structure of a parsed mod file: a `mod` mapping with non-empty
+ * string `title`, `version` and `entrypoint`, an optional string
+ * `description` (defaults to `""`), an optional `api` semver range, optional
+ * non-empty `type_path`, `default_mosaic` and `test_path`, an optional
+ * `config` mapping, optional `permissions`, an optional `theme`
+ * (`"default"` or `"none"`) and optional `libraries`. These keys are listed in `MOD_FILE_KEYS`. Other
+ * keys are ignored, the former `name` and `sample_collection` included, and
+ * an inline `schema` is rejected. Raises
+ * `ModFormatError` at the first failure.
+ */
+export function readModFormat(parsedYaml: ParsedYaml): ModFormat {
+  const source = parsedYaml.source;
+  const mod = readModMapping(parsedYaml);
+  const title = readRequiredText(mod, "title", source);
+  const version = readRequiredText(mod, "version", source);
+  const entrypoint = readRequiredText(mod, "entrypoint", source);
+  const description = readOptionalText(mod, "description", "", source);
+  const api = readModApiRange(mod, source);
+  const typePath = readOptionalPath(mod, "type_path", source);
+  const defaultMosaic = readOptionalPath(mod, "default_mosaic", source);
+  const testPath = readOptionalPath(mod, "test_path", source);
+  const config = readModConfig(mod, source);
+  checkNoInlineSchema(mod, source);
+  const modFormat: ModFormat = {
+    title,
+    version,
+    api,
+    description,
+    entrypoint,
+    typePath,
+    defaultMosaic,
+    testPath,
+    config,
+    permissions: readModPermissions(mod.permissions, source),
+    theme: readModTheme(mod, source),
+    libraries: readModLibraries(mod.libraries, source),
+  };
+  return modFormat;
+}

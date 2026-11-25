@@ -1,0 +1,6 @@
+# A fixture mod for the viewer's tests, with no API range and no default mosaic.
+mod:
+  title: "No Range"
+  version: "1.0.0"
+  description: "A fixture mod that declares no API range."
+  entrypoint: "./main.js"

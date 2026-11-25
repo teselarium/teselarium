@@ -1,0 +1,8 @@
+# A fixture collection for the explorer's tests (test/explorer_cases.ts), which only inspect it: its tiles are never requested.
+collection:
+  title: "Listed collection"
+  description: "A fixture collection that the explorer's tests list."
+  tiles:
+    - path: "./tiles/first.md"
+    - path: "./tiles/second.md"
+    - path: "./tiles/third.md"
