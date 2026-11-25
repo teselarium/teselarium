@@ -73,7 +73,7 @@ How you share depends on what you made.
 3. Share a link like this one, with the address of your file:
 
 ```
-https://DEMO_URL/#/run?mosaic=https://example.org/my_mosaic.yaml
+https://teselarium.com/#/run?mosaic=https://example.org/my_mosaic.yaml
 ```
 
 <details>

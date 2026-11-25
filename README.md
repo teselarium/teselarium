@@ -7,7 +7,7 @@ Bring your notes. Choose a visualization. Share the result with a link.
 Teselarium runs as static files. No server, no account.
 
 > Teselarium is in an early phase of its development (version 0.x) and some features are not ready yet. See [What works today](#what-works-today).
-> Live demo: https://DEMO_URL
+> Live demo: https://teselarium.com
 
 ## How it works
 
