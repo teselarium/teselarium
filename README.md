@@ -52,3 +52,7 @@ Teselarium can also works locally importing files from your computer.
 Issues and feedback are welcome.
 
 Code contributions are closed for now, while the project takes shape.
+
+## License
+
+Teselarium is free software under the GNU Lesser General Public License, version 3 or (at your option) any later version (`LGPL-3.0-or-later`). The license texts, the LGPL followed by the GPL it builds on, are in [LICENSE](LICENSE).
